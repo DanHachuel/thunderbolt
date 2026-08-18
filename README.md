@@ -17,7 +17,7 @@ A primeira versão implementa a camada UI independente com:
 | Vídeos | Filtro por estado e controlos iniciar/parar |
 | Upload | Destinos YouTube/TikTok e diagnóstico do TikTok |
 | Configurações | Caminhos locais, YouTube API key e credenciais TikTok |
-| Launcher | Execução directa e preparação para futura distribuição via `npx` |
+| Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 Os adaptadores de agentes Hermes, MoneyPrinterTurbo e publicação final em plataformas podem ser ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
@@ -60,6 +60,30 @@ O pacote está publicado no npm como `@danhachuel/content-hermes-ui` e pode ser 
 npx --yes @danhachuel/content-hermes-ui
 ```
 
+Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente virtual, dependências Python do Content-Hermes, dependências Python do MoneyPrinterTurbo, Streamlit e `imageio-ffmpeg` — execute:
+
+```bash
+npx --yes @danhachuel/content-hermes-ui install
+```
+
+Por defeito, o instalador clona o MoneyPrinterTurbo para `~/.content-hermes/MoneyPrinterTurbo`, cria o ambiente em `~/.content-hermes/.venv` e guarda o estado em `~/.content-hermes/storage`. Para usar uma cópia existente do MoneyPrinterTurbo:
+
+```bash
+MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install
+```
+
+Para instalar apenas a UI sem clonar o MoneyPrinterTurbo:
+
+```bash
+npx --yes @danhachuel/content-hermes-ui install --skip-moneyprinter
+```
+
+Para verificar o ambiente sem iniciar a aplicação:
+
+```bash
+npx --yes @danhachuel/content-hermes-ui doctor
+```
+
 Para executar apenas o diagnóstico do ambiente:
 
 ```bash
@@ -73,7 +97,7 @@ npm install --global @danhachuel/content-hermes-ui
 content-hermes
 ```
 
-A execução requer Python 3.11+ e as dependências de `requirements.txt`; o launcher verifica se o Streamlit está instalado antes de iniciar a UI em `localhost:3030`. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
+Após `install`, o launcher usa o ambiente virtual instalado em `~/.content-hermes/.venv` e inicia a UI em `localhost:3030`. O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
 
 ## Armazenamento local
 
