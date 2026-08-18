@@ -1,5 +1,7 @@
 # Content-Hermes UI
 
+> Consulte o [Manual completo de instalação](MANUAL-INSTALACAO.md) antes do primeiro teste local.
+
 UI web local do Content-Hermes Fase 3, baseada no fluxo Streamlit do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). A aplicação organiza canais, blueprints, lotes de vídeos, filas, artefactos e upload em armazenamento local JSON.
 
 ## Estado actual
