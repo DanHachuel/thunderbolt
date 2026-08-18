@@ -3,8 +3,9 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(new URL(".", import.meta.url).pathname, "..");
+const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
 const hermesHome = process.env.HERMES_HOME || join(homedir(), ".content-hermes");
 const venvDir = process.env.HERMES_VENV || join(hermesHome, ".venv");

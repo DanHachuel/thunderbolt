@@ -42,7 +42,35 @@ Instale os seguintes componentes antes de executar o instalador:
 
 A instalação local do MoneyPrinterTurbo recomenda Windows 10+, macOS 11+ ou uma distribuição Linux corrente. Python 3.11 é a opção de referência do projecto base.[1]
 
-### 2.1 Confirmar versões
+### 2.1 Windows: PowerShell bloqueia npx.ps1
+
+Em algumas instalações Windows, o PowerShell bloqueia o wrapper `npx.ps1` por causa da política de execução de scripts. Nesse caso, use `npx.cmd`, que executa o mesmo npm/npx sem depender do wrapper PowerShell:
+
+```powershell
+npx.cmd --yes @danhachuel/content-hermes-ui install
+npx.cmd --yes @danhachuel/content-hermes-ui doctor
+npx.cmd --yes @danhachuel/content-hermes-ui
+```
+
+Se preferir corrigir a política para o seu utilizador:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Para permitir apenas durante a sessão actual:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Não é necessário usar `Unrestricted`. Se estiver num terminal MobaXterm ou CMD, também pode executar:
+
+```cmd
+cmd /c npx.cmd --yes @danhachuel/content-hermes-ui install
+```
+
+### 2.2 Confirmar versões
 
 Linux ou macOS:
 

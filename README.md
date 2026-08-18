@@ -99,6 +99,26 @@ npm install --global @danhachuel/content-hermes-ui
 content-hermes
 ```
 
+No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
+
+```powershell
+npx.cmd --yes @danhachuel/content-hermes-ui install
+npx.cmd --yes @danhachuel/content-hermes-ui doctor
+npx.cmd --yes @danhachuel/content-hermes-ui
+```
+
+Como alternativa, pode permitir scripts para o seu utilizador:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Ou apenas para a sessão actual:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
 Após `install`, o launcher usa o ambiente virtual instalado em `~/.content-hermes/.venv` e inicia a UI em `localhost:3030`. O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
 
 ## Armazenamento local
