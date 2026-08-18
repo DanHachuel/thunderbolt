@@ -14,9 +14,9 @@ A instalação assistida cria um ambiente local separado para evitar misturar as
 | Componente | Local ou comportamento padrão |
 |---|---|
 | Python | Python 3.11 ou superior já instalado no sistema |
-| Ambiente virtual | `~/.content-hermes/.venv` |
-| MoneyPrinterTurbo | `~/.content-hermes/MoneyPrinterTurbo` |
-| Storage Content-Hermes | `~/.content-hermes/storage` |
+| Ambiente virtual | `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`) |
+| MoneyPrinterTurbo | `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`) |
+| Storage Content-Hermes | `~/Hermes-UI/storage` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage`) |
 | Dependências Content-Hermes | Instaladas a partir do `requirements.txt` incluído no pacote |
 | Dependências MoneyPrinterTurbo | Instaladas a partir do `requirements.txt` do repositório oficial |
 | Streamlit | Instalado como dependência Python |
@@ -103,12 +103,12 @@ npx --yes @danhachuel/content-hermes-ui install
 O instalador irá:
 
 1. localizar Python 3.11 ou superior;
-2. criar o ambiente virtual `~/.content-hermes/.venv`;
-3. clonar o repositório oficial MoneyPrinterTurbo para `~/.content-hermes/MoneyPrinterTurbo`;
+2. criar o ambiente virtual `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`);
+3. clonar o repositório oficial MoneyPrinterTurbo para `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`);
 4. instalar as dependências do Content-Hermes;
 5. instalar as dependências Python do MoneyPrinterTurbo;
 6. instalar `imageio-ffmpeg` para disponibilizar FFmpeg no ambiente Python;
-7. criar `~/.content-hermes/storage/state/settings.json`;
+7. criar `~/Hermes-UI/storage/state/settings.json` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\state\settings.json`);
 8. registar o caminho local do MoneyPrinterTurbo;
 9. deixar o ambiente pronto para o comando de arranque.
 
@@ -202,7 +202,7 @@ Abra no navegador:
 http://localhost:3030
 ```
 
-O launcher usa o ambiente virtual em `~/.content-hermes/.venv` quando ele existe. Se for necessário executar numa porta diferente:
+O launcher usa o ambiente virtual em `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`) quando ele existe. Se for necessário executar numa porta diferente:
 
 Linux ou macOS:
 
@@ -245,7 +245,7 @@ Instalação assistida:
 content-hermes install
 ```
 
-A instalação global controla apenas o launcher Node.js. O ambiente Python continua a ser criado em `~/.content-hermes/.venv`.
+A instalação global controla apenas o launcher Node.js. O ambiente Python continua a ser criado em `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`).
 
 ## 7. Instalação manual para desenvolvimento
 
@@ -334,7 +334,7 @@ As chaves devem ser inseridas apenas na configuração local. Não as coloque no
 Após iniciar a aplicação, valide o seguinte percurso:
 
 1. **Dashboard:** confirme que a UI abre e mostra o estado local.
-2. **Blueprints:** coloque um JSON em `~/.content-hermes/storage/blueprints/importados/` ou use o carregador da interface.
+2. **Blueprints:** coloque um JSON em `~/Hermes-UI/storage/blueprints/importados/` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
 4. **Canais:** cadastre um canal manualmente ou importe-o depois de configurar a YouTube Data API.
 5. **Novo vídeo:** teste primeiro o modo **Canal específico** e depois os modos de lote.
@@ -451,16 +451,16 @@ Para remover o ambiente e os dados locais:
 Linux ou macOS:
 
 ```bash
-rm -rf ~/.content-hermes
+rm -rf ~/Hermes-UI
 ```
 
 Windows PowerShell:
 
 ```powershell
-Remove-Item -Recurse -Force "$HOME\.content-hermes"
+Remove-Item -Recurse -Force "$HOME\\Hermes-UI"
 ```
 
-> A remoção de `~/.content-hermes` apaga estado JSON, blueprints, configurações e artefactos locais. Faça uma cópia de segurança antes de executar o comando.
+> A remoção de `~/Hermes-UI` (Windows: `C:\Users\<utilizador>\Hermes-UI`) apaga estado JSON, blueprints, configurações e artefactos locais. Faça uma cópia de segurança antes de executar o comando.
 
 ## 12. Segurança
 

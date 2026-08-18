@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
 const home = homedir();
-const hermesHome = process.env.HERMES_HOME || join(home, ".content-hermes");
+const hermesHome = process.env.HERMES_HOME || join(home, "Hermes-UI");
 const venvPath = process.env.HERMES_VENV || join(hermesHome, ".venv");
 const defaultMpt = process.env.MONEYPRINTER_PATH || join(hermesHome, "MoneyPrinterTurbo");
 const pythonBin = platform() === "win32" ? join(venvPath, "Scripts", "python.exe") : join(venvPath, "bin", "python");
