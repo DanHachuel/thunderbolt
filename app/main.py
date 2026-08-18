@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, pipeline_summary, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from integrations.platforms import TikTokAdapter, YouTubeAdapter
 from integrations.local_runtime import LocalRuntime
 
@@ -75,41 +76,95 @@ def render_dashboard():
 def render_blueprints():
     st.title("Blueprints")
     st.caption(f"Biblioteca local lida directamente de `{BLUEPRINTS}`")
-    uploaded = st.file_uploader("Subir novo blueprint JSON", type=["json"], key="blueprint_upload")
-    target_folder = st.selectbox("Pasta", ["importados", "canais", "nichos"])
-    if uploaded and st.button("Guardar blueprint", type="primary"):
-        try:
-            data = json.loads(uploaded.getvalue().decode("utf-8"))
-            if not isinstance(data, dict):
-                raise ValueError("O JSON raiz deve ser um objecto.")
-            safe_name = Path(uploaded.name).stem.replace(" ", "-") + ".json"
-            destination = BLUEPRINTS / target_folder / safe_name
-            if destination.exists() and not st.checkbox("Confirmar substituição", key="confirm_blueprint_replace"):
-                st.warning("O ficheiro já existe. Confirme a substituição.")
-            else:
-                destination.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-                st.success(f"Blueprint guardado em {destination}")
+    blueprint_tab, branding_tab = st.tabs(["Blueprints", "Brandings"])
+    with blueprint_tab:
+        st.subheader("Criar blueprint a partir de link")
+        with st.form("create_blueprint_from_link"):
+            source_url = st.text_input("Link do canal ou vídeo YouTube", placeholder="https://www.youtube.com/@canal ou https://youtu.be/video")
+            channel_name = st.text_input("Nome do canal, se conhecido")
+            niche = st.text_input("Nicho alvo", placeholder="Ex.: filosofia, história, finanças pessoais")
+            language = st.selectbox("Idioma do blueprint", ["Português (pt-BR)", "English", "Español"])
+            creation_type = st.radio("O que deseja criar?", ["Apenas Blueprint", "Blueprint + Branding completo"], horizontal=True)
+            create_submitted = st.form_submit_button("Criar a partir do link", type="primary")
+        if create_submitted:
+            try:
+                blueprint, branding = create_blueprint_from_link(source_url, niche, language, creation_type == "Blueprint + Branding completo", channel_name)
+                blueprint_path, branding_path = save_generated_blueprint(blueprint, branding)
+                st.success(f"Blueprint criado: {blueprint_path.name}")
+                if branding_path:
+                    st.success(f"Branding completo criado: {branding_path.name}")
                 st.rerun()
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-            st.error(f"JSON inválido: {exc}")
-    files = list_blueprint_files()
-    st.subheader(f"Blueprints existentes ({len(files)})")
-    if not files:
-        st.info("Ainda não existem blueprints na pasta local.")
-        return
-    search = st.text_input("Pesquisar")
-    for path in files:
-        if search and search.lower() not in path.name.lower():
-            continue
-        try:
-            data = load_blueprint_file(path)
-            title = data.get("channel_name") or data.get("name") or data.get("title") or path.stem
-            with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}"):
-                st.caption(f"Última alteração: {path.stat().st_mtime_ns}")
-                st.json(data)
-        except Exception as exc:
-            with st.expander(f"Inválido — {path.name}"):
+            except ValueError as exc:
                 st.error(str(exc))
+        st.divider()
+        st.subheader("Importar blueprint JSON")
+        uploaded = st.file_uploader("Subir novo blueprint JSON", type=["json"], key="blueprint_upload")
+        target_folder = st.selectbox("Pasta", ["importados", "canais", "nichos"], key="blueprint_target_folder")
+        if uploaded and st.button("Guardar blueprint JSON", type="secondary"):
+            try:
+                data = json.loads(uploaded.getvalue().decode("utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("O JSON raiz deve ser um objecto.")
+                safe_name = Path(uploaded.name).stem.replace(" ", "-") + ".json"
+                destination = BLUEPRINTS / target_folder / safe_name
+                if destination.exists() and not st.checkbox("Confirmar substituição", key="confirm_blueprint_replace"):
+                    st.warning("O ficheiro já existe. Confirme a substituição.")
+                else:
+                    destination.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    st.success(f"Blueprint guardado em {destination}")
+                    st.rerun()
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                st.error(f"JSON inválido: {exc}")
+        files = list_blueprint_files()
+        st.subheader(f"Blueprints existentes ({len(files)})")
+        search = st.text_input("Pesquisar blueprints", key="blueprint_search")
+        if not files:
+            st.info("Ainda não existem blueprints na pasta local.")
+        for path in files:
+            if search and search.lower() not in path.name.lower():
+                continue
+            try:
+                data = load_blueprint_file(path)
+                title = data.get("channel_name") or data.get("name") or data.get("title") or path.stem
+                with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}"):
+                    st.caption(f"Ficheiro: {path}")
+                    st.json(data)
+            except Exception as exc:
+                with st.expander(f"Inválido — {path.name}"):
+                    st.error(str(exc))
+    with branding_tab:
+        st.subheader("Brandings completos")
+        st.caption(f"Brandings gerados ou importados da pasta `{BLUEPRINTS / 'brandings'}`")
+        branding_upload = st.file_uploader("Subir Branding JSON", type=["json"], key="branding_upload")
+        if branding_upload and st.button("Guardar Branding", type="secondary"):
+            try:
+                data = json.loads(branding_upload.getvalue().decode("utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("O JSON raiz deve ser um objecto.")
+                target = BLUEPRINTS / "brandings" / (Path(branding_upload.name).stem.replace(" ", "-") + ".json")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                st.success(f"Branding guardado em {target}")
+                st.rerun()
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                st.error(f"Branding JSON inválido: {exc}")
+        branding_files = list_branding_files()
+        st.write(f"{len(branding_files)} branding(s) encontrado(s)")
+        branding_search = st.text_input("Pesquisar brandings", key="branding_search")
+        if not branding_files:
+            st.info("Ainda não existem brandings na pasta local.")
+        for path in branding_files:
+            if branding_search and branding_search.lower() not in path.name.lower():
+                continue
+            try:
+                data = load_blueprint_file(path)
+                title = data.get("name") or data.get("identity", {}).get("channel_name") or path.stem
+                with st.expander(f"{title} — {path.name}"):
+                    st.caption(f"Blueprint associado: {data.get('blueprint_id') or 'não associado'}")
+                    st.json(data)
+            except Exception as exc:
+                with st.expander(f"Inválido — {path.name}"):
+                    st.error(str(exc))
 
 
 def render_channels():

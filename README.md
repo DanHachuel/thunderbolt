@@ -10,7 +10,8 @@ A primeira versão implementa a camada UI independente com:
 |---|---|
 | Dashboard | Resumo de canais, tarefas, backlog, execução e falhas |
 | Pipeline | Filas por etapa |
-| Blueprints | Leitura da pasta `storage/blueprints/`, upload e validação de JSON |
+| Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
+| Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Cadastro manual, importação via YouTube Data API quando configurada e edição de dados importados |
 | Novo vídeo | Canal específico, lote no mesmo canal e lote geral |
 | Vídeos | Filtro por estado e controlos iniciar/parar |
@@ -80,9 +81,13 @@ storage/
 
 Para usar outro local, defina `HERMES_STORAGE_DIR`. O estado é escrito de forma atómica e ficheiros JSON inválidos são preservados com cópia `.corrupt-*` antes de serem recriados.
 
-## Blueprints
+## Blueprints e Brandings
 
 Coloque ficheiros `.json` em `storage/blueprints/canais`, `storage/blueprints/nichos` ou `storage/blueprints/importados`. A aba **Blueprints** relê a pasta e mostra o conteúdo estruturado. Também é possível importar através do carregador da própria interface.
+
+A mesma aba possui a subaba **Brandings**. No formulário **Criar blueprint a partir de link**, cole um link de canal, handle ou vídeo do YouTube, informe o nicho e o idioma e escolha entre **Apenas Blueprint** ou **Blueprint + Branding completo**. O primeiro modo grava o blueprint forense local; o segundo grava também um ficheiro de Branding com identidade do canal, handle, descrição, hashtags, keywords, prompts de imagem de perfil e banner, direcção visual de thumbnails, assets e checklist de revisão.
+
+O fluxo foi modelado a partir do blueprint de clonagem com Branding anexado, incluindo a distinção entre entrada de canal/vídeo, normalização do link, metadados de nicho/idioma, perfil do canal, estratégia de conteúdo, pesquisa, identidade visual e brand pack. Placeholders de serviços externos são tratados como configuração local; chaves presentes em workflows importados não devem ser commitadas.
 
 ## Canais YouTube
 

@@ -39,3 +39,25 @@ def test_blueprint_json_is_readable(tmp_path, monkeypatch):
     target = storage.BLUEPRINTS / "importados" / "blueprint.json"
     target.write_text(json.dumps({"name": "Teste", "unknown_field": {"keep": True}}), encoding="utf-8")
     assert storage.load_blueprint_file(target)["unknown_field"]["keep"] is True
+
+
+def test_blueprint_creation_modes(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import blueprints, storage
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+
+    blueprint, branding = blueprints.create_blueprint_from_link("https://youtu.be/abc123", "história", "Português (pt-BR)", False)
+    assert blueprint["metadata"]["input_type"] == "video"
+    assert branding is None
+    blueprint_path, branding_path = blueprints.save_generated_blueprint(blueprint)
+    assert blueprint_path.exists()
+    assert branding_path is None
+
+    blueprint2, branding2 = blueprints.create_blueprint_from_link("https://www.youtube.com/@canal", "filosofia", "Português (pt-BR)", True)
+    assert branding2 is not None
+    _, branding_path2 = blueprints.save_generated_blueprint(blueprint2, branding2)
+    assert branding_path2 is not None and branding_path2.exists()
+    assert len(blueprints.list_branding_files()) == 1
