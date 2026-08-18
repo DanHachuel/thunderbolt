@@ -33,10 +33,11 @@ Instale os seguintes componentes antes de executar o instalador:
 
 | Pré-requisito | Necessário | Observação |
 |---|---:|---|
-| Node.js 18+ | Sim | Necessário para executar o pacote via `npx` |
+| Python 3.11+ | Sim | No Windows, o instalador tenta instalar automaticamente via winget; noutros sistemas deve estar instalado |
 | npm | Sim | Normalmente vem incluído com Node.js |
-| Python 3.11+ | Sim | O instalador detecta `python3.11`, `python3` ou `python` |
+| Node.js 18+ | Sim | Necessário para executar o pacote via `npx` |
 | Git | Sim para instalação automática do MoneyPrinterTurbo | Pode ser evitado usando `--skip-moneyprinter` ou `MONEYPRINTER_PATH` |
+| winget | Recomendado no Windows | Permite ao instalador instalar Python 3.11 automaticamente; vem normalmente com Windows 10/11 actualizado |
 | Internet | Sim durante a instalação | Necessária para npm, GitHub e PyPI |
 | Espaço em disco | Recomendado 5 GB ou mais | Dependências, caches, modelos e artefactos podem ocupar espaço adicional |
 
@@ -90,7 +91,7 @@ py --version
 git --version
 ```
 
-O Python deve apresentar a versão `3.11` ou superior. Se o sistema não tiver Python, instale-o a partir de [python.org](https://www.python.org/downloads/) ou do gestor de pacotes da sua distribuição.
+O Python deve apresentar a versão `3.11` ou superior. Se estiver no Windows sem Python, o instalador tenta executar automaticamente `winget install --exact --id Python.Python.3.11`. Se `winget` não estiver disponível, instale o App Installer/Microsoft Store ou Python a partir de [python.org](https://www.python.org/downloads/windows/) e repita a instalação. Em macOS/Linux, o instalador não assume permissões administrativas para instalar Python no sistema; instale-o pelo gestor de pacotes ou use `HERMES_PYTHON`.
 
 ## 3. Instalação recomendada via npx
 
@@ -102,15 +103,18 @@ npx --yes @danhachuel/content-hermes-ui install
 
 O instalador irá:
 
-1. localizar Python 3.11 ou superior;
-2. criar o ambiente virtual `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`);
-3. clonar o repositório oficial MoneyPrinterTurbo para `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`);
-4. instalar as dependências do Content-Hermes;
-5. instalar as dependências Python do MoneyPrinterTurbo;
-6. instalar `imageio-ffmpeg` para disponibilizar FFmpeg no ambiente Python;
-7. criar `~/Hermes-UI/storage/state/settings.json` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\state\settings.json`);
-8. registar o caminho local do MoneyPrinterTurbo;
-9. deixar o ambiente pronto para o comando de arranque.
+1. procurar Python 3.11 ou superior;
+2. se estiver no Windows e Python não existir, instalar Python 3.11 automaticamente pelo `winget`;
+3. criar o ambiente virtual `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`);
+4. clonar o repositório oficial MoneyPrinterTurbo para `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`);
+5. instalar as dependências do Content-Hermes;
+6. instalar as dependências Python do MoneyPrinterTurbo;
+7. instalar `imageio-ffmpeg` para disponibilizar FFmpeg no ambiente Python;
+8. criar `~/Hermes-UI/storage/state/settings.json` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\state\settings.json`);
+9. registar o caminho local do MoneyPrinterTurbo;
+10. deixar o ambiente pronto para o comando de arranque.
+
+No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente.
 
 A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo.
 

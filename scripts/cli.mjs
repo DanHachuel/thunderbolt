@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
-const hermesHome = process.env.HERMES_HOME || join(homedir(), "Hermes-UI");
+const userHome = platform() === "win32" ? (process.env.USERPROFILE || homedir()) : homedir();
+const hermesHome = process.env.HERMES_HOME || join(userHome, "Hermes-UI");
 const venvDir = process.env.HERMES_VENV || join(hermesHome, ".venv");
 const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 const python = process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));

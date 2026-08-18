@@ -68,7 +68,7 @@ Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente vir
 npx --yes @danhachuel/content-hermes-ui install
 ```
 
-Por defeito, o instalador cria a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. Para usar uma cópia existente do MoneyPrinterTurbo:
+Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. Para usar uma cópia existente do MoneyPrinterTurbo:
 
 ```bash
 MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install
@@ -119,7 +119,7 @@ Ou apenas para a sessão actual:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Após `install`, o launcher usa o ambiente virtual instalado em `~/Hermes-UI/.venv` — no Windows, `C:\Users\<utilizador>\Hermes-UI\.venv` — e inicia a UI em `localhost:3030`. O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
+Após `install`, o launcher usa o ambiente virtual instalado em `~/Hermes-UI/.venv` — no Windows, `C:\Users\<utilizador>\Hermes-UI\.venv` — e inicia a UI em `localhost:3030`. No Windows, a raiz é obtida por `USERPROFILE`, evitando a redirecção de `HOME` que pode ocorrer no MobaXterm. O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
 
 ## Armazenamento local
 
