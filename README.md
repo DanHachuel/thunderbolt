@@ -54,13 +54,26 @@ node scripts/cli.mjs --check
 node scripts/cli.mjs
 ```
 
-O launcher também está preparado para um futuro pacote npm:
+O pacote está publicado no npm como `@danhachuel/content-hermes-ui` e pode ser executado directamente via `npx`:
 
 ```bash
-npx --yes ./
+npx --yes @danhachuel/content-hermes-ui
 ```
 
-A publicação no npm não faz parte desta fase.
+Para executar apenas o diagnóstico do ambiente:
+
+```bash
+npx --yes --package=@danhachuel/content-hermes-ui content-hermes --check
+```
+
+Para instalar globalmente e disponibilizar o comando `content-hermes`:
+
+```bash
+npm install --global @danhachuel/content-hermes-ui
+content-hermes
+```
+
+A execução requer Python 3.11+ e as dependências de `requirements.txt`; o launcher verifica se o Streamlit está instalado antes de iniciar a UI em `localhost:3030`. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
 
 ## Armazenamento local
 
