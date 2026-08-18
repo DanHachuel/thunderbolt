@@ -1,15 +1,29 @@
 {
-  "name": "content-hermes-ui",
+  "name": "@danhachuel/content-hermes-ui",
   "version": "0.1.0",
   "description": "UI local do Content-Hermes baseada no MoneyPrinterTurbo",
-  "private": true,
+  "main": "scripts/cli.mjs",
   "type": "module",
   "bin": {
     "content-hermes": "scripts/cli.mjs"
   },
+  "files": [
+    "app/main.py",
+    "hermes_ui/*.py",
+    "integrations/*.py",
+    "scripts/cli.mjs",
+    "storage/blueprints/**/*.json",
+    "README.md",
+    "requirements.txt",
+    "package.json"
+  ],
   "scripts": {
     "start": "node scripts/cli.mjs",
-    "check": "node scripts/cli.mjs --check"
+    "check": "node scripts/cli.mjs --check",
+    "pack:check": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"

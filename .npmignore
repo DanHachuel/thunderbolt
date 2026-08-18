@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.npmignore
+__pycache__/
+*.py[cod]
+.pytest_cache/
+tests/
+docs/
+storage/state/
+storage/artifacts/
+storage/videos/
+storage/scripts/
+storage/thumbnails/
+storage/brand/
+.env
+.env.*
+!.env.example

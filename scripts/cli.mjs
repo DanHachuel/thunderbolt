@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const root = resolve(new URL("..", import.meta.url).pathname, "..");
+const root = resolve(new URL(".", import.meta.url).pathname, "..");
 const args = process.argv.slice(2);
 const python = process.env.HERMES_PYTHON || (process.platform === "win32" ? "python" : "python3");
 const main = resolve(root, "app", "main.py");
