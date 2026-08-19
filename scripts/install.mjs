@@ -50,28 +50,65 @@ function ensureDirs() {
   mkdirSync(join(hermesHome, "storage"), { recursive: true });
 }
 
-function resetInstallationRoots() {
+function knownLegacyRoots() {
   const userProfile = process.env.USERPROFILE || home;
   const localAppData = process.env.LOCALAPPDATA || join(userProfile, "AppData", "Local");
-  const candidates = [
-    hermesHome,
+  const roots = [
     join(localAppData, "hermes"),
     join(localAppData, "Hermes-UI"),
     join(userProfile, ".content-hermes"),
     join(userProfile, "hermes"),
   ];
-  const uniqueCandidates = [...new Set(candidates.map((candidate) => resolve(candidate)))];
-  for (const candidate of uniqueCandidates) {
-    if (!existsSync(candidate)) continue;
-    console.log(`A apagar instalação anterior: ${candidate}`);
-    try {
-      rmSync(candidate, { recursive: true, force: true });
-    } catch (error) {
-      console.error(`Não foi possível apagar ${candidate}: ${error.message}`);
-      console.error("Feche processos Hermes/Node/Python que estejam a usar a pasta e execute novamente.");
-      process.exit(1);
+  return [...new Set(roots.map((candidate) => resolve(candidate)))].filter((candidate) => resolve(candidate) !== resolve(hermesHome));
+}
+
+function removePath(path) {
+  if (!existsSync(path)) return;
+  console.log(`A remover componente técnico: ${path}`);
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch (error) {
+    console.error(`Não foi possível remover ${path}: ${error.message}`);
+    console.error("Feche processos Hermes/Node/Python que estejam a usar a pasta e execute novamente.");
+    process.exit(1);
+  }
+}
+
+function containsUserData(path) {
+  return [
+    join(path, "storage", "blueprints"),
+    join(path, "storage", "brandings"),
+    join(path, "storage", "state"),
+  ].some((candidate) => existsSync(candidate));
+}
+
+function cleanInstallationRoots(moneyprinterPath) {
+  const purgeData = args.includes("--purge-data");
+  if (purgeData) {
+    console.warn("ATENÇÃO: --purge-data apaga Blueprints, Brandings, configurações, storage e artefactos locais.");
+    removePath(hermesHome);
+    for (const legacyRoot of knownLegacyRoots()) removePath(legacyRoot);
+    return;
+  }
+
+  // Actualizações normais preservam storage, Blueprints, Brandings, configurações e artefactos.
+  removePath(venvPath);
+  const defaultMptInsideRoot = resolve(moneyprinterPath).startsWith(resolve(hermesHome) + requireSeparator());
+  if (defaultMptInsideRoot) removePath(moneyprinterPath);
+
+  // A tentativa antiga sem dados do utilizador é lixo técnico e pode ser removida.
+  for (const legacyRoot of knownLegacyRoots()) {
+    if (!existsSync(legacyRoot)) continue;
+    if (containsUserData(legacyRoot)) {
+      console.warn(`Instalação antiga com dados do utilizador preservada para revisão manual: ${legacyRoot}`);
+    } else {
+      removePath(legacyRoot);
     }
   }
+}
+
+function requireSeparator() {
+  return platform() === "win32" ? "\\\\" : "/";
 }
 
 function installPythonWindows() {
@@ -152,7 +189,7 @@ function main() {
   const skipMpt = args.includes("--skip-moneyprinter");
   const skipDeps = args.includes("--skip-python-deps");
   const moneyprinterPath = process.env.MONEYPRINTER_PATH || defaultMpt;
-  resetInstallationRoots();
+  cleanInstallationRoots(moneyprinterPath);
   ensureDirs();
   const python = skipDeps ? null : ensurePython();
   if (!skipDeps) installContentHermesDependencies(python);

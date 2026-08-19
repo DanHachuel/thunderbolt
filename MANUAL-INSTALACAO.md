@@ -100,16 +100,24 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.5 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.7 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui@0.2.5 install
+npx --yes @danhachuel/content-hermes-ui@0.2.7 install
 ```
 
-A instalação faz uma **reinstalação limpa e destrutiva**: antes de instalar, apaga a pasta `Hermes-UI` e as instalações antigas conhecidas, incluindo `C:\Users\<utilizador>\AppData\Local\hermes`. Não migra nem copia ficheiros antigos; o MoneyPrinterTurbo, o ambiente virtual, as dependências e o storage são criados novamente do zero. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar essas pastas antes de executar.
+A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
+
+Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
+
+```powershell
+npx.cmd --yes --prefer-online @danhachuel/content-hermes-ui@VERSAO install --purge-data
+```
+
+O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
 
 O instalador irá:
 
@@ -124,7 +132,7 @@ O instalador irá:
 9. registar o caminho local do MoneyPrinterTurbo;
 10. deixar o ambiente pronto para o comando de arranque.
 
-No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. A limpeza faz parte do instalador e não é desactivada pelo fluxo normal.
+No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. O fluxo normal preserva os dados; somente `--purge-data` activa a limpeza destrutiva.
 
 A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo.
 

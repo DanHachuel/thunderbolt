@@ -1,6 +1,6 @@
 {
   "name": "@danhachuel/content-hermes-ui",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "UI local do Content-Hermes baseada no MoneyPrinterTurbo",
   "main": "scripts/cli.mjs",
   "type": "module",
