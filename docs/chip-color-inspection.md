@@ -1,6 +1,8 @@
 
-## Verificação final do selector
+## Smoke test da restauração
 
-O dropdown continua a apresentar exactamente `YouTube`, `TikTok`, `Instagram` e `Facebook Pages`. O estilo BaseWeb pode ser escondido sem remover as opções; os badges identitários gerados pelo Thunderbolt passam a ser a única representação visual das cores.
+A UI 0.2.21 iniciou em `http://127.0.0.1:3035` e carregou a navegação sem erro. O código agora usa novamente o `st.multiselect` original, sem marcador externo nem badges separados; os chips são estilizados dentro do próprio campo por `:has(button[aria-label*=...])`.
 
-A selecção automática de opções do componente BaseWeb não persistiu através de `browser_click`/`browser_select_option`; isto é uma limitação da automação do widget, não da UI. A estrutura e o código dos badges foram validados; a cor é definida directamente por `chip_colors[item]`, não por índice.
+## Smoke test do widget compacto
+
+Na UI 0.2.21, a página Upload voltou a mostrar o chip `YouTube` dentro do próprio campo `Destinos`, com botão de remoção e botão de abertura do dropdown. O layout não mostra badges/lista externa. O dropdown BaseWeb continua a ser a fonte das opções, enquanto o CSS usa `:has(button[aria-label*=...])` para aplicar a cor de cada plataforma.
