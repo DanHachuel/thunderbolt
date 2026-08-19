@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -7,6 +8,102 @@ from pathlib import Path
 from typing import Any
 
 import requests
+
+
+def _extract_json_assignment(document: str, variable: str) -> dict[str, Any] | None:
+    marker = re.search(rf"(?:var\s+)?{re.escape(variable)}\s*=", document)
+    if not marker:
+        return None
+    start = document.find("{", marker.end())
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(document)):
+        character = document[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    parsed = json.loads(document[start:index + 1])
+                except json.JSONDecodeError:
+                    return None
+                return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def _find_first_key(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        if key in value:
+            return value[key]
+        for child in value.values():
+            found = _find_first_key(child, key)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_first_key(child, key)
+            if found is not None:
+                return found
+    return None
+
+
+def _text_from_node(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        for key in ("simpleText", "content", "text"):
+            if isinstance(value.get(key), str):
+                return value[key].strip()
+        runs = value.get("runs")
+        if isinstance(runs, list):
+            return "".join(str(run.get("text", "")) for run in runs if isinstance(run, dict)).strip()
+    return ""
+
+
+def _parse_public_count(value: Any) -> int | None:
+    text = _text_from_node(value).lower().replace(" ", "")
+    if not text:
+        return None
+    match = re.search(r"([0-9][0-9.,]*)(mil|milhões|mi|bi|[kmb])?", text)
+    if not match:
+        return None
+    number = match.group(1)
+    suffix = match.group(2) or ""
+    if suffix == "milhões":
+        suffix = "m"
+    try:
+        if suffix in {"k", "mil"}:
+            return int(float(number.replace(",", ".")) * 1_000)
+        if suffix in {"m", "mi"}:
+            return int(float(number.replace(",", ".")) * 1_000_000)
+        if suffix == "b":
+            return int(float(number.replace(",", ".")) * 1_000_000_000)
+        return int(re.sub(r"[^0-9]", "", number))
+    except ValueError:
+        return None
+
+
+def _thumbnail_from_metadata(metadata: dict[str, Any]) -> str:
+    thumbnails = metadata.get("avatar", {}).get("thumbnails", []) if isinstance(metadata, dict) else []
+    if isinstance(thumbnails, list) and thumbnails:
+        last = thumbnails[-1]
+        if isinstance(last, dict):
+            return str(last.get("url", ""))
+    return ""
 
 
 @dataclass
@@ -17,14 +114,81 @@ class IntegrationResult:
 
 
 class YouTubeAdapter:
-    def __init__(self, api_key: str = ""):
-        self.api_key = api_key or os.getenv("YOUTUBE_API_KEY", "")
+    def __init__(self, api_key: str = "", settings: dict[str, Any] | None = None):
+        self.settings = settings or {}
+        self.api_key = api_key or self.settings.get("youtube_api_key", "") or os.getenv("YOUTUBE_API_KEY", "")
 
     @staticmethod
     def extract_channel_ref(value: str) -> str:
         value = value.strip()
         match = re.search(r"(?:channel/|@)([A-Za-z0-9_.-]+)", value)
         return match.group(1) if match else value
+
+    def fetch_channel_public(self, value: str) -> IntegrationResult:
+        """Fetch public channel metadata from YouTube HTML without an API key."""
+        source = (value or "").strip()
+        if not source:
+            return IntegrationResult(False, "Introduza o nome, handle, URL ou ID do canal.", {})
+        try:
+            if source.startswith("http://") or source.startswith("https://"):
+                page_url = source.rstrip("/")
+            elif source.startswith("UC"):
+                page_url = f"https://www.youtube.com/channel/{source}"
+            else:
+                handle = source if source.startswith("@") else f"@{source}"
+                page_url = f"https://www.youtube.com/{handle}"
+            if not page_url.endswith("/about"):
+                page_url = f"{page_url}/about"
+            response = requests.get(
+                page_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+                    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            document = response.text
+            initial_data = _extract_json_assignment(document, "ytInitialData")
+            metadata = _find_first_key(initial_data or {}, "channelMetadataRenderer") or {}
+            header = _find_first_key(initial_data or {}, "pageHeaderViewModel") or {}
+            if not metadata and not header:
+                return IntegrationResult(False, "O YouTube não disponibilizou dados públicos para este canal. Confirme o link ou tente a aba Cadastro manual.", {"url": page_url})
+            owner_urls = metadata.get("ownerUrls", []) if isinstance(metadata, dict) else []
+            canonical_url = owner_urls[0] if owner_urls else page_url.removesuffix("/about")
+            canonical_url = canonical_url.replace("http://", "https://")
+            handle_match = re.search(r"/@([^/?]+)", canonical_url)
+            handle = f"@{handle_match.group(1)}" if handle_match else ""
+            title = _text_from_node(metadata.get("title")) if isinstance(metadata, dict) else ""
+            if not title and isinstance(header, dict):
+                title = _text_from_node(header.get("title"))
+                if not title:
+                    title = _text_from_node(_find_first_key(header, "dynamicTextViewModel"))
+            description = _text_from_node(metadata.get("description")) if isinstance(metadata, dict) else ""
+            youtube_id = str(metadata.get("externalId", "")) if isinstance(metadata, dict) else ""
+            if not youtube_id:
+                id_match = re.search(r"/channel/(UC[A-Za-z0-9_-]+)", canonical_url)
+                youtube_id = id_match.group(1) if id_match else ""
+            subscriber_value = _find_first_key(initial_data or {}, "subscriberCountText")
+            video_value = _find_first_key(initial_data or {}, "videoCountText")
+            data = {
+                "youtube_id": youtube_id,
+                "name": title,
+                "handle": handle,
+                "url": canonical_url,
+                "description": description,
+                "thumbnail_url": _thumbnail_from_metadata(metadata),
+                "subscriber_count": _parse_public_count(subscriber_value),
+                "video_count": _parse_public_count(video_value),
+                "view_count": None,
+                "metrics_source": "youtube_public_page",
+                "public_lookup": True,
+            }
+            return IntegrationResult(True, "Canal encontrado publicamente no YouTube, sem API Key. Reveja os dados antes de guardar.", data)
+        except requests.RequestException as exc:
+            return IntegrationResult(False, f"Não foi possível consultar a página pública do YouTube: {exc}", {"url": source})
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            return IntegrationResult(False, f"A página pública do YouTube mudou ou não pôde ser interpretada: {exc}", {"url": source})
 
     def fetch_channel(self, value: str) -> IntegrationResult:
         ref = self.extract_channel_ref(value)
@@ -58,6 +222,36 @@ class YouTubeAdapter:
             return IntegrationResult(True, "Canal importado do YouTube.", data)
         except requests.RequestException as exc:
             return IntegrationResult(False, f"Falha ao consultar o YouTube: {exc}", {})
+
+    def upload_video(self, video_path: str, **kwargs: Any) -> IntegrationResult:
+        """Publish through the adapted youtube-automation-agent, then OAuth fallback."""
+        from integrations.youtube_upload import upload_youtube_with_fallback
+        from hermes_ui.storage import STORAGE
+
+        return upload_youtube_with_fallback(
+            self.settings,
+            STORAGE,
+            video_path=video_path,
+            **kwargs,
+        )
+
+    def upload_status(self) -> dict[str, IntegrationResult]:
+        from integrations.youtube_upload import youtube_upload_status
+        from hermes_ui.storage import STORAGE
+
+        return youtube_upload_status(self.settings, STORAGE)
+
+    def authorize_agent(self) -> IntegrationResult:
+        from integrations.youtube_upload import authorize_youtube_agent
+        from hermes_ui.storage import STORAGE
+
+        return authorize_youtube_agent(self.settings, STORAGE)
+
+    def authorize_fallback(self) -> IntegrationResult:
+        from integrations.youtube_upload import authorize_youtube_fallback
+        from hermes_ui.storage import STORAGE
+
+        return authorize_youtube_fallback(self.settings, STORAGE)
 
 
 class TikTokAdapter:

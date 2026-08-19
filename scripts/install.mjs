@@ -287,7 +287,7 @@ function writeSettings(moneyprinterPath) {
 
 function installThunderboltDependencies(python) {
   if (!existsSync(pythonBin)) run(python.command, [...python.args, "-m", "venv", venvPath]);
-  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg"], "Thunderbolt");
+  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "google.auth", "google_auth_oauthlib", "googleapiclient"], "Thunderbolt");
 }
 
 function installMoneyPrinterDependencies(moneyprinterPath) {

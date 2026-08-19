@@ -18,7 +18,7 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
-from integrations.platforms import TikTokAdapter, YouTubeAdapter
+from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 
@@ -194,38 +194,107 @@ def render_blueprints():
 
 def render_channels():
     st.title("Canais")
-    st.caption("Importação do YouTube com edição manual e armazenamento local")
-    with st.expander("Criar ou importar novo canal", expanded=True):
-        source = st.text_input("Nome, URL, handle ou ID do canal", placeholder="https://youtube.com/@seucanal")
+    st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
+    settings = read_json("settings.json", {})
+    youtube = YouTubeAdapter(settings=settings)
+    import_tab, manual_tab = st.tabs(["Importar do YouTube", "Cadastro manual"])
+
+    with import_tab:
+        st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
+        source = st.text_input("URL, handle ou ID do canal", placeholder="https://youtube.com/@seucanal", key="youtube_channel_source")
+        lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("Buscar no YouTube", type="primary", use_container_width=True):
-                result = YouTubeAdapter(read_json("settings.json", {}).get("youtube_api_key", "")).fetch_channel(source)
+            if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
+                if lookup_mode.startswith("Página pública"):
+                    result = youtube.fetch_channel_public(source)
+                elif not youtube.api_key:
+                    result = IntegrationResult(False, "A YouTube Data API Key não está configurada. Escolha a opção Página pública — sem API Key ou configure a chave em Configurações.", {"status": "api_key_not_configured"})
+                else:
+                    result = youtube.fetch_channel(source)
                 st.session_state["yt_import"] = result.data
                 st.session_state["yt_message"] = result.message
                 st.session_state["yt_ok"] = result.ok
         with col2:
-            if st.button("Limpar importação", use_container_width=True):
-                st.session_state.pop("yt_import", None)
+            if st.button("Limpar importação", use_container_width=True, key="youtube_channel_clear"):
+                for key in ("yt_import", "yt_message", "yt_ok"):
+                    st.session_state.pop(key, None)
+                st.rerun()
         if st.session_state.get("yt_message"):
             (st.success if st.session_state.get("yt_ok") else st.warning)(st.session_state["yt_message"])
         imported = st.session_state.get("yt_import", {})
-        with st.form("channel_form"):
-            name = st.text_input("Nome do canal", value=imported.get("name", ""))
-            url = st.text_input("URL", value=source if source.startswith("http") else imported.get("url", ""))
-            handle = st.text_input("Handle", value=imported.get("handle", ""))
-            language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0)
-            style = st.selectbox("Estilo wide", ["pexels", "full_ia"], index=0)
-            blueprint = st.text_input("Blueprint associado", value="")
-            submitted = st.form_submit_button("Guardar canal", type="primary")
+        if imported:
+            st.caption("Dados encontrados. Reveja ou edite os campos antes de guardar.")
+            with st.form("channel_import_form"):
+                name = st.text_input("Nome do canal", value=imported.get("name", ""), key="yt_import_name")
+                url = st.text_input("URL", value=imported.get("url", source if source.startswith("http") else ""), key="yt_import_url")
+                handle = st.text_input("Handle", value=imported.get("handle", ""), key="yt_import_handle")
+                language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="yt_import_language")
+                style = st.selectbox("Estilo wide", ["pexels", "full_ia"], index=0, key="yt_import_style")
+                blueprint = st.text_input("Blueprint associado", value="", key="yt_import_blueprint")
+                description = st.text_area("Descrição", value=imported.get("description", ""), key="yt_import_description")
+                metrics = st.columns(3)
+                with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=int(imported.get("subscriber_count") or 0), key="yt_import_subscribers")
+                with metrics[1]: video_count = st.number_input("Vídeos", min_value=0, value=int(imported.get("video_count") or 0), key="yt_import_videos")
+                with metrics[2]: view_count = st.number_input("Visualizações", min_value=0, value=int(imported.get("view_count") or 0), key="yt_import_views")
+                submitted = st.form_submit_button("Guardar canal importado", type="primary")
+                if submitted:
+                    if not name.strip():
+                        st.error("Informe o nome do canal antes de guardar.")
+                    else:
+                        metadata = {
+                            **imported,
+                            "handle": handle.strip(),
+                            "description": description.strip(),
+                            "language": language,
+                            "style_wide": style,
+                            "blueprint_id": blueprint.strip(),
+                            "subscriber_count": int(subscriber_count) or None,
+                            "video_count": int(video_count) or None,
+                            "view_count": int(view_count) or None,
+                            "metrics_source": imported.get("metrics_source", "youtube_public_page"),
+                        }
+                        channel = create_channel(name, url, metadata)
+                        st.success(f"Canal {channel['name']} guardado.")
+                        st.rerun()
+        else:
+            st.info("Introduza um URL, handle ou ID e clique em Buscar no YouTube. Não é necessária API Key na opção pública.")
+
+    with manual_tab:
+        st.caption("Este fluxo não consulta o YouTube e não exige API Key. Preencha os dados que quiser e guarde o canal localmente.")
+        with st.form("channel_manual_form"):
+            name = st.text_input("Nome do canal", key="manual_channel_name")
+            url = st.text_input("URL do canal", placeholder="https://youtube.com/@seucanal", key="manual_channel_url")
+            handle = st.text_input("Handle", placeholder="@seucanal", key="manual_channel_handle")
+            description = st.text_area("Descrição", key="manual_channel_description")
+            language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="manual_channel_language")
+            style = st.selectbox("Estilo wide", ["pexels", "full_ia"], index=0, key="manual_channel_style")
+            blueprint = st.text_input("Blueprint associado", key="manual_channel_blueprint")
+            thumbnail_url = st.text_input("URL da imagem do canal", key="manual_channel_thumbnail")
+            metrics = st.columns(3)
+            with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=0, key="manual_channel_subscribers")
+            with metrics[1]: video_count = st.number_input("Vídeos", min_value=0, value=0, key="manual_channel_videos")
+            with metrics[2]: view_count = st.number_input("Visualizações", min_value=0, value=0, key="manual_channel_views")
+            submitted = st.form_submit_button("Guardar canal manual", type="primary")
             if submitted:
                 if not name.strip():
                     st.error("Informe o nome do canal.")
                 else:
-                    metadata = {"handle": handle, "language": language, "style_wide": style, "blueprint_id": blueprint, **imported}
-                    channel = create_channel(name, url, metadata)
-                    st.success(f"Canal {channel['name']} guardado.")
+                    channel = create_channel(name, url, {
+                        "handle": handle.strip(),
+                        "description": description.strip(),
+                        "language": language,
+                        "style_wide": style,
+                        "blueprint_id": blueprint.strip(),
+                        "thumbnail_url": thumbnail_url.strip(),
+                        "subscriber_count": int(subscriber_count) or None,
+                        "video_count": int(video_count) or None,
+                        "view_count": int(view_count) or None,
+                        "metrics_source": "manual",
+                    })
+                    st.success(f"Canal {channel['name']} guardado manualmente.")
                     st.rerun()
+
     st.subheader("Canais cadastrados")
     channels = read_json("channels.json", [])
     if not channels:
@@ -241,7 +310,7 @@ def render_channels():
                     st.markdown("### YT")
             with cols[1]:
                 st.write(f"**{channel.get('name', 'Sem nome')}**")
-                st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'}")
+                st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
             with cols[2]: st.metric("Inscritos", channel.get("subscriber_count") if channel.get("subscriber_count") is not None else "—")
             with cols[3]: st.metric("Vídeos", channel.get("video_count") if channel.get("video_count") is not None else "—")
             with cols[4]: st.metric("Backlog", channel.get("backlog_total", 0))
@@ -253,41 +322,46 @@ def render_channels():
 
 def render_new_video():
     st.title("Novo vídeo")
-    channels = channel_options()
-    if not channels:
-        st.warning("Cadastre pelo menos um canal antes de criar vídeos.")
-        return
-    mode_label = st.radio("Modo de criação", ["Canal específico", "Lote no mesmo canal", "Lote geral"], horizontal=True)
-    mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
-    if mode == "general":
-        selected = st.multiselect("Canais incluídos", [c["id"] for c in channels], default=[c["id"] for c in channels], format_func=lambda cid: next(c["name"] for c in channels if c["id"] == cid))
-    else:
-        selected_one = st.selectbox("Canal", channels, format_func=lambda c: c["name"])
-        selected = [selected_one["id"]]
-    with st.form("new_video_form"):
-        topic = st.text_area("Tópico ou briefing", placeholder="Ex.: A história pouco conhecida por trás de...")
-        quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
-        language = st.selectbox("Idioma", ["Português", "English", "Español"], key="video_language")
-        fmt = st.selectbox("Formato", ["wide", "shorts", "music"])
-        style = st.selectbox("Estilo wide", ["pexels", "full_ia"])
-        submitted = st.form_submit_button("Criar tarefas", type="primary")
-    if submitted:
-        if not topic.strip() or not selected:
-            st.error("Informe um tópico e seleccione pelo menos um canal.")
+    create_tab, videos_tab = st.tabs(["Criar vídeo", "Vídeos"])
+    with create_tab:
+        channels = channel_options()
+        if not channels:
+            st.warning("Cadastre pelo menos um canal antes de criar vídeos.")
         else:
-            quantity = int(quantity if mode == "same_channel" else 1)
-            batch = create_batch(mode, selected, topic, quantity, {"language": language, "format": fmt, "style_wide": style})
-            tasks = create_tasks_for_batch(batch)
-            st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s).")
+            mode_label = st.radio("Modo de criação", ["Canal específico", "Lote no mesmo canal", "Lote geral"], horizontal=True, key="new_video_mode")
+            mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
+            if mode == "general":
+                selected = st.multiselect("Canais incluídos", [c["id"] for c in channels], default=[c["id"] for c in channels], format_func=lambda cid: next(c["name"] for c in channels if c["id"] == cid), key="new_video_channels_general")
+            else:
+                selected_one = st.selectbox("Canal", channels, format_func=lambda c: c["name"], key="new_video_channel")
+                selected = [selected_one["id"]]
+            with st.form("new_video_form"):
+                topic = st.text_area("Tópico ou briefing", placeholder="Ex.: A história pouco conhecida por trás de...")
+                quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
+                language = st.selectbox("Idioma", ["Português", "English", "Español"], key="video_language")
+                fmt = st.selectbox("Formato", ["wide", "shorts", "music"])
+                style = st.selectbox("Estilo wide", ["pexels", "full_ia"])
+                submitted = st.form_submit_button("Criar tarefas", type="primary")
+            if submitted:
+                if not topic.strip() or not selected:
+                    st.error("Informe um tópico e seleccione pelo menos um canal.")
+                else:
+                    quantity = int(quantity if mode == "same_channel" else 1)
+                    batch = create_batch(mode, selected, topic, quantity, {"language": language, "format": fmt, "style_wide": style})
+                    tasks = create_tasks_for_batch(batch)
+                    st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
+    with videos_tab:
+        render_videos()
 
 
 def render_videos():
-    st.title("Vídeos e backlog")
+    st.subheader("Vídeos e backlog")
+    st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     tasks = read_json("tasks.json", [])
     if not tasks:
         st.info("Nenhum vídeo criado.")
         return
-    state_filter = st.selectbox("Filtrar por estado", ["Todos", "to_do", "doing", "blocked", "done", "failed", "cancelled"])
+    state_filter = st.selectbox("Filtrar por estado", ["Todos", "to_do", "doing", "blocked", "done", "failed", "cancelled"], key="videos_state_filter")
     for task in tasks:
         if state_filter != "Todos" and task.get("state") != state_filter:
             continue
@@ -311,10 +385,32 @@ def render_videos():
 
 def render_upload():
     st.title("Upload")
+    settings = read_json("settings.json", {})
+    youtube = YouTubeAdapter(settings=settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
     destination = st.multiselect("Destinos", ["YouTube", "TikTok"], default=["YouTube"])
+
+    if "YouTube" in destination:
+        st.markdown("**YouTube — youtube-automation-agent (principal)**")
+        st.caption("O Thunderbolt executa internamente a lógica do PublishingSchedulingAgent: OAuth, upload resumível, metadados, thumbnail e legendas. O OAuth directo é usado apenas como redundância se o caminho principal falhar.")
+        status = youtube.upload_status()
+        status_cols = st.columns(2)
+        with status_cols[0]:
+            (st.success if status["agent"].ok else st.warning)(f"Agente: {status['agent'].message}")
+            if st.button("Autorizar agente YouTube", key="youtube_authorize_agent", use_container_width=True):
+                result = youtube.authorize_agent()
+                (st.success if result.ok else st.error)(result.message)
+                if result.ok:
+                    st.rerun()
+        with status_cols[1]:
+            (st.info if status["fallback"].ok else st.caption)(f"Fallback OAuth: {status['fallback'].message}")
+            if st.button("Autorizar fallback OAuth", key="youtube_authorize_fallback", use_container_width=True):
+                result = youtube.authorize_fallback()
+                (st.success if result.ok else st.error)(result.message)
+                if result.ok:
+                    st.rerun()
     if "TikTok" in destination:
-        status = TikTokAdapter(read_json("settings.json", {})).status()
+        status = TikTokAdapter(settings).status()
         (st.success if status.ok else st.warning)(status.message)
     if not tasks:
         st.info("Não há vídeos prontos para upload.")
@@ -322,14 +418,53 @@ def render_upload():
     for task in tasks:
         with st.container(border=True):
             st.write(f"**{task.get('topic')}** — {task.get('channel_name')}")
-            video_path = task.get("artifacts", {}).get("video", "")
+            artifacts = task.get("artifacts", {}) or {}
+            video_path = artifacts.get("video", "")
+            thumbnail_path = artifacts.get("thumbnail") or artifacts.get("cover", "")
+            captions_path = artifacts.get("captions") or artifacts.get("subtitle", "")
             st.caption(video_path or "Sem caminho de vídeo registado")
-            if st.button("Preparar upload", key=f"upload_{task['id']}"):
-                if "TikTok" in destination:
-                    result = TikTokAdapter(read_json("settings.json", {})).upload_video(video_path, task.get("topic", ""))
-                    (st.success if result.ok else st.warning)(result.message)
-                else:
-                    st.info("Upload YouTube preparado; configure o uploader local para executar a publicação.")
+            if "YouTube" in destination:
+                title = st.text_input("Título", value=task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
+                description = st.text_area("Descrição", value=task.get("description", ""), key=f"yt_description_{task['id']}", height=100)
+                tags_raw = st.text_input("Tags separadas por vírgula", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"yt_tags_{task['id']}")
+                yt_cols = st.columns(3)
+                with yt_cols[0]:
+                    privacy_status = st.selectbox("Privacidade", ["private", "unlisted", "public"], key=f"yt_privacy_{task['id']}")
+                with yt_cols[1]:
+                    category_id = st.text_input("Category ID", value="22", key=f"yt_category_{task['id']}")
+                with yt_cols[2]:
+                    language = st.text_input("Idioma", value="pt-BR", key=f"yt_language_{task['id']}")
+                if st.button("Publicar no YouTube", type="primary", key=f"upload_youtube_{task['id']}"):
+                    tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
+                    result = youtube.upload_video(
+                        video_path,
+                        title=title,
+                        description=description,
+                        tags=tags,
+                        category_id=category_id,
+                        language=language,
+                        privacy_status=privacy_status,
+                        thumbnail_path=thumbnail_path,
+                        captions_path=captions_path,
+                    )
+                    record = {
+                        "task_id": task.get("id"),
+                        "destination": "YouTube",
+                        "status": "published" if result.ok else "failed",
+                        "message": result.message,
+                        "data": result.data,
+                        "created_at": now(),
+                    }
+                    uploads = read_json("uploads.json", [])
+                    uploads.append(record)
+                    write_json("uploads.json", uploads)
+                    (st.success if result.ok else st.error)(result.message)
+                    if result.data.get("attempts"):
+                        with st.expander("Detalhes dos mecanismos de upload"):
+                            st.json(result.data["attempts"])
+            if "TikTok" in destination and st.button("Enviar para TikTok", key=f"upload_tiktok_{task['id']}"):
+                result = TikTokAdapter(settings).upload_video(video_path, task.get("topic", ""))
+                (st.success if result.ok else st.warning)(result.message)
 
 
 def render_settings():
@@ -620,12 +755,14 @@ def main():
         ("Blueprints", ":material/library_books:", "Blueprints"),
         ("Canais", ":material/ondemand_video:", "Canais"),
         ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
-        ("Vídeos", ":material/video_library:", "Vídeos"),
         ("Upload", ":material/cloud_upload:", "Upload"),
         ("Limpador de metadado", ":material/edit_note:", "Limpador de metadado"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
     current_page = st.session_state.get("page", "Dashboard")
+    if current_page == "Vídeos":
+        current_page = "Novo vídeo"
+        st.session_state["page"] = current_page
     with st.sidebar:
         version_markup = f'<span class="tb-brand-version">{APP_VERSION}</span>' if APP_VERSION else ""
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
@@ -639,7 +776,6 @@ def main():
         "Blueprints": render_blueprints,
         "Canais": render_channels,
         "Novo vídeo": render_new_video,
-        "Vídeos": render_videos,
         "Upload": render_upload,
         "Limpador de metadado": render_metadata_cleaner,
         "Configurações": render_settings,

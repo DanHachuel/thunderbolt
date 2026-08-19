@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.17
+> **Versão deste manual:** 0.2.18
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.17 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.18 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.17 install
+npx --yes @danhachuel/thunderbolt@0.2.18 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -348,6 +348,8 @@ Na primeira execução, abra **Configurações** e reveja:
 | YouTube Data API Key | Permitir importar nome, handle e métricas públicas de canais |
 | YouTube OAuth Client ID | Identificar a aplicação OAuth 2.0 do Google para operações autenticadas |
 | YouTube OAuth Client Secret | Secret do mesmo cliente OAuth 2.0; não é a Data API Key |
+| YouTube upload principal | Lógica do `youtube-automation-agent` adaptada e executada dentro do Thunderbolt |
+| OAuth directo de redundância | Caminho alternativo accionado automaticamente se o agente falhar |
 | TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
 
 As chaves devem ser inseridas apenas na configuração local. Não as coloque no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
@@ -359,10 +361,10 @@ Após iniciar a aplicação, valide o seguinte percurso:
 1. **Dashboard:** confirme que a UI abre e mostra o estado local.
 2. **Blueprints:** coloque um JSON em `~/.thunderbolt/storage/blueprints/importados/` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
-4. **Canais:** cadastre um canal manualmente ou importe-o depois de configurar a YouTube Data API.
+4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** ou a Data API opcional; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
 5. **Novo vídeo:** teste primeiro o modo **Canal específico** e depois os modos de lote.
-6. **Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar**.
-7. **Upload:** confirme os destinos configurados e os estados de pré-requisito.
+6. **Novo vídeo > Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar** dentro da subaba.
+7. **Upload:** autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key é exclusivamente para consultas públicas.
 8. **Limpador de metadado:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos da aba Novo vídeo não são aceites nesta área.
 9. **Configurações:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
 
@@ -505,6 +507,8 @@ Nunca publique ou envie por chat:
 - artefactos privados de canais.
 
 Use secrets do GitHub Actions apenas para publicação do pacote. Para execução local, mantenha credenciais fora do repositório e use a área de configurações local ou variáveis de ambiente.
+
+A publicação YouTube segue primeiro a lógica adaptada do `PublishingSchedulingAgent` do [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), sob licença MIT. O código corre dentro do processo Streamlit; não é necessário iniciar o agente Node separadamente. O fallback OAuth directo só é chamado quando a tentativa primária falha.
 
 ## 14. Referências
 

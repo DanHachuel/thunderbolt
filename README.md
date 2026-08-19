@@ -14,10 +14,9 @@ A primeira versão implementa a camada UI independente com:
 | Pipeline | Filas por etapa |
 | Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
-| Canais | Cadastro manual, importação via YouTube Data API quando configurada e edição de dados importados |
-| Novo vídeo | Canal específico, lote no mesmo canal e lote geral |
-| Vídeos | Filtro por estado e controlos iniciar/parar |
-| Upload | Destinos YouTube/TikTok e diagnóstico do TikTok |
+| Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
+| Novo vídeo | Subabas Criar vídeo e Vídeos; canal específico, lote no mesmo canal, lote geral, filtro de estados e controlos iniciar/parar |
+| Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, TikTok e diagnóstico |
 | Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
 | Configurações | Provedores LLM, TTS/voz, materiais, Whisper, FFmpeg, YouTube, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
@@ -103,9 +102,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.17 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.17 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.17
+npx.cmd --yes @danhachuel/thunderbolt@0.2.18 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.18 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.18
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -162,12 +161,25 @@ A descrição segue a composição do workflow de referência: preview, secção
 
 ## Canais YouTube
 
-Sem chave, o cadastro manual continua disponível. Para importar nome, handle e estatísticas através da API oficial do YouTube Data API, configure `youtube_api_key` na aba **Configurações** ou em `YOUTUBE_API_KEY`.
+A aba **Canais** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando `youtube_api_key` estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`.
+
+Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo e Blueprint associado. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar.
+
+## Upload YouTube
+
+O Upload usa como caminho **principal** a lógica do `PublishingSchedulingAgent` do [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), adaptada para Python e executada dentro do processo Streamlit do Thunderbolt. Não é necessário instalar ou iniciar um segundo servidor Node. O fluxo valida o MP4 real, constrói `snippet/status`, faz upload resumível e tenta enviar thumbnail e legendas.
+
+Na aba **Upload**, configure primeiro o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para publicar.
+
+Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separada para o caminho de redundância. Os resultados guardam no histórico local qual mecanismo foi utilizado e as tentativas realizadas, sem guardar segredos.
 
 ## TikTok
 
-A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret. Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
+A subaba **Vídeos**, dentro de **Novo vídeo**, mostra o backlog e permite iniciar/parar tarefas; deixou de existir como botão principal na barra lateral.
+
+A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret.
+ Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
 
 ## Segurança
 
-Não coloque chaves, cookies, tokens YouTube ou segredos TikTok no Git. Use a configuração local, variáveis de ambiente ou um ficheiro fora do repositório. O `.gitignore` exclui o storage de estado real, ambientes virtuais e ficheiros de segredo.
+Não coloque chaves, cookies, tokens YouTube ou segredos TikTok no Git. Use a configuração local, variáveis de ambiente ou um ficheiro fora do repositório. O `.gitignore` exclui o storage de estado real, ambientes virtuais e ficheiros de segredo. O adaptador interno foi baseado na lógica publicada sob licença MIT do [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent).
