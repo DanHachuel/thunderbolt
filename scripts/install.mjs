@@ -108,6 +108,8 @@ function ensureDirs() {
     join(storageRoot, "metadata_cleaner", "outputs"),
     join(storageRoot, "artifacts"),
     join(storageRoot, "skills"),
+    join(storageRoot, "music"),
+    join(storageRoot, "voice_previews"),
   ];
   for (const directory of directories) mkdirSync(directory, { recursive: true });
   copySeedBlueprints(storageRoot);
@@ -288,7 +290,7 @@ function writeSettings(moneyprinterPath) {
 
 function installThunderboltDependencies(python) {
   if (!existsSync(pythonBin)) run(python.command, [...python.args, "-m", "venv", venvPath]);
-  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "google.auth", "google_auth_oauthlib", "googleapiclient"], "Thunderbolt");
+  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "google.auth", "google_auth_oauthlib", "googleapiclient"], "Thunderbolt");
 }
 
 function installMoneyPrinterDependencies(moneyprinterPath) {

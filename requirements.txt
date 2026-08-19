@@ -6,3 +6,4 @@ toml>=0.10,<1
 google-auth>=2.29,<3
 google-auth-oauthlib>=1.2,<2
 google-api-python-client>=2.120,<3
+edge-tts>=7.0,<8

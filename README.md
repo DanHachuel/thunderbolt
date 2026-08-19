@@ -15,11 +15,12 @@ A primeira versão implementa a camada UI independente com:
 | Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
-| Novo vídeo | Subabas Criar vídeo e Vídeos; canal específico, lote no mesmo canal, lote geral, filtro de estados e controlos iniciar/parar |
-| Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, TikTok e diagnóstico |
+| Novo vídeo | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical |
+| Automação | Lista de vídeos e canais, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
+| Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
-| Configurações | Provedores LLM, TTS/voz, materiais, Whisper, FFmpeg, YouTube, TikTok Client ID/Secret e Upload-Post |
+| Configurações | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, YouTube, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
@@ -103,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.19 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.19 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.19
+npx.cmd --yes @danhachuel/thunderbolt@0.2.20 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.20 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.20
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -137,7 +138,11 @@ storage/
 │   ├── batches.json
 │   ├── uploads.json
 │   ├── metadata_edits.json
+│   ├── mcp_integrations.json
 │   └── settings.json
+├── music/             # músicas locais para o modo Apenas Música
+├── voice_previews/    # amostras isoladas do teste de vozes
+├── skills/            # skill MoneyPrinterTurbo guardada pelo utilizador
 ├── metadata_cleaner/
 │   ├── originals/    # cópias dos vídeos terceiros enviados
 │   └── outputs/      # versões com metadados limpos
@@ -164,7 +169,7 @@ A descrição segue a composição do workflow de referência: preview, secção
 
 A aba **Canais** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando `youtube_api_key` estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`.
 
-Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo e Blueprint associado. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar.
+Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo, Blueprint padrão, voz padrão, `DELEGATED_SESSION_ID` e configuração de Automação. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar. Cada cartão de canal tem **Activo** e, logo abaixo, **Apagar canal**, com confirmação; tarefas e artefactos não são apagados.
 
 ## Upload YouTube
 
@@ -173,6 +178,18 @@ O Upload usa como caminho **principal** a lógica do `PublishingSchedulingAgent`
 Na aba **Upload**, configure primeiro o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para publicar.
 
 Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separada para o caminho de redundância. Os resultados guardam no histórico local qual mecanismo foi utilizado e as tentativas realizadas, sem guardar segredos.
+
+A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Ela usa cookies, `sessionInfo`, `INNERTUBE_API_KEY` e `DELEGATED_SESSION_ID` fornecidos manualmente pelo utilizador, cria o vídeo através do endpoint interno e envia o ficheiro em chunks de 256 KiB. Este caminho é experimental, não extrai cookies automaticamente e fica separado do agente YouTube principal.
+
+## Novo vídeo, Automação e música
+
+Em **Novo vídeo**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
+
+O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. A aba **Automação** guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
+
+## Teste de vozes
+
+A área **Configurações > Teste de vozes** é isolada da pipeline. Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas.
 
 ## MCP e integrações externas opcionais
 

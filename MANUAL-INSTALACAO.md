@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.19
+> **Versão deste manual:** 0.2.20
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.19 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.20 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.19 install
+npx --yes @danhachuel/thunderbolt@0.2.20 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -367,8 +367,24 @@ Após iniciar a aplicação, valide o seguinte percurso:
 7. **Upload:** autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key é exclusivamente para consultas públicas.
 8. **Limpador de metadado:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos da aba Novo vídeo não são aceites nesta área.
 9. **Configurações:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
-10. **MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é apenas uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
-11. **Skill MCP:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+10. **Novo vídeo:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
+11. **Automação:** configure **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. A UI não inicia jobs em segundo plano nesta entrega.
+12. **Teste de vozes:** em Configurações, teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
+13. **Upload directo:** configure manualmente cookies, sessionInfo e INNERTUBE_API_KEY, atribua o `DELEGATED_SESSION_ID` no canal e teste apenas com um vídeo de validação. O método envia chunks de 256 KiB e não extrai cookies do navegador.
+14. **MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é apenas uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
+15. **Skill MCP:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+
+## Novo vídeo, Automação e música
+
+O modo `Pexels/Pixabay` representa materiais de stock. Ao seleccionar `full_ia`, o selector `Estilo IA` apresenta os 12 estilos disponíveis. Ao seleccionar `Apenas Música`, a UI obriga a escolher uma música existente, carregar um ficheiro ou solicitar uma música a um endpoint Suno configurado. O vídeo recebe `background_mode=none`, sem fundo Pexels/Pixabay ou IA.
+
+A aba **Automação** lista os canais e vídeos, guarda **Automação ON** e valida horários diários no formato `HH:MM`. É apenas uma camada de UI nesta versão, sem execução de worker.
+
+A área **Teste de vozes**, dentro de Configurações, é isolada da pipeline. O preview pode ser reproduzido e descarregado de `storage/voice_previews/`.
+
+## Upload directo
+
+A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Em cada canal, preencha `DELEGATED_SESSION_ID`; em Configurações, preencha manualmente os cookies `SID`, `SSID`, `HSID`, `APISID`, `SAPISID`, o token `sessionInfo` e `INNERTUBE_API_KEY`. O adaptador valida o vídeo, cria a sessão interna e envia chunks múltiplos de 256 KiB. Estes valores são segredos locais e não devem ser enviados para o Git.
 
 ## MCP e integrações externas
 
@@ -376,7 +392,7 @@ A aba **MCP** é um configurador local de quatro serviços opcionais. As portas 
 
 O botão **Guardar skill localmente** copia a skill anexada para `storage/skills/`. Esta pasta fica fora dos estados JSON e é criada pelo instalador e pelo launcher. Os quatro repositórios continuam fora do pacote npm.
 
-## 11. Limpador de metadado
+## 12. Limpador de metadado
 
 A aba **Limpador de metadado** recebe somente vídeos externos já prontos. O ficheiro enviado é copiado para `storage/metadata_cleaner/originals/`; a aplicação não altera o original. Ao aplicar a operação, o FFmpeg remove os metadados existentes do contentor e cria uma nova versão em `storage/metadata_cleaner/outputs/` com o título, descrição, tags, idioma e outros campos preenchidos.
 

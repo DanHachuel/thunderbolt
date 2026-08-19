@@ -19,5 +19,7 @@ sessionInfo/
 delegated_ids/
 config.toml
 storage/skills/
+storage/music/
+storage/voice_previews/
 node_modules/
 .DS_Store

@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -106,6 +108,72 @@ def _thumbnail_from_metadata(metadata: dict[str, Any]) -> str:
     return ""
 
 
+def _meta_content(document: str, *names: str) -> str:
+    for name in names:
+        pattern = rf'<meta[^>]+(?:name|property)=["\']{re.escape(name)}["\'][^>]+content=["\']([^"\']*)["\']'
+        match = re.search(pattern, document, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        reverse_pattern = rf'<meta[^>]+content=["\']([^"\']*)["\'][^>]+(?:name|property)=["\']{re.escape(name)}["\']'
+        match = re.search(reverse_pattern, document, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def _public_page_candidates(source: str) -> list[str]:
+    source = source.strip()
+    if source.startswith(("http://", "https://")):
+        parsed = urlparse(source)
+        base = f"https://{parsed.netloc}{parsed.path}".rstrip("/")
+        if parsed.netloc.lower().endswith("youtube.com"):
+            base = base.replace("/about", "").replace("/videos", "")
+    elif source.startswith("UC"):
+        base = f"https://www.youtube.com/channel/{source}"
+    else:
+        handle = source if source.startswith("@") else f"@{source}"
+        base = f"https://www.youtube.com/{handle}"
+    return list(dict.fromkeys([
+        f"{base}/about?hl=pt-BR&gl=BR",
+        f"{base}?hl=pt-BR&gl=BR",
+        f"{base}/videos?hl=pt-BR&gl=BR",
+    ]))
+
+
+def _channel_id_from_document(document: str, canonical_url: str = "") -> str:
+    patterns = [
+        r'"externalId"\s*:\s*"(UC[A-Za-z0-9_-]+)"',
+        r'"channelId"\s*:\s*"(UC[A-Za-z0-9_-]+)"',
+        r"/channel/(UC[A-Za-z0-9_-]+)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, document)
+        if match:
+            return match.group(1)
+    match = re.search(r"/channel/(UC[A-Za-z0-9_-]+)", canonical_url)
+    return match.group(1) if match else ""
+
+
+def _public_feed_data(channel_id: str, headers: dict[str, str]) -> dict[str, Any]:
+    if not channel_id:
+        return {}
+    try:
+        response = requests.get(
+            f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}",
+            headers=headers,
+            timeout=12,
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+        namespace = {"yt": "http://www.youtube.com/xml/schemas/2015", "atom": "http://www.w3.org/2005/Atom"}
+        title = root.findtext("atom:title", default="", namespaces=namespace).strip()
+        feed_id = root.findtext("yt:channelId", default=channel_id, namespaces=namespace).strip()
+        entries = root.findall("atom:entry", namespace)
+        return {"name": title, "youtube_id": feed_id, "video_count": len(entries) if entries else None}
+    except (requests.RequestException, ET.ParseError, ValueError):
+        return {}
+
+
 @dataclass
 class IntegrationResult:
     ok: bool
@@ -125,70 +193,72 @@ class YouTubeAdapter:
         return match.group(1) if match else value
 
     def fetch_channel_public(self, value: str) -> IntegrationResult:
-        """Fetch public channel metadata from YouTube HTML without an API key."""
+        """Fetch public channel metadata without requiring a YouTube Data API key."""
         source = (value or "").strip()
         if not source:
             return IntegrationResult(False, "Introduza o nome, handle, URL ou ID do canal.", {})
-        try:
-            if source.startswith("http://") or source.startswith("https://"):
-                page_url = source.rstrip("/")
-            elif source.startswith("UC"):
-                page_url = f"https://www.youtube.com/channel/{source}"
-            else:
-                handle = source if source.startswith("@") else f"@{source}"
-                page_url = f"https://www.youtube.com/{handle}"
-            if not page_url.endswith("/about"):
-                page_url = f"{page_url}/about"
-            response = requests.get(
-                page_url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
-                    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-                },
-                timeout=20,
-            )
-            response.raise_for_status()
-            document = response.text
-            initial_data = _extract_json_assignment(document, "ytInitialData")
-            metadata = _find_first_key(initial_data or {}, "channelMetadataRenderer") or {}
-            header = _find_first_key(initial_data or {}, "pageHeaderViewModel") or {}
-            if not metadata and not header:
-                return IntegrationResult(False, "O YouTube não disponibilizou dados públicos para este canal. Confirme o link ou tente a aba Cadastro manual.", {"url": page_url})
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        last_url = source
+        last_error = ""
+        for page_url in _public_page_candidates(source):
+            last_url = page_url
+            try:
+                response = requests.get(page_url, headers=headers, timeout=20)
+                response.raise_for_status()
+            except requests.RequestException as exc:
+                last_error = str(exc)
+                continue
+            document = response.text or ""
+            initial_data = _extract_json_assignment(document, "ytInitialData") or {}
+            metadata = _find_first_key(initial_data, "channelMetadataRenderer") or {}
+            header = _find_first_key(initial_data, "pageHeaderViewModel") or {}
+            canonical_url = _meta_content(document, "og:url", "twitter:url") or page_url.split("?", 1)[0].rstrip("/")
             owner_urls = metadata.get("ownerUrls", []) if isinstance(metadata, dict) else []
-            canonical_url = owner_urls[0] if owner_urls else page_url.removesuffix("/about")
-            canonical_url = canonical_url.replace("http://", "https://")
-            handle_match = re.search(r"/@([^/?]+)", canonical_url)
-            handle = f"@{handle_match.group(1)}" if handle_match else ""
+            if owner_urls:
+                canonical_url = str(owner_urls[0])
+            canonical_url = canonical_url.replace("http://", "https://").removesuffix("/about")
+            youtube_id = str(metadata.get("externalId", "")) if isinstance(metadata, dict) else ""
+            if not youtube_id:
+                youtube_id = _channel_id_from_document(document, canonical_url)
+            feed = _public_feed_data(youtube_id, headers)
             title = _text_from_node(metadata.get("title")) if isinstance(metadata, dict) else ""
             if not title and isinstance(header, dict):
                 title = _text_from_node(header.get("title"))
                 if not title:
                     title = _text_from_node(_find_first_key(header, "dynamicTextViewModel"))
+            if not title:
+                title = _meta_content(document, "og:title", "twitter:title") or feed.get("name", "")
             description = _text_from_node(metadata.get("description")) if isinstance(metadata, dict) else ""
-            youtube_id = str(metadata.get("externalId", "")) if isinstance(metadata, dict) else ""
-            if not youtube_id:
-                id_match = re.search(r"/channel/(UC[A-Za-z0-9_-]+)", canonical_url)
-                youtube_id = id_match.group(1) if id_match else ""
-            subscriber_value = _find_first_key(initial_data or {}, "subscriberCountText")
-            video_value = _find_first_key(initial_data or {}, "videoCountText")
+            description = description or _meta_content(document, "description", "og:description")
+            thumbnail_url = _thumbnail_from_metadata(metadata) or _meta_content(document, "og:image", "twitter:image")
+            handle_match = re.search(r"/@([^/?]+)", canonical_url)
+            handle = f"@{handle_match.group(1)}" if handle_match else ""
+            if not handle:
+                handle_match = re.search(r"/@([^/?]+)", document)
+                handle = f"@{handle_match.group(1)}" if handle_match else ""
+            subscriber_value = _find_first_key(initial_data, "subscriberCountText")
+            video_value = _find_first_key(initial_data, "videoCountText")
             data = {
-                "youtube_id": youtube_id,
+                "youtube_id": youtube_id or feed.get("youtube_id", ""),
                 "name": title,
                 "handle": handle,
                 "url": canonical_url,
                 "description": description,
-                "thumbnail_url": _thumbnail_from_metadata(metadata),
+                "thumbnail_url": thumbnail_url,
                 "subscriber_count": _parse_public_count(subscriber_value),
-                "video_count": _parse_public_count(video_value),
+                "video_count": _parse_public_count(video_value) or feed.get("video_count"),
                 "view_count": None,
                 "metrics_source": "youtube_public_page",
                 "public_lookup": True,
             }
-            return IntegrationResult(True, "Canal encontrado publicamente no YouTube, sem API Key. Reveja os dados antes de guardar.", data)
-        except requests.RequestException as exc:
-            return IntegrationResult(False, f"Não foi possível consultar a página pública do YouTube: {exc}", {"url": source})
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            return IntegrationResult(False, f"A página pública do YouTube mudou ou não pôde ser interpretada: {exc}", {"url": source})
+            if data["name"] or data["youtube_id"] or data["thumbnail_url"]:
+                return IntegrationResult(True, "Canal encontrado publicamente no YouTube, sem API Key. Reveja os dados antes de guardar.", data)
+            last_error = "A página respondeu sem metadados reconhecíveis."
+        return IntegrationResult(False, f"Não foi possível obter dados públicos do YouTube sem API Key. Confirme o URL/handle ou use Cadastro manual. {last_error}".strip(), {"url": last_url, "public_lookup": True})
 
     def fetch_channel(self, value: str) -> IntegrationResult:
         ref = self.extract_channel_ref(value)

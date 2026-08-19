@@ -49,6 +49,28 @@ def test_fetch_channel_public_without_api_key(monkeypatch):
     assert result.data["thumbnail_url"].endswith("avatar.jpg")
 
 
+def test_public_lookup_falls_back_to_open_graph_metadata(monkeypatch):
+    html = """<html><head>
+    <meta property='og:url' content='https://www.youtube.com/channel/UC999'>
+    <meta property='og:title' content='Canal por metatags'>
+    <meta property='og:description' content='Descrição por metatags'>
+    <meta property='og:image' content='https://img.example/meta.jpg'>
+    </head></html>"""
+
+    def fake_get(url, **kwargs):
+        if "/feeds/videos.xml" in url:
+            return FakeResponse("<feed xmlns='http://www.w3.org/2005/Atom' xmlns:yt='http://www.youtube.com/xml/schemas/2015'><title>Canal por feed</title><yt:channelId>UC999</yt:channelId><entry/><entry/></feed>")
+        return FakeResponse(html)
+
+    monkeypatch.setattr("integrations.platforms.requests.get", fake_get)
+    result = YouTubeAdapter(settings={}).fetch_channel_public("@canal")
+    assert result.ok
+    assert result.data["youtube_id"] == "UC999"
+    assert result.data["name"] == "Canal por metatags"
+    assert result.data["video_count"] == 2
+    assert result.data["thumbnail_url"].endswith("meta.jpg")
+
+
 def test_api_lookup_reports_optional_key_instead_of_blocking_public_flow():
     result = YouTubeAdapter(settings={}).fetch_channel("@canalpublico")
     assert not result.ok

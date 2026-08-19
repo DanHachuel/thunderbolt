@@ -177,6 +177,19 @@ DEFAULTS: dict[str, Any] = {
         "tiktok_scopes": "user.info.basic,video.publish,video.upload",
         "tiktok_access_token": "",
         "tiktok_connection_status": "not_configured",
+        "suno_api_key": "",
+        "suno_api_base_url": "",
+        "suno_api_endpoint": "/api/generate",
+        "voice_preview_provider": "edge",
+        "voice_preview_rate": "+0%",
+        "direct_cookie_sid": "",
+        "direct_cookie_ssid": "",
+        "direct_cookie_hsid": "",
+        "direct_cookie_apisid": "",
+        "direct_cookie_sapisid": "",
+        "direct_session_info": "",
+        "direct_innertube_api_key": "",
+        "direct_chunk_size": 262144,
     },
 }
 
@@ -198,7 +211,7 @@ def seed_blueprints() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs"]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews"]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     for filename, default in DEFAULTS.items():

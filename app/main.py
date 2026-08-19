@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
+import requests
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,14 +16,34 @@ try:
 except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, pipeline_summary, transition_task, update_channel
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, read_packaged_skill, update_integration
+from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
+from hermes_ui.voice_preview import DEFAULT_SAMPLE, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
+from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
+
+AI_STYLE_OPTIONS = [
+    "Natural Realista",
+    "Cocomelon style",
+    "Retro 90s Cartoon",
+    "Wool sculpture miniatures",
+    "LEGO Style",
+    "Paper cutout style",
+    "Anime Style",
+    "Studio Ghibli Style",
+    "Stop Motion Style (Massinha)",
+    "Ukiyo Style",
+    "Pixel Animation",
+    "Pixar Style",
+]
+
+WIDE_STYLE_OPTIONS = ["Pexels/Pixabay", "full_ia", "Apenas Música"]
 
 VIDEO_LANGUAGE_OPTIONS = [
     "00 – Apenas Música de Fundo (Sem Falas)",
@@ -92,8 +114,10 @@ st.markdown("""
 [data-testid="stSidebar"] .tb-brand-name { color:#f4f8fb; font-size:1.38rem; line-height:1.15; font-weight:750; letter-spacing:-0.02em; }
 [data-testid="stSidebar"] .tb-brand-version { color:#8ba6bb; font-size:0.92rem; line-height:1; font-weight:500; }
 [data-testid="stSidebar"] [data-testid="stButton"] { margin:0.025rem 0 !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:1.72rem; height:1.72rem; justify-content:flex-start; text-align:left; padding:0.10rem 0.52rem; border-radius:7px; border:1px solid transparent; font-size:0.86rem; font-weight:550; }
-[data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1; }
+[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:1.72rem; height:1.72rem; justify-content:flex-start !important; text-align:left !important; padding:0.10rem 0.52rem; border-radius:7px; border:1px solid transparent; font-size:0.86rem; font-weight:550; }
+[data-testid="stSidebar"] [data-testid="stButton"] button > div { width:100% !important; justify-content:flex-start !important; text-align:left !important; }
+[data-testid="stSidebar"] [data-testid="stButton"] button [data-testid="stMarkdownContainer"] { flex:1 1 auto !important; width:100% !important; text-align:left !important; }
+[data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1; width:100%; text-align:left !important; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:#e7edf2; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:#1c252e; border-color:#2d3944; color:#ffffff; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#292929; color:#ffffff; border-color:#3a3a3a; }
@@ -120,6 +144,37 @@ def card(label: str, value: str | int, note: str = ""):
 
 def channel_options() -> list[dict]:
     return [c for c in read_json("channels.json", []) if c.get("active", True)]
+
+
+def blueprint_catalog() -> list[tuple[str, str]]:
+    options = [("", "Sem Blueprint padrão")]
+    for path in list_blueprint_files():
+        try:
+            data = load_blueprint_file(path)
+            identifier = str(data.get("id") or path.stem)
+            label = str(data.get("name") or path.stem)
+            options.append((identifier, label))
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+    return options
+
+
+def valid_hhmm(value: str) -> bool:
+    return bool(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(value or "").strip()))
+
+
+def voice_catalog(current: str = "") -> list[str]:
+    voices = [""]
+    voice_file = ROOT / "integrations" / "data" / "azure_voices.json"
+    try:
+        voice_data = json.loads(voice_file.read_text(encoding="utf-8"))
+        voices.extend(f"{item.get('name', '')}-{item.get('gender', '')}" for item in voice_data if item.get("name"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    for candidate in (current, "en-US-AriaNeural-Female", "pt-BR-FranciscaNeural-Female", "pt-BR-AntonioNeural-Male"):
+        if candidate and candidate not in voices:
+            voices.append(candidate)
+    return voices
 
 
 def render_dashboard():
@@ -279,6 +334,13 @@ def render_channels():
         if st.session_state.get("yt_message"):
             (st.success if st.session_state.get("yt_ok") else st.warning)(st.session_state["yt_message"])
         imported = st.session_state.get("yt_import", {})
+        blueprint_items = blueprint_catalog()
+        blueprint_ids = [item[0] for item in blueprint_items]
+        blueprint_labels = {item[0]: item[1] for item in blueprint_items}
+        imported_blueprint = imported.get("default_blueprint_id") or imported.get("blueprint_id", "")
+        if imported_blueprint not in blueprint_ids:
+            blueprint_ids.append(imported_blueprint)
+            blueprint_labels[imported_blueprint] = imported_blueprint or "Sem Blueprint padrão"
         if imported:
             st.caption("Dados encontrados. Reveja ou edite os campos antes de guardar.")
             with st.form("channel_import_form"):
@@ -286,8 +348,14 @@ def render_channels():
                 url = st.text_input("URL", value=imported.get("url", source if source.startswith("http") else ""), key="yt_import_url")
                 handle = st.text_input("Handle", value=imported.get("handle", ""), key="yt_import_handle")
                 language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="yt_import_language")
-                style = st.selectbox("Estilo wide", ["pexels", "full_ia"], index=0, key="yt_import_style")
-                blueprint = st.text_input("Blueprint associado", value="", key="yt_import_blueprint")
+                style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="yt_import_style")
+                blueprint = st.selectbox("Blueprint padrão do canal", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
+                voice_options = voice_catalog(imported.get("default_voice") or imported.get("voice", ""))
+                current_voice = imported.get("default_voice") or imported.get("voice", "")
+                voice = st.selectbox("Voz padrão do canal", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key="yt_import_voice")
+                delegated_session_id = st.text_input("DELEGATED_SESSION_ID", value=imported.get("delegated_session_id", ""), type="password", key="yt_import_delegated_session_id")
+                automation_on = st.toggle("Automação ON", value=bool(imported.get("automation_on", False)), key="yt_import_automation_on")
+                automation_time = st.text_input("Horário diário (HH:MM)", value=imported.get("automation_time", "00:00"), key="yt_import_automation_time")
                 description = st.text_area("Descrição", value=imported.get("description", ""), key="yt_import_description")
                 metrics = st.columns(3)
                 with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=int(imported.get("subscriber_count") or 0), key="yt_import_subscribers")
@@ -297,14 +365,22 @@ def render_channels():
                 if submitted:
                     if not name.strip():
                         st.error("Informe o nome do canal antes de guardar.")
+                    elif not valid_hhmm(automation_time):
+                        st.error("O horário diário deve estar no formato HH:MM, por exemplo 08:30.")
                     else:
                         metadata = {
                             **imported,
                             "handle": handle.strip(),
                             "description": description.strip(),
                             "language": language,
-                            "style_wide": style,
+                            "style_wide": {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style, style),
                             "blueprint_id": blueprint.strip(),
+                            "default_blueprint_id": blueprint.strip(),
+                            "default_voice": voice.strip(),
+                            "voice": voice.strip(),
+                            "delegated_session_id": delegated_session_id.strip(),
+                            "automation_on": bool(automation_on),
+                            "automation_time": automation_time.strip() if valid_hhmm(automation_time) else "00:00",
                             "subscriber_count": int(subscriber_count) or None,
                             "video_count": int(video_count) or None,
                             "view_count": int(view_count) or None,
@@ -324,8 +400,16 @@ def render_channels():
             handle = st.text_input("Handle", placeholder="@seucanal", key="manual_channel_handle")
             description = st.text_area("Descrição", key="manual_channel_description")
             language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="manual_channel_language")
-            style = st.selectbox("Estilo wide", ["pexels", "full_ia"], index=0, key="manual_channel_style")
-            blueprint = st.text_input("Blueprint associado", key="manual_channel_blueprint")
+            style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="manual_channel_style")
+            manual_blueprint_items = blueprint_catalog()
+            manual_blueprint_ids = [item[0] for item in manual_blueprint_items]
+            manual_blueprint_labels = {item[0]: item[1] for item in manual_blueprint_items}
+            blueprint = st.selectbox("Blueprint padrão do canal", manual_blueprint_ids, format_func=lambda item: manual_blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="manual_channel_blueprint")
+            voice_options = voice_catalog()
+            voice = st.selectbox("Voz padrão do canal", voice_options, format_func=lambda item: item or "Sem voz padrão", key="manual_channel_voice")
+            delegated_session_id = st.text_input("DELEGATED_SESSION_ID", type="password", key="manual_channel_delegated_session_id")
+            automation_on = st.toggle("Automação ON", value=False, key="manual_channel_automation_on")
+            automation_time = st.text_input("Horário diário (HH:MM)", value="00:00", key="manual_channel_automation_time")
             thumbnail_url = st.text_input("URL da imagem do canal", key="manual_channel_thumbnail")
             metrics = st.columns(3)
             with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=0, key="manual_channel_subscribers")
@@ -335,13 +419,21 @@ def render_channels():
             if submitted:
                 if not name.strip():
                     st.error("Informe o nome do canal.")
+                elif not valid_hhmm(automation_time):
+                    st.error("O horário diário deve estar no formato HH:MM, por exemplo 08:30.")
                 else:
                     channel = create_channel(name, url, {
                         "handle": handle.strip(),
                         "description": description.strip(),
                         "language": language,
-                        "style_wide": style,
+                        "style_wide": {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style, style),
                         "blueprint_id": blueprint.strip(),
+                        "default_blueprint_id": blueprint.strip(),
+                        "default_voice": voice.strip(),
+                        "voice": voice.strip(),
+                        "delegated_session_id": delegated_session_id.strip(),
+                        "automation_on": bool(automation_on),
+                        "automation_time": automation_time.strip(),
                         "thumbnail_url": thumbnail_url.strip(),
                         "subscriber_count": int(subscriber_count) or None,
                         "video_count": int(video_count) or None,
@@ -374,6 +466,26 @@ def render_channels():
                 active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel['id']}")
                 if active != channel.get("active"):
                     update_channel(channel["id"], {"active": active})
+                    st.rerun()
+                delete_key = f"delete_pending_{channel['id']}"
+                if not st.session_state.get(delete_key, False):
+                    if st.button("Apagar canal", key=f"delete_{channel['id']}", use_container_width=True):
+                        st.session_state[delete_key] = True
+                        st.rerun()
+                else:
+                    st.warning("As tarefas, vídeos e artefactos relacionados serão preservados.")
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button("Confirmar apagar", key=f"confirm_delete_{channel['id']}", type="primary", use_container_width=True):
+                            removed = delete_channel(channel["id"])
+                            st.session_state.pop(delete_key, None)
+                            if removed:
+                                st.success(f"Canal {removed.get('name', 'seleccionado')} apagado.")
+                            st.rerun()
+                    with cancel_col:
+                        if st.button("Cancelar", key=f"cancel_delete_{channel['id']}", use_container_width=True):
+                            st.session_state.pop(delete_key, None)
+                            st.rerun()
 
 
 def render_new_video():
@@ -391,6 +503,47 @@ def render_new_video():
             else:
                 selected_one = st.selectbox("Canal", channels, format_func=lambda c: c["name"], key="new_video_channel")
                 selected = [selected_one["id"]]
+            wide_style_label = st.selectbox("Estilo wide", WIDE_STYLE_OPTIONS, key="new_video_style_wide")
+            style_ia = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key="new_video_style_ia") if wide_style_label == "full_ia" else ""
+            music_path = ""
+            music_source = ""
+            if wide_style_label == "Apenas Música":
+                st.caption("Apenas Música não gera Pexels/Pixabay nem fundo IA; o áudio musical será usado como elemento principal.")
+                music_source = st.radio("Fonte da música", ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API"], horizontal=True, key="new_video_music_source")
+                if music_source == "Ficheiro existente":
+                    local_music = list_music_files()
+                    if local_music:
+                        selected_music = st.selectbox("Música local", local_music, format_func=lambda item: item.name, key="new_video_music_existing")
+                        music_path = str(selected_music)
+                    else:
+                        st.warning("Ainda não existem músicas em storage/music. Escolha Carregar ficheiro ou Criar via Suno API.")
+                elif music_source == "Carregar ficheiro":
+                    uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key="new_video_music_upload")
+                    if uploaded_music and st.button("Guardar música local", key="new_video_music_store", use_container_width=True):
+                        try:
+                            stored_music = store_music_file(uploaded_music.name, uploaded_music.getvalue())
+                            st.session_state["new_video_music_path"] = str(stored_music)
+                            st.success(f"Música guardada em `{stored_music}`")
+                        except (OSError, ValueError) as exc:
+                            st.error(str(exc))
+                    music_path = st.session_state.get("new_video_music_path", "")
+                else:
+                    suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="new_video_suno_prompt")
+                    suno_title = st.text_input("Título da música", value=topic if "topic" in locals() else "Thunderbolt music", key="new_video_suno_title")
+                    if st.button("Solicitar música no Suno", key="new_video_suno_request", use_container_width=True):
+                        suno_result = request_suno_generation(read_json("settings.json", {}), suno_prompt, suno_title)
+                        (st.success if suno_result["ok"] else st.error)(suno_result["message"])
+                        if suno_result["ok"]:
+                            try:
+                                generated = materialize_suno_audio(suno_result.get("data", {}), suno_title or "suno-generated.mp3")
+                                if generated:
+                                    st.session_state["new_video_music_path"] = str(generated)
+                                    st.success(f"Música descarregada para `{generated}`")
+                                else:
+                                    st.info("O pedido foi aceite, mas o endpoint ainda não devolveu uma URL de áudio. Consulte o estado no serviço Suno e adicione o ficheiro quando estiver pronto.")
+                            except (OSError, requests.RequestException, ValueError) as exc:
+                                st.warning(f"Pedido criado, mas não foi possível descarregar o áudio: {exc}")
+                    music_path = st.session_state.get("new_video_music_path", "")
             with st.form("new_video_form"):
                 topic = st.text_area("Tópico ou briefing", placeholder="Ex.: A história pouco conhecida por trás de...")
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
@@ -404,14 +557,17 @@ def render_new_video():
                     st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
                 language = st.selectbox("Idioma", VIDEO_LANGUAGE_OPTIONS, key="video_language")
                 fmt = st.selectbox("Formato", ["wide", "shorts", "music"])
-                style = st.selectbox("Estilo wide", ["pexels", "full_ia"])
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
             if submitted:
                 if not topic.strip() or not selected:
                     st.error("Informe um tópico e seleccione pelo menos um canal.")
                 else:
                     quantity = int(quantity if mode == "same_channel" else 1)
-                    batch = create_batch(mode, selected, topic, quantity, {"language": language, "format": fmt, "style_wide": style})
+                    style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
+                    if style == "music" and not music_path:
+                        st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
+                        st.stop()
+                    batch = create_batch(mode, selected, topic, quantity, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source})
                     tasks = create_tasks_for_batch(batch)
                     st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
     with videos_tab:
@@ -447,12 +603,123 @@ def render_videos():
                     st.rerun()
 
 
+def render_automation():
+    st.title("Automação")
+    st.caption("Agendamento diário da geração por canal. Esta versão configura e guarda a UI; não inicia gerações em segundo plano.")
+    st.info("A geração só será executada quando existir um worker/agendador ligado à pipeline. Activar Automação ON não inicia um processo automaticamente nesta etapa.")
+    channels = read_json("channels.json", [])
+    if not channels:
+        st.info("Nenhum canal cadastrado para configurar.")
+    for channel in channels:
+        channel_id = channel["id"]
+        with st.container(border=True):
+            cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
+            with cols[0]:
+                if channel.get("thumbnail_url"):
+                    st.image(channel["thumbnail_url"], width=48)
+                else:
+                    st.markdown("### YT")
+            with cols[1]:
+                st.write(f"**{channel.get('name', 'Sem nome')}**")
+                st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+                st.caption(f"Blueprint: {channel.get('default_blueprint_id') or channel.get('blueprint_id') or '—'} · Voz: {channel.get('default_voice') or channel.get('voice') or '—'}")
+            with cols[2]:
+                enabled = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
+            with cols[3]:
+                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
+            with cols[4]:
+                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
+                    if not valid_hhmm(schedule_time):
+                        st.error("Use o formato HH:MM, por exemplo 08:30.")
+                    else:
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip()})
+                        st.success("Agendamento guardado.")
+                        st.rerun()
+
+    st.divider()
+    st.subheader("Vídeos cadastrados")
+    tasks = read_json("tasks.json", [])
+    if not tasks:
+        st.info("Ainda não existem vídeos cadastrados.")
+    for task in tasks:
+        with st.container(border=True):
+            task_cols = st.columns([2.6, 1.3, 1.3, 1.5])
+            with task_cols[0]:
+                st.write(f"**{task.get('topic', 'Sem tópico')}**")
+                st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
+            with task_cols[1]:
+                st.caption("Estado")
+                st.write(task.get("state", "—"))
+            with task_cols[2]:
+                st.caption("Estilo")
+                st.write(task.get("style_wide", "—"))
+            with task_cols[3]:
+                st.caption("Horário do canal")
+                st.write(task.get("automation_time", "00:00"))
+
+
+def render_upload_direct():
+    st.subheader("Upload directo")
+    st.caption("Upload interno baseado no YouTube-Video-Upload-Frontend-Api, sem usar a quota oficial da Data API. Este método requer cookies e tokens fornecidos manualmente pelo utilizador.")
+    st.warning("Não cole cookies ou tokens em mensagens, issues ou Git. O Thunderbolt guarda-os apenas no storage local. A integração não extrai sessões automaticamente do navegador.")
+    settings = read_json("settings.json", {})
+    channels = read_json("channels.json", [])
+    tasks = [task for task in read_json("tasks.json", []) if task.get("state") == "done" or task.get("artifacts", {}).get("video")]
+    if not channels:
+        st.info("Cadastre um canal e configure o DELEGATED_SESSION_ID antes de usar o upload directo.")
+    if not tasks:
+        st.info("Não há vídeos prontos para upload directo.")
+        return
+    channel_map = {channel.get("id"): channel for channel in channels}
+    for task in tasks:
+        channel = channel_map.get(task.get("channel_id"), {})
+        video_path = (task.get("artifacts", {}) or {}).get("video", "")
+        with st.container(border=True):
+            st.write(f"**{task.get('topic', 'Sem tópico')}** — {task.get('channel_name', 'Canal')}")
+            st.caption(video_path or "Sem caminho de vídeo registado")
+            if not channel.get("delegated_session_id"):
+                st.warning("Este canal não tem DELEGATED_SESSION_ID configurado na aba Canais.")
+            direct_cols = st.columns([2.2, 1, 1])
+            with direct_cols[0]:
+                title = st.text_input("Título", value=task.get("topic", "Vídeo Thunderbolt"), key=f"direct_title_{task['id']}")
+            with direct_cols[1]:
+                privacy = st.selectbox("Privacidade", ["private", "unlisted", "public"], key=f"direct_privacy_{task['id']}")
+            with direct_cols[2]:
+                chunk_size = st.number_input("Chunk bytes", min_value=262144, step=262144, value=int(settings.get("direct_chunk_size", 262144)), key=f"direct_chunk_{task['id']}")
+            description = st.text_area("Descrição", value=task.get("description", ""), key=f"direct_description_{task['id']}", height=90)
+            if st.button("Enviar por Upload directo", type="primary", key=f"direct_upload_{task['id']}"):
+                result = YouTubeDirectUploader(settings, channel).upload(video_path, title=title, description=description, visibility=privacy, chunk_size=int(chunk_size))
+                record = {"task_id": task.get("id"), "channel_id": channel.get("id"), "destination": "YouTube direct frontend", "status": "published" if result.ok else "failed", "message": result.message, "data": result.data, "created_at": now()}
+                uploads = read_json("uploads.json", [])
+                uploads.append(record)
+                write_json("uploads.json", uploads)
+                (st.success if result.ok else st.error)(result.message)
+
+
 def render_upload():
+    st.title("Upload")
+    upload_tab, direct_tab = st.tabs(["Upload convencional", "Upload directo"])
+    with direct_tab:
+        render_upload_direct()
+    with upload_tab:
+        render_upload_conventional()
+
+
+def render_upload_conventional():
     st.title("Upload")
     settings = read_json("settings.json", {})
     youtube = YouTubeAdapter(settings=settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
-    destination = st.multiselect("Destinos", ["YouTube", "TikTok"], default=["YouTube"])
+    destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"])
+    chip_colors = {"YouTube": "#ff4b4b", "TikTok": "#000000", "Instagram": "#e1306c", "Facebook Pages": "#1877f2"}
+    chips = " ".join(f'<span style="display:inline-block;background:{chip_colors[item]};color:#fff;padding:0.22rem 0.65rem;border-radius:999px;margin:0.18rem 0.25rem 0.35rem 0;font-weight:700;font-size:0.82rem">{item}</span>' for item in destination)
+    if chips:
+        st.markdown(chips, unsafe_allow_html=True)
+
+    if "Instagram" in destination:
+        st.info("Instagram está disponível no front end. A publicação real será ligada numa etapa de credenciais/API própria.")
+    if "Facebook Pages" in destination:
+        st.info("Facebook Pages está disponível no front end. A publicação real será ligada numa etapa de credenciais/API própria.")
 
     if "YouTube" in destination:
         st.markdown("**YouTube — youtube-automation-agent (principal)**")
@@ -529,6 +796,10 @@ def render_upload():
             if "TikTok" in destination and st.button("Enviar para TikTok", key=f"upload_tiktok_{task['id']}"):
                 result = TikTokAdapter(settings).upload_video(video_path, task.get("topic", ""))
                 (st.success if result.ok else st.warning)(result.message)
+            if "Instagram" in destination:
+                st.button("Preparar Instagram", key=f"upload_instagram_{task['id']}", disabled=True, help="UI preparada; publicação Instagram ainda não está activa.")
+            if "Facebook Pages" in destination:
+                st.button("Preparar Facebook Pages", key=f"upload_facebook_{task['id']}", disabled=True, help="UI preparada; publicação Facebook Pages ainda não está activa.")
 
 
 def render_settings():
@@ -558,6 +829,21 @@ def render_settings():
             youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud.")
         with youtube_cols[2]:
             youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0.")
+
+        with st.expander("Upload directo — sessão YouTube Frontend API"):
+            st.caption("Campos usados apenas pelo método Upload directo. Não são necessários para o youtube-automation-agent nem para a Data API pública.")
+            direct_cookie_cols = st.columns(3)
+            with direct_cookie_cols[0]:
+                direct_cookie_sid = text_setting("SID", "direct_cookie_sid", secret=True)
+                direct_cookie_ssid = text_setting("SSID", "direct_cookie_ssid", secret=True)
+            with direct_cookie_cols[1]:
+                direct_cookie_hsid = text_setting("HSID", "direct_cookie_hsid", secret=True)
+                direct_cookie_apisid = text_setting("APISID", "direct_cookie_apisid", secret=True)
+            with direct_cookie_cols[2]:
+                direct_cookie_sapisid = text_setting("SAPISID", "direct_cookie_sapisid", secret=True)
+                direct_session_info = text_setting("sessionInfo token", "direct_session_info", secret=True)
+            direct_innertube_api_key = text_setting("INNERTUBE_API_KEY", "direct_innertube_api_key", secret=True)
+            direct_chunk_size = st.number_input("Chunk size (múltiplo de 262144)", min_value=262144, step=262144, value=int(settings.get("direct_chunk_size", 262144)))
 
         with st.expander("Serviço, materiais e rede"):
             cols = st.columns(2)
@@ -605,7 +891,7 @@ def render_settings():
                 with cols[2]:
                     settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
 
-        with st.expander("Voz, TTS e música — Azure Speech e restantes serviços", expanded=True):
+        with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
             cols = st.columns(2)
             with cols[0]:
                 azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
@@ -623,6 +909,10 @@ def render_settings():
                 chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
                 sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
                 sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+                st.markdown("**Suno — agente musical opcional**")
+                suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
+                suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
         with st.expander("Vídeo, materiais, Whisper e FFmpeg"):
             cols = st.columns(2)
@@ -656,6 +946,7 @@ def render_settings():
             settings.update({
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
                 "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
+                "direct_cookie_sid": direct_cookie_sid, "direct_cookie_ssid": direct_cookie_ssid, "direct_cookie_hsid": direct_cookie_hsid, "direct_cookie_apisid": direct_cookie_apisid, "direct_cookie_sapisid": direct_cookie_sapisid, "direct_session_info": direct_session_info, "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                 "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
                 "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
@@ -665,7 +956,7 @@ def render_settings():
                 "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
                 "pexels_api_keys": pexels_api_keys, "pixabay_api_keys": pixabay_api_keys, "coverr_api_keys": coverr_api_keys, "twelvelabs_api_keys": twelvelabs_api_keys,
                 "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
-                "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "subtitle_provider": subtitle_provider,
+                "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint, "subtitle_provider": subtitle_provider,
                 "ffmpeg_path": ffmpeg_path, "video_codec": video_codec, "material_directory": material_directory,
                 "whisper_model_size": whisper_model_size, "whisper_device": whisper_device, "whisper_compute_type": whisper_compute_type,
                 "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
@@ -682,6 +973,33 @@ def render_settings():
                     st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
             except Exception as exc:
                 st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+
+    st.divider()
+    st.subheader("Teste de vozes")
+    st.caption("Este painel é exclusivamente um preview. O áudio gerado não altera vídeos, tarefas, Blueprints ou a configuração da pipeline.")
+    preview_cols = st.columns([1.1, 2.2, 1.2])
+    with preview_cols[0]:
+        preview_provider = st.selectbox("Provider", ["edge", "azure_speech", "elevenlabs", "minimax", "siliconflow", "gemini", "chatterbox"], index=0, key="voice_preview_provider")
+    with preview_cols[1]:
+        if preview_provider in {"edge", "azure_speech"}:
+            preview_voice_options = voice_catalog(settings.get("voice_preview_voice", "en-US-AriaNeural-Female"))
+            preview_voice = st.selectbox("Voz", preview_voice_options, index=preview_voice_options.index(settings.get("voice_preview_voice", "en-US-AriaNeural-Female")) if settings.get("voice_preview_voice", "en-US-AriaNeural-Female") in preview_voice_options else 0, format_func=lambda item: item or "Escolha uma voz", key="voice_preview_voice")
+        else:
+            preview_voice = st.text_input("Voice ID", value=settings.get("voice_preview_voice", ""), key="voice_preview_voice_text")
+    with preview_cols[2]:
+        preview_rate = st.selectbox("Velocidade", ["-20%", "-10%", "+0%", "+10%", "+20%"], index=2, key="voice_preview_rate")
+    preview_text = st.text_area("Texto de teste", value=DEFAULT_SAMPLE, max_chars=1000, height=110, key="voice_preview_text")
+    if st.button("Testar voz", type="primary", key="voice_preview_generate"):
+        try:
+            preview_path = synthesize_preview(preview_text, preview_provider, preview_voice, settings, preview_rate)
+            st.session_state["voice_preview_path"] = str(preview_path)
+            st.success("Amostra de voz gerada. Este ficheiro é apenas um preview.")
+        except Exception as exc:
+            st.error(f"Não foi possível gerar o preview: {exc}")
+    preview_path = Path(st.session_state.get("voice_preview_path", ""))
+    if preview_path.exists():
+        st.audio(preview_path.read_bytes(), format="audio/mpeg")
+        st.download_button("Descarregar amostra", data=preview_path.read_bytes(), file_name=preview_path.name, mime="audio/mpeg", key="voice_preview_download")
 
 
 def render_mcp():
@@ -890,6 +1208,7 @@ def main():
         ("Blueprints", ":material/library_books:", "Blueprints"),
         ("Canais", ":material/ondemand_video:", "Canais"),
         ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
+        ("Automação", ":material/schedule:", "Automação"),
         ("Upload", ":material/cloud_upload:", "Upload"),
         ("MCP", ":material/hub:", "MCP"),
         ("Limpador de metadado", ":material/edit_note:", "Limpador de metadado"),
@@ -912,6 +1231,7 @@ def main():
         "Blueprints": render_blueprints,
         "Canais": render_channels,
         "Novo vídeo": render_new_video,
+        "Automação": render_automation,
         "Upload": render_upload,
         "MCP": render_mcp,
         "Limpador de metadado": render_metadata_cleaner,

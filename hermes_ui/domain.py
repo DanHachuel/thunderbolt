@@ -34,8 +34,13 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "last_youtube_sync": None,
         "language": "Português",
         "blueprint_id": "",
+        "default_blueprint_id": "",
         "style_wide": "pexels",
         "voice": "",
+        "default_voice": "",
+        "delegated_session_id": "",
+        "automation_on": False,
+        "automation_time": "00:00",
         "active": True,
         "daily_limit": 1,
         "backlog_total": 0,
@@ -59,6 +64,17 @@ def update_channel(channel_id: str, updates: dict[str, Any]) -> dict[str, Any] |
             write_json("channels.json", channels)
             return channel
     return None
+
+
+def delete_channel(channel_id: str) -> dict[str, Any] | None:
+    """Remove apenas o cadastro do canal, preservando tarefas e artefactos."""
+    channels = read_json("channels.json", [])
+    remaining = [channel for channel in channels if channel.get("id") != channel_id]
+    if len(remaining) == len(channels):
+        return None
+    removed = next(channel for channel in channels if channel.get("id") == channel_id)
+    write_json("channels.json", remaining)
+    return removed
 
 
 def create_batch(mode: str, channel_ids: list[str], topic: str, quantity: int, options: dict[str, Any]) -> dict[str, Any]:
@@ -97,6 +113,15 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "language": batch["options"].get("language", channel.get("language", "Português")),
                 "format": batch["options"].get("format", "wide"),
                 "style_wide": batch["options"].get("style_wide", channel.get("style_wide", "pexels")),
+                "style_ia": batch["options"].get("style_ia", ""),
+                "music_mode": batch["options"].get("music_mode", False),
+                "music_path": batch["options"].get("music_path", ""),
+                "music_source": batch["options"].get("music_source", ""),
+                "background_mode": batch["options"].get("background_mode", "stock"),
+                "blueprint_id": channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
+                "voice": channel.get("default_voice") or channel.get("voice", ""),
+                "automation_on": bool(channel.get("automation_on", False)),
+                "automation_time": channel.get("automation_time", "00:00"),
                 "stage": "script",
                 "state": "to_do",
                 "progress": 0,
@@ -113,6 +138,17 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
         queues.setdefault("script", []).append(task["id"])
         write_json("queues.json", queues)
     return created
+
+
+def update_task(task_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    tasks = read_json("tasks.json", [])
+    for task in tasks:
+        if task.get("id") == task_id:
+            task.update(updates)
+            task["updated_at"] = now()
+            write_json("tasks.json", tasks)
+            return task
+    return None
 
 
 def transition_task(task_id: str, state: str | None = None, stage: str | None = None, error: str | None = None) -> dict[str, Any] | None:
