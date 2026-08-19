@@ -350,7 +350,15 @@ def render_settings():
         st.subheader("Execução local")
         port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
         moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-        youtube_api_key = st.text_input("YouTube Data API key", settings.get("youtube_api_key", ""), type="password")
+        st.markdown("**YouTube — API pública e OAuth 2.0**")
+        st.caption("A Data API Key consulta canais e estatísticas públicas. O Client ID e o Client Secret são credenciais OAuth 2.0 separadas, usadas para autorizar operações na conta, como upload.")
+        youtube_cols = st.columns(3)
+        with youtube_cols[0]:
+            youtube_api_key = text_setting("YouTube Data API Key", "youtube_api_key", secret=True, help_text="Chave criada em Google Cloud > APIs e serviços > Credenciais > Chave de API.")
+        with youtube_cols[1]:
+            youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud.")
+        with youtube_cols[2]:
+            youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0.")
 
         with st.expander("Serviço, materiais e rede"):
             cols = st.columns(2)
@@ -448,6 +456,7 @@ def render_settings():
         if st.form_submit_button("Guardar configurações do Thunderbolt", type="primary"):
             settings.update({
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
+                "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                 "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
                 "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,

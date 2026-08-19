@@ -29,6 +29,8 @@ DEFAULTS: dict[str, Any] = {
         "video_concurrency": 3,
         "upload_concurrency": 2,
         "youtube_api_key": "",
+        "youtube_client_id": "",
+        "youtube_client_secret": "",
         "llm_provider": "moonshot",
         "moonshot_api_key": "",
         "moonshot_base_url": "",

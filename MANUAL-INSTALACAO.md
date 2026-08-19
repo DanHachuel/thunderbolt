@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.16
+> **Versão deste manual:** 0.2.17
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.16 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.17 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.16 install
+npx --yes @danhachuel/thunderbolt@0.2.17 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -345,7 +345,9 @@ Na primeira execução, abra **Configurações** e reveja:
 |---|---|
 | Porta Streamlit | Definir a porta local da UI |
 | Pasta MoneyPrinterTurbo | Indicar o clone local que será sincronizado com `config.toml` |
-| YouTube Data API key | Permitir importar nome, handle e métricas de canais |
+| YouTube Data API Key | Permitir importar nome, handle e métricas públicas de canais |
+| YouTube OAuth Client ID | Identificar a aplicação OAuth 2.0 do Google para operações autenticadas |
+| YouTube OAuth Client Secret | Secret do mesmo cliente OAuth 2.0; não é a Data API Key |
 | TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
 
 As chaves devem ser inseridas apenas na configuração local. Não as coloque no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
