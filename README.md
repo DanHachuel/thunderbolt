@@ -18,10 +18,10 @@ A primeira versão implementa a camada UI independente com:
 | Novo vídeo | Canal específico, lote no mesmo canal e lote geral |
 | Vídeos | Filtro por estado e controlos iniciar/parar |
 | Upload | Destinos YouTube/TikTok e diagnóstico do TikTok |
-| Configurações | Caminhos locais, YouTube API key e credenciais TikTok |
+| Configurações | Provedores LLM, TTS/voz, materiais, Whisper, FFmpeg, YouTube, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
-Os adaptadores de agentes Hermes, MoneyPrinterTurbo e publicação final em plataformas podem ser ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
+Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
 ## Instalação
 
@@ -102,9 +102,9 @@ content-hermes
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.9 install
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.9 doctor
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.9
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 doctor
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:

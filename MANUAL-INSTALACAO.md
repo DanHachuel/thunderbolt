@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Content-Hermes, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/content-hermes-ui`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.0  
+> **Versão deste manual:** 0.2.11  
 > **Pacote npm:** `@danhachuel/content-hermes-ui`  
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/content-hermes-ui](https://github.com/DanHachuel/content-hermes-ui)
@@ -23,7 +23,7 @@ A instalação assistida cria um ambiente local separado para evitar misturar as
 | FFmpeg | Disponibilizado pelo pacote Python `imageio-ffmpeg` |
 | Porta da aplicação | `3030`, configurável com `HERMES_PORT` |
 
-A aplicação não instala drivers de GPU, Docker, modelos Whisper, chaves de API, cookies, tokens ou credenciais externas. Esses componentes devem ser configurados separadamente quando forem necessários.
+A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local.
 
 O MoneyPrinterTurbo declara Python 3.11 ou superior como requisito e documenta a instalação com `uv` ou com `venv + pip`. A aplicação segue o mesmo princípio e adiciona um instalador assistido próprio.[1]
 
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.9 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui@0.2.9 install
+npx --yes @danhachuel/content-hermes-ui@0.2.11 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -341,13 +341,10 @@ Na primeira execução, abra **Configurações** e reveja:
 
 | Configuração | Finalidade |
 |---|---|
-| Pasta MoneyPrinterTurbo | Indicar onde o projecto base está instalado |
 | Porta Streamlit | Definir a porta local da UI |
-| URL Hermes | Configurar eventual orquestrador local |
+| Pasta MoneyPrinterTurbo | Indicar o clone local que será sincronizado com `config.toml` |
 | YouTube Data API key | Permitir importar nome, handle e métricas de canais |
-| TikTok Client Key/Secret | Preparar a Content Posting API |
-| TikTok Redirect URI | Definir o callback registado no TikTok |
-| TikTok access token | Usar uma autorização já concluída, quando aplicável |
+| TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
 
 As chaves devem ser inseridas apenas na configuração local. Não as coloque no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
 

@@ -14,19 +14,28 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from integrations.platforms import TikTokAdapter, YouTubeAdapter
-from integrations.local_runtime import LocalRuntime
+from integrations.local_runtime import MoneyPrinterRuntime
+from integrations.moneyprinter_config import sync_moneyprinter_config
 
 ensure_storage()
-st.set_page_config(page_title="Content-Hermes", page_icon="H", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="MoneyPrinterTurbo UI", page_icon="M", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
 :root { --accent:#35a7ff; --bg:#0b1118; --card:#121b26; }
 [data-testid="stAppViewContainer"] { background: radial-gradient(circle at top right, #13283b 0, #0b1118 42%); }
 [data-testid="stSidebar"] { background:#091018; border-right:1px solid #1d3448; }
-.hermes-card { padding: 1rem 1.1rem; border:1px solid #20384d; border-radius:14px; background:rgba(18,27,38,.92); min-height:110px; }
-.hermes-label { color:#8ba6bb; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
-.hermes-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
+[data-testid="stSidebar"] [data-testid="stButton"] { margin:0.18rem 0; }
+[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:2.55rem; justify-content:flex-start; text-align:left; padding:0.55rem 0.85rem; border-radius:10px; border:1px solid transparent; font-weight:600; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:#e7edf2; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:#1c252e; border-color:#2d3944; color:#ffffff; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#292929; color:#ffffff; border-color:#3a3a3a; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:#343434; color:#ffffff; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span { color:#ffffff; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:#e7edf2; }
+.content-card { padding: 1rem 1.1rem; border:1px solid #20384d; border-radius:14px; background:rgba(18,27,38,.92); min-height:110px; }
+.content-label { color:#8ba6bb; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
+.content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
 .small-muted { color:#8ba6bb; font-size:.85rem; }
 /* Identidade visual dos destinos de upload: YouTube vermelho, TikTok preto. */
@@ -39,7 +48,7 @@ st.markdown("""
 
 
 def card(label: str, value: str | int, note: str = ""):
-    st.markdown(f'<div class="hermes-card"><div class="hermes-label">{label}</div><div class="hermes-value">{value}</div><div class="small-muted">{note}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="content-card"><div class="content-label">{label}</div><div class="content-value">{value}</div><div class="small-muted">{note}</div></div>', unsafe_allow_html=True)
 
 
 def channel_options() -> list[dict]:
@@ -47,8 +56,8 @@ def channel_options() -> list[dict]:
 
 
 def render_dashboard():
-    st.title("Content-Hermes")
-    st.caption("Central de operação local para a pipeline de conteúdo faceless")
+    st.title("MoneyPrinterTurbo UI")
+    st.caption("Interface local para operação e automação de conteúdo faceless")
     summary = pipeline_summary()
     cols = st.columns(6)
     for col, (label, value, note) in zip(cols, [("Canais", summary["channels"], f'{summary["active_channels"]} activos'), ("Tarefas", summary["total_tasks"], "total registado"), ("A fazer", summary["pending"], "na pipeline"), ("Em execução", summary["doing"], "a decorrer"), ("Concluídos", summary["done"], "artefactos prontos"), ("Falhas", summary["failed"], "requerem atenção")]):
@@ -313,25 +322,132 @@ def render_upload():
 
 
 def render_settings():
-    st.title("Configurações e chaves API")
+    st.title("Configurações do MoneyPrinterTurbo")
+    st.caption("Área compatível com config.toml do MoneyPrinterTurbo. As credenciais ficam no storage local e não são enviadas para o GitHub.")
     settings = read_json("settings.json", {})
+
+    def text_setting(label: str, key: str, *, secret: bool = False, help_text: str | None = None) -> str:
+        return st.text_input(label, settings.get(key, ""), type="password" if secret else "default", help=help_text)
+
     with st.form("settings_form"):
         st.subheader("Execução local")
         port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-        hermes_url = st.text_input("URL Hermes", settings.get("hermes_url", "http://localhost:8765"))
         moneyprinter_path = st.text_input("Pasta MoneyPrinterTurbo", settings.get("moneyprinter_path", ""))
-        st.subheader("YouTube")
         youtube_api_key = st.text_input("YouTube Data API key", settings.get("youtube_api_key", ""), type="password")
-        st.subheader("TikTok Content Posting API")
-        tiktok_client_key = st.text_input("Client Key", settings.get("tiktok_client_key", ""), type="password")
-        tiktok_client_secret = st.text_input("Client Secret", settings.get("tiktok_client_secret", ""), type="password")
-        tiktok_redirect_uri = st.text_input("Redirect URI", settings.get("tiktok_redirect_uri", "http://localhost:3030/oauth/tiktok/callback"))
-        tiktok_scopes = st.text_input("Scopes", settings.get("tiktok_scopes", "user.info.basic,video.publish,video.upload"))
-        tiktok_access_token = st.text_input("Access token TikTok (opcional)", settings.get("tiktok_access_token", ""), type="password", help="Pode ser substituído pela variável TIKTOK_ACCESS_TOKEN.")
-        if st.form_submit_button("Guardar configurações", type="primary"):
-            settings.update({"port": port, "hermes_url": hermes_url, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key, "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret, "tiktok_redirect_uri": tiktok_redirect_uri, "tiktok_scopes": tiktok_scopes, "tiktok_access_token": tiktok_access_token})
+
+        with st.expander("Serviço, materiais e rede"):
+            cols = st.columns(2)
+            with cols[0]:
+                log_level = st.selectbox("Log level", ["DEBUG", "INFO", "WARNING", "ERROR"], index=["DEBUG", "INFO", "WARNING", "ERROR"].index(settings.get("log_level", "DEBUG")) if settings.get("log_level", "DEBUG") in ["DEBUG", "INFO", "WARNING", "ERROR"] else 0)
+                listen_host = text_setting("API listen host", "listen_host")
+                listen_port = st.number_input("API listen port", 1, 65535, int(settings.get("listen_port", 8080)))
+                video_source = st.selectbox("Fonte de materiais", ["pexels", "pixabay", "coverr", "loomloom", "local"], index=["pexels", "pixabay", "coverr", "loomloom", "local"].index(settings.get("video_source", "pexels")) if settings.get("video_source", "pexels") in ["pexels", "pixabay", "coverr", "loomloom", "local"] else 0)
+            with cols[1]:
+                endpoint = text_setting("Endpoint público", "endpoint")
+                proxy_http = text_setting("Proxy HTTP", "proxy_http")
+                proxy_https = text_setting("Proxy HTTPS", "proxy_https")
+                match_materials_to_script = st.checkbox("Alinhar materiais ao roteiro", bool(settings.get("match_materials_to_script", False)))
+
+        with st.expander("LLM — providers e modelos", expanded=True):
+            provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
+            llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
+            llm_fields = [
+                ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True), ("OpenAI", "openai", True),
+                ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
+                ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
+                ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
+                ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
+                ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
+                ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
+            ]
+            for label, prefix, has_key in llm_fields:
+                st.markdown(f"**{label}**")
+                cols = st.columns(3)
+                with cols[0]:
+                    if has_key:
+                        settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
+                    else:
+                        settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
+                with cols[1]:
+                    settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
+                with cols[2]:
+                    settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
+
+        with st.expander("Voz, TTS e música"):
+            cols = st.columns(2)
+            with cols[0]:
+                azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
+                azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
+                siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
+                minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
+                minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
+            with cols[1]:
+                elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
+                chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
+                chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
+                sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+
+        with st.expander("Vídeo, materiais, Whisper e FFmpeg"):
+            cols = st.columns(2)
+            with cols[0]:
+                pexels_api_keys = text_setting("Pexels API keys", "pexels_api_keys", secret=True, help_text="Separe várias chaves por vírgula para rotação.")
+                pixabay_api_keys = text_setting("Pixabay API keys", "pixabay_api_keys", secret=True)
+                coverr_api_keys = text_setting("Coverr API keys", "coverr_api_keys", secret=True)
+                twelvelabs_api_keys = text_setting("TwelveLabs API keys", "twelvelabs_api_keys", secret=True)
+                material_directory = text_setting("Pasta de materiais", "material_directory")
+            with cols[1]:
+                subtitle_provider = st.selectbox("Subtitle provider", ["edge", "whisper", ""], index=["edge", "whisper", ""].index(settings.get("subtitle_provider", "edge")) if settings.get("subtitle_provider", "edge") in ["edge", "whisper", ""] else 0)
+                ffmpeg_path = text_setting("Caminho FFmpeg", "ffmpeg_path")
+                video_codec = text_setting("Codec de vídeo", "video_codec")
+                whisper_model_size = text_setting("Whisper model", "whisper_model_size")
+                whisper_device = st.selectbox("Whisper device", ["cpu", "cuda"], index=0 if settings.get("whisper_device", "cpu") == "cpu" else 1)
+                whisper_compute_type = text_setting("Whisper compute type", "whisper_compute_type")
+
+        with st.expander("TikTok for Developers"):
+            st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
+            tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
+            tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
+
+        with st.expander("Publicação através do Upload-Post"):
+            upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
+            upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
+            upload_post_username = text_setting("Upload-Post username", "upload_post_username")
+            upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
+            upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+
+        if st.form_submit_button("Guardar configurações do MoneyPrinterTurbo", type="primary"):
+            settings.update({
+                "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
+                "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
+                "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
+                "llm_provider": llm_provider, "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
+                "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
+                "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
+                "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
+                "pexels_api_keys": pexels_api_keys, "pixabay_api_keys": pixabay_api_keys, "coverr_api_keys": coverr_api_keys, "twelvelabs_api_keys": twelvelabs_api_keys,
+                "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
+                "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "subtitle_provider": subtitle_provider,
+                "ffmpeg_path": ffmpeg_path, "video_codec": video_codec, "material_directory": material_directory,
+                "whisper_model_size": whisper_model_size, "whisper_device": whisper_device, "whisper_compute_type": whisper_compute_type,
+                "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
+                "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
+                "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
+                "upload_post_auto_upload": upload_post_auto_upload,
+            })
             write_json("settings.json", settings)
-            st.success("Configurações guardadas localmente.")
+            try:
+                synced = sync_moneyprinter_config(settings, moneyprinter_path)
+                if synced:
+                    st.success(f"Configurações guardadas e sincronizadas com {synced}")
+                else:
+                    st.success("Configurações guardadas localmente. Indique uma pasta válida do MoneyPrinterTurbo para sincronizar config.toml.")
+            except Exception as exc:
+                st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
 
 
 def render_pipeline():
@@ -345,19 +461,25 @@ def render_pipeline():
 
 
 def main():
-    pages = ["Dashboard", "Pipeline", "Blueprints", "Canais", "Novo vídeo", "Vídeos", "Upload", "Configurações"]
+    pages = [
+        ("Dashboard", ":material/home:", "Início"),
+        ("Pipeline", ":material/account_tree:", "Pipeline"),
+        ("Blueprints", ":material/library_books:", "Blueprints"),
+        ("Canais", ":material/ondemand_video:", "Canais"),
+        ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
+        ("Vídeos", ":material/video_library:", "Vídeos"),
+        ("Upload", ":material/cloud_upload:", "Upload"),
+        ("Configurações", ":material/settings:", "Configurações"),
+    ]
+    current_page = st.session_state.get("page", "Dashboard")
     with st.sidebar:
-        st.title("Content-Hermes")
-        page = st.radio("Navegação", pages, index=pages.index(st.session_state.get("page", "Dashboard")))
-        st.session_state["page"] = page
-        st.caption("Storage JSON local")
-        settings = read_json("settings.json", {})
-        runtime = LocalRuntime(settings).status()
-        st.caption(f"Porta alvo: {settings.get('port', 3030)}")
-        st.caption(f"Modo: {runtime['mode']}")
-        st.caption(f"Hermes: {'online' if runtime['hermes'] else 'indisponível'}")
-        st.caption(f"MoneyPrinterTurbo: {'encontrado' if runtime['moneyprinter'] else 'não configurado'}")
-    {"Dashboard": render_dashboard, "Pipeline": render_pipeline, "Blueprints": render_blueprints, "Canais": render_channels, "Novo vídeo": render_new_video, "Vídeos": render_videos, "Upload": render_upload, "Configurações": render_settings}[page]()
+        st.title("MoneyPrinterTurbo")
+        st.caption("Navegação")
+        for target, icon, label in pages:
+            if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+                st.session_state["page"] = target
+                st.rerun()
+    {target: renderer for target, _, _ in pages}[current_page]()
 
 
 if __name__ == "__main__":

@@ -64,32 +64,27 @@ class TikTokAdapter:
     def __init__(self, settings: dict[str, Any]):
         self.client_key = settings.get("tiktok_client_key", "")
         self.client_secret = settings.get("tiktok_client_secret", "")
-        self.redirect_uri = settings.get("tiktok_redirect_uri", "")
-        self.scopes = settings.get("tiktok_scopes", "user.info.basic,video.publish,video.upload")
-        self.access_token = settings.get("tiktok_access_token", "") or os.getenv("TIKTOK_ACCESS_TOKEN", "")
+        # Redirect URI, scopes, OAuth e access token são geridos no TikTok for Developers Playground.
+        # A UI guarda apenas as credenciais da aplicação.
+        self.access_token = os.getenv("TIKTOK_ACCESS_TOKEN", "")
 
     @property
     def configured(self) -> bool:
-        return bool(self.client_key and self.client_secret and self.redirect_uri)
+        return bool(self.client_key and self.client_secret)
 
     def status(self) -> IntegrationResult:
         if not self.configured:
             return IntegrationResult(False, "TikTok ainda não configurado.", {"status": "not_configured"})
-        return IntegrationResult(True, "Credenciais TikTok configuradas; OAuth ainda deve ser autorizado.", {"status": "configured"})
-
-    def authorization_url(self, state: str) -> str:
-        from urllib.parse import urlencode
-        params = urlencode({"client_key": self.client_key, "scope": self.scopes, "response_type": "code", "redirect_uri": self.redirect_uri, "state": state})
-        return f"https://www.tiktok.com/v2/auth/authorize/?{params}"
+        return IntegrationResult(True, "TikTok Client ID e Client Secret configurados; autorização e publicação são geridas no TikTok for Developers Playground.", {"status": "configured"})
 
     def upload_video(self, video_path: str, title: str = "", privacy_level: str = "SELF_ONLY") -> IntegrationResult:
         path = Path(video_path)
         if not path.exists():
             return IntegrationResult(False, "Ficheiro de vídeo não encontrado.", {"path": video_path})
         if not self.configured:
-            return IntegrationResult(False, "Configure Client Key, Client Secret e Redirect URI antes do upload.", {"path": video_path})
+            return IntegrationResult(False, "Configure TikTok Client ID e Client Secret.", {"path": video_path})
         if not self.access_token:
-            return IntegrationResult(False, "Conclua o OAuth TikTok ou configure TIKTOK_ACCESS_TOKEN localmente.", {"path": str(path), "status": "requires_oauth"})
+            return IntegrationResult(False, "Conclua a autorização no TikTok for Developers Playground; o token de publicação deve ser fornecido pelo ambiente de execução.", {"path": str(path), "status": "requires_playground_authorization"})
         try:
             size = path.stat().st_size
             payload = {"post_info": {"title": title[:2200], "privacy_level": privacy_level, "disable_duet": False, "disable_comment": False, "disable_stitch": False}, "source_info": {"source": "FILE_UPLOAD", "video_size": size, "chunk_size": size, "total_chunk_count": 1}}
