@@ -9,6 +9,10 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+try:
+    APP_VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8")).get("version", "")
+except (OSError, json.JSONDecodeError):
+    APP_VERSION = ""
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, pipeline_summary, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
@@ -26,9 +30,14 @@ st.markdown("""
 :root { --accent:#35a7ff; --bg:#0b1118; --card:#121b26; }
 [data-testid="stAppViewContainer"] { background: radial-gradient(circle at top right, #13283b 0, #0b1118 42%); }
 [data-testid="stSidebar"] { background:#091018; border-right:1px solid #1d3448; }
-[data-testid="stSidebar"] [data-testid="stButton"] { margin:0.03rem 0; }
-[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:2.05rem; height:2.05rem; justify-content:flex-start; text-align:left; padding:0.28rem 0.7rem; border-radius:8px; border:1px solid transparent; font-weight:600; }
-[data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1.1; }
+[data-testid="stSidebar"] .block-container { padding-top:0.28rem; padding-bottom:0.45rem; }
+[data-testid="stSidebar"] > div:first-child { padding-top:0.28rem; }
+[data-testid="stSidebar"] .tb-brand { display:flex; align-items:baseline; gap:0.42rem; margin:0 0 0.68rem 0; white-space:nowrap; }
+[data-testid="stSidebar"] .tb-brand-name { color:#f4f8fb; font-size:1.38rem; line-height:1.15; font-weight:750; letter-spacing:-0.02em; }
+[data-testid="stSidebar"] .tb-brand-version { color:#8ba6bb; font-size:0.92rem; line-height:1; font-weight:500; }
+[data-testid="stSidebar"] [data-testid="stButton"] { margin:0.025rem 0 !important; }
+[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:1.72rem; height:1.72rem; justify-content:flex-start; text-align:left; padding:0.10rem 0.52rem; border-radius:7px; border:1px solid transparent; font-size:0.86rem; font-weight:550; }
+[data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:#e7edf2; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:#1c252e; border-color:#2d3944; color:#ffffff; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#292929; color:#ffffff; border-color:#3a3a3a; }
@@ -609,8 +618,8 @@ def main():
     ]
     current_page = st.session_state.get("page", "Dashboard")
     with st.sidebar:
-        st.title("Thunderbolt")
-        st.caption("Navegação")
+        version_markup = f'<span class="tb-brand-version">{APP_VERSION}</span>' if APP_VERSION else ""
+        st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
         for target, icon, label in pages:
             if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
                 st.session_state["page"] = target
