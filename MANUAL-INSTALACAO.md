@@ -97,9 +97,19 @@ O Python deve apresentar a versão `3.11` ou superior. Se estiver no Windows sem
 
 Execute:
 
-```bash
-npx --yes @danhachuel/content-hermes-ui install
+Windows PowerShell ou MobaXterm:
+
+```powershell
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.5 install
 ```
+
+Linux/macOS:
+
+```bash
+npx --yes @danhachuel/content-hermes-ui@0.2.5 install
+```
+
+A instalação é **idempotente**: reutiliza a pasta única `Hermes-UI` e não cria uma pasta nova para cada versão do pacote. Em instalações Windows antigas, detecta `C:\Users\<utilizador>\AppData\Local\hermes`, migra os dados para `C:\Users\<utilizador>\Hermes-UI` quando a pasta nova ainda não existe e remove a pasta antiga depois da migração. Se a pasta nova já existir, a instalação antiga é removida para evitar duplicação.
 
 O instalador irá:
 
@@ -114,7 +124,7 @@ O instalador irá:
 9. registar o caminho local do MoneyPrinterTurbo;
 10. deixar o ambiente pronto para o comando de arranque.
 
-No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente.
+No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. A limpeza automática pode ser desactivada apenas para uma migração manual através de `HERMES_KEEP_LEGACY=1`, mas isso deixará a instalação antiga no disco.
 
 A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo.
 

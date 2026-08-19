@@ -68,7 +68,7 @@ Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente vir
 npx --yes @danhachuel/content-hermes-ui install
 ```
 
-Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. Para usar uma cópia existente do MoneyPrinterTurbo:
+Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. A instalação é idempotente: reutiliza uma única pasta e detecta/migra a tentativa antiga em `C:\Users\<utilizador>\AppData\Local\hermes`, removendo-a depois para evitar lixo de versões. Para usar uma cópia existente do MoneyPrinterTurbo:
 
 ```bash
 MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install
@@ -102,9 +102,9 @@ content-hermes
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui install
-npx.cmd --yes @danhachuel/content-hermes-ui doctor
-npx.cmd --yes @danhachuel/content-hermes-ui
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.5 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.5 doctor
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.5
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
