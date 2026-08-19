@@ -359,8 +359,16 @@ def render_settings():
         with st.expander("LLM — providers e modelos", expanded=True):
             provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
             llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
+            st.markdown("**OpenAI — API key, Base URL e modelo**")
+            openai_cols = st.columns(3)
+            with openai_cols[0]:
+                openai_api_key = text_setting("OpenAI API key", "openai_api_key", secret=True)
+            with openai_cols[1]:
+                openai_base_url = text_setting("OpenAI Base URL", "openai_base_url", help_text="Opcional. Deixe vazio para a API oficial ou indique um endpoint compatível.")
+            with openai_cols[2]:
+                openai_model_name = text_setting("OpenAI model", "openai_model_name", help_text="Ex.: gpt-4o, gpt-4.1 ou o modelo disponibilizado pelo seu endpoint.")
             llm_fields = [
-                ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True), ("OpenAI", "openai", True),
+                ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
                 ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
                 ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
                 ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
@@ -381,7 +389,7 @@ def render_settings():
                 with cols[2]:
                     settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
 
-        with st.expander("Voz, TTS e música"):
+        with st.expander("Voz, TTS e música — Azure Speech e restantes serviços", expanded=True):
             cols = st.columns(2)
             with cols[0]:
                 azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
@@ -416,7 +424,7 @@ def render_settings():
                 whisper_device = st.selectbox("Whisper device", ["cpu", "cuda"], index=0 if settings.get("whisper_device", "cpu") == "cpu" else 1)
                 whisper_compute_type = text_setting("Whisper compute type", "whisper_compute_type")
 
-        with st.expander("TikTok for Developers"):
+        with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
             st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
             tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
             tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
@@ -433,7 +441,8 @@ def render_settings():
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                 "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
-                "llm_provider": llm_provider, "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
+                "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
+                "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
                 "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
                 "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
                 "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,

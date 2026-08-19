@@ -24,8 +24,22 @@ const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (e
 const main = resolve(root, "app", "main.py");
 const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
 
-function run(command, commandArgs) {
-  const result = spawnSync(command, commandArgs, { stdio: "inherit", env: process.env });
+function run(command, commandArgs, label = "comando") {
+  console.log(`Thunderbolt: a iniciar ${label}...`);
+  const result = spawnSync(command, commandArgs, {
+    stdio: "inherit",
+    env: process.env,
+    cwd: root,
+    windowsHide: false,
+  });
+  if (result.error) {
+    console.error(`Thunderbolt: não foi possível iniciar ${label}: ${result.error.message}`);
+    process.exit(1);
+  }
+  if (result.signal) {
+    console.error(`Thunderbolt: ${label} terminou pelo sinal ${result.signal}.`);
+    process.exit(1);
+  }
   process.exit(result.status ?? 1);
 }
 
@@ -96,7 +110,14 @@ function check() {
   }
 }
 
-if (args[0] === "install") run(process.execPath, [resolve(root, "scripts", "install.mjs"), ...args.slice(1)]);
+if (args[0] === "install" || args[0] === "--install") {
+  const installer = resolve(root, "scripts", "install.mjs");
+  if (!existsSync(installer)) {
+    console.error(`Thunderbolt: instalador não encontrado: ${installer}`);
+    process.exit(1);
+  }
+  run(process.execPath, [installer, ...args.slice(1)], "a instalação");
+}
 if (args[0] === "doctor" || args.includes("--check")) {
   check();
   process.exit(0);

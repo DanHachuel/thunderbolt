@@ -37,6 +37,12 @@ jobs:
           node -e "const p=require('./package.json'); if (!p.name.startsWith('@danhachuel/')) process.exit(1); if (!p.bin || !p.bin['thunderbolt']) process.exit(1); console.log(p.name + '@' + p.version)"
           npm pack --dry-run
 
+      - name: Smoke test launcher install
+        run: |
+          TEST_ROOT="${RUNNER_TEMP}/thunderbolt-install-smoke"
+          THUNDERBOLT_HOME="$TEST_ROOT" node scripts/cli.mjs install --skip-python-deps --skip-moneyprinter
+          test -d "$TEST_ROOT/storage/blueprints/importados"
+
       - name: Publish to npm
         run: npm publish --access public
         env:
