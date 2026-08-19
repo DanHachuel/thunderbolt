@@ -41,6 +41,23 @@ def test_blueprint_json_is_readable(tmp_path, monkeypatch):
     assert storage.load_blueprint_file(target)["unknown_field"]["keep"] is True
 
 
+def test_seed_blueprints_are_initialized_without_overwrite(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    imported = sorted((storage.BLUEPRINTS / "importados").glob("*.json"))
+    assert len(imported) == 13
+
+    preserved = imported[0]
+    preserved.write_text('{"name": "personalizado"}\n', encoding="utf-8")
+    storage.ensure_storage()
+    assert storage.load_blueprint_file(preserved)["name"] == "personalizado"
+
+
 def test_blueprint_creation_modes(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import blueprints, storage

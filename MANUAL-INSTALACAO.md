@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Content-Hermes, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/content-hermes-ui`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.11  
+> **Versão deste manual:** 0.2.12
 > **Pacote npm:** `@danhachuel/content-hermes-ui`  
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/content-hermes-ui](https://github.com/DanHachuel/content-hermes-ui)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui@0.2.11 install
+npx --yes @danhachuel/content-hermes-ui@0.2.12 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -359,9 +359,18 @@ Após iniciar a aplicação, valide o seguinte percurso:
 5. **Novo vídeo:** teste primeiro o modo **Canal específico** e depois os modos de lote.
 6. **Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar**.
 7. **Upload:** confirme os destinos configurados e os estados de pré-requisito.
-8. **Configurações:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
+8. **Limpador de metadado:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos da aba Novo vídeo não são aceites nesta área.
+9. **Configurações:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
 
-## 10. Problemas frequentes
+## 10. Limpador de metadado
+
+A aba **Limpador de metadado** recebe somente vídeos externos já prontos. O ficheiro enviado é copiado para `storage/metadata_cleaner/originals/`; a aplicação não altera o original. Ao aplicar a operação, o FFmpeg remove os metadados existentes do contentor e cria uma nova versão em `storage/metadata_cleaner/outputs/` com o título, descrição, tags, idioma e outros campos preenchidos.
+
+A descrição combina **Preview**, **Links** e **Timestamps**, seguindo a estrutura do workflow `YTBMetadataGenerator.json`. O preview recomendado tem entre 100 e 200 caracteres; os capítulos devem começar por `00:00`. O manifesto JSON descarregado contém os campos para um fluxo posterior de upload. Esta adaptação local não faz scraping automático via RSS/Apify nem publica directamente no YouTube.
+
+Se a limpeza falhar, confirme a disponibilidade do FFmpeg em **Configurações > Caminho FFmpeg** ou execute `doctor`. O processo usa `-map_metadata -1` para remover os metadados existentes e `-c copy` para evitar uma re-encodificação desnecessária sempre que o contentor permitir.
+
+## 11. Problemas frequentes
 
 ### Python não encontrado
 
@@ -457,7 +466,7 @@ Se uma dependência específica falhar, guarde o log completo e verifique a comp
 
 A instalação das dependências não baixa necessariamente todos os modelos grandes. O MoneyPrinterTurbo pode descarregar o modelo Whisper na primeira utilização, dependendo da configuração escolhida. Para ambientes sem acesso de rede, siga as instruções do projecto base para descarregar e colocar o modelo localmente.[1]
 
-## 11. Desinstalação
+## 12. Desinstalação
 
 Para remover o pacote global:
 
@@ -481,7 +490,7 @@ Remove-Item -Recurse -Force "$HOME\\Hermes-UI"
 
 > A remoção de `~/Hermes-UI` (Windows: `C:\Users\<utilizador>\Hermes-UI`) apaga estado JSON, blueprints, configurações e artefactos locais. Faça uma cópia de segurança antes de executar o comando.
 
-## 12. Segurança
+## 13. Segurança
 
 Nunca publique ou envie por chat:
 
@@ -493,7 +502,7 @@ Nunca publique ou envie por chat:
 
 Use secrets do GitHub Actions apenas para publicação do pacote. Para execução local, mantenha credenciais fora do repositório e use a área de configurações local ou variáveis de ambiente.
 
-## 13. Referências
+## 14. Referências
 
 [1]: https://github.com/harry0703/MoneyPrinterTurbo/blob/main/README-en.md — MoneyPrinterTurbo: requisitos, instalação, dependências, Streamlit e FFmpeg.
 

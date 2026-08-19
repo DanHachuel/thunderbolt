@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STORAGE = Path(os.getenv("HERMES_STORAGE_DIR", ROOT / "storage"))
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
+SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 
 DEFAULTS: dict[str, Any] = {
     "channels.json": [],
@@ -19,6 +20,7 @@ DEFAULTS: dict[str, Any] = {
     "queues.json": {"niche": [], "clone": [], "script": [], "title": [], "thumb": [], "video": [], "upload": []},
     "batches.json": [],
     "uploads.json": [],
+    "metadata_edits.json": [],
     "settings.json": {
         "port": 3030,
         "moneyprinter_path": "",
@@ -139,9 +141,22 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def seed_blueprints() -> None:
+    """Copy packaged seed Blueprints without overwriting local user files."""
+    if not SEED_BLUEPRINTS.exists():
+        return
+    destination = BLUEPRINTS / "importados"
+    destination.mkdir(parents=True, exist_ok=True)
+    for source in sorted(SEED_BLUEPRINTS.glob("*.json")):
+        target = destination / source.name
+        if not target.exists():
+            shutil.copy2(source, target)
+
+
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts"]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs"]:
         path.mkdir(parents=True, exist_ok=True)
+    seed_blueprints()
     for filename, default in DEFAULTS.items():
         target = STATE / filename
         if not target.exists():

@@ -18,6 +18,7 @@ A primeira versão implementa a camada UI independente com:
 | Novo vídeo | Canal específico, lote no mesmo canal e lote geral |
 | Vídeos | Filtro por estado e controlos iniciar/parar |
 | Upload | Destinos YouTube/TikTok e diagnóstico do TikTok |
+| Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
 | Configurações | Provedores LLM, TTS/voz, materiais, Whisper, FFmpeg, YouTube, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
@@ -102,9 +103,9 @@ content-hermes
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 install
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11 doctor
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.11
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 doctor
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -135,7 +136,11 @@ storage/
 │   ├── queues.json
 │   ├── batches.json
 │   ├── uploads.json
+│   ├── metadata_edits.json
 │   └── settings.json
+├── metadata_cleaner/
+│   ├── originals/    # cópias dos vídeos terceiros enviados
+│   └── outputs/      # versões com metadados limpos
 └── artifacts/        # ficheiros produzidos e caminhos referenciados
 ```
 
@@ -143,11 +148,17 @@ Para usar outro local, defina `HERMES_STORAGE_DIR`. O estado é escrito de forma
 
 ## Blueprints e Brandings
 
-Coloque ficheiros `.json` em `storage/blueprints/canais`, `storage/blueprints/nichos` ou `storage/blueprints/importados`. A aba **Blueprints** relê a pasta e mostra o conteúdo estruturado. Também é possível importar através do carregador da própria interface.
+Coloque ficheiros `.json` em `storage/blueprints/canais`, `storage/blueprints/nichos` ou `storage/blueprints/importados`. A aba **Blueprints** relê a pasta e mostra o conteúdo estruturado. A instalação já inclui 13 Blueprints seed, copiados apenas quando o ficheiro ainda não existe; actualizações não substituem Blueprints locais. Também é possível importar através do carregador da própria interface.
 
 A mesma aba possui a subaba **Brandings**. No formulário **Criar blueprint a partir de link**, cole um link de canal, handle ou vídeo do YouTube, informe o nicho e o idioma e escolha entre **Apenas Blueprint** ou **Blueprint + Branding completo**. O primeiro modo grava o blueprint forense local; o segundo grava também um ficheiro de Branding com identidade do canal, handle, descrição, hashtags, keywords, prompts de imagem de perfil e banner, direcção visual de thumbnails, assets e checklist de revisão.
 
 O fluxo foi modelado a partir do blueprint de clonagem com Branding anexado, incluindo a distinção entre entrada de canal/vídeo, normalização do link, metadados de nicho/idioma, perfil do canal, estratégia de conteúdo, pesquisa, identidade visual e brand pack. Placeholders de serviços externos são tratados como configuração local; chaves presentes em workflows importados não devem ser commitadas.
+
+## Limpador de metadado
+
+A aba **Limpador de metadado** foi adaptada do workflow `YTBMetadataGenerator.json`. Ela recebe apenas um vídeo externo já pronto, guarda uma cópia original separada, remove os metadados do contentor com FFmpeg e grava uma nova cópia com título, descrição, links, timestamps, tags e outros campos opcionais. O original nunca é alterado e os vídeos produzidos pela aba **Novo vídeo** não aparecem nesta área.
+
+A descrição segue a composição do workflow de referência: preview, secção de links e capítulos/timestamps. O resultado inclui um manifesto JSON para utilizar os metadados num fluxo posterior de upload. A versão local não usa o trigger RSS, o Apify ou a actualização automática de um vídeo YouTube; em vez disso, o utilizador fornece directamente o vídeo terceiro e controla a edição antes de publicar.
 
 ## Canais YouTube
 
@@ -155,7 +166,7 @@ Sem chave, o cadastro manual continua disponível. Para importar nome, handle e 
 
 ## TikTok
 
-A aba **Configurações** contém os campos da Content Posting API do TikTok: Client Key, Client Secret, Redirect URI e scopes. A publicação final depende da autorização OAuth e das permissões/aprovação da aplicação TikTok. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
+A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret. Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
 
 ## Segurança
 

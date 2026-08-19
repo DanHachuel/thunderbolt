@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, pipeline_summary, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
+from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from integrations.platforms import TikTokAdapter, YouTubeAdapter
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -450,6 +451,120 @@ def render_settings():
                 st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
 
 
+def render_metadata_cleaner():
+    st.title("Limpador de metadado")
+    st.caption("Limpeza e edição de metadados para vídeos de terceiros que já estão prontos.")
+    st.warning("Esta área aceita exclusivamente vídeos externos. Vídeos criados na aba Novo vídeo não são listados nem processados aqui.")
+
+    uploaded = st.file_uploader(
+        "Subir vídeo de terceiro",
+        type=["mp4", "mov", "mkv", "webm", "avi", "m4v", "mpeg", "mpg"],
+        help="O sistema cria uma cópia separada em storage/metadata_cleaner/originals e nunca altera o ficheiro original enviado.",
+        key="metadata_external_video_upload",
+    )
+    if uploaded and st.button("Carregar vídeo externo", type="primary", key="metadata_store_external_video"):
+        try:
+            source, digest = store_external_video(uploaded.name, uploaded.getvalue())
+            st.session_state["metadata_external_source"] = str(source)
+            st.session_state["metadata_external_digest"] = digest
+            st.session_state["metadata_external_name"] = uploaded.name
+            st.success("Vídeo externo carregado numa área separada do pipeline de vídeos.")
+        except ValueError as exc:
+            st.error(str(exc))
+
+    source_value = st.session_state.get("metadata_external_source", "")
+    source = Path(source_value) if source_value else None
+    if not source or not source.exists():
+        st.info("Suba um vídeo de terceiro para começar. Nenhum vídeo produzido pelo sistema é usado nesta página.")
+    else:
+        st.divider()
+        cols = st.columns([2, 1, 1])
+        with cols[0]:
+            st.write(f"**Vídeo externo:** {st.session_state.get('metadata_external_name', source.name)}")
+            st.caption(f"Cópia original preservada em `{source}`")
+        with cols[1]:
+            st.metric("Tamanho", f"{source.stat().st_size / 1024 / 1024:.1f} MB")
+        with cols[2]:
+            if st.button("Trocar vídeo", key="metadata_clear_external_source"):
+                for key in ["metadata_external_source", "metadata_external_digest", "metadata_external_name", "metadata_last_record"]:
+                    st.session_state.pop(key, None)
+                st.rerun()
+
+        st.subheader("Metadados para a versão limpa")
+        st.caption("A descrição segue o formato do workflow YTB Metadata Generator: preview, links e timestamps. As tags são guardadas sem hashtags.")
+        with st.form("metadata_cleaner_form"):
+            title = st.text_input("Título", value=source.stem.replace("-", " "))
+            preview = st.text_area("Preview / descrição curta", height=90, help="O workflow recomenda uma prévia envolvente de 100 a 200 caracteres, sem hashtags.")
+            links = st.text_area("Links", height=90, placeholder="Website: https://exemplo.com\nInstagram: https://instagram.com/exemplo")
+            timestamps = st.text_area("Timestamps / capítulos", height=120, placeholder="00:00 Introdução\n00:45 Contexto\n02:10 Conclusão")
+            tags = st.text_input("Tags SEO", placeholder="palavra-chave, tema do vídeo, canal dark")
+            left, right = st.columns(2)
+            with left:
+                language = st.text_input("Idioma", value="pt-BR")
+                creator = st.text_input("Criador / canal", value="")
+                genre = st.text_input("Género", value="")
+            with right:
+                category_options = ["Não definido", "Film & Animation", "Autos & Vehicles", "Education", "Entertainment", "Howto & Style", "People & Blogs", "Science & Technology", "News & Politics"]
+                category = st.selectbox("Categoria para o manifesto de upload", category_options)
+                copyright_text = st.text_input("Copyright", value="")
+                comment = st.text_input("Comentário interno", value="")
+            apply = st.form_submit_button("Limpar e guardar nova versão", type="primary")
+
+        if len(preview.strip()) and not 100 <= len(preview.strip()) <= 200:
+            st.caption(f"Prévia: {len(preview.strip())} caracteres. O workflow de referência recomenda entre 100 e 200.")
+        if apply:
+            selected_tags = normalize_tags(tags)
+            description = build_description(preview, links, timestamps)
+            metadata = {
+                "title": title.strip(),
+                "description": description,
+                "preview": preview.strip(),
+                "links": links.strip(),
+                "timestamps": timestamps.strip(),
+                "tags": selected_tags,
+                "language": language.strip(),
+                "creator": creator.strip(),
+                "genre": genre.strip(),
+                "category": "" if category == "Não definido" else category,
+                "copyright": copyright_text.strip(),
+                "comment": comment.strip(),
+            }
+            if not metadata["title"]:
+                st.error("Informe um título antes de limpar os metadados.")
+            else:
+                try:
+                    output, run_info = clean_video_metadata(source, metadata, ffmpeg_path=read_json("settings.json", {}).get("ffmpeg_path", ""))
+                    record = save_edit_record(source, output, metadata, run_info)
+                    st.session_state["metadata_last_record"] = record
+                    st.success("Metadados removidos e nova cópia criada. O original continua preservado.")
+                except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                    st.error(str(exc))
+
+        record = st.session_state.get("metadata_last_record")
+        if record and Path(record.get("output_path", "")).exists():
+            output = Path(record["output_path"])
+            st.subheader("Resultado")
+            st.write(f"**Ficheiro limpo:** `{output.name}`")
+            mime = "video/mp4" if output.suffix.lower() == ".mp4" else "video/*"
+            st.download_button("Descarregar vídeo limpo", data=output.read_bytes(), file_name=output.name, mime=mime, use_container_width=True, key="metadata_download_video")
+            st.download_button("Descarregar manifesto de upload (JSON)", data=metadata_manifest(record), file_name=f"{output.stem}-metadata.json", mime="application/json", use_container_width=True, key="metadata_download_manifest")
+            with st.expander("Pré-visualizar metadados"):
+                st.json(record["metadata"])
+
+    st.divider()
+    st.subheader("Histórico do Limpador de metadado")
+    records = list_edit_records()
+    if not records:
+        st.caption("Ainda não há edições registadas.")
+    for record in records[:10]:
+        output = Path(record.get("output_path", ""))
+        with st.container(border=True):
+            st.write(f"**{record.get('metadata', {}).get('title') or record.get('output_name')}**")
+            st.caption(f"Terceiro · {record.get('created_at', '—')} · {record.get('output_name', 'sem saída')}")
+            if output.exists():
+                st.download_button("Descarregar", data=output.read_bytes(), file_name=output.name, mime="video/*", key=f"metadata_history_{record.get('id')}")
+
+
 def render_pipeline():
     st.title("Pipeline")
     st.caption("Estado das filas locais e dependências da cascata")
@@ -469,6 +584,7 @@ def main():
         ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
         ("Vídeos", ":material/video_library:", "Vídeos"),
         ("Upload", ":material/cloud_upload:", "Upload"),
+        ("Limpador de metadado", ":material/edit_note:", "Limpador de metadado"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
     current_page = st.session_state.get("page", "Dashboard")
@@ -479,7 +595,18 @@ def main():
             if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
                 st.session_state["page"] = target
                 st.rerun()
-    {target: renderer for target, _, _ in pages}[current_page]()
+    renderers = {
+        "Dashboard": render_dashboard,
+        "Pipeline": render_pipeline,
+        "Blueprints": render_blueprints,
+        "Canais": render_channels,
+        "Novo vídeo": render_new_video,
+        "Vídeos": render_videos,
+        "Upload": render_upload,
+        "Limpador de metadado": render_metadata_cleaner,
+        "Configurações": render_settings,
+    }
+    renderers.get(current_page, render_dashboard)()
 
 
 if __name__ == "__main__":

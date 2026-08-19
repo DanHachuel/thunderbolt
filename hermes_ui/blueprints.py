@@ -96,7 +96,7 @@ def create_blueprint_from_link(url: str, niche: str, language: str, include_bran
 def create_branding_for_blueprint(blueprint: dict[str, Any]) -> dict[str, Any]:
     metadata = blueprint.get("metadata", {})
     channel = blueprint.get("channel_profile", {})
-    name = channel.get("channel_name") or blueprint.get("name", "Canal Hermes").replace("Blueprint — ", "")
+    name = channel.get("channel_name") or blueprint.get("name", "Canal").replace("Blueprint — ", "")
     branding = {
         "id": f"branding_{uuid.uuid4().hex[:10]}",
         "name": f"Branding — {name}",
