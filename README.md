@@ -1,8 +1,8 @@
-# Content-Hermes UI
+# Thunderbolt UI
 
 > Consulte o [Manual completo de instalação](MANUAL-INSTALACAO.md) antes do primeiro teste local.
 
-UI web local do Content-Hermes Fase 3, baseada no fluxo Streamlit do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). A aplicação organiza canais, blueprints, lotes de vídeos, filas, artefactos e upload em armazenamento local JSON.
+Thunderbolt — UI web local da Fase 3, baseada no fluxo Streamlit do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). A aplicação organiza canais, blueprints, lotes de vídeos, filas, artefactos e upload em armazenamento local JSON.
 
 ## Estado actual
 
@@ -57,55 +57,55 @@ node scripts/cli.mjs --check
 node scripts/cli.mjs
 ```
 
-O pacote está publicado no npm como `@danhachuel/content-hermes-ui` e pode ser executado directamente via `npx`:
+O pacote está publicado no npm como `@danhachuel/thunderbolt` e pode ser executado directamente via `npx`:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui
+npx --yes @danhachuel/thunderbolt
 ```
 
-Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente virtual, dependências Python do Content-Hermes, dependências Python do MoneyPrinterTurbo, Streamlit e `imageio-ffmpeg` — execute:
+Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente virtual, dependências Python do Thunderbolt, dependências Python do MoneyPrinterTurbo, Streamlit e `imageio-ffmpeg` — execute:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui install
+npx --yes @danhachuel/thunderbolt install
 ```
 
-Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. A instalação normal é segura para actualizações: preserva `storage`, Blueprints, Brandings, configurações e artefactos, removendo apenas `.venv` e o clone técnico do MoneyPrinterTurbo para os recriar. A antiga pasta sem dados do utilizador em `C:\Users\<utilizador>\AppData\Local\hermes` pode ser removida. O caminho `AppData\Local\npm-cache\_npx` é apenas cache temporária do npm, não é a pasta de instalação final. Para apagar dados intencionalmente, use o parâmetro explícito `--purge-data`; nunca o use numa actualização normal. Para usar uma cópia existente do MoneyPrinterTurbo:
+Por defeito, o instalador cria automaticamente a pasta `~/.thunderbolt` — no Windows, `%LOCALAPPDATA%\\THUNDERBOLT` —, clona o MoneyPrinterTurbo para `THUNDERBOLT/MoneyPrinterTurbo`, cria o ambiente em `THUNDERBOLT/.venv` e guarda o estado em `THUNDERBOLT/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. A instalação normal é segura para actualizações: preserva `storage`, Blueprints, Brandings, configurações e artefactos, removendo apenas `.venv` e o clone técnico do MoneyPrinterTurbo para os recriar. A antiga pasta sem dados do utilizador em `C:\Users\<utilizador>\AppData\Local\hermes` pode ser removida. O caminho `AppData\Local\npm-cache\_npx` é apenas cache temporária do npm, não é a pasta de instalação final. Para apagar dados intencionalmente, use o parâmetro explícito `--purge-data`; nunca o use numa actualização normal. Para usar uma cópia existente do MoneyPrinterTurbo:
 
 ```bash
-MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install
+MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/thunderbolt install
 ```
 
 Para instalar apenas a UI sem clonar o MoneyPrinterTurbo:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui install --skip-moneyprinter
+npx --yes @danhachuel/thunderbolt install --skip-moneyprinter
 ```
 
 Para verificar o ambiente sem iniciar a aplicação:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui doctor
+npx --yes @danhachuel/thunderbolt doctor
 ```
 
 Para executar apenas o diagnóstico do ambiente:
 
 ```bash
-npx --yes --package=@danhachuel/content-hermes-ui content-hermes --check
+npx --yes --package=@danhachuel/thunderbolt thunderbolt --check
 ```
 
-Para instalar globalmente e disponibilizar o comando `content-hermes`:
+Para instalar globalmente e disponibilizar o comando `thunderbolt`:
 
 ```bash
-npm install --global @danhachuel/content-hermes-ui
-content-hermes
+npm install --global @danhachuel/thunderbolt
+thunderbolt
 ```
 
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 install
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 doctor
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12
+npx.cmd --yes @danhachuel/thunderbolt@0.2.13 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.13 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.13
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -120,7 +120,7 @@ Ou apenas para a sessão actual:
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Após `install`, o launcher usa o ambiente virtual instalado em `~/Hermes-UI/.venv` — no Windows, `C:\Users\<utilizador>\Hermes-UI\.venv` — e inicia a UI em `localhost:3030`. No Windows, a raiz é obtida por `USERPROFILE` ou `HOMEDRIVE/HOMEPATH`, evitando a redirecção de `HOME` que pode ocorrer no MobaXterm; o destino final é `C:\Users\<utilizador>\Hermes-UI`.
+Após `install`, o launcher usa o ambiente virtual instalado em `~/.thunderbolt/.venv` — no Windows, `%LOCALAPPDATA%\\THUNDERBOLT\\.venv` — e inicia a UI em `localhost:3030`. No Windows, a raiz é `%LOCALAPPDATA%\\THUNDERBOLT`; no computador indicado, o caminho será `C:\\Users\\danha\\AppData\\Local\\THUNDERBOLT`. Isto evita a redirecção de `HOME` que pode ocorrer no MobaXterm.
  O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
 
 ## Armazenamento local
@@ -144,7 +144,7 @@ storage/
 └── artifacts/        # ficheiros produzidos e caminhos referenciados
 ```
 
-Para usar outro local, defina `HERMES_STORAGE_DIR`. O estado é escrito de forma atómica e ficheiros JSON inválidos são preservados com cópia `.corrupt-*` antes de serem recriados.
+Para usar outro local, defina `THUNDERBOLT_STORAGE_DIR`. O estado é escrito de forma atómica e ficheiros JSON inválidos são preservados com cópia `.corrupt-*` antes de serem recriados.
 
 ## Blueprints e Brandings
 

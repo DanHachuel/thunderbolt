@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-STORAGE = Path(os.getenv("HERMES_STORAGE_DIR", ROOT / "storage"))
+STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
@@ -17,7 +17,7 @@ SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 DEFAULTS: dict[str, Any] = {
     "channels.json": [],
     "tasks.json": [],
-    "queues.json": {"niche": [], "clone": [], "script": [], "title": [], "thumb": [], "video": [], "upload": []},
+    "queues.json": {"niche": [], "blueprint": [], "brand": [], "script": [], "title": [], "thumbnail": [], "video": [], "edit": [], "upload": []},
     "batches.json": [],
     "uploads.json": [],
     "metadata_edits.json": [],

@@ -1,11 +1,11 @@
 {
-  "name": "@danhachuel/content-hermes-ui",
-  "version": "0.2.12",
-  "description": "UI local do Content-Hermes baseada no MoneyPrinterTurbo",
+  "name": "@danhachuel/thunderbolt",
+  "version": "0.2.13",
+  "description": "Thunderbolt — interface local para operação de canais faceless e motor MoneyPrinterTurbo",
   "main": "scripts/cli.mjs",
   "type": "module",
   "bin": {
-    "content-hermes": "scripts/cli.mjs"
+    "thunderbolt": "scripts/cli.mjs"
   },
   "files": [
     "app/main.py",

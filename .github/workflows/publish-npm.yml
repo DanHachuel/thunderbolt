@@ -34,7 +34,7 @@ jobs:
       - name: Validate package metadata
         run: |
           node --check scripts/cli.mjs
-          node -e "const p=require('./package.json'); if (!p.name.startsWith('@danhachuel/')) process.exit(1); if (!p.bin || !p.bin['content-hermes']) process.exit(1); console.log(p.name + '@' + p.version)"
+          node -e "const p=require('./package.json'); if (!p.name.startsWith('@danhachuel/')) process.exit(1); if (!p.bin || !p.bin['thunderbolt']) process.exit(1); console.log(p.name + '@' + p.version)"
           npm pack --dry-run
 
       - name: Publish to npm

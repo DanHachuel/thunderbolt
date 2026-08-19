@@ -19,15 +19,16 @@ from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 
 ensure_storage()
-st.set_page_config(page_title="MoneyPrinterTurbo UI", page_icon="M", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
 :root { --accent:#35a7ff; --bg:#0b1118; --card:#121b26; }
 [data-testid="stAppViewContainer"] { background: radial-gradient(circle at top right, #13283b 0, #0b1118 42%); }
 [data-testid="stSidebar"] { background:#091018; border-right:1px solid #1d3448; }
-[data-testid="stSidebar"] [data-testid="stButton"] { margin:0.18rem 0; }
-[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:2.55rem; justify-content:flex-start; text-align:left; padding:0.55rem 0.85rem; border-radius:10px; border:1px solid transparent; font-weight:600; }
+[data-testid="stSidebar"] [data-testid="stButton"] { margin:0.03rem 0; }
+[data-testid="stSidebar"] [data-testid="stButton"] button { min-height:2.05rem; height:2.05rem; justify-content:flex-start; text-align:left; padding:0.28rem 0.7rem; border-radius:8px; border:1px solid transparent; font-weight:600; }
+[data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1.1; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:#e7edf2; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:#1c252e; border-color:#2d3944; color:#ffffff; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#292929; color:#ffffff; border-color:#3a3a3a; }
@@ -57,7 +58,7 @@ def channel_options() -> list[dict]:
 
 
 def render_dashboard():
-    st.title("MoneyPrinterTurbo UI")
+    st.title("Thunderbolt")
     st.caption("Interface local para operação e automação de conteúdo faceless")
     summary = pipeline_summary()
     cols = st.columns(6)
@@ -323,17 +324,23 @@ def render_upload():
 
 
 def render_settings():
-    st.title("Configurações do MoneyPrinterTurbo")
-    st.caption("Área compatível com config.toml do MoneyPrinterTurbo. As credenciais ficam no storage local e não são enviadas para o GitHub.")
+    st.title("Configurações do Thunderbolt")
+    st.caption("Configuração do motor de vídeo e dos serviços usados pelo Thunderbolt. As credenciais ficam no storage local e não são enviadas para o GitHub.")
     settings = read_json("settings.json", {})
 
     def text_setting(label: str, key: str, *, secret: bool = False, help_text: str | None = None) -> str:
-        return st.text_input(label, settings.get(key, ""), type="password" if secret else "default", help=help_text)
+        return st.text_input(
+            label,
+            settings.get(key, ""),
+            type="password" if secret else "default",
+            help=help_text,
+            key=f"settings_{key}",
+        )
 
     with st.form("settings_form"):
         st.subheader("Execução local")
         port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-        moneyprinter_path = st.text_input("Pasta MoneyPrinterTurbo", settings.get("moneyprinter_path", ""))
+        moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
         youtube_api_key = st.text_input("YouTube Data API key", settings.get("youtube_api_key", ""), type="password")
 
         with st.expander("Serviço, materiais e rede"):
@@ -421,7 +428,7 @@ def render_settings():
             upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
             upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
 
-        if st.form_submit_button("Guardar configurações do MoneyPrinterTurbo", type="primary"):
+        if st.form_submit_button("Guardar configurações do Thunderbolt", type="primary"):
             settings.update({
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
@@ -446,7 +453,7 @@ def render_settings():
                 if synced:
                     st.success(f"Configurações guardadas e sincronizadas com {synced}")
                 else:
-                    st.success("Configurações guardadas localmente. Indique uma pasta válida do MoneyPrinterTurbo para sincronizar config.toml.")
+                    st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
             except Exception as exc:
                 st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
 
@@ -569,10 +576,14 @@ def render_pipeline():
     st.title("Pipeline")
     st.caption("Estado das filas locais e dependências da cascata")
     queues = read_json("queues.json", {})
+    blueprint_count = len(list_blueprint_files())
     cols = st.columns(len(STAGES))
     for col, stage in zip(cols, STAGES):
         with col:
-            card(stage.title(), len(queues.get(stage, [])), "fila")
+            if stage == "blueprint":
+                card("Blueprints", blueprint_count, f"na biblioteca · {len(queues.get(stage, []))} tarefa(s) na fila")
+            else:
+                card(stage.title(), len(queues.get(stage, [])), "fila")
 
 
 def main():
@@ -589,7 +600,7 @@ def main():
     ]
     current_page = st.session_state.get("page", "Dashboard")
     with st.sidebar:
-        st.title("MoneyPrinterTurbo")
+        st.title("Thunderbolt")
         st.caption("Navegação")
         for target, icon, label in pages:
             if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):

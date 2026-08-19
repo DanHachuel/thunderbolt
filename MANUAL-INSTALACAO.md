@@ -1,27 +1,27 @@
-# Manual de Instalação — Content-Hermes UI
+# Manual de Instalação — Thunderbolt UI
 
-Este manual descreve a instalação local da UI Content-Hermes, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/content-hermes-ui`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
+Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.12
-> **Pacote npm:** `@danhachuel/content-hermes-ui`  
+> **Versão deste manual:** 0.2.13
+> **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
-> **Repositório:** [github.com/DanHachuel/content-hermes-ui](https://github.com/DanHachuel/content-hermes-ui)
+> **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
 
 ## 1. O que será instalado
 
-A instalação assistida cria um ambiente local separado para evitar misturar as dependências do Content-Hermes com outros projectos Python.
+A instalação assistida cria um ambiente local separado para evitar misturar as dependências do Thunderbolt com outros projectos Python.
 
 | Componente | Local ou comportamento padrão |
 |---|---|
 | Python | Python 3.11 ou superior já instalado no sistema |
-| Ambiente virtual | `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`) |
-| MoneyPrinterTurbo | `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`) |
-| Storage Content-Hermes | `~/Hermes-UI/storage` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage`) |
-| Dependências Content-Hermes | Instaladas a partir do `requirements.txt` incluído no pacote |
+| Ambiente virtual | `~/.thunderbolt/.venv` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\.venv`) |
+| MoneyPrinterTurbo | `~/.thunderbolt/MoneyPrinterTurbo` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\MoneyPrinterTurbo`) |
+| Storage Thunderbolt | `~/.thunderbolt/storage` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\storage`) |
+| Dependências Thunderbolt | Instaladas a partir do `requirements.txt` incluído no pacote |
 | Dependências MoneyPrinterTurbo | Instaladas a partir do `requirements.txt` do repositório oficial |
 | Streamlit | Instalado como dependência Python |
 | FFmpeg | Disponibilizado pelo pacote Python `imageio-ffmpeg` |
-| Porta da aplicação | `3030`, configurável com `HERMES_PORT` |
+| Porta da aplicação | `3030`, configurável com `THUNDERBOLT_PORT` |
 
 A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local.
 
@@ -48,9 +48,9 @@ A instalação local do MoneyPrinterTurbo recomenda Windows 10+, macOS 11+ ou um
 Em algumas instalações Windows, o PowerShell bloqueia o wrapper `npx.ps1` por causa da política de execução de scripts. Nesse caso, use `npx.cmd`, que executa o mesmo npm/npx sem depender do wrapper PowerShell:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui install
-npx.cmd --yes @danhachuel/content-hermes-ui doctor
-npx.cmd --yes @danhachuel/content-hermes-ui
+npx.cmd --yes @danhachuel/thunderbolt install
+npx.cmd --yes @danhachuel/thunderbolt doctor
+npx.cmd --yes @danhachuel/thunderbolt
 ```
 
 Se preferir corrigir a política para o seu utilizador:
@@ -68,7 +68,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 Não é necessário usar `Unrestricted`. Se estiver num terminal MobaXterm ou CMD, também pode executar:
 
 ```cmd
-cmd /c npx.cmd --yes @danhachuel/content-hermes-ui install
+cmd /c npx.cmd --yes @danhachuel/thunderbolt install
 ```
 
 ### 2.2 Confirmar versões
@@ -91,7 +91,7 @@ py --version
 git --version
 ```
 
-O Python deve apresentar a versão `3.11` ou superior. Se estiver no Windows sem Python, o instalador tenta executar automaticamente `winget install --exact --id Python.Python.3.11`. Se `winget` não estiver disponível, instale o App Installer/Microsoft Store ou Python a partir de [python.org](https://www.python.org/downloads/windows/) e repita a instalação. Em macOS/Linux, o instalador não assume permissões administrativas para instalar Python no sistema; instale-o pelo gestor de pacotes ou use `HERMES_PYTHON`.
+O Python deve apresentar a versão `3.11` ou superior. Se estiver no Windows sem Python, o instalador tenta executar automaticamente `winget install --exact --id Python.Python.3.11`. Se `winget` não estiver disponível, instale o App Installer/Microsoft Store ou Python a partir de [python.org](https://www.python.org/downloads/windows/) e repita a instalação. Em macOS/Linux, o instalador não assume permissões administrativas para instalar Python no sistema; instale-o pelo gestor de pacotes ou use `THUNDERBOLT_PYTHON`.
 
 ## 3. Instalação recomendada via npx
 
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.12 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.13 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui@0.2.12 install
+npx --yes @danhachuel/thunderbolt@0.2.13 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -114,27 +114,29 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/content-hermes-ui@VERSAO install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@VERSAO install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
+
+No Windows, a instalação cria automaticamente `C:\\Users\\danha\\AppData\\Local\\THUNDERBOLT\\storage` quando executada pela conta `danha`; para outras contas, `%LOCALAPPDATA%\\THUNDERBOLT\\storage` aponta para a pasta equivalente do utilizador.
 
 O instalador irá:
 
 1. procurar Python 3.11 ou superior;
 2. se estiver no Windows e Python não existir, instalar Python 3.11 automaticamente pelo `winget`;
-3. criar o ambiente virtual `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`);
-4. clonar o repositório oficial MoneyPrinterTurbo para `~/Hermes-UI/MoneyPrinterTurbo` (Windows: `C:\Users\<utilizador>\Hermes-UI\MoneyPrinterTurbo`);
-5. instalar as dependências do Content-Hermes;
+3. criar o ambiente virtual `~/.thunderbolt/.venv` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\.venv`);
+4. clonar o repositório oficial MoneyPrinterTurbo para `~/.thunderbolt/MoneyPrinterTurbo` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\MoneyPrinterTurbo`);
+5. instalar as dependências do Thunderbolt;
 6. instalar as dependências Python do MoneyPrinterTurbo;
 7. instalar `imageio-ffmpeg` para disponibilizar FFmpeg no ambiente Python;
-8. criar `~/Hermes-UI/storage/state/settings.json` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\state\settings.json`);
+8. criar `~/.thunderbolt/storage/state/settings.json` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\state\settings.json`);
 9. registar o caminho local do MoneyPrinterTurbo;
 10. deixar o ambiente pronto para o comando de arranque.
 
-No Windows, o caminho padrão é construído a partir de `USERPROFILE`, `HOMEDRIVE/HOMEPATH` ou, em último recurso, `HOME`. O instalador remove o redireccionamento de MobaXterm (`AppData\Local\hermes` ou `AppData\Roaming\MobaXterm\home`) e usa `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. A pasta `AppData\Local\npm-cache\_npx` é apenas cache temporária do npm e não é a pasta de instalação final. O fluxo normal preserva os dados; somente `--purge-data` activa a limpeza destrutiva.
+No Windows, o caminho padrão é construído a partir de `USERPROFILE`, `HOMEDRIVE/HOMEPATH` ou, em último recurso, `HOME`. O instalador remove o redireccionamento de MobaXterm (`AppData\Local\hermes` ou `AppData\Roaming\MobaXterm\home`) e usa `%LOCALAPPDATA%\\THUNDERBOLT`, salvo se `THUNDERBOLT_HOME` for definido explicitamente. A pasta `AppData\Local\npm-cache\_npx` é apenas cache temporária do npm e não é a pasta de instalação final. O fluxo normal preserva os dados; somente `--purge-data` activa a limpeza destrutiva.
 
-A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo. O caminho do pacote dentro de `AppData\Local\npm-cache\_npx` que aparece no log é temporário; o launcher usa esse pacote apenas para executar o instalador e os ficheiros finais ficam em `C:\Users\<utilizador>\Hermes-UI`.
+A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo. O caminho do pacote dentro de `AppData\Local\npm-cache\_npx` que aparece no log é temporário; o launcher usa esse pacote apenas para executar o instalador e os ficheiros finais ficam em `%LOCALAPPDATA%\\THUNDERBOLT`.
 
 ### 3.1 Usar o instalador com uma cópia existente do MoneyPrinterTurbo
 
@@ -144,24 +146,24 @@ Linux ou macOS:
 
 ```bash
 MONEYPRINTER_PATH=/caminho/para/MoneyPrinterTurbo \
-  npx --yes @danhachuel/content-hermes-ui install
+  npx --yes @danhachuel/thunderbolt install
 ```
 
 Windows PowerShell:
 
 ```powershell
 $env:MONEYPRINTER_PATH="C:\caminho\MoneyPrinterTurbo"
-npx --yes @danhachuel/content-hermes-ui install
+npx --yes @danhachuel/thunderbolt install
 ```
 
-O instalador reutiliza a pasta existente e instala as suas dependências no ambiente virtual do Content-Hermes.
+O instalador reutiliza a pasta existente e instala as suas dependências no ambiente virtual do Thunderbolt.
 
 ### 3.2 Instalar apenas a UI
 
 Se pretende testar a interface sem clonar o MoneyPrinterTurbo:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui install --skip-moneyprinter
+npx --yes @danhachuel/thunderbolt install --skip-moneyprinter
 ```
 
 Este modo instala o ambiente Python e as dependências da UI, mas não instala o conjunto de dependências do MoneyPrinterTurbo nem configura a integração local com ele.
@@ -173,19 +175,19 @@ Este modo instala o ambiente Python e as dependências da UI, mas não instala o
 Linux ou macOS:
 
 ```bash
-HERMES_HOME=/caminho/content-hermes \
+THUNDERBOLT_HOME=/caminho/thunderbolt \
 MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo \
-HERMES_VENV=/caminho/content-hermes/.venv \
-npx --yes @danhachuel/content-hermes-ui install
+THUNDERBOLT_VENV=/caminho/thunderbolt/.venv \
+npx --yes @danhachuel/thunderbolt install
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:HERMES_HOME="C:\ContentHermes"
+$env:THUNDERBOLT_HOME="C:\ContentHermes"
 $env:MONEYPRINTER_PATH="C:\MoneyPrinterTurbo"
-$env:HERMES_VENV="C:\ContentHermes\.venv"
-npx --yes @danhachuel/content-hermes-ui install
+$env:THUNDERBOLT_VENV="C:\ContentHermes\.venv"
+npx --yes @danhachuel/thunderbolt install
 ```
 
 ## 4. Diagnóstico antes de iniciar
@@ -193,13 +195,13 @@ npx --yes @danhachuel/content-hermes-ui install
 Depois da instalação, execute:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui doctor
+npx --yes @danhachuel/thunderbolt doctor
 ```
 
 Também é possível usar:
 
 ```bash
-npx --yes --package=@danhachuel/content-hermes-ui content-hermes --check
+npx --yes --package=@danhachuel/thunderbolt thunderbolt --check
 ```
 
 Uma saída saudável apresenta versões de Python e Streamlit e um caminho de FFmpeg. Por exemplo:
@@ -215,7 +217,7 @@ Se o diagnóstico indicar que FFmpeg não foi detectado, execute novamente a ins
 Depois de instalar e diagnosticar:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui
+npx --yes @danhachuel/thunderbolt
 ```
 
 Abra no navegador:
@@ -224,19 +226,19 @@ Abra no navegador:
 http://localhost:3030
 ```
 
-O launcher usa o ambiente virtual em `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`) quando ele existe. Se for necessário executar numa porta diferente:
+O launcher usa o ambiente virtual em `~/.thunderbolt/.venv` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\.venv`) quando ele existe. Se for necessário executar numa porta diferente:
 
 Linux ou macOS:
 
 ```bash
-HERMES_PORT=3040 npx --yes @danhachuel/content-hermes-ui
+THUNDERBOLT_PORT=3040 npx --yes @danhachuel/thunderbolt
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:HERMES_PORT="3040"
-npx --yes @danhachuel/content-hermes-ui
+$env:THUNDERBOLT_PORT="3040"
+npx --yes @danhachuel/thunderbolt
 ```
 
 Para parar a aplicação, volte ao terminal e pressione `Ctrl+C`.
@@ -246,36 +248,36 @@ Para parar a aplicação, volte ao terminal e pressione `Ctrl+C`.
 Como alternativa ao `npx`, instale o comando globalmente:
 
 ```bash
-npm install --global @danhachuel/content-hermes-ui
+npm install --global @danhachuel/thunderbolt
 ```
 
 Depois execute:
 
 ```bash
-content-hermes
+thunderbolt
 ```
 
 Diagnóstico:
 
 ```bash
-content-hermes doctor
+thunderbolt doctor
 ```
 
 Instalação assistida:
 
 ```bash
-content-hermes install
+thunderbolt install
 ```
 
-A instalação global controla apenas o launcher Node.js. O ambiente Python continua a ser criado em `~/Hermes-UI/.venv` (Windows: `C:\Users\<utilizador>\Hermes-UI\.venv`).
+A instalação global controla apenas o launcher Node.js. O ambiente Python continua a ser criado em `~/.thunderbolt/.venv` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\\.venv`).
 
 ## 7. Instalação manual para desenvolvimento
 
 Use esta opção quando quiser trabalhar directamente a partir do repositório GitHub.
 
 ```bash
-git clone https://github.com/DanHachuel/content-hermes-ui.git
-cd content-hermes-ui
+git clone https://github.com/DanHachuel/thunderbolt.git
+cd thunderbolt
 ```
 
 ### 7.1 Linux ou macOS
@@ -353,7 +355,7 @@ As chaves devem ser inseridas apenas na configuração local. Não as coloque no
 Após iniciar a aplicação, valide o seguinte percurso:
 
 1. **Dashboard:** confirme que a UI abre e mostra o estado local.
-2. **Blueprints:** coloque um JSON em `~/Hermes-UI/storage/blueprints/importados/` (Windows: `C:\Users\<utilizador>\Hermes-UI\storage\blueprints\importados\`) ou use o carregador da interface.
+2. **Blueprints:** coloque um JSON em `~/.thunderbolt/storage/blueprints/importados/` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
 4. **Canais:** cadastre um canal manualmente ou importe-o depois de configurar a YouTube Data API.
 5. **Novo vídeo:** teste primeiro o modo **Canal específico** e depois os modos de lote.
@@ -389,14 +391,14 @@ python3 --version
 Se houver várias versões instaladas, indique explicitamente:
 
 ```bash
-HERMES_PYTHON=/caminho/para/python3.11 npx --yes @danhachuel/content-hermes-ui install
+THUNDERBOLT_PYTHON=/caminho/para/python3.11 npx --yes @danhachuel/thunderbolt install
 ```
 
 No Windows PowerShell:
 
 ```powershell
-$env:HERMES_PYTHON="C:\Python311\python.exe"
-npx --yes @danhachuel/content-hermes-ui install
+$env:THUNDERBOLT_PYTHON="C:\Python311\python.exe"
+npx --yes @danhachuel/thunderbolt install
 ```
 
 ### Git não encontrado
@@ -408,8 +410,8 @@ Instale Git a partir de [git-scm.com](https://git-scm.com/downloads), ou forneç
 Execute:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui install
-npx --yes @danhachuel/content-hermes-ui doctor
+npx --yes @danhachuel/thunderbolt install
+npx --yes @danhachuel/thunderbolt doctor
 ```
 
 Em instalação manual:
@@ -429,7 +431,7 @@ python -m pip install --upgrade imageio-ffmpeg
 Depois confirme:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui doctor
+npx --yes @danhachuel/thunderbolt doctor
 ```
 
 O MoneyPrinterTurbo também permite indicar um caminho manual para FFmpeg na configuração local quando a detecção automática não funcionar.[1]
@@ -439,7 +441,7 @@ O MoneyPrinterTurbo também permite indicar um caminho manual para FFmpeg na con
 Use outra porta:
 
 ```bash
-HERMES_PORT=3040 npx --yes @danhachuel/content-hermes-ui
+THUNDERBOLT_PORT=3040 npx --yes @danhachuel/thunderbolt
 ```
 
 ### O MoneyPrinterTurbo não aparece na UI
@@ -447,7 +449,7 @@ HERMES_PORT=3040 npx --yes @danhachuel/content-hermes-ui
 Confirme o caminho na aba **Configurações** ou execute:
 
 ```bash
-MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install --skip-python-deps
+MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/thunderbolt install --skip-python-deps
 ```
 
 Depois reinicie a aplicação.
@@ -457,7 +459,7 @@ Depois reinicie a aplicação.
 Actualize pip e tente novamente:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui install
+npx --yes @danhachuel/thunderbolt install
 ```
 
 Se uma dependência específica falhar, guarde o log completo e verifique a compatibilidade da versão Python. Python 3.11 é a opção mais conservadora para o MoneyPrinterTurbo.
@@ -471,7 +473,7 @@ A instalação das dependências não baixa necessariamente todos os modelos gra
 Para remover o pacote global:
 
 ```bash
-npm uninstall --global @danhachuel/content-hermes-ui
+npm uninstall --global @danhachuel/thunderbolt
 ```
 
 Para remover o ambiente e os dados locais:
@@ -479,16 +481,16 @@ Para remover o ambiente e os dados locais:
 Linux ou macOS:
 
 ```bash
-rm -rf ~/Hermes-UI
+rm -rf ~/.thunderbolt
 ```
 
 Windows PowerShell:
 
 ```powershell
-Remove-Item -Recurse -Force "$HOME\\Hermes-UI"
+Remove-Item -Recurse -Force "$HOME\\THUNDERBOLT"
 ```
 
-> A remoção de `~/Hermes-UI` (Windows: `C:\Users\<utilizador>\Hermes-UI`) apaga estado JSON, blueprints, configurações e artefactos locais. Faça uma cópia de segurança antes de executar o comando.
+> A remoção de `~/.thunderbolt` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT`) apaga estado JSON, blueprints, configurações e artefactos locais. Faça uma cópia de segurança antes de executar o comando.
 
 ## 13. Segurança
 
@@ -506,6 +508,6 @@ Use secrets do GitHub Actions apenas para publicação do pacote. Para execuçã
 
 [1]: https://github.com/harry0703/MoneyPrinterTurbo/blob/main/README-en.md — MoneyPrinterTurbo: requisitos, instalação, dependências, Streamlit e FFmpeg.
 
-[2]: https://www.npmjs.com/package/@danhachuel/content-hermes-ui — Pacote npm publicado.
+[2]: https://www.npmjs.com/package/@danhachuel/thunderbolt — Pacote npm publicado.
 
-[3]: https://github.com/DanHachuel/content-hermes-ui — Repositório GitHub do Content-Hermes UI.
+[3]: https://github.com/DanHachuel/thunderbolt — Repositório GitHub do Thunderbolt UI.

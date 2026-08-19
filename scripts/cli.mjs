@@ -1,39 +1,28 @@
-#!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, copyFileSync, readdirSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
+
 function getUserHome() {
   if (platform() !== "win32") return homedir();
   const driveHome = process.env.HOMEDRIVE && process.env.HOMEPATH ? `${process.env.HOMEDRIVE}${process.env.HOMEPATH}` : null;
-  const candidates = [process.env.USERPROFILE, driveHome, homedir()].filter(Boolean);
-  const slash = String.fromCharCode(92);
-  for (const candidate of candidates) {
-    const normalized = candidate.replaceAll("/", slash);
-    const lower = normalized.toLowerCase();
-    const userMarker = `${slash}users${slash}`;
-    const suffixes = [
-      `${slash}appdata${slash}local${slash}hermes`,
-      `${slash}appdata${slash}local${slash}hermes-ui`,
-      `${slash}appdata${slash}roaming${slash}mobaxterm${slash}home`,
-    ];
-    const suffix = suffixes.find((value) => lower.endsWith(value));
-    if (suffix && lower.includes(userMarker)) return normalized.slice(0, -suffix.length);
-    if (lower.includes(userMarker)) return normalized;
-  }
-  return candidates[0] || homedir();
+  return process.env.USERPROFILE || driveHome || homedir();
 }
 
 const userHome = getUserHome();
-const hermesHome = process.env.HERMES_HOME || join(userHome, "Hermes-UI");
-const venvDir = process.env.HERMES_VENV || join(hermesHome, ".venv");
+const defaultThunderboltHome = platform() === "win32"
+  ? join(process.env.LOCALAPPDATA || join(userHome, "AppData", "Local"), "THUNDERBOLT")
+  : join(userHome, ".thunderbolt");
+const thunderboltHome = resolve(process.env.THUNDERBOLT_HOME || defaultThunderboltHome);
+const venvDir = process.env.THUNDERBOLT_VENV || process.env.HERMES_VENV || join(thunderboltHome, ".venv");
 const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
-const python = process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));
+const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));
 const main = resolve(root, "app", "main.py");
+const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
 
 function run(command, commandArgs) {
   const result = spawnSync(command, commandArgs, { stdio: "inherit", env: process.env });
@@ -44,19 +33,67 @@ function pythonVersion() {
   return spawnSync(python, ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"], { encoding: "utf8" });
 }
 
+function moduleAvailable(moduleName) {
+  const code = `import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(${JSON.stringify(moduleName)}) else 1)`;
+  return spawnSync(python, ["-c", code], { stdio: "ignore" }).status === 0;
+}
+
+function configuredMoneyPrinterPath() {
+  if (!existsSync(settingsPath)) return join(thunderboltHome, "MoneyPrinterTurbo");
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    return settings.moneyprinter_path || join(thunderboltHome, "MoneyPrinterTurbo");
+  } catch {
+    return join(thunderboltHome, "MoneyPrinterTurbo");
+  }
+}
+
+function ensureRuntimeStorage() {
+  const storageRoot = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
+  const directories = [
+    storageRoot,
+    join(storageRoot, "state"),
+    join(storageRoot, "blueprints"),
+    join(storageRoot, "blueprints", "canais"),
+    join(storageRoot, "blueprints", "nichos"),
+    join(storageRoot, "blueprints", "importados"),
+    join(storageRoot, "blueprints", "brandings"),
+    join(storageRoot, "metadata_cleaner"),
+    join(storageRoot, "metadata_cleaner", "originals"),
+    join(storageRoot, "metadata_cleaner", "outputs"),
+  ];
+  for (const directory of directories) mkdirSync(directory, { recursive: true });
+  const seedRoot = resolve(root, "seed", "blueprints");
+  const destination = join(storageRoot, "blueprints", "importados");
+  if (existsSync(seedRoot)) {
+    for (const filename of readdirSync(seedRoot)) {
+      if (!filename.endsWith(".json")) continue;
+      const target = join(destination, filename);
+      if (!existsSync(target)) copyFileSync(join(seedRoot, filename), target);
+    }
+  }
+}
+
 function check() {
   const version = pythonVersion();
   if (version.status !== 0) {
-    console.error(`Python não encontrado. Execute: npx --yes @danhachuel/content-hermes-ui install`);
+    console.error(`Python não encontrado. Execute: npx.cmd --yes @danhachuel/thunderbolt install`);
     process.exit(1);
   }
-  const streamlit = spawnSync(python, ["-c", "import streamlit; print(streamlit.__version__)"], { stdio: "pipe", encoding: "utf8" });
-  if (streamlit.status !== 0) {
-    console.error(`Streamlit não está instalado neste ambiente Python. Execute: npx --yes @danhachuel/content-hermes-ui install`);
+  const requiredModules = ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg"];
+  const missing = requiredModules.filter((moduleName) => !moduleAvailable(moduleName));
+  const ffmpeg = moduleAvailable("imageio_ffmpeg");
+  const mptPath = configuredMoneyPrinterPath();
+  const mptReady = existsSync(join(mptPath, "requirements.txt")) || existsSync(join(mptPath, "pyproject.toml"));
+  console.log(`Thunderbolt: ${thunderboltHome}`);
+  console.log(`Python: ${version.stdout.trim()}`);
+  console.log(`Dependências da aplicação: ${missing.length ? `em falta (${missing.join(", ")})` : "OK"}`);
+  console.log(`FFmpeg: ${ffmpeg ? "OK via imageio-ffmpeg" : "em falta"}`);
+  console.log(`Motor de vídeo: ${mptReady ? `OK (${mptPath})` : `não encontrado (${mptPath})`}`);
+  if (missing.length || !ffmpeg) {
+    console.error("Instalação incompleta. Execute `npx.cmd --yes @danhachuel/thunderbolt install`; dependências já válidas serão reutilizadas.");
     process.exit(1);
   }
-  const ffmpeg = spawnSync(python, ["-c", "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"], { stdio: "pipe", encoding: "utf8" });
-  console.log(`Ambiente OK. Python: ${version.stdout.trim()}; Streamlit: ${streamlit.stdout.trim()}; FFmpeg: ${ffmpeg.status === 0 ? ffmpeg.stdout.trim() : "não detectado"}`);
 }
 
 if (args[0] === "install") run(process.execPath, [resolve(root, "scripts", "install.mjs"), ...args.slice(1)]);
@@ -68,6 +105,11 @@ if (!existsSync(main)) {
   console.error(`Entrada não encontrada: ${main}`);
   process.exit(1);
 }
-const port = process.env.HERMES_PORT || "3030";
-const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", port, "--server.address", "localhost"], { cwd: root, stdio: "inherit", env: { ...process.env, HERMES_STORAGE_DIR: process.env.HERMES_STORAGE_DIR || join(hermesHome, "storage") } });
+ensureRuntimeStorage();
+const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
+const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", port, "--server.address", "localhost"], {
+  cwd: root,
+  stdio: "inherit",
+  env: { ...process.env, THUNDERBOLT_STORAGE_DIR: process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage") },
+});
 child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
