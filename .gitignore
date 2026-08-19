@@ -18,5 +18,6 @@ cookies/
 sessionInfo/
 delegated_ids/
 config.toml
+storage/skills/
 node_modules/
 .DS_Store

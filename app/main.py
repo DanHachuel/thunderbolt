@@ -18,9 +18,65 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
+from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, read_packaged_skill, update_integration
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
+
+VIDEO_LANGUAGE_OPTIONS = [
+    "00 – Apenas Música de Fundo (Sem Falas)",
+    "01 – Inglês",
+    "02 – Norueguês",
+    "03 – Dinamarquês",
+    "04 – Sueco",
+    "05 – Holandês",
+    "06 – Alemão",
+    "07 – Luxemburguês",
+    "08 – Finlandês",
+    "09 – Hebraico",
+    "10 – Japonês",
+    "11 – Árabe (Golfo)",
+    "12 – Islandês",
+    "13 – Espanhol (Espanha)",
+    "14 – Francês",
+    "15 – Italiano",
+    "16 – Coreano",
+    "16 – Irlandês",
+    "17 – Estoniano",
+    "18 – Grego",
+    "19 – Esloveno",
+    "20 – Polonês",
+    "21 – Tcheco",
+    "22 – Lituano",
+    "23 – Português (Portugal)",
+    "24 – Eslovaco",
+    "25 – Letão",
+    "26 – Ucraniano",
+    "27 – Húngaro",
+    "28 – Afrikaans",
+    "29 – Turco",
+    "30 – Romeno",
+    "31 – Russo",
+    "32 – Croata",
+    "33 – Árabe (Magreb)",
+    "34 – Sérvio",
+    "35 – Búlgaro",
+    "36 – Português (Brasil)",
+    "37 – Cantonês",
+    "38 – Persa (Farsi)",
+    "39 – Mandarim",
+    "40 – Malaio",
+    "41 – Espanhol (LatAm)",
+    "42 – Vietnamita",
+    "43 – Filipino (Tagalog)",
+    "44 – Indonésio",
+    "45 – Malayalam",
+    "46 – Tailandês",
+    "47 – Télugo",
+    "48 – Tamil",
+    "49 – Bengali",
+    "50 – Hausa",
+]
 
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
@@ -338,7 +394,15 @@ def render_new_video():
             with st.form("new_video_form"):
                 topic = st.text_area("Tópico ou briefing", placeholder="Ex.: A história pouco conhecida por trás de...")
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
-                language = st.selectbox("Idioma", ["Português", "English", "Español"], key="video_language")
+                legacy_language = st.session_state.get("video_language")
+                legacy_language_map = {
+                    "Português": "36 – Português (Brasil)",
+                    "English": "01 – Inglês",
+                    "Español": "41 – Espanhol (LatAm)",
+                }
+                if legacy_language not in VIDEO_LANGUAGE_OPTIONS:
+                    st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
+                language = st.selectbox("Idioma", VIDEO_LANGUAGE_OPTIONS, key="video_language")
                 fmt = st.selectbox("Formato", ["wide", "shorts", "music"])
                 style = st.selectbox("Estilo wide", ["pexels", "full_ia"])
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
@@ -620,6 +684,77 @@ def render_settings():
                 st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
 
 
+def render_mcp():
+    st.title("MCP")
+    st.caption("Clientes opcionais para serviços externos. Os repositórios não são instalados nem incluídos no pacote Thunderbolt.")
+    st.info("Activar uma integração guarda apenas a preferência local. O Thunderbolt não inicia processos externos automaticamente; a detecção verifica passivamente se existe um serviço já disponível na porta configurada.")
+
+    integrations = load_integrations()
+    for integration in integrations:
+        integration_id = integration["id"]
+        with st.container(border=True):
+            header_cols = st.columns([2.6, 1.15, 1.65, 1.2])
+            with header_cols[0]:
+                st.write(f"**{integration['name']}**")
+                st.caption(f"{integration['protocol']} · {integration['description']}")
+                st.markdown(f"[Abrir repositório oficial]({integration['repository']})")
+            with header_cols[1]:
+                port = st.number_input(
+                    "Porta",
+                    min_value=1,
+                    max_value=65535,
+                    value=int(integration.get("port", 8000)),
+                    step=1,
+                    key=f"mcp_port_{integration_id}",
+                )
+            with header_cols[2]:
+                status = detect_local_service({**integration, "port": port})
+                if status["available"]:
+                    st.success("Disponível")
+                else:
+                    st.caption("Não detectado")
+                st.caption(status["message"])
+            with header_cols[3]:
+                active = st.toggle("Activo", value=bool(integration.get("active", False)), key=f"mcp_active_{integration_id}")
+                if active != bool(integration.get("active", False)):
+                    update_integration(integration_id, active=active)
+                    st.rerun()
+
+            st.caption(integration.get("endpoint_note", "Porta editável para o serviço local."))
+            if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", use_container_width=True):
+                update_integration(integration_id, port=int(port))
+                st.success(f"Porta de {integration['name']} guardada: {int(port)}")
+                st.rerun()
+
+    st.divider()
+    st.subheader("Skill MoneyPrinterTurbo")
+    st.caption("A skill anexada pode ser guardada na pasta local do Thunderbolt ou descarregada como ficheiro Markdown. Nenhum dos quatro repositórios externos é copiado para o pacote.")
+    skill_cols = st.columns(2)
+    with skill_cols[0]:
+        if st.button("Guardar skill localmente", type="primary", use_container_width=True, key="mcp_install_mpt_skill"):
+            try:
+                destination = install_skill_locally()
+                st.success(f"Skill guardada em `{destination}`")
+            except (FileNotFoundError, OSError) as exc:
+                st.error(f"Não foi possível guardar a skill: {exc}")
+    with skill_cols[1]:
+        try:
+            skill_data = read_packaged_skill()
+        except FileNotFoundError:
+            skill_data = None
+        if skill_data is not None:
+            st.download_button(
+                "Descarregar skill .md",
+                data=skill_data,
+                file_name="moneyprinterturbo-video.md",
+                mime="text/markdown",
+                use_container_width=True,
+                key="mcp_download_mpt_skill",
+            )
+        else:
+            st.warning("A skill ainda não está disponível nesta instalação.")
+
+
 def render_metadata_cleaner():
     st.title("Limpador de metadado")
     st.caption("Limpeza e edição de metadados para vídeos de terceiros que já estão prontos.")
@@ -756,6 +891,7 @@ def main():
         ("Canais", ":material/ondemand_video:", "Canais"),
         ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
         ("Upload", ":material/cloud_upload:", "Upload"),
+        ("MCP", ":material/hub:", "MCP"),
         ("Limpador de metadado", ":material/edit_note:", "Limpador de metadado"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
@@ -777,6 +913,7 @@ def main():
         "Canais": render_channels,
         "Novo vídeo": render_new_video,
         "Upload": render_upload,
+        "MCP": render_mcp,
         "Limpador de metadado": render_metadata_cleaner,
         "Configurações": render_settings,
     }

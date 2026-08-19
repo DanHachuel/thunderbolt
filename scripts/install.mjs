@@ -107,6 +107,7 @@ function ensureDirs() {
     join(storageRoot, "metadata_cleaner", "originals"),
     join(storageRoot, "metadata_cleaner", "outputs"),
     join(storageRoot, "artifacts"),
+    join(storageRoot, "skills"),
   ];
   for (const directory of directories) mkdirSync(directory, { recursive: true });
   copySeedBlueprints(storageRoot);

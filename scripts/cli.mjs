@@ -76,6 +76,7 @@ function ensureRuntimeStorage() {
     join(storageRoot, "metadata_cleaner"),
     join(storageRoot, "metadata_cleaner", "originals"),
     join(storageRoot, "metadata_cleaner", "outputs"),
+    join(storageRoot, "skills"),
   ];
   for (const directory of directories) mkdirSync(directory, { recursive: true });
   const seedRoot = resolve(root, "seed", "blueprints");

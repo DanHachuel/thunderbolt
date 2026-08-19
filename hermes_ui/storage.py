@@ -21,6 +21,48 @@ DEFAULTS: dict[str, Any] = {
     "batches.json": [],
     "uploads.json": [],
     "metadata_edits.json": [],
+    "mcp_integrations.json": [
+        {
+            "id": "short-video-maker",
+            "name": "Short Video Maker",
+            "repository": "https://github.com/gyoridavid/short-video-maker",
+            "protocol": "MCP + REST",
+            "description": "Servidor externo para criação de vídeos curtos, com MCP e API REST.",
+            "port": 3123,
+            "active": False,
+            "endpoint_note": "Porta documentada pelo projecto: 3123.",
+        },
+        {
+            "id": "autovio",
+            "name": "AutoVio",
+            "repository": "https://github.com/Auto-Vio/autovio",
+            "protocol": "MCP + REST",
+            "description": "Pipeline externo de vídeo com API REST e servidor MCP separado.",
+            "port": 3001,
+            "active": False,
+            "endpoint_note": "Porta padrão da API backend documentada pelo projecto: 3001.",
+        },
+        {
+            "id": "openmontage",
+            "name": "OpenMontage",
+            "repository": "https://github.com/calesthio/OpenMontage",
+            "protocol": "Agente local",
+            "description": "Sistema externo de produção agentic de vídeo; não documenta um servidor MCP/HTTP padrão.",
+            "port": 8000,
+            "active": False,
+            "endpoint_note": "Porta editável de referência; o projecto não documenta uma porta local padrão.",
+        },
+        {
+            "id": "opencut",
+            "name": "OpenCut",
+            "repository": "https://github.com/opencut-app/opencut",
+            "protocol": "API em desenvolvimento",
+            "description": "Editor externo; a documentação actual indica API/MCP em desenvolvimento.",
+            "port": 8787,
+            "active": False,
+            "endpoint_note": "Porta padrão da API documentada pelo projecto: 8787; frontend usa 5173.",
+        },
+    ],
     "settings.json": {
         "port": 3030,
         "moneyprinter_path": "",
@@ -156,7 +198,7 @@ def seed_blueprints() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs"]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs"]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     for filename, default in DEFAULTS.items():

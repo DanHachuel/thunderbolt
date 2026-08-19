@@ -17,6 +17,7 @@ A primeira versão implementa a camada UI independente com:
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Novo vídeo | Subabas Criar vídeo e Vídeos; canal específico, lote no mesmo canal, lote geral, filtro de estados e controlos iniciar/parar |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, TikTok e diagnóstico |
+| MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
 | Configurações | Provedores LLM, TTS/voz, materiais, Whisper, FFmpeg, YouTube, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
@@ -102,9 +103,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.18 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.18 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.18
+npx.cmd --yes @danhachuel/thunderbolt@0.2.19 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.19 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.19
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -172,6 +173,14 @@ O Upload usa como caminho **principal** a lógica do `PublishingSchedulingAgent`
 Na aba **Upload**, configure primeiro o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para publicar.
 
 Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separada para o caminho de redundância. Os resultados guardam no histórico local qual mecanismo foi utilizado e as tentativas realizadas, sem guardar segredos.
+
+## MCP e integrações externas opcionais
+
+A aba **MCP** funciona como um catálogo local de clientes externos. Ela lista **Short Video Maker**, **AutoVio**, **OpenMontage** e **OpenCut** com os respectivos links oficiais, protocolo/capacidade conhecida, porta local editável e toggle **Activo**. Os repositórios não são clonados, instalados ou incluídos no pacote npm do Thunderbolt.
+
+As portas iniciais são `3123` para Short Video Maker, `3001` para a API backend do AutoVio, `8000` como referência editável para OpenMontage — que não documenta uma porta HTTP padrão — e `8787` para a API do OpenCut, cujo frontend de desenvolvimento usa `5173`. A detecção é passiva: apenas consulta `localhost` e nunca inicia processos externos. Activar uma integração guarda a preferência local; não substitui a instalação/configuração do serviço externo.
+
+A mesma aba permite **Guardar skill localmente**, copiando `moneyprinterturbo-video.md` para `storage/skills/`, e **Descarregar skill .md** através do navegador. A skill é um recurso separado dos quatro repositórios externos.
 
 ## TikTok
 
