@@ -29,6 +29,11 @@ st.markdown("""
 .hermes-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
 .small-muted { color:#8ba6bb; font-size:.85rem; }
+/* Identidade visual dos destinos de upload: YouTube vermelho, TikTok preto. */
+[data-testid="stMultiSelect"] [data-baseweb="tag"] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
+[data-testid="stMultiSelect"] [data-baseweb="tag"] svg { color:#ffffff !important; fill:#ffffff !important; }
+[data-testid="stMultiSelect"] [data-baseweb="tag"]:nth-child(1) { background:#ff4b4b !important; }
+[data-testid="stMultiSelect"] [data-baseweb="tag"]:nth-child(2) { background:#000000 !important; }
 </style>
 """, unsafe_allow_html=True)
 
