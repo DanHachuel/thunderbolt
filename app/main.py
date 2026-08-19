@@ -129,11 +129,11 @@ st.markdown("""
 .content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
 .small-muted { color:#8ba6bb; font-size:.85rem; }
-/* Identidade visual dos destinos de upload: YouTube vermelho, TikTok preto. */
-[data-testid="stMultiSelect"] [data-baseweb="tag"] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
-[data-testid="stMultiSelect"] [data-baseweb="tag"] svg { color:#ffffff !important; fill:#ffffff !important; }
-[data-testid="stMultiSelect"] [data-baseweb="tag"]:nth-child(1) { background:#ff4b4b !important; }
-[data-testid="stMultiSelect"] [data-baseweb="tag"]:nth-child(2) { background:#000000 !important; }
+/* Identidade visual dos destinos: os tags BaseWeb são instáveis por ordem; usamos badges próprios por plataforma. */
+[data-testid="stVerticalBlock"]:has(.tb-dest-marker) [data-testid="stMultiSelect"] [data-baseweb="tag"] { display:none !important; }
+[data-testid="stVerticalBlock"]:has(.tb-dest-marker) [data-testid="stMultiSelect"] [data-baseweb="tag"] svg { display:none !important; }
+.tb-destination-chips { display:flex; flex-wrap:wrap; gap:.28rem; margin:.25rem 0 .55rem; }
+.tb-destination-chip { display:inline-block; color:#fff; padding:.22rem .65rem; border-radius:999px; font-weight:700; font-size:.82rem; line-height:1.1; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -710,11 +710,13 @@ def render_upload_conventional():
     settings = read_json("settings.json", {})
     youtube = YouTubeAdapter(settings=settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
-    destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"])
     chip_colors = {"YouTube": "#ff4b4b", "TikTok": "#000000", "Instagram": "#e1306c", "Facebook Pages": "#1877f2"}
-    chips = " ".join(f'<span style="display:inline-block;background:{chip_colors[item]};color:#fff;padding:0.22rem 0.65rem;border-radius:999px;margin:0.18rem 0.25rem 0.35rem 0;font-weight:700;font-size:0.82rem">{item}</span>' for item in destination)
-    if chips:
-        st.markdown(chips, unsafe_allow_html=True)
+    with st.container():
+        st.markdown('<div class="tb-dest-marker"></div>', unsafe_allow_html=True)
+        destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"], key="upload_destinations")
+        if destination:
+            chips = "".join(f'<span class="tb-destination-chip" style="background:{chip_colors[item]}">{item}</span>' for item in destination)
+            st.markdown(f'<div class="tb-destination-chips">{chips}</div>', unsafe_allow_html=True)
 
     if "Instagram" in destination:
         st.info("Instagram está disponível no front end. A publicação real será ligada numa etapa de credenciais/API própria.")
