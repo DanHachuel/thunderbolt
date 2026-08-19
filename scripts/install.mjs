@@ -1,13 +1,34 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform, arch } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
-const home = platform() === "win32" ? (process.env.USERPROFILE || homedir()) : homedir();
+function getUserHome() {
+  if (platform() !== "win32") return homedir();
+  const driveHome = process.env.HOMEDRIVE && process.env.HOMEPATH ? `${process.env.HOMEDRIVE}${process.env.HOMEPATH}` : null;
+  const candidates = [process.env.USERPROFILE, driveHome, homedir()].filter(Boolean);
+  const slash = String.fromCharCode(92);
+  for (const candidate of candidates) {
+    const normalized = candidate.replaceAll("/", slash);
+    const lower = normalized.toLowerCase();
+    const userMarker = `${slash}users${slash}`;
+    const suffixes = [
+      `${slash}appdata${slash}local${slash}hermes`,
+      `${slash}appdata${slash}local${slash}hermes-ui`,
+      `${slash}appdata${slash}roaming${slash}mobaxterm${slash}home`,
+    ];
+    const suffix = suffixes.find((value) => lower.endsWith(value));
+    if (suffix && lower.includes(userMarker)) return normalized.slice(0, -suffix.length);
+    if (lower.includes(userMarker)) return normalized;
+  }
+  return candidates[0] || homedir();
+}
+
+const home = getUserHome();
 const hermesHome = process.env.HERMES_HOME || join(home, "Hermes-UI");
 const venvPath = process.env.HERMES_VENV || join(hermesHome, ".venv");
 const defaultMpt = process.env.MONEYPRINTER_PATH || join(hermesHome, "MoneyPrinterTurbo");
@@ -155,8 +176,10 @@ function cloneMoneyPrinter(path) {
     console.error("Git não encontrado. Instale Git ou defina MONEYPRINTER_PATH para uma cópia local do MoneyPrinterTurbo.");
     process.exit(1);
   }
-  mkdirSync(resolve(path, ".."), { recursive: true });
-  run("git", ["clone", "--depth", "1", "https://github.com/harry0703/MoneyPrinterTurbo.git", path]);
+  const destination = resolve(path);
+  const parent = resolve(destination, "..");
+  mkdirSync(parent, { recursive: true });
+  run("git", ["clone", "--depth", "1", "https://github.com/harry0703/MoneyPrinterTurbo.git", basename(destination)], { cwd: parent });
 }
 
 function writeSettings(moneyprinterPath) {

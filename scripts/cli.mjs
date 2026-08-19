@@ -7,7 +7,28 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
-const userHome = platform() === "win32" ? (process.env.USERPROFILE || homedir()) : homedir();
+function getUserHome() {
+  if (platform() !== "win32") return homedir();
+  const driveHome = process.env.HOMEDRIVE && process.env.HOMEPATH ? `${process.env.HOMEDRIVE}${process.env.HOMEPATH}` : null;
+  const candidates = [process.env.USERPROFILE, driveHome, homedir()].filter(Boolean);
+  const slash = String.fromCharCode(92);
+  for (const candidate of candidates) {
+    const normalized = candidate.replaceAll("/", slash);
+    const lower = normalized.toLowerCase();
+    const userMarker = `${slash}users${slash}`;
+    const suffixes = [
+      `${slash}appdata${slash}local${slash}hermes`,
+      `${slash}appdata${slash}local${slash}hermes-ui`,
+      `${slash}appdata${slash}roaming${slash}mobaxterm${slash}home`,
+    ];
+    const suffix = suffixes.find((value) => lower.endsWith(value));
+    if (suffix && lower.includes(userMarker)) return normalized.slice(0, -suffix.length);
+    if (lower.includes(userMarker)) return normalized;
+  }
+  return candidates[0] || homedir();
+}
+
+const userHome = getUserHome();
 const hermesHome = process.env.HERMES_HOME || join(userHome, "Hermes-UI");
 const venvDir = process.env.HERMES_VENV || join(hermesHome, ".venv");
 const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");

@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/content-hermes-ui@0.2.7 install
+npx.cmd --yes @danhachuel/content-hermes-ui@0.2.9 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/content-hermes-ui@0.2.7 install
+npx --yes @danhachuel/content-hermes-ui@0.2.9 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -132,9 +132,9 @@ O instalador irá:
 9. registar o caminho local do MoneyPrinterTurbo;
 10. deixar o ambiente pronto para o comando de arranque.
 
-No Windows, o caminho padrão é construído a partir de `USERPROFILE`, não de `HOME`. Assim, mesmo em MobaXterm, a pasta padrão será `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. O fluxo normal preserva os dados; somente `--purge-data` activa a limpeza destrutiva.
+No Windows, o caminho padrão é construído a partir de `USERPROFILE`, `HOMEDRIVE/HOMEPATH` ou, em último recurso, `HOME`. O instalador remove o redireccionamento de MobaXterm (`AppData\Local\hermes` ou `AppData\Roaming\MobaXterm\home`) e usa `C:\Users\<utilizador>\Hermes-UI`, salvo se `HERMES_HOME` for definido explicitamente. A pasta `AppData\Local\npm-cache\_npx` é apenas cache temporária do npm e não é a pasta de instalação final. O fluxo normal preserva os dados; somente `--purge-data` activa a limpeza destrutiva.
 
-A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo.
+A instalação pode demorar alguns minutos, especialmente durante a instalação de `faster-whisper` e de bibliotecas de processamento de vídeo. O caminho do pacote dentro de `AppData\Local\npm-cache\_npx` que aparece no log é temporário; o launcher usa esse pacote apenas para executar o instalador e os ficheiros finais ficam em `C:\Users\<utilizador>\Hermes-UI`.
 
 ### 3.1 Usar o instalador com uma cópia existente do MoneyPrinterTurbo
 
