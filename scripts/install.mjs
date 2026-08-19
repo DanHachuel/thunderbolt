@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform, arch } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,38 +50,26 @@ function ensureDirs() {
   mkdirSync(join(hermesHome, "storage"), { recursive: true });
 }
 
-function isManagedLegacyRoot(candidate) {
-  if (!candidate || resolve(candidate) === resolve(hermesHome) || !existsSync(candidate)) return false;
-  return ["MoneyPrinterTurbo", ".venv", "storage"].some((name) => existsSync(join(candidate, name)));
-}
-
-function cleanupLegacyInstallations() {
-  if (process.env.HERMES_HOME || process.env.MONEYPRINTER_PATH || process.env.HERMES_KEEP_LEGACY === "1") return;
-  if (platform() !== "win32") return;
+function resetInstallationRoots() {
   const userProfile = process.env.USERPROFILE || home;
   const localAppData = process.env.LOCALAPPDATA || join(userProfile, "AppData", "Local");
   const candidates = [
+    hermesHome,
     join(localAppData, "hermes"),
     join(localAppData, "Hermes-UI"),
     join(userProfile, ".content-hermes"),
     join(userProfile, "hermes"),
   ];
-  for (const candidate of candidates) {
-    if (!isManagedLegacyRoot(candidate)) continue;
-    if (!existsSync(hermesHome)) {
-      console.log(`A migrar instalação antiga de ${candidate} para ${hermesHome}`);
-      mkdirSync(resolve(hermesHome, ".."), { recursive: true });
-      try {
-        cpSync(candidate, hermesHome, { recursive: true, force: false, errorOnExist: false });
-        rmSync(candidate, { recursive: true, force: true });
-      } catch (error) {
-        console.error(`Não foi possível migrar ${candidate}: ${error.message}`);
-        console.error("A instalação foi interrompida para evitar duplicação ou perda de dados.");
-        process.exit(1);
-      }
-    } else if (resolve(candidate) !== resolve(hermesHome)) {
-      console.log(`A remover instalação antiga detectada em ${candidate}`);
+  const uniqueCandidates = [...new Set(candidates.map((candidate) => resolve(candidate)))];
+  for (const candidate of uniqueCandidates) {
+    if (!existsSync(candidate)) continue;
+    console.log(`A apagar instalação anterior: ${candidate}`);
+    try {
       rmSync(candidate, { recursive: true, force: true });
+    } catch (error) {
+      console.error(`Não foi possível apagar ${candidate}: ${error.message}`);
+      console.error("Feche processos Hermes/Node/Python que estejam a usar a pasta e execute novamente.");
+      process.exit(1);
     }
   }
 }
@@ -164,7 +152,7 @@ function main() {
   const skipMpt = args.includes("--skip-moneyprinter");
   const skipDeps = args.includes("--skip-python-deps");
   const moneyprinterPath = process.env.MONEYPRINTER_PATH || defaultMpt;
-  cleanupLegacyInstallations();
+  resetInstallationRoots();
   ensureDirs();
   const python = skipDeps ? null : ensurePython();
   if (!skipDeps) installContentHermesDependencies(python);

@@ -68,7 +68,7 @@ Para instalar automaticamente o ambiente completo — Python 3.11+, ambiente vir
 npx --yes @danhachuel/content-hermes-ui install
 ```
 
-Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. A instalação é idempotente: reutiliza uma única pasta e detecta/migra a tentativa antiga em `C:\Users\<utilizador>\AppData\Local\hermes`, removendo-a depois para evitar lixo de versões. Para usar uma cópia existente do MoneyPrinterTurbo:
+Por defeito, o instalador cria automaticamente a pasta `~/Hermes-UI` — no Windows, `C:\Users\<utilizador>\Hermes-UI` —, clona o MoneyPrinterTurbo para `Hermes-UI/MoneyPrinterTurbo`, cria o ambiente em `Hermes-UI/.venv` e guarda o estado em `Hermes-UI/storage`. No Windows, se Python 3.11+ não estiver instalado, o instalador tenta instalá-lo automaticamente através do `winget`. A instalação é uma reinstalação limpa: apaga a pasta `Hermes-UI` e as instalações antigas conhecidas, incluindo `C:\Users\<utilizador>\AppData\Local\hermes`, sem migrar nem copiar ficheiros. O ambiente virtual, o MoneyPrinterTurbo, as dependências e o storage são recriados do zero. Para usar uma cópia existente do MoneyPrinterTurbo:
 
 ```bash
 MONEYPRINTER_PATH=/caminho/MoneyPrinterTurbo npx --yes @danhachuel/content-hermes-ui install
