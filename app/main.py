@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from datetime import date, datetime
@@ -38,6 +39,7 @@ from integrations.youtube_direct_credentials import COOKIE_KEYS as DIRECT_COOKIE
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
+from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL, ModelDiscoveryError, fetch_openai_compatible_models
 
 AI_STYLE_OPTIONS = [
     "Natural Realista",
@@ -1595,14 +1597,36 @@ def render_settings():
         with st.expander("LLM — providers e modelos", expanded=True):
             provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
             llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
-            st.markdown("**OpenAI — API key, Base URL e modelo**")
+            st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
+            st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
             openai_cols = st.columns(3)
             with openai_cols[0]:
-                openai_api_key = text_setting("OpenAI API key", "openai_api_key", secret=True)
+                openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
             with openai_cols[1]:
-                openai_base_url = text_setting("OpenAI Base URL", "openai_base_url", help_text="Opcional. Deixe vazio para a API oficial ou indique um endpoint compatível.")
+                openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
             with openai_cols[2]:
-                openai_model_name = text_setting("OpenAI model", "openai_model_name", help_text="Ex.: gpt-4o, gpt-4.1 ou o modelo disponibilizado pelo seu endpoint.")
+                cached_catalog = st.session_state.get("openai_model_catalog", {})
+                catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
+                cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
+                current_model_name = str(settings.get("openai_model_name", "") or "")
+                manual_option = "__manual_model__"
+                if cached_models:
+                    model_options = [manual_option, *cached_models]
+                    model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
+                    selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
+                    if selected_model == manual_option:
+                        openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help_text="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
+                    else:
+                        openai_model_name = selected_model
+                else:
+                    openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
+            refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
+            if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
+                st.warning(str(cached_catalog["error"]))
+            elif cached_models:
+                st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
+            else:
+                st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
             llm_fields = [
                 ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
                 ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
@@ -1675,6 +1699,16 @@ def render_settings():
             upload_post_username = text_setting("Upload-Post username", "upload_post_username")
             upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
             upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+
+        if refresh_openai_models:
+            try:
+                discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
+                st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
+                st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
+                st.rerun()
+            except ModelDiscoveryError as exc:
+                st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
+                st.rerun()
 
         if st.form_submit_button("Guardar configurações do Thunderbolt", type="primary"):
             direct_cookie_error = ""

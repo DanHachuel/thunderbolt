@@ -16,6 +16,7 @@ def test_moneyprinter_config_preserves_existing_and_maps_services():
     assert payload["custom"]["keep"] is True
     assert payload["app"]["llm_provider"] == "openai"
     assert payload["app"]["openai_api_key"] == "secret"
+    assert payload["app"]["openai_model_name"] == "gpt-test"
     assert payload["app"]["pexels_api_keys"] == ["p1", "p2"]
     assert payload["azure"]["speech_region"] == "westeurope"
     assert payload["elevenlabs"]["api_key"] == "eleven-secret"

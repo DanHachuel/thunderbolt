@@ -22,7 +22,7 @@ A primeira versão implementa a camada UI independente com:
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados funcional, Cortes reservado e Editor Python inspirado no PYEdit para vídeos e scripts locais |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo via sessão Frontend API com cookies/sessionInfo por conta e DELEGATED_SESSION_ID por canal, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Configurações Técnicas | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID e Client Secret por conta, cookies SID/SSID/HSID/APISID/SAPISID e sessionInfo por conta, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
+| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID e Client Secret por conta, cookies SID/SSID/HSID/APISID/SAPISID e sessionInfo por conta, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 ## Upload directo — credenciais por conta e por canal
@@ -36,9 +36,17 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.42
+## Navegação da UI 0.2.43
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+
+## OpenAI/ NVIDIA NIM — descoberta de modelos
+
+Em **Configurações Técnicas > LLM — providers e modelos**, a área anteriormente chamada **OpenAI — API key, Base URL e modelo** passa a chamar-se **OpenAI/ NVIDIA NIM — API key, Base URL e modelo**. O provider interno continua a ser `openai`, para preservar a compatibilidade com o MoneyPrinterTurbo e com os restantes endpoints OpenAI-compatible.
+
+A Base URL predefinida para NVIDIA NIM é `https://integrate.api.nvidia.com/v1`. Depois de inserir a API key, clique em **Consultar/actualizar modelos NIM**. O Thunderbolt consulta a Base URL acrescentando `/models`, lê os identificadores do formato OpenAI (`data[].id`) e apresenta-os num selector. O modelo escolhido é guardado em `openai_model_name` e é sincronizado para o `config.toml` do motor.
+
+A consulta só é executada quando o utilizador carrega no botão; a aplicação não envia a API key ao abrir a página. Se o endpoint estiver offline, recusar a credencial ou não disponibilizar `/models`, a UI mostra o erro sem expor a API key e mantém a opção **Escrever modelo manualmente**. Também é possível manter um endpoint local NIM ou outro servidor OpenAI-compatible substituindo a Base URL.
 
 ## Instalação
 
@@ -125,9 +133,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.42 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.42 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.42
+npx.cmd --yes @danhachuel/thunderbolt@0.2.43 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.43 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.43
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -151,7 +159,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.42 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.43 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 

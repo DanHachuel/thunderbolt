@@ -100,7 +100,7 @@ DEFAULTS: dict[str, Any] = {
         "shengsuanyun_base_url": "",
         "shengsuanyun_model_name": "",
         "openai_api_key": "",
-        "openai_base_url": "",
+        "openai_base_url": "https://integrate.api.nvidia.com/v1",
         "openai_model_name": "",
         "gemini_api_key": "",
         "gemini_model_name": "",

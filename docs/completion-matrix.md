@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.42.
+Estado auditado para o release 0.2.43.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -17,6 +17,7 @@ Estado auditado para o release 0.2.42.
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
 | Área de teste de vozes em Configurações | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download. |
+| OpenAI/ NVIDIA NIM — descoberta de modelos OpenAI-compatible | Concluído | `integrations/openai_model_discovery.py` consulta explicitamente `/models`, valida `data[].id`, envia Bearer API key sem a expor, apresenta selector e mantém fallback manual; `openai_model_name` continua sincronizado com o MoneyPrinterTurbo. |
 | Upload directo via YouTube-Video-Upload-Frontend-Api | Concluído como adaptador experimental | `integrations/youtube_direct_upload.py`, sessão manual, metadata e chunks múltiplos de 256 KiB; credenciais directas passam a ser lidas por conta Google associada. |
 | Upload directo com cookies/sessionInfo por conta e `DELEGATED_SESSION_ID` por canal | Concluído | `integrations/youtube_direct_credentials.py` aceita JSON/lista JSON/Netscape, valida SID/SSID/HSID/APISID/SAPISID e guarda em `storage/youtube_direct_accounts/<account-id>/cookies.json`; `direct_session_info` fica na conta Google e `delegated_session_id` no canal; o upload bloqueia credenciais incompletas. |
 | `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | Campos por canal, selectors e propagação para tasks. |
