@@ -20,8 +20,10 @@ except (OSError, json.JSONDecodeError):
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
+from app.modules.niche_finder.summarizer import summarize_items
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
@@ -745,8 +747,139 @@ def render_niche_finder():
 
 def render_niche_finder_apify():
     st.title("Niche Finder Apify")
-    st.caption("Área reservada para a futura integração do Niche Finder com o Apify.")
-    st.info("Esta aba está preparada para desenvolvimento futuro e ainda não executa nenhuma operação.")
+    st.caption("Alternativa independente ao Niche Finder Kaggle: pesquisa vídeos outlier no YouTube através do actor Apify e organiza dados, legendas e estrutura dos vídeos.")
+    st.info("Esta página não usa o dataset, os filtros, a execução ou os resultados do Kaggle. A instalação das dependências é automática, mas a operação é manual: defina os parâmetros nesta aba e clique em **Pesquisar no Apify** para iniciar.")
+    settings = read_json("settings.json", {})
+
+    active_run = st.session_state.get("niche_apify_active_run")
+    if active_run:
+        st.warning(f"Existe uma execução Apify pendente: `{active_run.get('run_id', 'sem ID')}`.")
+        if st.button("Cancelar execução actual", key="niche_apify_cancel"):
+            try:
+                abort_actor_run(settings.get("apify_api_token", ""), active_run.get("run_id", ""))
+                st.session_state.pop("niche_apify_active_run", None)
+                st.success("Execução Apify cancelada.")
+                st.rerun()
+            except ApifyError as exc:
+                st.error(str(exc))
+
+    with st.container(border=True):
+        st.subheader("Parâmetros da pesquisa")
+        with st.form("niche_apify_parameters", clear_on_submit=False):
+            keyword_cols = st.columns(3)
+            with keyword_cols[0]:
+                keyword1 = st.text_input("Palavra-chave 1", key="niche_apify_keyword1", placeholder="Ex.: healthy food")
+            with keyword_cols[1]:
+                keyword2 = st.text_input("Palavra-chave 2", key="niche_apify_keyword2", placeholder="Ex.: meal prep healthy")
+            with keyword_cols[2]:
+                keyword3 = st.text_input("Palavra-chave 3", key="niche_apify_keyword3", placeholder="Ex.: high protein snack")
+            search_cols = st.columns(4)
+            with search_cols[0]:
+                date_filter = st.selectbox("Período", ["week", "month", "3months", "year", "all"], index=0, key="niche_apify_date_filter")
+            with search_cols[1]:
+                max_results = st.number_input("Máximo por pesquisa", min_value=1, max_value=100, value=3, step=1, key="niche_apify_max_results")
+            with search_cols[2]:
+                max_results_shorts = st.number_input("Máximo de Shorts", min_value=0, max_value=100, value=0, step=1, key="niche_apify_max_results_shorts")
+            with search_cols[3]:
+                length_filter = st.selectbox("Duração", ["between420", "any", "short", "long"], index=0, key="niche_apify_length_filter")
+            filter_cols = st.columns(4)
+            with filter_cols[0]:
+                subtitles_language = st.selectbox("Idioma das legendas", ["en", "pt", "es", "fr", "de"], index=0, key="niche_apify_subtitles_language")
+            with filter_cols[1]:
+                sorting_order = st.selectbox("Ordenação", ["relevance", "date", "viewCount", "rating"], index=0, key="niche_apify_sorting_order")
+            with filter_cols[2]:
+                download_subtitles = st.checkbox("Descarregar legendas", value=True, key="niche_apify_download_subtitles")
+            with filter_cols[3]:
+                has_cc = st.checkbox("Apenas vídeos com CC", value=False, key="niche_apify_has_cc")
+            analyse_apify = st.form_submit_button("Pesquisar no Apify", type="primary", use_container_width=True)
+
+    if analyse_apify:
+        try:
+            actor_input = build_actor_input(
+                [keyword1, keyword2, keyword3],
+                date_filter=date_filter,
+                max_results=int(max_results),
+                max_results_shorts=int(max_results_shorts),
+                length_filter=length_filter,
+                subtitles_language=subtitles_language,
+                download_subtitles=download_subtitles,
+                sorting_order=sorting_order,
+                has_cc=has_cc,
+            )
+            token = str(settings.get("apify_api_token", "") or "").strip()
+            actor_id = str(settings.get("apify_actor_id", DEFAULT_ACTOR_ID) or DEFAULT_ACTOR_ID).strip()
+            st.session_state["niche_apify_active_run"] = {"run_id": "a iniciar", "started_at": now()}
+            progress = st.progress(0, text="A iniciar o actor Apify…")
+            run = start_actor_run(token, actor_id, actor_input)
+            st.session_state["niche_apify_active_run"] = {"run_id": run.run_id, "started_at": now(), "status": run.status}
+            progress.progress(15, text=f"Actor iniciado: {run.run_id}. A aguardar dataset…")
+
+            def update_progress(current_run):
+                st.session_state["niche_apify_active_run"] = {"run_id": current_run.run_id, "started_at": st.session_state["niche_apify_active_run"].get("started_at", now()), "status": current_run.status}
+                progress.progress(35 if current_run.status not in {"SUCCEEDED"} else 55, text=f"Estado Apify: {current_run.status}")
+
+            finished = wait_for_actor_run(
+                token,
+                run,
+                poll_interval=int(settings.get("apify_poll_interval_seconds", 10)),
+                timeout_seconds=int(settings.get("apify_run_timeout_seconds", 900)),
+                on_status=update_progress,
+            )
+            progress.progress(60, text="Dataset recebido. A carregar vídeos…")
+            raw_items = get_dataset_items(token, finished.dataset_id, limit=int(max_results) * max(1, len([value for value in [keyword1, keyword2, keyword3] if value.strip()])))
+            items = normalize_video_items(raw_items)
+            progress.progress(70, text=f"{len(items)} vídeo(s) carregado(s). A preparar transcrições…")
+            items = summarize_items(items, settings, on_item=lambda current, total, item: progress.progress(70 + int((current / max(total, 1)) * 25), text=f"A resumir vídeo {current}/{total}…"))
+            st.session_state["niche_apify_results"] = items
+            st.session_state["niche_apify_last_run"] = {"run_id": finished.run_id, "status": finished.status, "dataset_id": finished.dataset_id, "created_at": now(), "item_count": len(items), "parameters": actor_input}
+            history = read_json("niche_apify_runs.json", [])
+            if not isinstance(history, list):
+                history = []
+            history.insert(0, st.session_state["niche_apify_last_run"])
+            write_json("niche_apify_runs.json", history[:20])
+            st.session_state.pop("niche_apify_active_run", None)
+            progress.progress(100, text="Pesquisa Apify concluída.")
+            st.success(f"Pesquisa concluída: {len(items)} vídeo(s) recebido(s).")
+        except ApifyError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"A pesquisa Apify terminou com um erro inesperado: {exc}")
+
+    results = st.session_state.get("niche_apify_results", [])
+    if not results:
+        st.caption("Ainda não existe uma pesquisa nesta sessão. Ajuste os parâmetros e clique em **Pesquisar no Apify**.")
+        return
+
+    st.subheader("Vídeos encontrados")
+    result_filter = st.text_input("Filtrar resultados", placeholder="Título, canal ou palavra no resumo", key="niche_apify_result_filter")
+    status_filter = st.selectbox("Estado da sumarização", ["Todos", "concluído", "sem transcrição", "não aplicável", "erro"], key="niche_apify_status_filter")
+    visible_results = results
+    if result_filter.strip():
+        term = result_filter.strip().casefold()
+        visible_results = [item for item in visible_results if term in str(item.get("title", "")).casefold() or term in str(item.get("channel_name", "")).casefold() or term in str(item.get("summary", "")).casefold()]
+    if status_filter != "Todos":
+        visible_results = [item for item in visible_results if str(item.get("summary_status", "")).startswith(status_filter)]
+    try:
+        import pandas as pd
+        result_frame = pd.DataFrame(visible_results)
+        display_columns = ["title", "channel_name", "duration", "view_count", "subscriber_count", "comments_count", "vsc_ratio", "url", "transcript_status", "summary_status", "summary"]
+        display_columns = [column for column in display_columns if column in result_frame.columns]
+        st.dataframe(result_frame[display_columns], use_container_width=True, hide_index=True)
+        export_frame = result_frame.drop(columns=["transcript"], errors="ignore")
+        export_json = export_frame.to_json(orient="records", force_ascii=False, indent=2)
+        export_csv = export_frame.to_csv(index=False).encode("utf-8")
+        export_cols = st.columns(2)
+        with export_cols[0]:
+            st.download_button("Exportar JSON", data=export_json, file_name="niche-finder-apify-results.json", mime="application/json", use_container_width=True, key="niche_apify_export_json")
+        with export_cols[1]:
+            st.download_button("Exportar CSV", data=export_csv, file_name="niche-finder-apify-results.csv", mime="text/csv", use_container_width=True, key="niche_apify_export_csv")
+    except ImportError:
+        st.dataframe(visible_results, use_container_width=True, hide_index=True)
+
+    last_run = st.session_state.get("niche_apify_last_run", {})
+    if last_run:
+        with st.expander("Detalhes da última execução"):
+            st.json({key: value for key, value in last_run.items() if key != "parameters"})
 
 
 def render_videos():
@@ -1041,6 +1174,18 @@ def render_settings():
             with kaggle_cols[2]:
                 kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
 
+        with st.expander("Niche Finder — execução através da Apify", expanded=True):
+            st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
+            apify_cols = st.columns(4)
+            with apify_cols[0]:
+                apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
+            with apify_cols[1]:
+                apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
+            with apify_cols[2]:
+                apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
+            with apify_cols[3]:
+                apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
+
         with st.expander("Consulta oficial de métricas — opcional"):
             st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
             youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
@@ -1162,6 +1307,7 @@ def render_settings():
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
                 "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
                 "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
+                "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
                 "direct_cookie_sid": direct_cookie_sid, "direct_cookie_ssid": direct_cookie_ssid, "direct_cookie_hsid": direct_cookie_hsid, "direct_cookie_apisid": direct_cookie_apisid, "direct_cookie_sapisid": direct_cookie_sapisid, "direct_session_info": direct_session_info, "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                 "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,

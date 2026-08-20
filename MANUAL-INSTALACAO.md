@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.35
+> **Versão deste manual:** 0.2.36
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.35 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.36 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.35 install
+npx --yes @danhachuel/thunderbolt@0.2.36 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -345,7 +345,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## 8. Configuração inicial da UI
 
-Na primeira execução, a barra lateral apresenta **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise actual; **Niche Finder Apify** é uma área vazia reservada para desenvolvimento futuro. Abra **Configurações > Configurações Técnicas** e reveja. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. O menu **Configurações** contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica numa área opcional, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
+Na primeira execução, a barra lateral apresenta **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. Abra **Configurações > Configurações Técnicas** e reveja. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. O menu **Configurações** contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica numa área opcional, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
 | Configuração | Finalidade |
 |---|---|
@@ -360,8 +360,11 @@ Na primeira execução, a barra lateral apresenta **Início**, **Pipeline**, **A
 | Kaggle Username | Nome da conta Kaggle usada para publicar e executar a kernel remota |
 | Kaggle API Key | Chave da conta Kaggle, guardada mascarada apenas em `storage/state/settings.json` |
 | Slug da kernel Kaggle | Identificador da kernel remota, por padrão `thunderbolt-niche-finder` |
+| Apify API Token | Token pessoal da Apify, guardado mascarado no storage local e usado apenas pela alternativa Apify |
+| Apify Actor ID | Actor usado pela alternativa Apify, por padrão `streamers~youtube-scraper` |
+| Apify polling/timeout | Intervalo de consulta e limite máximo da execução do actor |
 
-As credenciais devem ser inseridas apenas na configuração local. A Kaggle API Key é usada somente pelo executor remoto para publicar a kernel, consultar o estado e obter os resultados pequenos; o dataset não é descarregado para `storage/data/niches`. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
+As credenciais devem ser inseridas apenas na configuração local. A Kaggle API Key pertence exclusivamente à alternativa Kaggle. O Apify API Token pertence exclusivamente à alternativa Apify e não é usado para Kaggle; os resultados e histórico Apify ficam separados em `niche_apify_runs.json`. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
 
 ## 9. Testar as áreas principais
 
@@ -371,7 +374,7 @@ Após iniciar a aplicação, valide o seguinte percurso:
 2. **Blueprints:** coloque um JSON em `~/.thunderbolt/storage/blueprints/importados/` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
 4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** com um URL `/channel/UC...`, um handle ou uma subpágina `/videos`; o parser resolve o ID, consulta a página pública e tenta o RSS quando necessário. Confirme que o resultado abre o formulário de revisão sem Data API Key. Se o canal não existir ou não fornecer metadados, confirme a mensagem clara e que o formulário de uma pesquisa anterior desaparece. A Data API é opcional e fica separada; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
-5. **Niche Finder Kaggle:** abra o menu expansível **Niche Finder**, seleccione **Niche Finder Kaggle**, defina os parâmetros dentro do conteúdo principal e confirme que não há preparação automática. Antes do clique, não deve existir download de dataset nem análise. Clique em **Analisar Nichos** para iniciar a preparação dos dados e a análise; depois altere país, engagement, datas e tags e clique novamente para aplicar os novos parâmetros. Abra também **Niche Finder Apify** e confirme que a página está vazia, informativa e sem operações.
+5. **Niche Finder Kaggle:** abra o menu expansível **Niche Finder**, seleccione **Niche Finder Kaggle**, defina os parâmetros dentro do conteúdo principal e confirme que não há preparação automática. Antes do clique, não deve existir download de dataset nem análise. Clique em **Analisar Nichos** para iniciar a preparação dos dados e a análise; depois altere país, engagement, datas e tags e clique novamente para aplicar os novos parâmetros. Em seguida, abra a alternativa independente **Niche Finder Apify**, configure as palavras-chave e filtros na própria aba e confirme que nada é executado antes de clicar em **Pesquisar no Apify**.
 6. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote.
 7. **Criação de Vídeos > Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar** dentro da subaba. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
 8. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
@@ -385,7 +388,7 @@ Após iniciar a aplicação, valide o seguinte percurso:
 16. **Configurações > MCP > Servidor MCP:** abra a subaba, mantenha o host `127.0.0.1`, active **Servidor MCP ON** e clique em **Guardar e iniciar Servidor MCP**. Confirme o endpoint `/mcp` e o health endpoint `/health`. Mantenha **Permitir ferramentas de escrita** desactivado até precisar que um agente crie lotes.
 17. **Configurações > MCP > Skill:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
 
-## Niche Finder
+## Niche Finder Kaggle e Niche Finder Apify
 
 A página **Niche Finder Kaggle** integra a lógica adaptada do projecto open source [johanfortus/Niche-Finder](https://github.com/johanfortus/Niche-Finder), cujo projecto original usa K-Means e FP-Growth sobre o dataset público [Trending Youtube Video Statistics (113 Countries)](https://www.kaggle.com/datasets/asaniczka/trending-youtube-videos-113-countries). No Thunderbolt não existe Flask, rota HTTP adicional, template HTML, JavaScript D3 ou segundo processo; toda a análise é síncrona no Streamlit.
 
@@ -393,7 +396,11 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.35 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.36 install`; o instalador detecta e reutiliza o que já estiver válido.
+
+### Niche Finder Apify
+
+A alternativa Apify não usa o dataset, parâmetros, execução ou estado da alternativa Kaggle. Configure o **Apify API Token**, o **Apify Actor ID**, o intervalo de consulta e o limite da execução em **Configurações Técnicas**. Na aba, informe até três palavras-chave, período, máximo de resultados, Shorts, duração, idioma das legendas, ordenação e filtros de legendas. O botão **Pesquisar no Apify** inicia manualmente o actor `streamers~youtube-scraper`, consulta o estado do run, carrega o dataset, normaliza os vídeos, limpa SRT, calcula VSC Ratio, tenta resumir transcrições através do LLM configurado e disponibiliza resultados JSON/CSV. O histórico resumido é guardado em `storage/state/niche_apify_runs.json`; não há gravação automática no Airtable do workflow anexado.
 
 ## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
 

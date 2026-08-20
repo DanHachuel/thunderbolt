@@ -169,4 +169,5 @@ def test_niche_finder_navigation_has_kaggle_and_apify_pages():
     assert '"Niche Finder Apify": render_niche_finder_apify' in source
     assert source.index('("Niche Finder Kaggle"') < source.index('("Niche Finder Apify"')
     assert 'st.title("Niche Finder Apify")' in source
-    assert "não executa nenhuma operação" in source
+    assert 'st.form_submit_button("Pesquisar no Apify"' in source
+    assert 'Ainda não existe uma pesquisa nesta sessão' in source

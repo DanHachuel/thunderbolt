@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release final 0.2.20.
+Estado auditado para o release 0.2.36.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -19,7 +19,9 @@ Estado auditado para o release final 0.2.20.
 | Área de teste de vozes em Configurações | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download. |
 | Upload directo via YouTube-Video-Upload-Frontend-Api | Concluído como adaptador experimental | `integrations/youtube_direct_upload.py`, sessão manual, metadata e chunks múltiplos de 256 KiB. |
 | `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | Campos por canal, selectors e propagação para tasks. |
-| Agendamento real em segundo plano | Fora do escopo actual de UI | O pedido de Automação foi definido como “apenas UI por enquanto”; não executar jobs até existir backend aprovado. |
+| Agendamento real em segundo plano | Fora do escopo actual de UI | O worker de Automação é local e baseado no relógio; não é usado pelo Niche Finder Apify. |
+| Niche Finder Kaggle e Niche Finder Apify | Concluído como alternativas independentes | Kaggle usa `app/modules/niche_finder/core.py` e `data_loader.py`; Apify usa `app/modules/niche_finder/apify.py`, `summarizer.py`, estado `niche_apify_runs.json` e credencial própria. |
+| Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |
 
 ## Regra de release
 

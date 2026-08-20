@@ -21,6 +21,7 @@ DEFAULTS: dict[str, Any] = {
     "queues.json": {"niche": [], "blueprint": [], "brand": [], "script": [], "title": [], "thumbnail": [], "video": [], "edit": [], "upload": []},
     "batches.json": [],
     "uploads.json": [],
+    "niche_apify_runs.json": [],
     "metadata_edits.json": [],
     "mcp_server.json": {
         "enabled": False,
@@ -84,6 +85,10 @@ DEFAULTS: dict[str, Any] = {
         "kaggle_username": "",
         "kaggle_api_key": "",
         "kaggle_kernel_slug": "thunderbolt-niche-finder",
+        "apify_api_token": "",
+        "apify_actor_id": "streamers~youtube-scraper",
+        "apify_poll_interval_seconds": 10,
+        "apify_run_timeout_seconds": 900,
         "llm_provider": "moonshot",
         "moonshot_api_key": "",
         "moonshot_base_url": "",
