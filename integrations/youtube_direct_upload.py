@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from integrations.youtube_direct_credentials import COOKIE_KEYS, load_cookie_file
 from urllib.parse import quote
 
 import requests
@@ -15,7 +17,6 @@ import requests
 
 CHUNK_GRANULARITY = 262144
 SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".webm", ".avi", ".mpeg", ".mpg", ".flv", ".wmv", ".3gpp"}
-COOKIE_KEYS = ("SID", "SSID", "HSID", "APISID", "SAPISID")
 
 
 @dataclass
@@ -25,8 +26,18 @@ class DirectUploadResult:
     data: dict[str, Any]
 
 
-def _cookie_settings(settings: dict[str, Any]) -> dict[str, str]:
+def _cookie_settings(settings: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> dict[str, str]:
+    if account is not None and storage_root is not None:
+        account_cookies = load_cookie_file(storage_root, account)
+        if account_cookies:
+            return {key: str(account_cookies.get(key, "") or "").strip() for key in COOKIE_KEYS}
     return {key: str(settings.get(f"direct_cookie_{key.lower()}", "") or "").strip() for key in COOKIE_KEYS}
+
+
+def _session_info(settings: dict[str, Any], account: dict[str, Any] | None = None) -> str:
+    if account is not None:
+        return str(account.get("direct_session_info", "") or "").strip()
+    return str(settings.get("direct_session_info", "") or "").strip()
 
 
 def _cookie_header(cookies: dict[str, str]) -> str:
@@ -51,7 +62,7 @@ def _header(response: requests.Response, name: str) -> str:
     return ""
 
 
-def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], settings: dict[str, Any]) -> str | None:
+def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], settings: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str | None:
     path = Path(video_path)
     if not path.exists() or not path.is_file():
         return "Ficheiro de vídeo não encontrado."
@@ -59,10 +70,10 @@ def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], sett
         return "Formato de vídeo não suportado pelo upload directo."
     if path.stat().st_size <= 0:
         return "O ficheiro de vídeo está vazio."
-    missing_cookies = [key for key, value in _cookie_settings(settings).items() if not value]
+    missing_cookies = [key for key, value in _cookie_settings(settings, account, storage_root).items() if not value]
     if missing_cookies:
         return f"Faltam cookies de sessão para upload directo: {', '.join(missing_cookies)}."
-    if not str(settings.get("direct_session_info", "") or "").strip():
+    if not _session_info(settings, account):
         return "Configure o token sessionInfo do upload directo."
     if not str(settings.get("direct_innertube_api_key", "") or "").strip():
         return "Configure o INNERTUBE_API_KEY do upload directo."
@@ -72,11 +83,14 @@ def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], sett
 
 
 class YouTubeDirectUploader:
-    def __init__(self, settings: dict[str, Any], channel: dict[str, Any], *, session: requests.Session | None = None):
+    def __init__(self, settings: dict[str, Any], channel: dict[str, Any], *, account: dict[str, Any] | None = None, storage_root: Path | None = None, session: requests.Session | None = None):
         self.settings = settings
         self.channel = channel
+        self.account = account
+        self.storage_root = storage_root
         self.session = session or requests.Session()
-        self.cookies = _cookie_settings(settings)
+        self.cookies = _cookie_settings(settings, account, storage_root)
+        self.session_info = _session_info(settings, account)
         self.cookie_header = _cookie_header(self.cookies)
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
         self.inner_tube = _innertube_id()
@@ -124,7 +138,7 @@ class YouTubeDirectUploader:
             "botguardClientResponse": f"${hashlib.sha1(os.urandom(16)).hexdigest()}",
             "context": {
                 "client": {"clientName": 62, "clientVersion": "1.20210806.02.00", "hl": "pt-BR", "gl": "BR", "experimentsToken": "", "utcOffsetMinutes": 0},
-                "request": {"sessionInfo": {"token": str(self.settings.get("direct_session_info", ""))}},
+                "request": {"sessionInfo": {"token": self.session_info}},
                 "user": {"onBehalfOfUser": str(self.channel.get("delegated_session_id", ""))},
             },
         }
@@ -157,13 +171,13 @@ class YouTubeDirectUploader:
 
     def upload(self, video_path: str | Path, *, title: str, description: str = "", visibility: str = "private", chunk_size: int = CHUNK_GRANULARITY) -> DirectUploadResult:
         path = Path(video_path)
-        validation_error = validate_direct_upload(path, self.channel, self.settings)
+        validation_error = validate_direct_upload(path, self.channel, self.settings, self.account, self.storage_root)
         if validation_error:
             return DirectUploadResult(False, validation_error, {"mechanism": "youtube-frontend-direct"})
         try:
             self.describe_file(path)
             self.create_video(title, description, visibility)
             self.upload_chunks(path, chunk_size)
-            return DirectUploadResult(True, f"Upload directo concluído: {self.video_id}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id, "page_id": self.channel.get("delegated_session_id", "")})
+            return DirectUploadResult(True, f"Upload directo concluído: {self.video_id}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id, "page_id": self.channel.get("delegated_session_id", ""), "google_account_id": (self.account or {}).get("id", "")})
         except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
             return DirectUploadResult(False, f"Upload directo falhou: {exc}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id})

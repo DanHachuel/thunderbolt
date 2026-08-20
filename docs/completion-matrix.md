@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.36.
+Estado auditado para o release 0.2.42.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -17,7 +17,8 @@ Estado auditado para o release 0.2.36.
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
 | Área de teste de vozes em Configurações | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download. |
-| Upload directo via YouTube-Video-Upload-Frontend-Api | Concluído como adaptador experimental | `integrations/youtube_direct_upload.py`, sessão manual, metadata e chunks múltiplos de 256 KiB. |
+| Upload directo via YouTube-Video-Upload-Frontend-Api | Concluído como adaptador experimental | `integrations/youtube_direct_upload.py`, sessão manual, metadata e chunks múltiplos de 256 KiB; credenciais directas passam a ser lidas por conta Google associada. |
+| Upload directo com cookies/sessionInfo por conta e `DELEGATED_SESSION_ID` por canal | Concluído | `integrations/youtube_direct_credentials.py` aceita JSON/lista JSON/Netscape, valida SID/SSID/HSID/APISID/SAPISID e guarda em `storage/youtube_direct_accounts/<account-id>/cookies.json`; `direct_session_info` fica na conta Google e `delegated_session_id` no canal; o upload bloqueia credenciais incompletas. |
 | `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | Campos por canal, selectors e propagação para tasks. |
 | Agendamento real em segundo plano | Fora do escopo actual de UI | O worker de Automação é local e baseado no relógio; não é usado pelo Niche Finder Apify. |
 | Niche Finder Kaggle e Niche Finder Apify | Concluído como alternativas independentes | Kaggle usa `app/modules/niche_finder/core.py` e `data_loader.py`; Apify usa `app/modules/niche_finder/apify.py`, `summarizer.py`, estado `niche_apify_runs.json` e credencial própria. |

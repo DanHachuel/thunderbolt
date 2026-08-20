@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from integrations.youtube_direct_credentials import direct_account_status, parse_cookie_file, save_cookie_file
 from integrations.youtube_direct_upload import YouTubeDirectUploader, validate_direct_upload
 
 
@@ -44,6 +45,36 @@ def test_direct_upload_requires_manual_session_values(tmp_path: Path):
     video.write_bytes(b"video")
     error = validate_direct_upload(str(video), {"delegated_session_id": ""}, valid_settings())
     assert error and "DELEGATED_SESSION_ID" in error
+
+
+def test_cookie_file_parser_accepts_json_and_netscape(tmp_path: Path):
+    json_content = b'{"SID":"sid-a","SSID":"ssid-a","HSID":"hsid-a","APISID":"apisid-a","SAPISID":"sapisid-a"}'
+    assert parse_cookie_file(json_content)["SID"] == "sid-a"
+    netscape = b".youtube.com\tTRUE\t/\tTRUE\t0\tSID\tsid-n\n.youtube.com\tTRUE\t/\tTRUE\t0\tSSID\tssid-n\n.youtube.com\tTRUE\t/\tTRUE\t0\tHSID\thsid-n\n.youtube.com\tTRUE\t/\tTRUE\t0\tAPISID\tapisid-n\n.youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tsapisid-n\n"
+    assert parse_cookie_file(netscape, "cookies.txt")["SAPISID"] == "sapisid-n"
+
+
+def test_cookie_file_is_saved_per_google_account(tmp_path: Path):
+    account = {"id": "google-one", "email": "one@example.com", "direct_session_info": "session-one"}
+    path = save_cookie_file(tmp_path, account, b'{"SID":"sid","SSID":"ssid","HSID":"hsid","APISID":"apisid","SAPISID":"sapisid"}')
+    assert path == tmp_path / "youtube_direct_accounts" / "google-one" / "cookies.json"
+    status = direct_account_status(tmp_path, account)
+    assert status["ready"] is True
+    assert status["missing_cookies"] == []
+
+
+def test_direct_upload_uses_account_credentials_and_channel_page_id(tmp_path: Path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    account = {"id": "google-one", "email": "one@example.com", "direct_session_info": "session-from-account"}
+    save_cookie_file(tmp_path, account, b'{"SID":"sid-account","SSID":"ssid-account","HSID":"hsid-account","APISID":"apisid-account","SAPISID":"sapisid-account"}')
+    settings = {"direct_innertube_api_key": "innertube-key", "direct_session_info": "wrong-global-session"}
+    session = FakeSession()
+    result = YouTubeDirectUploader(settings, {"delegated_session_id": "channel-page"}, account=account, storage_root=tmp_path, session=session).upload(str(video), title="Título")
+    assert result.ok
+    create_call = next(call for call in session.calls if "createvideo" in call[0])
+    assert '"token": "session-from-account"' in create_call[1]["data"]
+    assert create_call[1]["headers"]["Cookie"].find("sid-account") >= 0
 
 
 def test_direct_upload_uses_page_id_and_chunks(tmp_path: Path):
