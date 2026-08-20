@@ -9,6 +9,7 @@
   },
   "files": [
     "app/main.py",
+    "app/modules/**/*.py",
     "hermes_ui/*.py",
     "integrations/*.py",
     "integrations/data/*.json",
@@ -18,6 +19,7 @@
     "seed/skills/*.md",
     "README.md",
     "MANUAL-INSTALACAO.md",
+    "THIRD-PARTY-NOTICES.md",
     "requirements.txt",
     "package.json"
   ],

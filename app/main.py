@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 import sys
 from pathlib import Path
 
@@ -18,6 +19,8 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
+from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset, load_dataframe
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
@@ -626,9 +629,132 @@ def render_music_creation():
     render_new_video(page_title="Criação de Músicas")
 
 
+@st.cache_data(show_spinner=False)
+def _cached_niche_dataset(path_str: str, modified_ns: int):
+    return load_dataframe(path_str)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_niche_download():
+    return str(download_kaggle_dataset())
+
+
+def _load_automatic_niche_dataset():
+    dataset_path = _cached_niche_download()
+    path = Path(dataset_path)
+    return dataset_path, _cached_niche_dataset(dataset_path, path.stat().st_mtime_ns)
+
+
+def _niche_tag_options(frame) -> list[str]:
+    tags: set[str] = set()
+    for value in frame.get("video_tags", []):
+        text = str(value or "").replace('"', "").replace("'", "")
+        for tag in re.split(r"[|,]", text.strip("[]")):
+            tag = re.sub(r"\s+", " ", tag).strip().lower()
+            if tag and tag not in {"nan", "none", "null"}:
+                tags.add(tag)
+    return sorted(tags)
+
+
+def _niche_date_bounds(frame):
+    dates = frame["publish_date"].dropna().astype(str)
+    if dates.empty:
+        return None, None
+    return dates.min(), dates.max()
+
+
 def render_niche_finder():
     st.title("Niche Finder")
-    st.info("Esta área está reservada para o Niche Finder e será implementada numa próxima etapa.")
+    st.caption("Busca automática de padrões, nichos e tags para orientar canais faceless.")
+    st.info("O Thunderbolt prepara e analisa automaticamente os dados necessários. Não é necessária configuração manual.")
+
+    try:
+        with st.spinner("A preparar automaticamente o Niche Finder…"):
+            dataset_path, frame = _load_automatic_niche_dataset()
+    except (DatasetError, OSError) as exc:
+        st.error("Não foi possível preparar automaticamente o Niche Finder neste momento. Verifique a ligação à Internet e tente novamente.")
+        with st.expander("Detalhes técnicos"):
+            st.caption(str(exc))
+        return
+
+    signature = f"{dataset_path}:{Path(dataset_path).stat().st_mtime_ns}"
+    if st.session_state.get("niche_results_signature") != signature:
+        st.session_state.pop("niche_results", None)
+        st.session_state["niche_results_signature"] = signature
+
+    min_date, max_date = _niche_date_bounds(frame)
+    countries = ["Todos"] + sorted(str(value) for value in frame["country"].dropna().unique())
+    tag_options = _niche_tag_options(frame)
+    with st.sidebar:
+        st.subheader("Parâmetros da busca")
+        n_clusters = st.slider("Número de Clusters", 2, 10, 5, key="niche_n_clusters")
+        min_support = st.slider("Suporte Mínimo", 0.01, 0.5, 0.05, 0.01, format="%.2f", key="niche_min_support")
+        country = st.selectbox("País", countries, key="niche_country")
+        engagement = st.selectbox("Engagement", ["Todos", "High", "Moderate", "Low"], key="niche_engagement")
+        start_date = st.date_input("Data inicial", value=date.fromisoformat(min_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_start_date") if min_date else None
+        end_date = st.date_input("Data final", value=date.fromisoformat(max_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_end_date") if max_date else None
+        selected_tags = st.multiselect("Tags opcionais", tag_options, key="niche_tags")
+        analyse = st.button("Analisar Nichos", type="primary", use_container_width=True, key="niche_analyse")
+
+    results = st.session_state.get("niche_results")
+    if results is None or analyse:
+        try:
+            if start_date and end_date and start_date > end_date:
+                raise NicheAnalysisError("A data inicial não pode ser posterior à data final.")
+            with st.spinner("A analisar nichos automaticamente…"):
+                results = run_niche_analysis(
+                    str(dataset_path),
+                    n_clusters=n_clusters,
+                    min_support=min_support,
+                    start_date=start_date.isoformat() if start_date else None,
+                    end_date=end_date.isoformat() if end_date else None,
+                    country=country,
+                    engagement=engagement,
+                    tags=selected_tags,
+                )
+            st.session_state["niche_results"] = results
+        except (NicheAnalysisError, DatasetError, OSError) as exc:
+            st.error("Não foi possível concluir a análise automática com os filtros actuais.")
+            with st.expander("Detalhes técnicos"):
+                st.caption(str(exc))
+            return
+
+    summary = results.get("summary", {})
+    metric_cols = st.columns(4)
+    for col, (label, value) in zip(metric_cols, [("Registos analisados", summary.get("rows_filtered", 0)), ("Clusters", summary.get("cluster_count", 0)), ("Itemsets frequentes", summary.get("frequent_item_count", 0)), ("Regras de associação", summary.get("association_rule_count", 0))]):
+        with col:
+            card(label, value)
+
+    cluster_table = results["clusters"]
+    rules_table = results["association_rules"]
+    items_table = results["frequent_items"]
+    points = results["cluster_points"].copy()
+    keyword = st.text_input("Filtrar palavras-chave nos clusters", key="niche_cluster_keyword", placeholder="Ex.: música, gaming, receitas")
+    if keyword.strip():
+        cluster_table = cluster_table[cluster_table["palavras"].str.contains(keyword.strip(), case=False, na=False)]
+    tab_clusters, tab_rules, tab_data = st.tabs(["Clusters encontrados", "Regras de associação", "Dados analisados"])
+    with tab_clusters:
+        st.dataframe(cluster_table, use_container_width=True, hide_index=True)
+        if not points.empty:
+            try:
+                import plotly.express as px
+                points["cluster"] = points["cluster_id"].astype(str)
+                hover = [column for column in ["title", "channel_name", "country", "view_count", "engagement_rate"] if column in points.columns]
+                figure = px.scatter(points, x="x", y="y", color="cluster", hover_data=hover, title="Distribuição dos clusters")
+                figure.update_layout(legend_title_text="Cluster")
+                st.plotly_chart(figure, use_container_width=True)
+            except ImportError:
+                st.error("A visualização da análise não está disponível nesta instalação.")
+    with tab_rules:
+        if rules_table.empty:
+            st.info("Não foram encontradas regras com os filtros actuais. Reduza o suporte mínimo ou escolha outro filtro.")
+        else:
+            st.dataframe(rules_table, use_container_width=True, hide_index=True)
+        if not items_table.empty:
+            st.subheader("Itemsets frequentes")
+            st.dataframe(items_table, use_container_width=True, hide_index=True)
+    with tab_data:
+        st.dataframe(results["raw_data"], use_container_width=True, hide_index=True)
 
 
 def render_videos():

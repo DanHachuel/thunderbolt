@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
+NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 
 DEFAULTS: dict[str, Any] = {
@@ -221,7 +222,7 @@ def seed_blueprints() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews"]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     for filename, default in DEFAULTS.items():

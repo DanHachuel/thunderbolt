@@ -79,6 +79,8 @@ function ensureRuntimeStorage() {
     join(storageRoot, "skills"),
     join(storageRoot, "music"),
     join(storageRoot, "voice_previews"),
+    join(storageRoot, "data"),
+    join(storageRoot, "data", "niches"),
   ];
   for (const directory of directories) mkdirSync(directory, { recursive: true });
   const seedRoot = resolve(root, "seed", "blueprints");
@@ -98,7 +100,7 @@ function check() {
     console.error(`Python não encontrado. Execute: npx.cmd --yes @danhachuel/thunderbolt install`);
     process.exit(1);
   }
-  const requiredModules = ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts"];
+  const requiredModules = ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "sklearn", "mlxtend", "plotly", "seaborn", "kagglehub"];
   const missing = requiredModules.filter((moduleName) => !moduleAvailable(moduleName));
   const ffmpeg = moduleAvailable("imageio_ffmpeg");
   const mptPath = configuredMoneyPrinterPath();
