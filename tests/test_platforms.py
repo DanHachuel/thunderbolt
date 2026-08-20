@@ -71,7 +71,57 @@ def test_public_lookup_falls_back_to_open_graph_metadata(monkeypatch):
     assert result.data["thumbnail_url"].endswith("meta.jpg")
 
 
+def test_public_lookup_uses_rss_when_direct_channel_page_has_no_metadata(monkeypatch):
+    channel_id = "UC1234567890ABCDEF"
+    feed = "<feed xmlns='http://www.w3.org/2005/Atom' xmlns:yt='http://www.youtube.com/xml/schemas/2015'><title>Canal RSS</title><yt:channelId>UC1234567890ABCDEF</yt:channelId><entry/></feed>"
+
+    def fake_get(url, **kwargs):
+        if "/feeds/videos.xml" in url:
+            return FakeResponse(feed)
+        return FakeResponse("<html><body>consent</body></html>")
+
+    monkeypatch.setattr("integrations.platforms.requests.get", fake_get)
+    result = YouTubeAdapter(settings={}).fetch_channel_public(f"https://www.youtube.com/channel/{channel_id}/videos?hl=pt-BR")
+    assert result.ok
+    assert result.data["youtube_id"] == channel_id
+    assert result.data["name"] == "Canal RSS"
+    assert result.data["metrics_source"] == "youtube_public_feed"
+
+
+def test_public_lookup_reports_nonexistent_channel_instead_of_empty_success(monkeypatch):
+    payload = {
+        "header": {"c4TabbedHeaderRenderer": {"channelId": "UC1234567890ABCDEF"}},
+        "alerts": [{"alertRenderer": {"type": "ERROR", "text": {"simpleText": "Este canal não existe."}}}],
+    }
+    html = "<script>var ytInitialData = " + json.dumps(payload, ensure_ascii=False) + ";</script>"
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: FakeResponse(html, 200))
+    result = YouTubeAdapter(settings={}).fetch_channel_public("https://www.youtube.com/channel/UC1234567890ABCDEF")
+    assert not result.ok
+    assert "não existe" in result.message
+    assert result.data["public_error"] == "Este canal não existe."
+
+
+def test_public_lookup_rejects_non_youtube_url_without_request(monkeypatch):
+    calls = []
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: calls.append(args) or FakeResponse(""))
+    result = YouTubeAdapter(settings={}).fetch_channel_public("https://example.com/channel/UC1234567890ABCDEF")
+    assert not result.ok
+    assert "youtube.com" in result.message
+    assert calls == []
+
+
+def test_public_lookup_does_not_report_id_only_page_as_success(monkeypatch):
+    html = "<html><script>var ytInitialData = {\"responseContext\": {}};</script></html>"
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: FakeResponse(html, 200))
+    result = YouTubeAdapter(settings={}).fetch_channel_public("https://www.youtube.com/channel/UC1234567890ABCDEF")
+    assert not result.ok
+    assert "metadados públicos" in result.message
+    assert result.data["youtube_id"] == "UC1234567890ABCDEF"
+
+
 def test_api_lookup_reports_optional_key_instead_of_blocking_public_flow():
     result = YouTubeAdapter(settings={}).fetch_channel("@canalpublico")
     assert not result.ok
-    assert "YOUTUBE_API_KEY" in result.message
+    assert result.data["status"] == "api_key_not_configured"
+    assert "Data API Key própria" in result.message
+    assert "OAuth Client ID" in result.message

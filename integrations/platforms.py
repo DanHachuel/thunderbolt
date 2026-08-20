@@ -4,6 +4,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from html import unescape
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -121,6 +122,69 @@ def _meta_content(document: str, *names: str) -> str:
     return ""
 
 
+def _channel_id_from_source(source: str) -> str:
+    """Extract a channel ID from a direct channel URL or a raw UC... value."""
+    value = (source or "").strip()
+    match = re.search(r"(?<![A-Za-z0-9_-])(UC[A-Za-z0-9_-]{3,})(?![A-Za-z0-9_-])", value)
+    return match.group(1) if match else ""
+
+
+def _canonical_link(document: str) -> str:
+    patterns = [
+        r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']',
+        r'<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']canonical["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, document, flags=re.IGNORECASE)
+        if match:
+            return unescape(match.group(1)).strip()
+    return ""
+
+
+def _jsonld_channel_data(document: str) -> dict[str, Any]:
+    """Read channel-like fields from JSON-LD without requiring a fixed YouTube renderer."""
+    for raw in re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', document, flags=re.IGNORECASE | re.DOTALL):
+        try:
+            payload = json.loads(unescape(raw.strip()))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        candidates = payload if isinstance(payload, list) else [payload]
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_type = candidate.get("@type", "")
+            if candidate_type in {"Person", "Organization", "Brand", "ProfilePage"} or any(key in candidate for key in ("channelId", "identifier", "sameAs")):
+                image = candidate.get("image", "")
+                if isinstance(image, dict):
+                    image = image.get("url", "")
+                identifier = candidate.get("channelId") or candidate.get("identifier", "")
+                if isinstance(identifier, dict):
+                    identifier = identifier.get("value", "")
+                same_as = candidate.get("sameAs", [])
+                if isinstance(same_as, str):
+                    same_as = [same_as]
+                return {
+                    "name": _text_from_node(candidate.get("name")),
+                    "description": _text_from_node(candidate.get("description")),
+                    "url": _text_from_node(candidate.get("url")),
+                    "thumbnail_url": _text_from_node(image),
+                    "youtube_id": _text_from_node(identifier),
+                    "same_as": same_as if isinstance(same_as, list) else [],
+                }
+    return {}
+
+
+def _public_error_from_initial_data(initial_data: dict[str, Any]) -> str:
+    alerts = _find_first_key(initial_data, "alerts")
+    if not isinstance(alerts, list):
+        return ""
+    for alert in alerts:
+        text = _text_from_node(_find_first_key(alert, "text"))
+        if text:
+            return text
+    return ""
+
+
 def _public_page_candidates(source: str) -> list[str]:
     source = source.strip()
     if source.startswith(("http://", "https://")):
@@ -197,73 +261,134 @@ class YouTubeAdapter:
         source = (value or "").strip()
         if not source:
             return IntegrationResult(False, "Introduza o nome, handle, URL ou ID do canal.", {})
+        if source.startswith(("http://", "https://")):
+            host = (urlparse(source).hostname or "").lower()
+            if host != "youtube.com" and not host.endswith(".youtube.com"):
+                return IntegrationResult(False, "O link deve pertencer ao YouTube. Use um URL youtube.com, um handle @nome ou um ID UC... .", {"url": source, "public_lookup": True})
         headers = {
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
             "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
+        direct_id = _channel_id_from_source(source)
+        feed_cache: dict[str, dict[str, Any]] = {}
+
+        def feed_for(channel_id: str) -> dict[str, Any]:
+            if channel_id and channel_id not in feed_cache:
+                feed_cache[channel_id] = _public_feed_data(channel_id, headers)
+            return feed_cache.get(channel_id, {})
+
+        if direct_id:
+            direct_feed = feed_for(direct_id)
+            if direct_feed.get("name"):
+                feed_name = str(direct_feed.get("name", ""))
+            else:
+                feed_name = ""
+        else:
+            feed_name = ""
         last_url = source
         last_error = ""
         for page_url in _public_page_candidates(source):
             last_url = page_url
             try:
-                response = requests.get(page_url, headers=headers, timeout=20)
+                response = requests.get(page_url, headers=headers, timeout=20, allow_redirects=True)
                 response.raise_for_status()
             except requests.RequestException as exc:
-                last_error = str(exc)
+                last_error = f"Falha HTTP: {exc}"
                 continue
             document = response.text or ""
             initial_data = _extract_json_assignment(document, "ytInitialData") or {}
+            public_error = _public_error_from_initial_data(initial_data)
             metadata = _find_first_key(initial_data, "channelMetadataRenderer") or {}
             header = _find_first_key(initial_data, "pageHeaderViewModel") or {}
-            canonical_url = _meta_content(document, "og:url", "twitter:url") or page_url.split("?", 1)[0].rstrip("/")
+            jsonld = _jsonld_channel_data(document)
+            response_url = str(getattr(response, "url", "") or "")
+            canonical_url = (
+                _meta_content(document, "og:url", "twitter:url")
+                or _canonical_link(document)
+                or (response_url if "youtube.com" in response_url else "")
+                or jsonld.get("url", "")
+                or page_url.split("?", 1)[0].rstrip("/")
+            )
             owner_urls = metadata.get("ownerUrls", []) if isinstance(metadata, dict) else []
             if owner_urls:
                 canonical_url = str(owner_urls[0])
-            canonical_url = canonical_url.replace("http://", "https://").removesuffix("/about")
+            canonical_url = canonical_url.replace("http://", "https://").split("?", 1)[0].rstrip("/")
             youtube_id = str(metadata.get("externalId", "")) if isinstance(metadata, dict) else ""
-            if not youtube_id:
-                youtube_id = _channel_id_from_document(document, canonical_url)
-            feed = _public_feed_data(youtube_id, headers)
-            title = _text_from_node(metadata.get("title")) if isinstance(metadata, dict) else ""
-            if not title and isinstance(header, dict):
-                title = _text_from_node(header.get("title"))
-                if not title:
-                    title = _text_from_node(_find_first_key(header, "dynamicTextViewModel"))
-            if not title:
-                title = _meta_content(document, "og:title", "twitter:title") or feed.get("name", "")
-            description = _text_from_node(metadata.get("description")) if isinstance(metadata, dict) else ""
-            description = description or _meta_content(document, "description", "og:description")
-            thumbnail_url = _thumbnail_from_metadata(metadata) or _meta_content(document, "og:image", "twitter:image")
-            handle_match = re.search(r"/@([^/?]+)", canonical_url)
-            handle = f"@{handle_match.group(1)}" if handle_match else ""
-            if not handle:
-                handle_match = re.search(r"/@([^/?]+)", document)
-                handle = f"@{handle_match.group(1)}" if handle_match else ""
+            youtube_id = youtube_id or _channel_id_from_source(canonical_url) or _channel_id_from_document(document, canonical_url)
+            youtube_id = youtube_id or _channel_id_from_source(jsonld.get("youtube_id", "")) or direct_id
+            feed = feed_for(youtube_id)
+            page_title = _text_from_node(metadata.get("title")) if isinstance(metadata, dict) else ""
+            if not page_title and isinstance(header, dict):
+                page_title = _text_from_node(header.get("title"))
+                if not page_title:
+                    page_title = _text_from_node(_find_first_key(header, "dynamicTextViewModel"))
+            page_title = page_title or jsonld.get("name", "") or _meta_content(document, "og:title", "twitter:title")
+            title = page_title or feed.get("name", "") or feed_name
+            page_description = _text_from_node(metadata.get("description")) if isinstance(metadata, dict) else ""
+            page_description = page_description or jsonld.get("description", "") or _meta_content(document, "description", "og:description")
+            description = page_description
+            page_thumbnail = _thumbnail_from_metadata(metadata) or jsonld.get("thumbnail_url", "") or _meta_content(document, "og:image", "twitter:image")
+            thumbnail_url = page_thumbnail
+            handle = ""
+            for handle_source in (canonical_url, *jsonld.get("same_as", []), document):
+                handle_match = re.search(r"/@([^/?\"'\\]+)", str(handle_source))
+                if handle_match:
+                    handle = f"@{handle_match.group(1)}"
+                    break
             subscriber_value = _find_first_key(initial_data, "subscriberCountText")
             video_value = _find_first_key(initial_data, "videoCountText")
             data = {
                 "youtube_id": youtube_id or feed.get("youtube_id", ""),
                 "name": title,
                 "handle": handle,
-                "url": canonical_url,
+                "url": canonical_url or (f"https://www.youtube.com/channel/{youtube_id}" if youtube_id else source),
                 "description": description,
                 "thumbnail_url": thumbnail_url,
                 "subscriber_count": _parse_public_count(subscriber_value),
                 "video_count": _parse_public_count(video_value) or feed.get("video_count"),
                 "view_count": None,
-                "metrics_source": "youtube_public_page",
+                "metrics_source": "youtube_public_page" if (page_title or page_description or page_thumbnail) else ("youtube_public_feed" if feed.get("name") else "youtube_public_page"),
                 "public_lookup": True,
             }
-            if data["name"] or data["youtube_id"] or data["thumbnail_url"]:
+            if public_error and any(marker in public_error.lower() for marker in ("não existe", "nao existe", "não encontrado", "nao encontrado", "not found", "does not exist")):
+                data["public_error"] = public_error
+                return IntegrationResult(False, f"O YouTube indicou que este canal não existe ou não está disponível: {public_error}", data)
+            has_metadata = bool(
+                data["name"]
+                or data["handle"]
+                or data["description"]
+                or data["thumbnail_url"]
+                or data["subscriber_count"] is not None
+                or data["video_count"] is not None
+            )
+            if has_metadata:
                 return IntegrationResult(True, "Canal encontrado publicamente no YouTube, sem API Key. Reveja os dados antes de guardar.", data)
-            last_error = "A página respondeu sem metadados reconhecíveis."
-        return IntegrationResult(False, f"Não foi possível obter dados públicos do YouTube sem API Key. Confirme o URL/handle ou use Cadastro manual. {last_error}".strip(), {"url": last_url, "public_lookup": True})
+            last_error = "O YouTube respondeu, mas não forneceu metadados públicos reconhecíveis para este canal."
+        if direct_id and feed_name:
+            data = {
+                "youtube_id": direct_id,
+                "name": feed_name,
+                "handle": "",
+                "url": f"https://www.youtube.com/channel/{direct_id}",
+                "description": "",
+                "thumbnail_url": "",
+                "subscriber_count": None,
+                "video_count": feed_cache.get(direct_id, {}).get("video_count"),
+                "view_count": None,
+                "metrics_source": "youtube_public_feed",
+                "public_lookup": True,
+            }
+            return IntegrationResult(True, "Canal encontrado no feed público do YouTube, sem API Key. Reveja os dados antes de guardar.", data)
+        data = {"url": last_url, "public_lookup": True}
+        if direct_id:
+            data["youtube_id"] = direct_id
+        return IntegrationResult(False, f"Não foi possível obter dados públicos do YouTube sem API Key. {last_error or 'Confirme o URL/handle ou use Cadastro manual.'}".strip(), data)
 
     def fetch_channel(self, value: str) -> IntegrationResult:
         ref = self.extract_channel_ref(value)
         if not self.api_key:
-            return IntegrationResult(False, "YOUTUBE_API_KEY não configurada; preencha os dados manualmente.", {"url": value, "handle": ref})
+            return IntegrationResult(False, "A YouTube Data API Key própria não está configurada. Escolha Página pública — sem API Key ou adicione uma chave separada em Configurações; o OAuth Client ID e Secret não substituem esta credencial.", {"url": value, "handle": ref, "status": "api_key_not_configured"})
         try:
             params = {"part": "snippet,statistics", "key": self.api_key}
             if ref.startswith("UC"):

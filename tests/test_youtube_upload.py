@@ -28,6 +28,16 @@ def test_agent_metadata_matches_publishing_shape():
     assert payload["status"]["publishAt"].endswith("Z")
 
 
+def test_oauth_uses_client_pair_without_data_api_key(tmp_path: Path):
+    uploader = YouTubeAutomationAgentUploader(
+        {"youtube_client_id": "oauth-client-id", "youtube_client_secret": "oauth-client-secret"},
+        tmp_path,
+    )
+    assert uploader.configured
+    assert uploader.client_id == "oauth-client-id"
+    assert uploader.client_secret == "oauth-client-secret"
+
+
 def test_invalid_video_is_rejected(tmp_path: Path):
     invalid = tmp_path / "video.mov"
     invalid.write_bytes(b"not-a-video")

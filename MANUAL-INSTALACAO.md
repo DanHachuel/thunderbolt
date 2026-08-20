@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.22
+> **Versão deste manual:** 0.2.23
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.22 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.23 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.22 install
+npx --yes @danhachuel/thunderbolt@0.2.23 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -339,20 +339,20 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## 8. Configuração inicial da UI
 
-Na primeira execução, abra **Configurações** e reveja:
+Na primeira execução, abra **Configurações** e reveja. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica numa área opcional, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
 | Configuração | Finalidade |
 |---|---|
 | Porta Streamlit | Definir a porta local da UI |
 | Pasta MoneyPrinterTurbo | Indicar o clone local que será sincronizado com `config.toml` |
-| YouTube Data API Key | Permitir importar nome, handle e métricas públicas de canais |
-| YouTube OAuth Client ID | Identificar a aplicação OAuth 2.0 do Google para operações autenticadas |
-| YouTube OAuth Client Secret | Secret do mesmo cliente OAuth 2.0; não é a Data API Key |
+| YouTube Data API Key (opcional) | Permitir o método oficial Data API para métricas públicas; não é necessária para a página pública nem para OAuth |
+| YouTube OAuth Client ID | Identificar a aplicação OAuth 2.0 do Google para autorizar operações autenticadas, como upload |
+| YouTube OAuth Client Secret | Secret do mesmo cliente OAuth 2.0; não é uma Data API Key nem um token de acesso |
 | YouTube upload principal | Lógica do `youtube-automation-agent` adaptada e executada dentro do Thunderbolt |
 | OAuth directo de redundância | Caminho alternativo accionado automaticamente se o agente falhar |
 | TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
 
-As chaves devem ser inseridas apenas na configuração local. Não as coloque no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
+As credenciais devem ser inseridas apenas na configuração local. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
 
 ## 9. Testar as áreas principais
 
@@ -361,10 +361,10 @@ Após iniciar a aplicação, valide o seguinte percurso:
 1. **Dashboard:** confirme que a UI abre e mostra o estado local.
 2. **Blueprints:** coloque um JSON em `~/.thunderbolt/storage/blueprints/importados/` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
-4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** ou a Data API opcional; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
+4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** com um URL `/channel/UC...`, um handle ou uma subpágina `/videos`; o parser resolve o ID, consulta a página pública e tenta o RSS quando necessário. Confirme que o resultado abre o formulário de revisão sem Data API Key. Se o canal não existir ou não fornecer metadados, confirme a mensagem clara e que o formulário de uma pesquisa anterior desaparece. A Data API é opcional e fica separada; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
 5. **Novo vídeo:** teste primeiro o modo **Canal específico** e depois os modos de lote.
 6. **Novo vídeo > Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar** dentro da subaba.
-7. **Upload:** autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key é exclusivamente para consultas públicas.
+7. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
 8. **Limpador de metadado:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos da aba Novo vídeo não são aceites nesta área.
 9. **Configurações:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
 10. **Novo vídeo:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.

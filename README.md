@@ -20,7 +20,7 @@ A primeira versão implementa a camada UI independente com:
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
-| Configurações | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, YouTube, Upload directo, TikTok Client ID/Secret e Upload-Post |
+| Configurações | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, Data API Key opcional, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
@@ -104,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.22 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.22 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.22
+npx.cmd --yes @danhachuel/thunderbolt@0.2.23 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.23 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.23
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -167,15 +167,15 @@ A descrição segue a composição do workflow de referência: preview, secção
 
 ## Canais YouTube
 
-A aba **Canais** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando `youtube_api_key` estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`.
+A aba **Canais** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando uma **YouTube Data API Key própria** estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`; essa chave é distinta do OAuth Client ID e Client Secret.
 
-Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo, Blueprint padrão, voz padrão, `DELEGATED_SESSION_ID` e configuração de Automação. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar. Cada cartão de canal tem **Activo** e, logo abaixo, **Apagar canal**, com confirmação; tarefas e artefactos não são apagados.
+Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo, Blueprint padrão, voz padrão, `DELEGATED_SESSION_ID` e configuração de Automação. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar. A resolução pública aceita URLs `/channel/UC...`, handles e subpáginas; quando existe um ID mas o HTML não traz todos os dados, tenta o feed RSS público. Se o YouTube responder que o canal não existe ou não fornecer metadados, a UI mostra uma mensagem clara e não mantém o formulário de uma pesquisa anterior. Cada cartão de canal tem **Activo** e, logo abaixo, **Apagar canal**, com confirmação; tarefas e artefactos não são apagados.
 
 ## Upload YouTube
 
 O Upload usa como caminho **principal** a lógica do `PublishingSchedulingAgent` do [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), adaptada para Python e executada dentro do processo Streamlit do Thunderbolt. Não é necessário instalar ou iniciar um segundo servidor Node. O fluxo valida o MP4 real, constrói `snippet/status`, faz upload resumível e tenta enviar thumbnail e legendas.
 
-Na aba **Upload**, configure primeiro o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para publicar.
+Na aba **Upload**, configure primeiro apenas o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para autorizar ou publicar.
 
 Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separada para o caminho de redundância. Os resultados guardam no histórico local qual mecanismo foi utilizado e as tentativas realizadas, sem guardar segredos.
 
@@ -203,7 +203,7 @@ A mesma aba permite **Guardar skill localmente**, copiando `moneyprinterturbo-vi
 
 A subaba **Vídeos**, dentro de **Novo vídeo**, mostra o backlog e permite iniciar/parar tarefas; deixou de existir como botão principal na barra lateral.
 
-A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret.
+A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret para TikTok. Para YouTube, o bloco principal pede o OAuth Client ID e Client Secret; a Data API Key, se usada, fica numa área opcional separada. Client ID + Client Secret não formam uma Data API Key nem um token OAuth.
  Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
 
 ## Segurança

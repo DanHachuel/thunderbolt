@@ -29,7 +29,7 @@ O Thunderbolt não vai arrancar um segundo servidor Node nem depender de uma ins
 
 O fluxo primário será nomeado e exposto como `youtube-automation-agent (adaptado)`. O fallback será um caminho OAuth directo separado, chamado apenas quando o adaptador primário falhar. Ambos reutilizam o token OAuth local do Thunderbolt quando necessário, mas a ordem de execução e os estados de erro ficam explícitos na UI.
 
-O token ficará em `storage/state/youtube_oauth_token.json`, coberto pelo `.gitignore` existente. Client ID, Client Secret e Data API Key continuam em settings; o Data API Key será usado apenas para consultas públicas, nunca para publicação.
+O token ficará em `storage/state/youtube_oauth_token.json`, coberto pelo `.gitignore` existente. Client ID e Client Secret continuam em settings para o fluxo OAuth; a Data API Key é opcional, fica numa área secundária e só é usada para consultas oficiais públicas, nunca para autorização ou publicação.
 
 ## Fontes
 

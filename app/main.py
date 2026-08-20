@@ -335,7 +335,7 @@ def render_channels():
                 st.rerun()
         if st.session_state.get("yt_message"):
             (st.success if st.session_state.get("yt_ok") else st.warning)(st.session_state["yt_message"])
-        imported = st.session_state.get("yt_import", {})
+        imported = st.session_state.get("yt_import", {}) if st.session_state.get("yt_ok") else {}
         blueprint_items = blueprint_catalog()
         blueprint_ids = [item[0] for item in blueprint_items]
         blueprint_labels = {item[0]: item[1] for item in blueprint_items}
@@ -818,15 +818,16 @@ def render_settings():
         st.subheader("Execução local")
         port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
         moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-        st.markdown("**YouTube — API pública e OAuth 2.0**")
-        st.caption("A Data API Key consulta canais e estatísticas públicas. O Client ID e o Client Secret são credenciais OAuth 2.0 separadas, usadas para autorizar operações na conta, como upload.")
-        youtube_cols = st.columns(3)
+        st.markdown("**YouTube — OAuth 2.0 e consulta pública**")
+        st.caption("Para autorizar uploads, preencha apenas o YouTube OAuth Client ID e o YouTube OAuth Client Secret. Depois, autorize o agente na aba Upload. Estes dados identificam a aplicação OAuth; não são uma Data API Key nem um token de acesso.")
+        youtube_cols = st.columns(2)
         with youtube_cols[0]:
-            youtube_api_key = text_setting("YouTube Data API Key", "youtube_api_key", secret=True, help_text="Chave criada em Google Cloud > APIs e serviços > Credenciais > Chave de API.")
+            youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud. É usado para iniciar a autorização da conta YouTube.")
         with youtube_cols[1]:
-            youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud.")
-        with youtube_cols[2]:
-            youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0.")
+            youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0. Não é uma API Key.")
+        with st.expander("Consulta oficial de métricas — opcional"):
+            st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
+            youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
 
         with st.expander("Upload directo — sessão YouTube Frontend API"):
             st.caption("Campos usados apenas pelo método Upload directo. Não são necessários para o youtube-automation-agent nem para a Data API pública.")
