@@ -104,6 +104,28 @@ def test_automation_defaults_are_carried_into_created_tasks(tmp_path, monkeypatc
     assert task["voice"] == "pt-BR-FranciscaNeural-Female"
 
 
+def test_set_channel_defaults_syncs_aliases_and_tasks(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import create_batch, create_channel, create_tasks_for_batch, set_channel_defaults
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    channel = create_channel("Canal com defaults")
+    updated = set_channel_defaults(channel["id"], "BlueprintCocomelon", "pt-BR-FranciscaNeural-Female")
+
+    assert updated["blueprint_id"] == "BlueprintCocomelon"
+    assert updated["default_blueprint_id"] == "BlueprintCocomelon"
+    assert updated["voice"] == "pt-BR-FranciscaNeural-Female"
+    assert updated["default_voice"] == "pt-BR-FranciscaNeural-Female"
+
+    batch = create_batch("single", [channel["id"]], "Tema", 1, {})
+    task = create_tasks_for_batch(batch)[0]
+    assert task["blueprint_id"] == "BlueprintCocomelon"
+    assert task["voice"] == "pt-BR-FranciscaNeural-Female"
+
+
 def test_delete_channel_removes_only_selected_channel(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage

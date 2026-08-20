@@ -16,7 +16,7 @@ A primeira versão implementa a camada UI independente com:
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Novo vídeo | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical |
-| Automação | Lista de vídeos e canais, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
+| Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
@@ -104,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.23 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.23 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.23
+npx.cmd --yes @danhachuel/thunderbolt@0.2.24 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.24 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.24
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -185,7 +185,7 @@ A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https:/
 
 Em **Novo vídeo**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
 
-O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. A aba **Automação** guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
+O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
 
 ## Teste de vozes
 

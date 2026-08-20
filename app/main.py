@@ -16,7 +16,7 @@ try:
 except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, transition_task, update_channel
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
@@ -177,6 +177,20 @@ def voice_catalog(current: str = "") -> list[str]:
         if candidate and candidate not in voices:
             voices.append(candidate)
     return voices
+
+
+def channel_default_options(channel: dict) -> tuple[list[str], dict[str, str], str, list[str], str]:
+    """Return synchronised Blueprint and voice options for a channel editor."""
+    blueprint_items = blueprint_catalog()
+    blueprint_ids = [item[0] for item in blueprint_items]
+    blueprint_labels = {item[0]: item[1] for item in blueprint_items}
+    current_blueprint = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "")
+    if current_blueprint and current_blueprint not in blueprint_ids:
+        blueprint_ids.append(current_blueprint)
+        blueprint_labels[current_blueprint] = current_blueprint
+    current_voice = str(channel.get("default_voice") or channel.get("voice") or "")
+    voice_options = voice_catalog(current_voice)
+    return blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice
 
 
 def render_dashboard():
@@ -488,6 +502,29 @@ def render_channels():
                         if st.button("Cancelar", key=f"cancel_delete_{channel['id']}", use_container_width=True):
                             st.session_state.pop(delete_key, None)
                             st.rerun()
+            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
+            with st.expander("Definir Blueprint e voz padrão", expanded=False):
+                editor_cols = st.columns(2)
+                with editor_cols[0]:
+                    channel_blueprint = st.selectbox(
+                        "Blueprint padrão",
+                        blueprint_ids,
+                        index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
+                        format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
+                        key=f"channel_default_blueprint_{channel['id']}",
+                    )
+                with editor_cols[1]:
+                    channel_voice = st.selectbox(
+                        "Voz padrão",
+                        voice_options,
+                        index=voice_options.index(current_voice) if current_voice in voice_options else 0,
+                        format_func=lambda item: item or "Sem voz padrão",
+                        key=f"channel_default_voice_{channel['id']}",
+                    )
+                if st.button("Guardar Blueprint e voz", key=f"save_channel_defaults_{channel['id']}", type="primary"):
+                    set_channel_defaults(channel["id"], channel_blueprint, channel_voice)
+                    st.success("Blueprint padrão e voz padrão guardados para este canal.")
+                    st.rerun()
 
 
 def render_new_video():
@@ -624,7 +661,25 @@ def render_automation():
             with cols[1]:
                 st.write(f"**{channel.get('name', 'Sem nome')}**")
                 st.caption(channel.get("handle") or channel.get("url") or "sem URL")
-                st.caption(f"Blueprint: {channel.get('default_blueprint_id') or channel.get('blueprint_id') or '—'} · Voz: {channel.get('default_voice') or channel.get('voice') or '—'}")
+                st.caption(f"Blueprint actual: {channel.get('default_blueprint_id') or channel.get('blueprint_id') or '—'} · Voz actual: {channel.get('default_voice') or channel.get('voice') or '—'}")
+            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
+            default_cols = st.columns(2)
+            with default_cols[0]:
+                automation_blueprint = st.selectbox(
+                    "Blueprint padrão",
+                    blueprint_ids,
+                    index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
+                    format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
+                    key=f"automation_blueprint_{channel_id}",
+                )
+            with default_cols[1]:
+                automation_voice = st.selectbox(
+                    "Voz padrão",
+                    voice_options,
+                    index=voice_options.index(current_voice) if current_voice in voice_options else 0,
+                    format_func=lambda item: item or "Sem voz padrão",
+                    key=f"automation_voice_{channel_id}",
+                )
             with cols[2]:
                 enabled = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
             with cols[3]:
@@ -634,7 +689,11 @@ def render_automation():
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip()})
+                        update_channel(channel_id, {
+                            "automation_on": bool(enabled),
+                            "automation_time": schedule_time.strip(),
+                        })
+                        set_channel_defaults(channel_id, automation_blueprint, automation_voice)
                         st.success("Agendamento guardado.")
                         st.rerun()
 

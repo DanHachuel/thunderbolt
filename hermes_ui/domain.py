@@ -66,6 +66,18 @@ def update_channel(channel_id: str, updates: dict[str, Any]) -> dict[str, Any] |
     return None
 
 
+def set_channel_defaults(channel_id: str, blueprint_id: str = "", voice: str = "") -> dict[str, Any] | None:
+    """Persist the canonical and legacy aliases for a channel's generation defaults."""
+    blueprint = str(blueprint_id or "").strip()
+    selected_voice = str(voice or "").strip()
+    return update_channel(channel_id, {
+        "blueprint_id": blueprint,
+        "default_blueprint_id": blueprint,
+        "voice": selected_voice,
+        "default_voice": selected_voice,
+    })
+
+
 def delete_channel(channel_id: str) -> dict[str, Any] | None:
     """Remove apenas o cadastro do canal, preservando tarefas e artefactos."""
     channels = read_json("channels.json", [])
