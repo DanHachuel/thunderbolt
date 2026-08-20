@@ -21,6 +21,13 @@ DEFAULTS: dict[str, Any] = {
     "batches.json": [],
     "uploads.json": [],
     "metadata_edits.json": [],
+    "mcp_server.json": {
+        "enabled": False,
+        "host": "127.0.0.1",
+        "port": 3031,
+        "auth_token": "",
+        "write_enabled": False,
+    },
     "mcp_integrations.json": [
         {
             "id": "short-video-maker",

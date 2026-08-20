@@ -104,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.26 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.26 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.26
+npx.cmd --yes @danhachuel/thunderbolt@0.2.27 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.27 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.27
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -193,11 +193,14 @@ A área **Configurações > Teste de vozes** é isolada da pipeline. Permite esc
 
 ## MCP e integrações externas opcionais
 
-A aba **MCP** funciona como um catálogo local de clientes externos. Ela lista **Short Video Maker**, **AutoVio**, **OpenMontage** e **OpenCut** com os respectivos links oficiais, protocolo/capacidade conhecida, porta local editável e toggle **Activo**. Os repositórios não são clonados, instalados ou incluídos no pacote npm do Thunderbolt.
+A aba **MCP** está organizada em três subabas independentes. **Client MCP** lista **Short Video Maker**, **AutoVio**, **OpenMontage** e **OpenCut** com links oficiais, protocolo/capacidade conhecida, porta local editável, detecção passiva e toggle **Activo**. Os repositórios externos não são clonados, instalados ou incluídos no pacote npm do Thunderbolt.
 
-As portas iniciais são `3123` para Short Video Maker, `3001` para a API backend do AutoVio, `8000` como referência editável para OpenMontage — que não documenta uma porta HTTP padrão — e `8787` para a API do OpenCut, cujo frontend de desenvolvimento usa `5173`. A detecção é passiva: apenas consulta `localhost` e nunca inicia processos externos. Activar uma integração guarda a preferência local; não substitui a instalação/configuração do serviço externo.
+As portas iniciais são `3123` para Short Video Maker, `3001` para a API backend do AutoVio, `8000` como referência editável para OpenMontage — que não documenta uma porta HTTP padrão — e `8787` para a API do OpenCut, cujo frontend de desenvolvimento usa `5173`. A detecção do Client MCP apenas consulta `localhost` e nunca inicia processos externos.
 
-A mesma aba permite **Guardar skill localmente**, copiando `moneyprinterturbo-video.md` para `storage/skills/`, e **Descarregar skill .md** através do navegador. A skill é um recurso separado dos quatro repositórios externos.
+**Servidor MCP** activa, mediante confirmação explícita na UI, um endpoint local em `http://127.0.0.1:3031/mcp`. O endpoint usa JSON-RPC sobre HTTP POST, disponibiliza ferramentas de leitura para estado da pipeline, canais, vídeos e Blueprints e exige um token quando o host é exposto fora do computador local. As ferramentas de escrita ficam desactivadas por padrão; quando o utilizador as activa, o agente pode criar lotes de vídeos através de uma ferramenta controlada. O endpoint `/health` serve apenas para verificação de disponibilidade.
+
+**Skill** contém exclusivamente os botões para guardar localmente ou descarregar `moneyprinterturbo-video.md`. A skill é guardada em `storage/skills/` e não é misturada com o catálogo de clientes MCP.
+
 
 ## TikTok
 

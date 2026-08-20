@@ -9,6 +9,13 @@ from . import storage
 
 
 SKILL_FILENAME = "moneyprinterturbo-video.md"
+MCP_SERVER_DEFAULTS: dict[str, Any] = {
+    "enabled": False,
+    "host": "127.0.0.1",
+    "port": 3031,
+    "auth_token": "",
+    "write_enabled": False,
+}
 
 MCP_DEFAULTS: list[dict[str, Any]] = [
     {
@@ -70,6 +77,36 @@ def _merge_defaults(saved: Any) -> list[dict[str, Any]]:
         item["active"] = bool(item.get("active", False))
         merged.append(item)
     return merged
+
+
+def load_server_config() -> dict[str, Any]:
+    saved = storage.read_json("mcp_server.json", MCP_SERVER_DEFAULTS)
+    config = {**MCP_SERVER_DEFAULTS, **(saved if isinstance(saved, dict) else {})}
+    config["enabled"] = bool(config.get("enabled", False))
+    config["write_enabled"] = bool(config.get("write_enabled", False))
+    config["host"] = str(config.get("host", "127.0.0.1") or "127.0.0.1").strip()
+    config["auth_token"] = str(config.get("auth_token", "") or "").strip()
+    try:
+        config["port"] = max(1, min(65535, int(config.get("port", 3031))))
+    except (TypeError, ValueError):
+        config["port"] = 3031
+    return config
+
+
+def save_server_config(**updates: Any) -> dict[str, Any]:
+    config = load_server_config()
+    config.update(updates)
+    config = {**MCP_SERVER_DEFAULTS, **config}
+    config["enabled"] = bool(config.get("enabled", False))
+    config["write_enabled"] = bool(config.get("write_enabled", False))
+    config["host"] = str(config.get("host", "127.0.0.1") or "127.0.0.1").strip()
+    config["auth_token"] = str(config.get("auth_token", "") or "").strip()
+    try:
+        config["port"] = max(1, min(65535, int(config.get("port", 3031))))
+    except (TypeError, ValueError):
+        config["port"] = 3031
+    storage.write_json("mcp_server.json", config)
+    return config
 
 
 def load_integrations() -> list[dict[str, Any]]:

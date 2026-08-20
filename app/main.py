@@ -20,7 +20,8 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
-from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, read_packaged_skill, update_integration
+from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
+from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
@@ -1077,73 +1078,141 @@ def render_settings():
 
 def render_mcp():
     st.title("MCP")
-    st.caption("Clientes opcionais para serviços externos. Os repositórios não são instalados nem incluídos no pacote Thunderbolt.")
-    st.info("Activar uma integração guarda apenas a preferência local. O Thunderbolt não inicia processos externos automaticamente; a detecção verifica passivamente se existe um serviço já disponível na porta configurada.")
+    st.caption("Clientes externos, servidor MCP do Thunderbolt e a skill local ficam separados para evitar confundir funções diferentes.")
 
-    integrations = load_integrations()
-    for integration in integrations:
-        integration_id = integration["id"]
-        with st.container(border=True):
-            header_cols = st.columns([2.6, 1.15, 1.65, 1.2])
-            with header_cols[0]:
-                st.write(f"**{integration['name']}**")
-                st.caption(f"{integration['protocol']} · {integration['description']}")
-                st.markdown(f"[Abrir repositório oficial]({integration['repository']})")
-            with header_cols[1]:
-                port = st.number_input(
-                    "Porta",
-                    min_value=1,
-                    max_value=65535,
-                    value=int(integration.get("port", 8000)),
-                    step=1,
-                    key=f"mcp_port_{integration_id}",
-                )
-            with header_cols[2]:
-                status = detect_local_service({**integration, "port": port})
-                if status["available"]:
-                    st.success("Disponível")
-                else:
-                    st.caption("Não detectado")
-                st.caption(status["message"])
-            with header_cols[3]:
-                active = st.toggle("Activo", value=bool(integration.get("active", False)), key=f"mcp_active_{integration_id}")
-                if active != bool(integration.get("active", False)):
-                    update_integration(integration_id, active=active)
+    client_tab, server_tab, skill_tab = st.tabs(["Client MCP", "Servidor MCP", "Skill"])
+
+    with client_tab:
+        st.subheader("Client MCP")
+        st.info("Configure aqui os serviços MCP externos que o Thunderbolt pode detectar passivamente. Activar uma integração guarda apenas a preferência; não instala nem inicia processos externos.")
+        integrations = load_integrations()
+        for integration in integrations:
+            integration_id = integration["id"]
+            with st.container(border=True):
+                header_cols = st.columns([2.6, 1.15, 1.65, 1.2])
+                with header_cols[0]:
+                    st.write(f"**{integration['name']}**")
+                    st.caption(f"{integration['protocol']} · {integration['description']}")
+                    st.markdown(f"[Abrir repositório oficial]({integration['repository']})")
+                with header_cols[1]:
+                    port = st.number_input(
+                        "Porta",
+                        min_value=1,
+                        max_value=65535,
+                        value=int(integration.get("port", 8000)),
+                        step=1,
+                        key=f"mcp_port_{integration_id}",
+                    )
+                with header_cols[2]:
+                    status = detect_local_service({**integration, "port": port})
+                    if status["available"]:
+                        st.success("Disponível")
+                    else:
+                        st.caption("Não detectado")
+                    st.caption(status["message"])
+                with header_cols[3]:
+                    active = st.toggle("Activo", value=bool(integration.get("active", False)), key=f"mcp_active_{integration_id}")
+                    if active != bool(integration.get("active", False)):
+                        update_integration(integration_id, active=active)
+                        st.rerun()
+
+                st.caption(integration.get("endpoint_note", "Porta editável para o serviço local."))
+                if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", use_container_width=True):
+                    update_integration(integration_id, port=int(port))
+                    st.success(f"Porta de {integration['name']} guardada: {int(port)}")
                     st.rerun()
 
-            st.caption(integration.get("endpoint_note", "Porta editável para o serviço local."))
-            if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", use_container_width=True):
-                update_integration(integration_id, port=int(port))
-                st.success(f"Porta de {integration['name']} guardada: {int(port)}")
-                st.rerun()
-
-    st.divider()
-    st.subheader("Skill MoneyPrinterTurbo")
-    st.caption("A skill anexada pode ser guardada na pasta local do Thunderbolt ou descarregada como ficheiro Markdown. Nenhum dos quatro repositórios externos é copiado para o pacote.")
-    skill_cols = st.columns(2)
-    with skill_cols[0]:
-        if st.button("Guardar skill localmente", type="primary", use_container_width=True, key="mcp_install_mpt_skill"):
+    with server_tab:
+        st.subheader("Servidor MCP")
+        st.caption("Servidor local do Thunderbolt para ser descoberto por um agente compatível com MCP. O endpoint usa JSON-RPC sobre HTTP POST em `/mcp`.")
+        st.warning("Por segurança, o servidor inicia apenas quando o activar explicitamente. Por padrão fica acessível somente neste computador em 127.0.0.1:3031.")
+        server_config = load_server_config()
+        if server_config.get("enabled") and not server_status().get("running"):
             try:
-                destination = install_skill_locally()
-                st.success(f"Skill guardada em `{destination}`")
-            except (FileNotFoundError, OSError) as exc:
-                st.error(f"Não foi possível guardar a skill: {exc}")
-    with skill_cols[1]:
-        try:
-            skill_data = read_packaged_skill()
-        except FileNotFoundError:
-            skill_data = None
-        if skill_data is not None:
-            st.download_button(
-                "Descarregar skill .md",
-                data=skill_data,
-                file_name="moneyprinterturbo-video.md",
-                mime="text/markdown",
-                use_container_width=True,
-                key="mcp_download_mpt_skill",
+                start_server(
+                    str(server_config.get("host", "127.0.0.1")),
+                    int(server_config.get("port", 3031)),
+                    str(server_config.get("auth_token", "")),
+                    bool(server_config.get("write_enabled", False)),
+                )
+            except Exception as exc:
+                st.error(f"Não foi possível iniciar o Servidor MCP guardado: {exc}")
+
+        server_cols = st.columns([1.3, 1.4, 1.4])
+        with server_cols[0]:
+            server_enabled = st.checkbox("Servidor MCP ON", value=bool(server_config.get("enabled", False)), key="mcp_server_enabled")
+        with server_cols[1]:
+            server_host = st.text_input("Host", value=str(server_config.get("host", "127.0.0.1")), key="mcp_server_host", help="Use 127.0.0.1 para acesso local. Um host externo exige token.")
+        with server_cols[2]:
+            server_port = st.number_input("Porta do servidor", min_value=1, max_value=65535, value=int(server_config.get("port", 3031)), step=1, key="mcp_server_port")
+        server_token = st.text_input("Token de acesso MCP (opcional no localhost)", value=str(server_config.get("auth_token", "")), type="password", key="mcp_server_token")
+        write_enabled = st.checkbox("Permitir ferramentas de escrita", value=bool(server_config.get("write_enabled", False)), key="mcp_server_write", help="Desactivado por padrão. Quando activo, o agente pode criar lotes de vídeos através de uma ferramenta MCP; leituras continuam disponíveis sem esta opção.")
+        if str(server_host).strip() not in {"127.0.0.1", "localhost", "::1"} and not str(server_token).strip():
+            st.error("Para expor o servidor fora do computador local, defina um token de acesso MCP.")
+
+        action_label = "Guardar e iniciar Servidor MCP" if server_enabled else "Guardar e parar Servidor MCP"
+        if st.button(action_label, type="primary", key="mcp_server_save", use_container_width=True):
+            try:
+                saved = save_server_config(enabled=server_enabled, host=server_host, port=int(server_port), auth_token=server_token, write_enabled=write_enabled)
+                if saved["enabled"]:
+                    status = start_server(saved["host"], saved["port"], saved["auth_token"], saved["write_enabled"])
+                    st.success(f"Servidor MCP activo em `{status['endpoint']}`")
+                else:
+                    stop_server()
+                    st.success("Servidor MCP parado.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível guardar/iniciar o Servidor MCP: {exc}")
+
+        runtime = server_status()
+        if runtime.get("running"):
+            st.success(f"Servidor MCP activo: `{runtime['endpoint']}`")
+            st.code(
+                json.dumps(
+                    {
+                        "endpoint": runtime["endpoint"],
+                        "health": runtime["health_endpoint"],
+                        "transport": "Streamable HTTP / JSON-RPC POST",
+                        "write_tools": runtime["write_enabled"],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                language="json",
             )
+            st.caption("Use o endpoint `/mcp` na configuração do agente. O endpoint `/health` serve apenas para verificar se o servidor está activo. Não partilhe o token.")
         else:
-            st.warning("A skill ainda não está disponível nesta instalação.")
+            st.info("Servidor MCP parado. As configurações ficam guardadas localmente e só são usadas depois de clicar em Guardar e iniciar.")
+        st.markdown("**Ferramentas disponibilizadas**")
+        st.write("Leitura: estado da pipeline, canais, vídeos e Blueprints. Ferramentas de escrita: criação de lotes de vídeos, apenas quando a opção de escrita estiver activada pelo utilizador.")
+
+    with skill_tab:
+        st.subheader("Skill")
+        st.caption("A skill anexada pode ser guardada na pasta local do Thunderbolt ou descarregada como ficheiro Markdown. Nenhum dos quatro repositórios externos é copiado para o pacote.")
+        skill_cols = st.columns(2)
+        with skill_cols[0]:
+            if st.button("Guardar skill localmente", type="primary", use_container_width=True, key="mcp_install_mpt_skill"):
+                try:
+                    destination = install_skill_locally()
+                    st.success(f"Skill guardada em `{destination}`")
+                except (FileNotFoundError, OSError) as exc:
+                    st.error(f"Não foi possível guardar a skill: {exc}")
+        with skill_cols[1]:
+            try:
+                skill_data = read_packaged_skill()
+            except FileNotFoundError:
+                skill_data = None
+            if skill_data is not None:
+                st.download_button(
+                    "Descarregar skill .md",
+                    data=skill_data,
+                    file_name="moneyprinterturbo-video.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                    key="mcp_download_mpt_skill",
+                )
+            else:
+                st.warning("A skill ainda não está disponível nesta instalação.")
 
 
 def render_metadata_cleaner():

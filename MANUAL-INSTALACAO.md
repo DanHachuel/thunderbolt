@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.26
+> **Versão deste manual:** 0.2.27
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.26 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.27 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.26 install
+npx --yes @danhachuel/thunderbolt@0.2.27 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -371,8 +371,9 @@ Após iniciar a aplicação, valide o seguinte percurso:
 11. **Automação:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais** e são usados em novas tarefas. A UI não inicia jobs em segundo plano nesta entrega.
 12. **Teste de vozes:** em Configurações, teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
 13. **Upload directo:** configure manualmente cookies, sessionInfo e INNERTUBE_API_KEY, atribua o `DELEGATED_SESSION_ID` no canal e teste apenas com um vídeo de validação. O método envia chunks de 256 KiB e não extrai cookies do navegador.
-14. **MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é apenas uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
-15. **Skill MCP:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+14. **MCP — Client MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
+15. **MCP — Servidor MCP:** abra a subaba, mantenha o host `127.0.0.1`, active **Servidor MCP ON** e clique em **Guardar e iniciar Servidor MCP**. Confirme o endpoint `/mcp` e o health endpoint `/health`. Mantenha **Permitir ferramentas de escrita** desactivado até precisar que um agente crie lotes.
+16. **MCP — Skill:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
 
 ## Novo vídeo, Automação e música
 
@@ -388,9 +389,11 @@ A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https:/
 
 ## MCP e integrações externas
 
-A aba **MCP** é um configurador local de quatro serviços opcionais. As portas iniciais são `3123` para Short Video Maker, `3001` para AutoVio, `8000` como referência editável para OpenMontage e `8787` para a API do OpenCut. A página consulta apenas `http://127.0.0.1:<porta>/` com timeout curto; não clona, instala ou inicia processos externos.
+A subaba **Client MCP** é um configurador local de quatro serviços opcionais. As portas iniciais são `3123` para Short Video Maker, `3001` para AutoVio, `8000` como referência editável para OpenMontage e `8787` para a API do OpenCut. A página consulta apenas `http://127.0.0.1:<porta>/` com timeout curto; não clona, instala ou inicia processos externos.
 
-O botão **Guardar skill localmente** copia a skill anexada para `storage/skills/`. Esta pasta fica fora dos estados JSON e é criada pelo instalador e pelo launcher. Os quatro repositórios continuam fora do pacote npm.
+A subaba **Servidor MCP** disponibiliza, após activação explícita, `http://127.0.0.1:3031/mcp` por JSON-RPC sobre HTTP POST. Para configurar um agente compatível, use esse URL como endpoint MCP. Se o host for alterado para uma interface externa, preencha primeiro um token e trate-o como segredo. O servidor disponibiliza ferramentas de leitura por padrão; a criação de lotes só é exposta quando **Permitir ferramentas de escrita** está activado.
+
+A subaba **Skill** contém as acções para guardar a skill anexada em `storage/skills/` ou descarregá-la como Markdown. Esta pasta fica fora dos estados JSON e é criada pelo instalador e pelo launcher. Os quatro repositórios continuam fora do pacote npm.
 
 ## 12. Limpador de metadado
 
