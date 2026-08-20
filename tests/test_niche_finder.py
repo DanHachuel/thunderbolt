@@ -156,3 +156,17 @@ def test_automatic_loader_downloads_into_empty_temporary_directory(tmp_path, mon
     assert cached_path.exists()
     assert calls[0][0] == data_loader.DEFAULT_DATASET_SLUG
     assert not list(data_dir.parent.glob(".niche-kaggle-*"))
+
+
+def test_niche_finder_navigation_has_kaggle_and_apify_pages():
+    source_path = Path(__file__).parents[1] / "app" / "main.py"
+    source = source_path.read_text(encoding="utf-8")
+
+    assert 'niche_finder_items = [' in source
+    assert '("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle")' in source
+    assert '("Niche Finder Apify", ":material/api:", "Niche Finder Apify")' in source
+    assert '"Niche Finder Kaggle": render_niche_finder' in source
+    assert '"Niche Finder Apify": render_niche_finder_apify' in source
+    assert source.index('("Niche Finder Kaggle"') < source.index('("Niche Finder Apify"')
+    assert 'st.title("Niche Finder Apify")' in source
+    assert "não executa nenhuma operação" in source

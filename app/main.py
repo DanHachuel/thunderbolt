@@ -637,7 +637,7 @@ def _cached_niche_download():
 
 
 def render_niche_finder():
-    st.title("Niche Finder")
+    st.title("Niche Finder Kaggle")
     st.caption("Busca de padrões, nichos e tags para orientar canais faceless.")
     st.info("A instalação das dependências é automática. A operação não é: defina os parâmetros abaixo e clique em **Analisar Nichos** para iniciar.")
 
@@ -741,6 +741,12 @@ def render_niche_finder():
             st.dataframe(items_table, use_container_width=True, hide_index=True)
     with tab_data:
         st.dataframe(results["raw_data"], use_container_width=True, hide_index=True)
+
+
+def render_niche_finder_apify():
+    st.title("Niche Finder Apify")
+    st.caption("Área reservada para a futura integração do Niche Finder com o Apify.")
+    st.info("Esta aba está preparada para desenvolvimento futuro e ainda não executa nenhuma operação.")
 
 
 def render_videos():
@@ -1498,6 +1504,10 @@ def main():
         ("MCP", ":material/hub:", "MCP"),
         ("Configurações Técnicas", ":material/settings:", "Configurações Técnicas"),
     ]
+    niche_finder_items = [
+        ("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle"),
+        ("Niche Finder Apify", ":material/api:", "Niche Finder Apify"),
+    ]
     top_pages = [
         ("Início", ":material/home:", "Início"),
         ("Pipeline", ":material/account_tree:", "Pipeline"),
@@ -1510,10 +1520,11 @@ def main():
         "Novo vídeo": "Criação de Vídeos",
         "Vídeos": "Criação de Vídeos",
         "Limpador de metadado": "Limpador de Metadados",
+        "Niche Finder": "Niche Finder Kaggle",
         "Configurações Técnicas": "Configurações Técnicas",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + settings_items}:
+    if current_page not in {item[0] for item in top_pages + pipeline_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
 
@@ -1533,6 +1544,10 @@ def main():
                 with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
                     for child_target, child_icon, child_label in pipeline_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Niche Finder":
+                with st.expander("Niche Finder", expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
+                    for child_target, child_icon, child_label in niche_finder_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Configurações":
                 with st.expander("Configurações", expanded=current_page in {item[0] for item in settings_items}, icon=":material/settings:"):
                     for child_target, child_icon, child_label in settings_items:
@@ -1545,7 +1560,8 @@ def main():
         "Criação de Vídeos": render_new_video,
         "Criação de Músicas": render_music_creation,
         "Automação": render_automation,
-        "Niche Finder": render_niche_finder,
+        "Niche Finder Kaggle": render_niche_finder,
+        "Niche Finder Apify": render_niche_finder_apify,
         "Upload": render_upload,
         "Limpador de Metadados": render_metadata_cleaner,
         "Canais": render_channels,

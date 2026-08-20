@@ -17,7 +17,7 @@ A primeira versão implementa a camada UI independente com:
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
-| Niche Finder | Parâmetros dentro da própria aba, início manual após clique, K-Means, FP-Growth, regras de associação, clusters e gráfico Plotly nativo |
+| Niche Finder | Menu expansível com Niche Finder Kaggle (análise manual, K-Means e FP-Growth) e Niche Finder Apify reservado para desenvolvimento futuro |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de Metadados | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
@@ -26,9 +26,9 @@ A primeira versão implementa a camada UI independente com:
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.34
+## Navegação da UI 0.2.35
 
-A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 ## Instalação
 
@@ -115,9 +115,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.34 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.34 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.34
+npx.cmd --yes @danhachuel/thunderbolt@0.2.35 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.35 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.35
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -137,11 +137,11 @@ Após `install`, o launcher usa o ambiente virtual instalado em `~/.thunderbolt/
 
 ## Niche Finder
 
-A página **Niche Finder** integra a lógica do projecto open source [johanfortus/Niche-Finder](https://github.com/johanfortus/Niche-Finder) directamente no processo Streamlit. O Thunderbolt não inicia Flask, não abre uma porta adicional e não copia templates HTML ou D3. Ao abrir a página, o Thunderbolt não descarrega dados, não prepara o dataset e não executa análises. A instalação das dependências continua automática, mas a operação é manual: o utilizador define os parâmetros dentro da própria aba e clica em **Analisar Nichos**. Só nesse momento o KaggleHub prepara ou reutiliza a cache local do dataset e a análise é executada.
+O menu expansível **Niche Finder** contém duas páginas. **Niche Finder Kaggle** é a página actual de análise e integra a lógica do projecto open source [johanfortus/Niche-Finder](https://github.com/johanfortus/Niche-Finder) directamente no processo Streamlit. O Thunderbolt não inicia Flask, não abre uma porta adicional e não copia templates HTML ou D3. Ao abrir a página, o Thunderbolt não descarrega dados, não prepara o dataset e não executa análises. A instalação das dependências continua automática, mas a operação é manual: o utilizador define os parâmetros dentro da própria aba e clica em **Analisar Nichos**. Só nesse momento o KaggleHub prepara ou reutiliza a cache local do dataset e a análise é executada.
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-As dependências adicionais são instaladas pelo fluxo normal do pacote: `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.34 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é uma página vazia reservada para a futura integração com o Apify e não executa nenhuma operação. As dependências adicionais são instaladas pelo fluxo normal do pacote: `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.35 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Armazenamento local
 
