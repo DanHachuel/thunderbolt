@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.31
+> **Versão deste manual:** 0.2.33
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.31 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.33 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.31 install
+npx --yes @danhachuel/thunderbolt@0.2.33 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -218,6 +218,12 @@ Depois de instalar e diagnosticar:
 
 ```bash
 npx --yes @danhachuel/thunderbolt
+```
+
+O comando normal inicia a UI e o worker local de Automação. O worker verifica o relógio local do computador e cria os lotes dos canais com **Automação ON** quando o horário `HH:MM` coincide. Para executar apenas o worker, sem abrir a UI:
+
+```bash
+npx --yes @danhachuel/thunderbolt worker
 ```
 
 Abra no navegador:
@@ -372,7 +378,7 @@ Após iniciar a aplicação, valide o seguinte percurso:
 9. **Pipeline > Limpador de Metadados:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos das páginas de criação não são aceites nesta área.
 10. **Configurações > Configurações Técnicas:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
 11. **Criação de Vídeos:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
-12. **Automação:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais** e são usados em novas tarefas. A UI não inicia jobs em segundo plano nesta entrega.
+12. **Automação:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais** e são usados em novas tarefas. Inicie o Thunderbolt pelo launcher, confirme o aviso verde **Worker activo** e verifique que o relógio apresentado corresponde ao computador. O worker cria no máximo um lote por canal por dia quando o horário local coincide.
 13. **Configurações > Configurações Técnicas > Teste de vozes:** teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
 14. **Upload directo:** configure manualmente cookies, sessionInfo e INNERTUBE_API_KEY, atribua o `DELEGATED_SESSION_ID` no canal e teste apenas com um vídeo de validação. O método envia chunks de 256 KiB e não extrai cookies do navegador.
 15. **Configurações > MCP > Client MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
@@ -387,13 +393,13 @@ Ao abrir a página, o Thunderbolt prepara automaticamente os dados públicos atr
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. A análise inicial é automática; o botão **Analisar Nichos** recalcula os resultados depois de alterar os filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.31 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.33 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
 
 O modo `Pexels/Pixabay` representa materiais de stock. Ao seleccionar `full_ia`, o selector `Estilo IA` apresenta os 12 estilos disponíveis. Ao seleccionar `Apenas Música`, a UI obriga a escolher uma música existente, carregar um ficheiro ou solicitar uma música a um endpoint Suno configurado. O vídeo recebe `background_mode=none`, sem fundo Pexels/Pixabay ou IA.
 
-A aba **Automação** lista os canais e vídeos, permite escolher e guardar **Blueprint padrão** e **Voz padrão** por canal, guarda **Automação ON** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais** e são copiados para novas tarefas. É apenas uma camada de UI nesta versão, sem execução de worker.
+A aba **Automação** lista os canais e vídeos, permite escolher e guardar **Blueprint padrão** e **Voz padrão** por canal, guarda **Automação ON** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, cria lotes agendados na fila e evita duplicar o mesmo canal no mesmo dia.
 
 A área **Teste de vozes**, dentro de **Configurações > Configurações Técnicas**, é isolada da pipeline. O preview pode ser reproduzido e descarregado de `storage/voice_previews/`. Caminhos vazios, directórios, ficheiros vazios e previews sem permissões de leitura são ignorados com uma mensagem clara, sem traceback. Se uma instalação antiga mostrar que `edge-tts` está em falta, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o detector reinstala apenas a dependência ausente.
 

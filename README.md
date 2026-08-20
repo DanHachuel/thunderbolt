@@ -16,7 +16,7 @@ A primeira versão implementa a camada UI independente com:
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
-| Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
+| Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | Niche Finder | Preparação e análise automáticas, filtros, K-Means, FP-Growth, regras de associação, clusters e gráfico Plotly nativo |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
@@ -26,7 +26,7 @@ A primeira versão implementa a camada UI independente com:
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.32
+## Navegação da UI 0.2.33
 
 A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -61,6 +61,12 @@ Ou através do launcher Node:
 ```bash
 node scripts/cli.mjs --check
 node scripts/cli.mjs
+```
+
+O comando normal inicia a UI e o worker local de Automação. O worker verifica o relógio local do computador e coloca na fila os lotes de canais com **Automação ON** quando o horário `HH:MM` coincide. Para executar apenas o worker, sem abrir a UI:
+
+```bash
+node scripts/cli.mjs worker
 ```
 
 O pacote está publicado no npm como `@danhachuel/thunderbolt` e pode ser executado directamente via `npx`:
@@ -109,9 +115,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.32 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.32 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.32
+npx.cmd --yes @danhachuel/thunderbolt@0.2.33 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.33 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.33
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:

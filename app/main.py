@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 import sys
 from pathlib import Path
 
@@ -18,6 +18,7 @@ except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
+from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset, load_dataframe
@@ -788,8 +789,18 @@ def render_videos():
 
 def render_automation():
     st.title("Automação")
-    st.caption("Agendamento diário da geração por canal. Esta versão configura e guarda a UI; não inicia gerações em segundo plano.")
-    st.info("A geração só será executada quando existir um worker/agendador ligado à pipeline. Activar Automação ON não inicia um processo automaticamente nesta etapa.")
+    st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
+    worker_status = load_worker_status()
+    local_now = datetime.now().astimezone()
+    if worker_status.get("alive"):
+        st.success(f"Worker activo · relógio local: {local_now.strftime('%d/%m/%Y %H:%M:%S %Z')}")
+    else:
+        st.warning("Worker de automação não está activo. Inicie o Thunderbolt pelo launcher (`npx.cmd --yes @danhachuel/thunderbolt`) para activar as verificações horárias.")
+    last_tick = worker_status.get("last_tick_local")
+    if last_tick:
+        st.caption(f"Última verificação do worker: {last_tick}")
+    if worker_status.get("last_error"):
+        st.error(f"Último erro do worker: {worker_status['last_error']}")
     channels = read_json("channels.json", [])
     if not channels:
         st.info("Nenhum canal cadastrado para configurar.")

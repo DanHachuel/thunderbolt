@@ -133,10 +133,39 @@ if (!existsSync(main)) {
   process.exit(1);
 }
 ensureRuntimeStorage();
+const storageDir = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
+const runtimeEnv = {
+  ...process.env,
+  THUNDERBOLT_STORAGE_DIR: storageDir,
+  STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false",
+  STREAMLIT_SERVER_HEADLESS: "true",
+};
+
+if (args[0] === "worker" || args.includes("--worker")) {
+  run(python, ["-m", "hermes_ui.automation_worker", ...args.filter((arg) => arg !== "worker" && arg !== "--worker")], "worker de automação");
+}
+
 const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
+const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
+  cwd: root,
+  stdio: "inherit",
+  env: runtimeEnv,
+  windowsHide: false,
+});
 const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", port, "--server.address", "localhost"], {
   cwd: root,
   stdio: "inherit",
-  env: { ...process.env, THUNDERBOLT_STORAGE_DIR: process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage") },
+  env: runtimeEnv,
+  windowsHide: false,
 });
-child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+
+const stopWorker = () => {
+  if (!worker.killed) worker.kill();
+};
+process.on("SIGINT", stopWorker);
+process.on("SIGTERM", stopWorker);
+child.on("exit", (code, signal) => {
+  stopWorker();
+  process.exit(code ?? (signal ? 1 : 0));
+});
+worker.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
