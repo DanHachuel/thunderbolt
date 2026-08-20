@@ -19,13 +19,14 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
 from hermes_ui.automation_worker import load_worker_status
-from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from hermes_ui.storage import BLUEPRINTS, STORAGE, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
 from app.modules.niche_finder.summarizer import summarize_items
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
+from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
@@ -888,6 +889,134 @@ def render_edit_placeholder(page_title: str, description: str):
     st.info("Esta aba está reservada para desenvolvimento futuro e ainda não executa nenhuma operação.")
 
 
+def render_python_editor():
+    st.title("Editor Python")
+    st.caption("Editor local inspirado no PYEdit para scripts Python e edição manual de vídeos do Thunderbolt.")
+    st.info("Escolha um vídeo gerado, indique uma pasta local ou faça upload de um vídeo. Nenhum código Python é executado nesta aba; as operações de vídeo só começam depois de clicar no botão da operação.")
+
+    video_tab, code_tab = st.tabs(["Vídeos", "Código Python"])
+    with video_tab:
+        st.subheader("Escolher vídeo")
+        source_mode = st.radio("Origem", ["Vídeos gerados", "Pasta local", "Upload manual"], horizontal=True, key="python_editor_source_mode")
+        source_path = None
+        if source_mode == "Vídeos gerados":
+            tasks = read_json("tasks.json", [])
+            generated_paths = list_generated_videos(tasks)
+            if not generated_paths:
+                st.info("Ainda não existem vídeos gerados com caminho registado nos artefactos da pipeline.")
+            else:
+                labels = [f"{path.name} — {path}" for path in generated_paths]
+                selected_index = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: labels[index], key="python_editor_generated_index")
+                source_path = generated_paths[selected_index]
+        elif source_mode == "Pasta local":
+            default_folder = str(STORAGE / "videos")
+            folder_value = st.text_input("Pasta de vídeos", value=st.session_state.get("python_editor_folder", default_folder), key="python_editor_folder")
+            folder_paths = list_video_files(folder_value)
+            if not folder_paths:
+                st.info("Não foram encontrados vídeos nessa pasta. Pode indicar a pasta de vídeos gerados ou qualquer outra pasta local.")
+            else:
+                labels = [f"{path.name} — {path}" for path in folder_paths]
+                selected_index = st.selectbox("Vídeo da pasta", range(len(folder_paths)), format_func=lambda index: labels[index], key="python_editor_folder_index")
+                source_path = folder_paths[selected_index]
+        else:
+            uploaded_video = st.file_uploader("Subir vídeo para editar", type=sorted(extension.lstrip(".") for extension in VIDEO_EXTENSIONS), key="python_editor_video_upload")
+            if uploaded_video is not None:
+                try:
+                    source_path = store_uploaded_asset(uploaded_video.name, uploaded_video.getvalue())
+                except PythonEditorError as exc:
+                    st.error(str(exc))
+
+        if source_path and source_path.is_file():
+            st.session_state["python_editor_source_path"] = str(source_path)
+            st.caption(f"Fonte seleccionada: `{source_path}` · {source_path.stat().st_size / (1024 * 1024):.2f} MB")
+            st.video(str(source_path))
+            st.divider()
+            st.subheader("Operação PYEdit")
+            operation_options = ["Cortar trecho", "Remover áudio", "Extrair áudio", "Substituir áudio", "Alterar velocidade", "Redimensionar vídeo"]
+            operation = st.selectbox("Operação", operation_options, key="python_editor_operation")
+            with st.form("python_editor_video_form", clear_on_submit=False):
+                start_seconds = end_seconds = speed = None
+                width = height = None
+                replacement_audio = None
+                if operation == "Cortar trecho":
+                    op_cols = st.columns(2)
+                    with op_cols[0]:
+                        start_seconds = st.number_input("Início (segundos)", min_value=0.0, value=0.0, step=0.5, key="python_editor_trim_start")
+                    with op_cols[1]:
+                        end_seconds = st.number_input("Fim (segundos)", min_value=0.5, value=10.0, step=0.5, key="python_editor_trim_end")
+                elif operation == "Substituir áudio":
+                    replacement_audio = st.file_uploader("Novo áudio", type=sorted(extension.lstrip(".") for extension in AUDIO_EXTENSIONS), key="python_editor_audio_upload")
+                    st.caption("O áudio substitui a faixa original e a duração final fica limitada ao menor fluxo.")
+                elif operation == "Alterar velocidade":
+                    speed = st.number_input("Velocidade", min_value=0.25, max_value=4.0, value=1.0, step=0.25, key="python_editor_speed")
+                elif operation == "Redimensionar vídeo":
+                    resize_cols = st.columns(2)
+                    with resize_cols[0]:
+                        width = st.number_input("Largura", min_value=16, max_value=7680, value=1280, step=2, key="python_editor_width")
+                    with resize_cols[1]:
+                        height = st.number_input("Altura", min_value=16, max_value=7680, value=720, step=2, key="python_editor_height")
+                apply_operation = st.form_submit_button(f"Aplicar: {operation}", type="primary", use_container_width=True)
+            if apply_operation:
+                try:
+                    ffmpeg_path = read_json("settings.json", {}).get("ffmpeg_path", "")
+                    if operation == "Cortar trecho":
+                        output, run_info = trim_video(source_path, float(start_seconds), float(end_seconds), ffmpeg_path=ffmpeg_path)
+                    elif operation == "Remover áudio":
+                        output, run_info = remove_audio(source_path, ffmpeg_path=ffmpeg_path)
+                    elif operation == "Extrair áudio":
+                        output, run_info = extract_audio(source_path, ffmpeg_path=ffmpeg_path)
+                    elif operation == "Substituir áudio":
+                        if replacement_audio is None:
+                            raise PythonEditorError("Seleccione o novo áudio antes de aplicar a operação.")
+                        audio_path = store_uploaded_asset(replacement_audio.name, replacement_audio.getvalue(), audio=True)
+                        output, run_info = replace_audio(source_path, audio_path, ffmpeg_path=ffmpeg_path)
+                    elif operation == "Alterar velocidade":
+                        output, run_info = change_speed(source_path, float(speed), ffmpeg_path=ffmpeg_path)
+                    else:
+                        output, run_info = resize_video(source_path, int(width), int(height), ffmpeg_path=ffmpeg_path)
+                    record = save_python_editor_record(source_path, output, run_info)
+                    st.session_state["python_editor_last_record"] = record
+                    st.success(f"Operação concluída: {output.name}")
+                    if output.suffix.lower() in AUDIO_EXTENSIONS:
+                        st.audio(output.read_bytes(), format="audio/mpeg")
+                    else:
+                        st.video(str(output))
+                    st.download_button("Descarregar resultado", data=output.read_bytes(), file_name=output.name, mime="video/mp4" if output.suffix.lower() in VIDEO_EXTENSIONS else "audio/mpeg", key=f"python_editor_download_{record['id']}")
+                    st.download_button("Descarregar manifesto JSON", data=editor_manifest(record), file_name=f"{output.stem}.json", mime="application/json", key=f"python_editor_manifest_{record['id']}")
+                except (PythonEditorError, OSError, ValueError) as exc:
+                    st.error(str(exc))
+        else:
+            st.caption("Seleccione uma fonte de vídeo para activar as operações inspiradas no PYEdit.")
+
+        records = list_python_editor_records()
+        if records:
+            with st.expander("Histórico do Editor Python"):
+                st.dataframe([{key: record.get(key, "") for key in ("created_at", "operation", "source_name", "output_name")} for record in records[:20]], use_container_width=True, hide_index=True)
+
+    with code_tab:
+        st.subheader("Scripts Python locais")
+        st.warning("Por segurança, o Editor Python guarda e edita scripts, mas não oferece execução de código dentro da UI.")
+        scripts = list_scripts()
+        script_options = ["Novo script"] + [str(path.name) for path in scripts]
+        selected_script = st.selectbox("Script", script_options, key="python_editor_script_name")
+        if selected_script != "Novo script":
+            selected_path = next((path for path in scripts if path.name == selected_script), None)
+            if selected_path and st.button("Carregar script", key="python_editor_load_script"):
+                st.session_state["python_editor_code"] = read_script(selected_path)
+                st.rerun()
+        with st.form("python_editor_code_form", clear_on_submit=False):
+            script_name = st.text_input("Nome do script", value="script.py" if selected_script == "Novo script" else selected_script, key="python_editor_code_name")
+            script_content = st.text_area("Código Python", value=st.session_state.get("python_editor_code", ""), height=420, key="python_editor_code_text")
+            save_code = st.form_submit_button("Guardar script localmente", type="primary")
+        if save_code:
+            try:
+                path = save_script(script_name, script_content)
+                st.session_state["python_editor_code"] = script_content
+                st.success(f"Script guardado em `{path}`.")
+            except PythonEditorError as exc:
+                st.error(str(exc))
+
+
 def render_videos():
     st.subheader("Vídeos e backlog")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
@@ -1735,7 +1864,7 @@ def main():
         "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": lambda: render_edit_placeholder("Cortes", "Área reservada para a futura funcionalidade de cortes de vídeo."),
-        "Editor Python": lambda: render_edit_placeholder("Editor Python", "Área reservada para o futuro editor Python."),
+        "Editor Python": render_python_editor,
         "Models AI": lambda: render_edit_placeholder("Models AI", "Seleccione uma das abas Models AI no menu expansível."),
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),

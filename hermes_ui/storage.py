@@ -23,6 +23,7 @@ DEFAULTS: dict[str, Any] = {
     "uploads.json": [],
     "niche_apify_runs.json": [],
     "metadata_edits.json": [],
+    "python_editor_edits.json": [],
     "mcp_server.json": {
         "enabled": False,
         "host": "127.0.0.1",
@@ -227,7 +228,7 @@ def seed_blueprints() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", NICHES_DATA]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     for filename, default in DEFAULTS.items():

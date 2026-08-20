@@ -184,7 +184,7 @@ def test_edition_navigation_has_cleaner_cuts_and_python_editor():
     assert source.index('("Limpador de Metadados", ":material/edit_note:') < source.index('("Cortes", ":material/content_cut:') < source.index('("Editor Python", ":material/code:')
     assert '"Edição": lambda: render_edit_placeholder("Edição"' in source
     assert '"Cortes": lambda: render_edit_placeholder("Cortes"' in source
-    assert '"Editor Python": lambda: render_edit_placeholder("Editor Python"' in source
+    assert '"Editor Python": render_python_editor' in source
 
 
 def test_models_ai_navigation_has_characters_and_social_pages():

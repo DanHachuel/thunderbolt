@@ -22,6 +22,7 @@ Estado auditado para o release 0.2.36.
 | Agendamento real em segundo plano | Fora do escopo actual de UI | O worker de Automação é local e baseado no relógio; não é usado pelo Niche Finder Apify. |
 | Niche Finder Kaggle e Niche Finder Apify | Concluído como alternativas independentes | Kaggle usa `app/modules/niche_finder/core.py` e `data_loader.py`; Apify usa `app/modules/niche_finder/apify.py`, `summarizer.py`, estado `niche_apify_runs.json` e credencial própria. |
 | Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |
+| Editor Python baseado no PYEdit | Concluído como editor local seguro | Vídeos gerados pelos artefactos, selecção de pasta, upload manual, corte, áudio, velocidade, redimensionamento, histórico próprio e edição/guarda de scripts sem execução de código. |
 
 ## Regra de release
 

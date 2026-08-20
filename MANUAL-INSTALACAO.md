@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.39
+> **Versão deste manual:** 0.2.40
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.39 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.40 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.39 install
+npx --yes @danhachuel/thunderbolt@0.2.40 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -396,7 +396,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.39 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.40 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -408,7 +408,13 @@ O menu **Models AI** foi adicionado abaixo de **Edição**. As abas **Personagen
 
 ## Edição: Limpador de Metadados, Cortes e Editor Python
 
-A aba **Limpador de Metadados** continua funcional e foi movida para **Edição**. As abas **Cortes** e **Editor Python** estão visíveis na mesma ordem e mostram apenas uma mensagem de reserva para desenvolvimento futuro; não executam operações.
+A aba **Limpador de Metadados** continua funcional e foi movida para **Edição**. A aba **Cortes** permanece reservada e não executa operações. A aba **Editor Python** é funcional e permite escolher vídeos gerados, indicar uma pasta local ou fazer upload manual; as operações são manuais e criam cópias sem alterar os originais.
+
+## Editor Python baseado no PYEdit
+
+O **Editor Python** adapta o recorte do [PYEdit](https://github.com/Congren/PYEdit) ao Thunderbolt. Na subaba **Vídeos**, pode seleccionar um vídeo já gerado e registado nos artefactos da pipeline, indicar uma pasta local de vídeos ou fazer upload manual. As operações disponíveis são cortar trecho, remover áudio, extrair áudio, substituir áudio, alterar velocidade e redimensionar vídeo.
+
+Cada operação usa FFmpeg local, preserva o original, cria a saída em `storage/python_editor/outputs/`, guarda o histórico em `storage/state/python_editor_edits.json` e permite descarregar o resultado e um manifesto JSON. Na subaba **Código Python**, pode criar e guardar scripts em `storage/python_editor/scripts/` ou carregar scripts existentes. Por segurança, a UI não executa código Python e não executa scripts automaticamente.
 
 ## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
 
