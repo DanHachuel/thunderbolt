@@ -26,7 +26,7 @@ A primeira versão implementa a camada UI independente com:
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.30
+## Navegação da UI 0.2.31
 
 A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -109,9 +109,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.30 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.30 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.30
+npx.cmd --yes @danhachuel/thunderbolt@0.2.31 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.31 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.31
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -135,7 +135,7 @@ A página **Niche Finder** integra a lógica do projecto open source [johanfortu
 
 A interface apresenta directamente os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A análise inicial é executada automaticamente e **Analisar Nichos** permite recalcular os resultados depois de alterar os filtros. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-As dependências adicionais são instaladas pelo fluxo normal do pacote: `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.30 install`; o instalador detecta e reutiliza componentes já válidos.
+As dependências adicionais são instaladas pelo fluxo normal do pacote: `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.31 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Armazenamento local
 

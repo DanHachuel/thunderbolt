@@ -72,3 +72,68 @@ def test_run_niche_analysis_returns_dataframes_and_filters(niche_csv):
     assert len(result["raw_data"]) == 9
     assert 1 <= len(result["clusters"]) <= 3
     assert result["summary"]["rows_filtered"] == 9
+
+
+def _write_minimal_cached_dataset(path):
+    pd.DataFrame(
+        [
+            {
+                "title": "Cached video",
+                "publish_date": "2025-01-01",
+                "country": "US",
+                "view_count": 100,
+                "like_count": 10,
+                "comment_count": 1,
+                "video_tags": "cache|test",
+            }
+        ]
+    ).to_csv(path, index=False)
+
+
+def test_automatic_loader_reuses_valid_existing_cache(tmp_path, monkeypatch):
+    from app.modules.niche_finder import data_loader
+
+    data_dir = tmp_path / "storage" / "data" / "niches"
+    data_dir.mkdir(parents=True)
+    cached_path = data_dir / data_loader.DEFAULT_DATASET_FILENAME
+    _write_minimal_cached_dataset(cached_path)
+    monkeypatch.setattr(data_loader, "DATA_DIR", data_dir)
+    monkeypatch.setattr(data_loader, "DEFAULT_DATASET_PATH", cached_path)
+
+    class UnexpectedKaggleHub:
+        def dataset_download(self, *args, **kwargs):
+            raise AssertionError("KaggleHub não deveria ser chamado para uma cache válida")
+
+    monkeypatch.setattr(data_loader, "kagglehub", UnexpectedKaggleHub())
+    assert data_loader.download_kaggle_dataset() == cached_path
+
+
+def test_automatic_loader_downloads_into_empty_temporary_directory(tmp_path, monkeypatch):
+    from app.modules.niche_finder import data_loader
+
+    data_dir = tmp_path / "storage" / "data" / "niches"
+    data_dir.mkdir(parents=True)
+    cached_path = data_dir / data_loader.DEFAULT_DATASET_FILENAME
+    monkeypatch.setattr(data_loader, "DATA_DIR", data_dir)
+    monkeypatch.setattr(data_loader, "DEFAULT_DATASET_PATH", cached_path)
+    calls = []
+
+    class FakeKaggleHub:
+        def dataset_download(self, slug, *, output_dir, force_download):
+            output = Path(output_dir)
+            calls.append((slug, output, force_download))
+            assert output.exists()
+            assert list(output.iterdir()) == []
+            assert force_download is True
+            source = output / data_loader.DEFAULT_DATASET_FILENAME
+            _write_minimal_cached_dataset(source)
+            return str(output)
+
+    from pathlib import Path
+
+    monkeypatch.setattr(data_loader, "kagglehub", FakeKaggleHub())
+    result = data_loader.download_kaggle_dataset()
+    assert result == cached_path
+    assert cached_path.exists()
+    assert calls[0][0] == data_loader.DEFAULT_DATASET_SLUG
+    assert not list(data_dir.parent.glob(".niche-kaggle-*"))

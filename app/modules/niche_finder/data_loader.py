@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -61,26 +62,50 @@ def _copy_csv(source: Path, destination: Path) -> Path:
     return destination
 
 
+def _has_usable_cached_dataset() -> bool:
+    """Check only the header so a valid multi-gigabyte cache is not read twice."""
+    if not DEFAULT_DATASET_PATH.exists() or DEFAULT_DATASET_PATH.stat().st_size <= 0:
+        return False
+    try:
+        columns = set(pd.read_csv(DEFAULT_DATASET_PATH, nrows=0).columns)
+    except (OSError, UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        return False
+    return set(REQUIRED_COLUMNS).issubset(columns)
+
+
 def _download_with_kagglehub() -> Path | None:
     if kagglehub is None:
         return None
-    data_dir = ensure_data_dir()
-    try:
-        downloaded = kagglehub.dataset_download(DEFAULT_DATASET_SLUG, output_dir=str(data_dir))
-    except TypeError:
-        downloaded = kagglehub.dataset_download(DEFAULT_DATASET_SLUG)
-    except Exception as exc:  # pragma: no cover - depends on network/provider state
-        raise DatasetError(f"O Thunderbolt não conseguiu preparar os dados automáticos: {exc}") from exc
-    source = _find_csv(Path(downloaded))
-    if source is None:
-        raise DatasetError("A preparação automática terminou sem encontrar dados compatíveis.")
-    return _copy_csv(source, DEFAULT_DATASET_PATH)
+    ensure_data_dir()
+    # KaggleHub rejects a non-empty output_dir on Windows. Use a new temporary
+    # directory for every download, then copy only the validated CSV into the
+    # persistent Thunderbolt cache. This also isolates partial downloads.
+    with tempfile.TemporaryDirectory(prefix=".niche-kaggle-", dir=str(DATA_DIR.parent)) as temporary_root:
+        temporary_path = Path(temporary_root)
+        try:
+            try:
+                downloaded = kagglehub.dataset_download(
+                    DEFAULT_DATASET_SLUG,
+                    output_dir=str(temporary_path),
+                    force_download=True,
+                )
+            except TypeError:  # compatibility with older KaggleHub releases
+                downloaded = kagglehub.dataset_download(
+                    DEFAULT_DATASET_SLUG,
+                    output_dir=str(temporary_path),
+                )
+        except Exception as exc:  # pragma: no cover - depends on network/provider state
+            raise DatasetError(f"O Thunderbolt não conseguiu preparar os dados automáticos: {exc}") from exc
+        source = _find_csv(Path(downloaded))
+        if source is None:
+            raise DatasetError("A preparação automática terminou sem encontrar dados compatíveis.")
+        return _copy_csv(source, DEFAULT_DATASET_PATH)
 
 
 def download_kaggle_dataset() -> Path:
     """Prepare and cache the public Niche-Finder dataset without user interaction."""
     ensure_data_dir()
-    if DEFAULT_DATASET_PATH.exists() and DEFAULT_DATASET_PATH.stat().st_size > 0:
+    if _has_usable_cached_dataset():
         return DEFAULT_DATASET_PATH
     if kagglehub is None:
         raise DatasetError("O componente automático de dados não está disponível nesta instalação.")
