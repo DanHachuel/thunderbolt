@@ -21,7 +21,7 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
-from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset, load_dataframe
+from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
@@ -631,78 +631,55 @@ def render_music_creation():
 
 
 @st.cache_data(show_spinner=False)
-def _cached_niche_dataset(path_str: str, modified_ns: int):
-    return load_dataframe(path_str)
-
-
-@st.cache_data(show_spinner=False)
 def _cached_niche_download():
+    """Download or reuse the dataset only after the user submits the form."""
     return str(download_kaggle_dataset())
-
-
-def _load_automatic_niche_dataset():
-    dataset_path = _cached_niche_download()
-    path = Path(dataset_path)
-    return dataset_path, _cached_niche_dataset(dataset_path, path.stat().st_mtime_ns)
-
-
-def _niche_tag_options(frame) -> list[str]:
-    tags: set[str] = set()
-    for value in frame.get("video_tags", []):
-        text = str(value or "").replace('"', "").replace("'", "")
-        for tag in re.split(r"[|,]", text.strip("[]")):
-            tag = re.sub(r"\s+", " ", tag).strip().lower()
-            if tag and tag not in {"nan", "none", "null"}:
-                tags.add(tag)
-    return sorted(tags)
-
-
-def _niche_date_bounds(frame):
-    dates = frame["publish_date"].dropna().astype(str)
-    if dates.empty:
-        return None, None
-    return dates.min(), dates.max()
 
 
 def render_niche_finder():
     st.title("Niche Finder")
-    st.caption("Busca automática de padrões, nichos e tags para orientar canais faceless.")
-    st.info("O Thunderbolt prepara e analisa automaticamente os dados necessários. Não é necessária configuração manual.")
+    st.caption("Busca de padrões, nichos e tags para orientar canais faceless.")
+    st.info("A instalação das dependências é automática. A operação não é: defina os parâmetros abaixo e clique em **Analisar Nichos** para iniciar.")
 
-    try:
-        with st.spinner("A preparar automaticamente o Niche Finder…"):
-            dataset_path, frame = _load_automatic_niche_dataset()
-    except (DatasetError, OSError) as exc:
-        st.error("Não foi possível preparar automaticamente o Niche Finder neste momento. Verifique a ligação à Internet e tente novamente.")
-        with st.expander("Detalhes técnicos"):
-            st.caption(str(exc))
-        return
-
-    signature = f"{dataset_path}:{Path(dataset_path).stat().st_mtime_ns}"
-    if st.session_state.get("niche_results_signature") != signature:
-        st.session_state.pop("niche_results", None)
-        st.session_state["niche_results_signature"] = signature
-
-    min_date, max_date = _niche_date_bounds(frame)
-    countries = ["Todos"] + sorted(str(value) for value in frame["country"].dropna().unique())
-    tag_options = _niche_tag_options(frame)
-    with st.sidebar:
+    default_start = date(2023, 9, 20)
+    default_end = date.today()
+    country_options = [
+        "Todos", "US", "BR", "GB", "CA", "AU", "DE", "FR", "ES", "IT", "JP", "KR", "IN", "MX", "AR", "PT",
+    ]
+    with st.container(border=True):
         st.subheader("Parâmetros da busca")
-        n_clusters = st.slider("Número de Clusters", 2, 10, 5, key="niche_n_clusters")
-        min_support = st.slider("Suporte Mínimo", 0.01, 0.5, 0.05, 0.01, format="%.2f", key="niche_min_support")
-        country = st.selectbox("País", countries, key="niche_country")
-        engagement = st.selectbox("Engagement", ["Todos", "High", "Moderate", "Low"], key="niche_engagement")
-        start_date = st.date_input("Data inicial", value=date.fromisoformat(min_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_start_date") if min_date else None
-        end_date = st.date_input("Data final", value=date.fromisoformat(max_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_end_date") if max_date else None
-        selected_tags = st.multiselect("Tags opcionais", tag_options, key="niche_tags")
-        analyse = st.button("Analisar Nichos", type="primary", use_container_width=True, key="niche_analyse")
+        st.caption("Estes controlos pertencem a esta aba. Nenhum dataset é descarregado e nenhuma análise é executada enquanto não clicar no botão.")
+        with st.form("niche_finder_parameters", clear_on_submit=False):
+            parameter_cols = st.columns(3)
+            with parameter_cols[0]:
+                n_clusters = st.slider("Número de Clusters", 2, 10, 5, key="niche_n_clusters")
+                min_support = st.slider("Suporte Mínimo", 0.01, 0.5, 0.05, 0.01, format="%.2f", key="niche_min_support")
+            with parameter_cols[1]:
+                country = st.selectbox("País", country_options, key="niche_country")
+                engagement = st.selectbox("Engagement", ["Todos", "High", "Moderate", "Low"], key="niche_engagement")
+            with parameter_cols[2]:
+                start_date = st.date_input("Data inicial", value=default_start, min_value=date(2020, 1, 1), max_value=default_end, key="niche_start_date")
+                end_date = st.date_input("Data final", value=default_end, min_value=date(2020, 1, 1), max_value=default_end, key="niche_end_date")
+            tags_text = st.text_input("Tags opcionais", key="niche_tags_text", placeholder="Ex.: history, facts, documentary")
+            analyse = st.form_submit_button("Analisar Nichos", type="primary", use_container_width=True)
 
+    current_parameters = {
+        "n_clusters": n_clusters,
+        "min_support": min_support,
+        "country": country,
+        "engagement": engagement,
+        "start_date": start_date.isoformat() if start_date else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "tags": [tag.strip() for tag in re.split(r"[,|]", tags_text) if tag.strip()],
+    }
     results = st.session_state.get("niche_results")
-    if results is None or analyse:
+    if analyse:
         try:
             if start_date and end_date and start_date > end_date:
                 raise NicheAnalysisError("A data inicial não pode ser posterior à data final.")
-            with st.spinner("A analisar nichos automaticamente…"):
+            with st.spinner("A preparar os dados apenas porque solicitou a análise…"):
+                dataset_path = _cached_niche_download()
+            with st.spinner("A executar a análise dos nichos…"):
                 results = run_niche_analysis(
                     str(dataset_path),
                     n_clusters=n_clusters,
@@ -711,14 +688,22 @@ def render_niche_finder():
                     end_date=end_date.isoformat() if end_date else None,
                     country=country,
                     engagement=engagement,
-                    tags=selected_tags,
+                    tags=current_parameters["tags"],
                 )
             st.session_state["niche_results"] = results
+            st.session_state["niche_last_parameters"] = current_parameters
+            st.success("Análise concluída.")
         except (NicheAnalysisError, DatasetError, OSError) as exc:
-            st.error("Não foi possível concluir a análise automática com os filtros actuais.")
+            st.error("Não foi possível concluir a análise solicitada com os parâmetros actuais.")
             with st.expander("Detalhes técnicos"):
                 st.caption(str(exc))
             return
+
+    if results is None:
+        st.caption("Ainda não existe uma análise nesta sessão. Ajuste os parâmetros e clique em **Analisar Nichos**.")
+        return
+    if st.session_state.get("niche_last_parameters") != current_parameters:
+        st.warning("Os resultados apresentados pertencem à última análise executada. Clique em **Analisar Nichos** para aplicar os parâmetros actuais.")
 
     summary = results.get("summary", {})
     metric_cols = st.columns(4)

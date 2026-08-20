@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -8,6 +11,22 @@ from app.modules.niche_finder.data_loader import DatasetError, load_dataframe
 
 
 pytestmark = pytest.mark.filterwarnings("ignore::FutureWarning")
+
+
+def test_niche_finder_requires_explicit_analysis_submit():
+    source_path = Path(__file__).parents[1] / "app" / "main.py"
+    module = ast.parse(source_path.read_text(encoding="utf-8"))
+    function = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "render_niche_finder")
+    function_source = ast.get_source_segment(source_path.read_text(encoding="utf-8"), function)
+
+    assert function_source is not None
+    assert "with st.sidebar" not in function_source
+    assert 'st.form_submit_button("Analisar Nichos"' in function_source
+    assert "if analyse:" in function_source
+    assert "_cached_niche_download()" in function_source
+    assert "run_niche_analysis(" in function_source
+    assert "Nenhum dataset é descarregado e nenhuma análise é executada enquanto não clicar" in function_source
+
 
 
 @pytest.fixture

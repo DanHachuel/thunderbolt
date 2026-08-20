@@ -103,7 +103,7 @@ def _download_with_kagglehub() -> Path | None:
 
 
 def download_kaggle_dataset() -> Path:
-    """Prepare and cache the public Niche-Finder dataset without user interaction."""
+    """Prepare and cache the public Niche-Finder dataset after an explicit user action."""
     ensure_data_dir()
     if _has_usable_cached_dataset():
         return DEFAULT_DATASET_PATH
