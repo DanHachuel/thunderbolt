@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from hermes_ui import music, storage
-from hermes_ui.voice_preview import synthesize_preview
+from hermes_ui.voice_preview import load_preview_file, synthesize_preview
 
 
 def _use_temp_storage(monkeypatch, tmp_path):
@@ -32,6 +32,24 @@ def test_voice_preview_rejects_empty_text(tmp_path, monkeypatch):
     _use_temp_storage(monkeypatch, tmp_path)
     with pytest.raises(ValueError, match="texto"):
         synthesize_preview("", "edge", "en-US-AriaNeural-Female", {})
+
+
+def test_voice_preview_loader_rejects_empty_directory_and_zero_byte_file(tmp_path):
+    assert load_preview_file("") is None
+    assert load_preview_file(tmp_path) is None
+    empty_file = tmp_path / "empty.mp3"
+    empty_file.write_bytes(b"")
+    assert load_preview_file(empty_file) is None
+
+
+def test_voice_preview_loader_reads_non_empty_audio_file(tmp_path):
+    audio_file = tmp_path / "preview.mp3"
+    audio_file.write_bytes(b"fake-mp3")
+    loaded = load_preview_file(str(audio_file))
+    assert loaded is not None
+    path, data = loaded
+    assert path == audio_file
+    assert data == b"fake-mp3"
 
 
 def test_voice_preview_rejects_unknown_provider(tmp_path, monkeypatch):

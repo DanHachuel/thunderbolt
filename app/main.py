@@ -22,7 +22,7 @@ from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, read_packaged_skill, update_integration
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
-from hermes_ui.voice_preview import DEFAULT_SAMPLE, synthesize_preview
+from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.local_runtime import MoneyPrinterRuntime
@@ -1057,16 +1057,22 @@ def render_settings():
         preview_rate = st.selectbox("Velocidade", ["-20%", "-10%", "+0%", "+10%", "+20%"], index=2, key="voice_preview_rate")
     preview_text = st.text_area("Texto de teste", value=DEFAULT_SAMPLE, max_chars=1000, height=110, key="voice_preview_text")
     if st.button("Testar voz", type="primary", key="voice_preview_generate"):
+        st.session_state.pop("voice_preview_path", None)
         try:
             preview_path = synthesize_preview(preview_text, preview_provider, preview_voice, settings, preview_rate)
             st.session_state["voice_preview_path"] = str(preview_path)
             st.success("Amostra de voz gerada. Este ficheiro é apenas um preview.")
         except Exception as exc:
             st.error(f"Não foi possível gerar o preview: {exc}")
-    preview_path = Path(st.session_state.get("voice_preview_path", ""))
-    if preview_path.exists():
-        st.audio(preview_path.read_bytes(), format="audio/mpeg")
-        st.download_button("Descarregar amostra", data=preview_path.read_bytes(), file_name=preview_path.name, mime="audio/mpeg", key="voice_preview_download")
+    preview_value = str(st.session_state.get("voice_preview_path", "") or "").strip()
+    loaded_preview = load_preview_file(preview_value)
+    if loaded_preview:
+        preview_path, preview_data = loaded_preview
+        st.audio(preview_data, format="audio/mpeg")
+        st.download_button("Descarregar amostra", data=preview_data, file_name=preview_path.name, mime="audio/mpeg", key="voice_preview_download")
+    elif preview_value:
+        st.session_state.pop("voice_preview_path", None)
+        st.warning("A amostra de voz anterior não é um ficheiro de áudio legível e foi removida do estado local. Teste a voz novamente.")
 
 
 def render_mcp():

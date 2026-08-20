@@ -104,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.25 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.25 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.25
+npx.cmd --yes @danhachuel/thunderbolt@0.2.26 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.26 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.26
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -189,7 +189,7 @@ O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áu
 
 ## Teste de vozes
 
-A área **Configurações > Teste de vozes** é isolada da pipeline. Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas.
+A área **Configurações > Teste de vozes** é isolada da pipeline. Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas. Se uma instalação antiga não tiver `edge-tts`, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o instalador detecta a dependência em falta sem reinstalar componentes válidos.
 
 ## MCP e integrações externas opcionais
 

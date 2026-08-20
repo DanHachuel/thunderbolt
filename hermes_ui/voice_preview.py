@@ -26,7 +26,10 @@ def _edge_voice_name(value: str) -> str:
 
 
 async def _save_edge_async(text: str, voice: str, output: Path, rate: str) -> None:
-    import edge_tts
+    try:
+        import edge_tts
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("A dependência edge-tts não está instalada. Execute `npx.cmd --yes @danhachuel/thunderbolt install` para completar a instalação.") from exc
 
     kwargs: dict[str, Any] = {"rate": rate}
     if "boundary" in inspect.signature(edge_tts.Communicate).parameters:
@@ -95,6 +98,23 @@ def _save_openai_compatible(text: str, voice: str, output: Path, settings: dict[
             raise RuntimeError("O provider devolveu JSON sem áudio reconhecível.")
     else:
         output.write_bytes(response.content)
+
+
+def load_preview_file(path_value: str | Path) -> tuple[Path, bytes] | None:
+    """Return a readable non-empty preview file, never a directory or empty path."""
+    raw_path = str(path_value or "").strip()
+    if not raw_path:
+        return None
+    candidate = Path(raw_path)
+    try:
+        if not candidate.is_file():
+            return None
+        data = candidate.read_bytes()
+    except (OSError, PermissionError):
+        return None
+    if not data:
+        return None
+    return candidate, data
 
 
 def synthesize_preview(text: str, provider: str, voice: str, settings: dict[str, Any], rate: str = "+0%") -> Path:
