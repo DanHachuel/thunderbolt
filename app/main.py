@@ -1654,6 +1654,10 @@ def main():
         ("Cortes", ":material/content_cut:", "Cortes"),
         ("Editor Python", ":material/code:", "Editor Python"),
     ]
+    models_ai_items = [
+        ("Personagens", ":material/person:", "Personagens"),
+        ("Redes Sociais", ":material/share:", "Redes Sociais"),
+    ]
     settings_items = [
         ("Canais", ":material/ondemand_video:", "Canais"),
         ("Blueprints", ":material/library_books:", "Blueprints"),
@@ -1669,6 +1673,7 @@ def main():
         ("Pipeline", ":material/account_tree:", "Pipeline"),
         ("Automação", ":material/schedule:", "Automação"),
         ("Edição", ":material/edit:", "Edição"),
+        ("Models AI", ":material/smart_toy:", "Models AI"),
         ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
@@ -1681,7 +1686,7 @@ def main():
         "Configurações Técnicas": "Configurações Técnicas",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + edition_items + niche_finder_items + settings_items}:
+    if current_page not in {item[0] for item in top_pages + pipeline_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
 
@@ -1705,6 +1710,10 @@ def main():
                 with st.expander("Edição", expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
                     for child_target, child_icon, child_label in edition_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Models AI":
+                with st.expander("Models AI", expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
+                    for child_target, child_icon, child_label in models_ai_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Niche Finder":
                 with st.expander("Niche Finder", expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
                     for child_target, child_icon, child_label in niche_finder_items:
@@ -1727,6 +1736,9 @@ def main():
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": lambda: render_edit_placeholder("Cortes", "Área reservada para a futura funcionalidade de cortes de vídeo."),
         "Editor Python": lambda: render_edit_placeholder("Editor Python", "Área reservada para o futuro editor Python."),
+        "Models AI": lambda: render_edit_placeholder("Models AI", "Seleccione uma das abas Models AI no menu expansível."),
+        "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
+        "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Upload": render_upload,
         "Canais": render_channels,
         "Blueprints": render_blueprints,
