@@ -10,20 +10,24 @@ A primeira versão implementa a camada UI independente com:
 
 | Área | Incluído |
 |---|---|
-| Dashboard | Resumo de canais, tarefas, backlog, execução e falhas |
-| Pipeline | Filas por etapa |
+| Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
+| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas, Upload e Limpador de Metadados |
 | Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
-| Novo vídeo | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical |
+| Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Limpador de metadado | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
-| Configurações | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, Data API Key opcional, Upload directo, TikTok Client ID/Secret e Upload-Post |
+| Limpador de Metadados | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
+| Configurações Técnicas | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, Data API Key opcional, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
+
+## Navegação da UI 0.2.28
+
+A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas. Niche Finder permanece como placeholder vazio nesta versão.
 
 ## Instalação
 
@@ -104,9 +108,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.27 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.27 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.27
+npx.cmd --yes @danhachuel/thunderbolt@0.2.28 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.28 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.28
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -159,9 +163,9 @@ A mesma aba possui a subaba **Brandings**. No formulário **Criar blueprint a pa
 
 O fluxo foi modelado a partir do blueprint de clonagem com Branding anexado, incluindo a distinção entre entrada de canal/vídeo, normalização do link, metadados de nicho/idioma, perfil do canal, estratégia de conteúdo, pesquisa, identidade visual e brand pack. Placeholders de serviços externos são tratados como configuração local; chaves presentes em workflows importados não devem ser commitadas.
 
-## Limpador de metadado
+## Limpador de Metadados
 
-A aba **Limpador de metadado** foi adaptada do workflow `YTBMetadataGenerator.json`. Ela recebe apenas um vídeo externo já pronto, guarda uma cópia original separada, remove os metadados do contentor com FFmpeg e grava uma nova cópia com título, descrição, links, timestamps, tags e outros campos opcionais. O original nunca é alterado e os vídeos produzidos pela aba **Novo vídeo** não aparecem nesta área.
+A aba **Limpador de Metadados** foi adaptada do workflow `YTBMetadataGenerator.json`. Ela recebe apenas um vídeo externo já pronto, guarda uma cópia original separada, remove os metadados do contentor com FFmpeg e grava uma nova cópia com título, descrição, links, timestamps, tags e outros campos opcionais. O original nunca é alterado e os vídeos produzidos pelas páginas **Criação de Vídeos** e **Criação de Músicas** não aparecem nesta área.
 
 A descrição segue a composição do workflow de referência: preview, secção de links e capítulos/timestamps. O resultado inclui um manifesto JSON para utilizar os metadados num fluxo posterior de upload. A versão local não usa o trigger RSS, o Apify ou a actualização automática de um vídeo YouTube; em vez disso, o utilizador fornece directamente o vídeo terceiro e controla a edição antes de publicar.
 
@@ -181,15 +185,16 @@ Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separad
 
 A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Ela usa cookies, `sessionInfo`, `INNERTUBE_API_KEY` e `DELEGATED_SESSION_ID` fornecidos manualmente pelo utilizador, cria o vídeo através do endpoint interno e envia o ficheiro em chunks de 256 KiB. Este caminho é experimental, não extrai cookies automaticamente e fica separado do agente YouTube principal.
 
-## Novo vídeo, Automação e música
+## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
 
-Em **Novo vídeo**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
+Em **Criação de Vídeos**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. **Criação de Músicas** reutiliza o mesmo conteúdo e formulário com título próprio. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
 
 O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
 
 ## Teste de vozes
 
-A área **Configurações > Teste de vozes** é isolada da pipeline. Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas. Se uma instalação antiga não tiver `edge-tts`, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o instalador detecta a dependência em falta sem reinstalar componentes válidos.
+A área **Configurações > Configurações Técnicas > Teste de vozes** é isolada da pipeline.
+ Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas. Se uma instalação antiga não tiver `edge-tts`, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o instalador detecta a dependência em falta sem reinstalar componentes válidos.
 
 ## MCP e integrações externas opcionais
 
@@ -204,9 +209,10 @@ As portas iniciais são `3123` para Short Video Maker, `3001` para a API backend
 
 ## TikTok
 
-A subaba **Vídeos**, dentro de **Novo vídeo**, mostra o backlog e permite iniciar/parar tarefas; deixou de existir como botão principal na barra lateral.
+A subaba **Vídeos**, dentro de **Criação de Vídeos** ou **Criação de Músicas**, mostra o backlog e permite iniciar/parar tarefas; deixou de existir como botão principal na barra lateral.
 
-A aba **Configurações** contém apenas o TikTok Client ID e o TikTok Client Secret para TikTok. Para YouTube, o bloco principal pede o OAuth Client ID e Client Secret; a Data API Key, se usada, fica numa área opcional separada. Client ID + Client Secret não formam uma Data API Key nem um token OAuth.
+A página **Configurações Técnicas** contém apenas o TikTok Client ID e o TikTok Client Secret para TikTok.
+ Para YouTube, o bloco principal pede o OAuth Client ID e Client Secret; a Data API Key, se usada, fica numa área opcional separada. Client ID + Client Secret não formam uma Data API Key nem um token OAuth.
  Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
 
 ## Segurança

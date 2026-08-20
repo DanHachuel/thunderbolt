@@ -125,6 +125,13 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:#343434; color:#ffffff; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span { color:#ffffff; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:#e7edf2; }
+[data-testid="stSidebar"] [data-testid="stExpander"] { border:0 !important; background:transparent !important; margin:0.02rem 0 !important; }
+[data-testid="stSidebar"] [data-testid="stExpander"] details { border:0 !important; background:transparent !important; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary { min-height:1.72rem; padding:0.10rem 0.52rem !important; border-radius:7px; color:#e7edf2; font-size:0.86rem; font-weight:650; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background:#1c252e; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
+[data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
+[data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
 .content-card { padding: 1rem 1.1rem; border:1px solid #20384d; border-radius:14px; background:rgba(18,27,38,.92); min-height:110px; }
 .content-label { color:#8ba6bb; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
 .content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
@@ -212,27 +219,18 @@ def render_dashboard():
         with col:
             card(label, value, note)
     st.divider()
-    left, right = st.columns([1.5, 1])
-    with left:
-        st.subheader("Pipeline")
-        tasks = read_json("tasks.json", [])
-        counts = {stage: sum(1 for t in tasks if t.get("stage") == stage and t.get("state") not in {"done", "cancelled"}) for stage in STAGES}
-        for stage in STAGES:
-            st.markdown(f'<div class="stage"><strong>{stage.title()}</strong> <span class="small-muted">{counts[stage]} tarefa(s)</span></div>', unsafe_allow_html=True)
-    with right:
-        st.subheader("Acções rápidas")
-        if st.button("Criar novo vídeo", use_container_width=True):
-            st.session_state["page"] = "Novo vídeo"
-            st.rerun()
-        if st.button("Importar canal", use_container_width=True):
-            st.session_state["page"] = "Canais"
-            st.rerun()
-        if st.button("Abrir Blueprints", use_container_width=True):
-            st.session_state["page"] = "Blueprints"
-            st.rerun()
-        if st.button("Abrir Upload", use_container_width=True):
-            st.session_state["page"] = "Upload"
-            st.rerun()
+    st.subheader("Pipeline")
+    st.caption("Filas locais e dependências da cascata")
+    queues = read_json("queues.json", {})
+    blueprint_count = len(list_blueprint_files())
+    for row_start in range(0, len(STAGES), 3):
+        queue_cols = st.columns(3)
+        for col, stage in zip(queue_cols, STAGES[row_start:row_start + 3]):
+            with col:
+                if stage == "blueprint":
+                    card("Blueprints", blueprint_count, f"na biblioteca · {len(queues.get(stage, []))} tarefa(s) na fila")
+                else:
+                    card(stage.title(), len(queues.get(stage, [])), "fila")
 
 
 def render_blueprints():
@@ -537,8 +535,8 @@ def render_channels():
                     st.rerun()
 
 
-def render_new_video():
-    st.title("Novo vídeo")
+def render_new_video(page_title: str = "Criação de Vídeos"):
+    st.title(page_title)
     create_tab, videos_tab = st.tabs(["Criar vídeo", "Vídeos"])
     with create_tab:
         channels = channel_options()
@@ -621,6 +619,16 @@ def render_new_video():
                     st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
     with videos_tab:
         render_videos()
+
+
+def render_music_creation():
+    """Expose the complete video-creation UI under the music-oriented navigation entry without changing the original page."""
+    render_new_video(page_title="Criação de Músicas")
+
+
+def render_niche_finder():
+    st.title("Niche Finder")
+    st.info("Esta área está reservada para o Niche Finder e será implementada numa próxima etapa.")
 
 
 def render_videos():
@@ -870,7 +878,7 @@ def render_upload_conventional():
 
 
 def render_settings():
-    st.title("Configurações do Thunderbolt")
+    st.title("Configurações Técnicas")
     st.caption("Configuração do motor de vídeo e dos serviços usados pelo Thunderbolt. As credenciais ficam no storage local e não são enviadas para o GitHub.")
     settings = read_json("settings.json", {})
 
@@ -1216,7 +1224,7 @@ def render_mcp():
 
 
 def render_metadata_cleaner():
-    st.title("Limpador de metadado")
+    st.title("Limpador de Metadados")
     st.caption("Limpeza e edição de metadados para vídeos de terceiros que já estão prontos.")
     st.warning("Esta área aceita exclusivamente vídeos externos. Vídeos criados na aba Novo vídeo não são listados nem processados aqui.")
 
@@ -1344,43 +1352,74 @@ def render_pipeline():
 
 
 def main():
-    pages = [
-        ("Dashboard", ":material/home:", "Início"),
-        ("Pipeline", ":material/account_tree:", "Pipeline"),
-        ("Blueprints", ":material/library_books:", "Blueprints"),
-        ("Canais", ":material/ondemand_video:", "Canais"),
-        ("Novo vídeo", ":material/add_circle:", "Novo vídeo"),
-        ("Automação", ":material/schedule:", "Automação"),
+    pipeline_items = [
+        ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
+        ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
         ("Upload", ":material/cloud_upload:", "Upload"),
+        ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
+    ]
+    settings_items = [
+        ("Canais", ":material/ondemand_video:", "Canais"),
+        ("Blueprints", ":material/library_books:", "Blueprints"),
         ("MCP", ":material/hub:", "MCP"),
-        ("Limpador de metadado", ":material/edit_note:", "Limpador de metadado"),
+        ("Configurações Técnicas", ":material/settings:", "Configurações Técnicas"),
+    ]
+    top_pages = [
+        ("Início", ":material/home:", "Início"),
+        ("Pipeline", ":material/account_tree:", "Pipeline"),
+        ("Automação", ":material/schedule:", "Automação"),
+        ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
-    current_page = st.session_state.get("page", "Dashboard")
-    if current_page == "Vídeos":
-        current_page = "Novo vídeo"
-        st.session_state["page"] = current_page
+    aliases = {
+        "Dashboard": "Início",
+        "Novo vídeo": "Criação de Vídeos",
+        "Vídeos": "Criação de Vídeos",
+        "Limpador de metadado": "Limpador de Metadados",
+        "Configurações Técnicas": "Configurações Técnicas",
+    }
+    current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
+    if current_page not in {item[0] for item in top_pages + pipeline_items + settings_items}:
+        current_page = "Início"
+    st.session_state["page"] = current_page
+
+    def navigate(target: str):
+        st.session_state["page"] = target
+        st.rerun()
+
+    def render_nav_button(target: str, icon: str, label: str, *, child: bool = False):
+        if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+            navigate(target)
+
     with st.sidebar:
         version_markup = f'<span class="tb-brand-version">{APP_VERSION}</span>' if APP_VERSION else ""
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
-        for target, icon, label in pages:
-            if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
-                st.session_state["page"] = target
-                st.rerun()
+        for target, icon, label in top_pages:
+            if target == "Pipeline":
+                with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
+                    for child_target, child_icon, child_label in pipeline_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Configurações":
+                with st.expander("Configurações", expanded=current_page in {item[0] for item in settings_items}, icon=":material/settings:"):
+                    for child_target, child_icon, child_label in settings_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
+            else:
+                render_nav_button(target, icon, label)
+
     renderers = {
-        "Dashboard": render_dashboard,
-        "Pipeline": render_pipeline,
-        "Blueprints": render_blueprints,
-        "Canais": render_channels,
-        "Novo vídeo": render_new_video,
+        "Início": render_dashboard,
+        "Criação de Vídeos": render_new_video,
+        "Criação de Músicas": render_music_creation,
         "Automação": render_automation,
+        "Niche Finder": render_niche_finder,
         "Upload": render_upload,
+        "Limpador de Metadados": render_metadata_cleaner,
+        "Canais": render_channels,
+        "Blueprints": render_blueprints,
         "MCP": render_mcp,
-        "Limpador de metadado": render_metadata_cleaner,
-        "Configurações": render_settings,
+        "Configurações Técnicas": render_settings,
     }
     renderers.get(current_page, render_dashboard)()
-
 
 if __name__ == "__main__":
     main()
