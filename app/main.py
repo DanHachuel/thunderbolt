@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 import sys
 from pathlib import Path
 
@@ -18,6 +19,8 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
 from hermes_ui.storage import BLUEPRINTS, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
+from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset, list_cached_datasets, load_dataframe, save_uploaded_csv
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
@@ -626,9 +629,164 @@ def render_music_creation():
     render_new_video(page_title="Criação de Músicas")
 
 
+@st.cache_data(show_spinner=False)
+def _cached_niche_dataset(path_str: str, modified_ns: int):
+    return load_dataframe(path_str)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_niche_download():
+    return str(download_kaggle_dataset())
+
+
+def _niche_tag_options(frame) -> list[str]:
+    tags: set[str] = set()
+    for value in frame.get("video_tags", []):
+        text = str(value or "").replace('"', "").replace("'", "")
+        for tag in re.split(r"[|,]", text.strip("[]")):
+            tag = re.sub(r"\s+", " ", tag).strip().lower()
+            if tag and tag not in {"nan", "none", "null"}:
+                tags.add(tag)
+    return sorted(tags)
+
+
+def _niche_date_bounds(frame):
+    dates = frame["publish_date"].dropna().astype(str)
+    if dates.empty:
+        return None, None
+    return dates.min(), dates.max()
+
+
 def render_niche_finder():
     st.title("Niche Finder")
-    st.info("Esta área está reservada para o Niche Finder e será implementada numa próxima etapa.")
+    st.caption("Busca de nichos baseada no projecto open source Niche-Finder, integrada no processo Streamlit do Thunderbolt.")
+    st.info("A análise é executada localmente, sem Flask ou segundo servidor. O dataset padrão é guardado em `storage/data/niches/` e pode ser substituído por um CSV próprio.")
+
+    with st.sidebar:
+        st.subheader("Fonte de dados")
+        uploaded_file = st.file_uploader("Carregar CSV próprio", type=["csv"], key="niche_uploaded_csv")
+        if st.button("Baixar Dataset Kaggle", use_container_width=True, key="niche_download_dataset"):
+            try:
+                downloaded = _cached_niche_download()
+                st.session_state["niche_dataset_path"] = downloaded
+                st.success("Dataset Kaggle guardado no storage local.")
+                st.rerun()
+            except DatasetError as exc:
+                st.error(str(exc))
+        cached = list_cached_datasets()
+        if cached:
+            labels = {str(path): path.relative_to(path.parents[2]).as_posix() if len(path.parents) > 2 else path.name for path in cached}
+            current_path = st.session_state.get("niche_dataset_path", str(cached[0]))
+            if current_path not in labels:
+                current_path = str(cached[0])
+            selected_path = st.selectbox("Dataset local", list(labels), index=list(labels).index(current_path), format_func=lambda item: labels[item], key="niche_dataset_selector")
+            if selected_path != st.session_state.get("niche_dataset_path"):
+                st.session_state["niche_dataset_path"] = selected_path
+                st.session_state.pop("niche_results", None)
+                st.rerun()
+        if uploaded_file is not None and st.button("Usar CSV carregado", use_container_width=True, key="niche_use_uploaded"):
+            try:
+                uploaded_path = save_uploaded_csv(uploaded_file.getvalue(), uploaded_file.name)
+                st.session_state["niche_dataset_path"] = str(uploaded_path)
+                st.session_state.pop("niche_results", None)
+                st.success(f"CSV guardado em `{uploaded_path}`.")
+                st.rerun()
+            except DatasetError as exc:
+                st.error(str(exc))
+
+    dataset_path = st.session_state.get("niche_dataset_path")
+    frame = None
+    if dataset_path:
+        path = Path(dataset_path)
+        if path.exists():
+            try:
+                frame = _cached_niche_dataset(str(path), path.stat().st_mtime_ns)
+            except (DatasetError, OSError) as exc:
+                st.error(str(exc))
+        else:
+            st.warning("O dataset seleccionado já não existe no storage local. Baixe-o novamente ou carregue um CSV.")
+    if frame is None:
+        st.subheader("Começar uma análise")
+        st.write("Baixe o dataset público do Kaggle ou carregue um CSV com as colunas `title`, `publish_date`, `country`, `view_count`, `like_count` e `comment_count`.")
+        return
+
+    min_date, max_date = _niche_date_bounds(frame)
+    countries = ["Todos"] + sorted(str(value) for value in frame["country"].dropna().unique())
+    tag_options = _niche_tag_options(frame)
+    with st.sidebar:
+        st.subheader("Parâmetros")
+        n_clusters = st.slider("Número de Clusters", 2, 10, 5, key="niche_n_clusters")
+        min_support = st.slider("Suporte Mínimo", 0.01, 0.5, 0.05, 0.01, format="%.2f", key="niche_min_support")
+        country = st.selectbox("País", countries, key="niche_country")
+        engagement = st.selectbox("Engagement", ["Todos", "High", "Moderate", "Low"], key="niche_engagement")
+        start_date = st.date_input("Data inicial", value=date.fromisoformat(min_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_start_date") if min_date else None
+        end_date = st.date_input("Data final", value=date.fromisoformat(max_date), min_value=date.fromisoformat(min_date), max_value=date.fromisoformat(max_date), key="niche_end_date") if max_date else None
+        selected_tags = st.multiselect("Tags opcionais", tag_options, key="niche_tags")
+        analyse = st.button("Analisar Nichos", type="primary", use_container_width=True, key="niche_analyse")
+
+    if analyse:
+        try:
+            if start_date and end_date and start_date > end_date:
+                raise NicheAnalysisError("A data inicial não pode ser posterior à data final.")
+            with st.spinner("A analisar clusters e associações…"):
+                results = run_niche_analysis(
+                    str(dataset_path),
+                    n_clusters=n_clusters,
+                    min_support=min_support,
+                    start_date=start_date.isoformat() if start_date else None,
+                    end_date=end_date.isoformat() if end_date else None,
+                    country=country,
+                    engagement=engagement,
+                    tags=selected_tags,
+                )
+            st.session_state["niche_results"] = results
+        except (NicheAnalysisError, DatasetError, OSError) as exc:
+            st.error(str(exc))
+
+    results = st.session_state.get("niche_results")
+    if not results:
+        st.subheader("Dataset carregado")
+        st.dataframe(frame.head(100), use_container_width=True, hide_index=True)
+        st.caption(f"{len(frame):,} registos válidos carregados. Ajuste os parâmetros na barra lateral e clique em Analisar Nichos.")
+        return
+
+    summary = results.get("summary", {})
+    metric_cols = st.columns(4)
+    for col, (label, value) in zip(metric_cols, [("Registos filtrados", summary.get("rows_filtered", 0)), ("Clusters", summary.get("cluster_count", 0)), ("Itemsets frequentes", summary.get("frequent_item_count", 0)), ("Regras", summary.get("association_rule_count", 0))]):
+        with col:
+            card(label, value)
+
+    cluster_table = results["clusters"]
+    rules_table = results["association_rules"]
+    items_table = results["frequent_items"]
+    points = results["cluster_points"].copy()
+    keyword = st.text_input("Filtrar palavras-chave nos clusters", key="niche_cluster_keyword", placeholder="Ex.: música, gaming, receitas")
+    if keyword.strip():
+        cluster_table = cluster_table[cluster_table["palavras"].str.contains(keyword.strip(), case=False, na=False)]
+    tab_clusters, tab_rules, tab_data = st.tabs(["Clusters encontrados", "Regras de associação", "Dados filtrados"])
+    with tab_clusters:
+        st.dataframe(cluster_table, use_container_width=True, hide_index=True)
+        if not points.empty:
+            try:
+                import plotly.express as px
+                points["cluster"] = points["cluster_id"].astype(str)
+                hover = [column for column in ["title", "channel_name", "country", "view_count", "engagement_rate"] if column in points.columns]
+                figure = px.scatter(points, x="x", y="y", color="cluster", hover_data=hover, title="Distribuição dos clusters")
+                figure.update_layout(legend_title_text="Cluster")
+                st.plotly_chart(figure, use_container_width=True)
+            except ImportError:
+                st.warning("A visualização Plotly não está instalada. Execute a instalação incremental do Thunderbolt.")
+    with tab_rules:
+        if rules_table.empty:
+            st.info("Não foram encontradas regras com o suporte e lift actuais. Reduza o suporte mínimo ou escolha outro filtro.")
+        else:
+            st.dataframe(rules_table, use_container_width=True, hide_index=True)
+        if not items_table.empty:
+            st.subheader("Itemsets frequentes")
+            st.dataframe(items_table, use_container_width=True, hide_index=True)
+    with tab_data:
+        st.dataframe(results["raw_data"], use_container_width=True, hide_index=True)
+
 
 
 def render_videos():

@@ -110,6 +110,9 @@ function ensureDirs() {
     join(storageRoot, "skills"),
     join(storageRoot, "music"),
     join(storageRoot, "voice_previews"),
+    join(storageRoot, "data"),
+    join(storageRoot, "data", "niches"),
+    join(storageRoot, "data", "niches", "uploads"),
   ];
   for (const directory of directories) mkdirSync(directory, { recursive: true });
   copySeedBlueprints(storageRoot);

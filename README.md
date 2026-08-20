@@ -17,6 +17,7 @@ A primeira versão implementa a camada UI independente com:
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON e horário diário HH:MM; UI configurável sem worker em segundo plano |
+| Niche Finder | Dataset Kaggle ou CSV próprio, cache local, filtros, K-Means, FP-Growth, regras de associação, clusters e gráfico Plotly nativo |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
 | Limpador de Metadados | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
@@ -25,9 +26,9 @@ A primeira versão implementa a camada UI independente com:
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.28
+## Navegação da UI 0.2.29
 
-A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas. Niche Finder permanece como placeholder vazio nesta versão.
+A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 ## Instalação
 
@@ -108,9 +109,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28
+npx.cmd --yes @danhachuel/thunderbolt@0.2.29 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.29 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.29
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -127,6 +128,16 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 Após `install`, o launcher usa o ambiente virtual instalado em `~/.thunderbolt/.venv` — no Windows, `%LOCALAPPDATA%\\THUNDERBOLT\\.venv` — e inicia a UI em `localhost:3030`. No Windows, a raiz é `%LOCALAPPDATA%\\THUNDERBOLT`; no computador indicado, o caminho será `C:\\Users\\danha\\AppData\\Local\\THUNDERBOLT`. Isto evita a redirecção de `HOME` que pode ocorrer no MobaXterm.
  O instalador não instala drivers de GPU, Docker, chaves de API, modelos Whisper ou credenciais de plataformas; esses componentes continuam dependentes do sistema e da configuração do utilizador. Para desenvolvimento a partir do clone, continue a usar `node scripts/cli.mjs`.
+
+## Niche Finder
+
+A página **Niche Finder** integra a lógica do projecto open source [johanfortus/Niche-Finder](https://github.com/johanfortus/Niche-Finder) directamente no processo Streamlit. O Thunderbolt não inicia Flask, não abre uma porta adicional e não copia templates HTML ou D3. A análise usa o dataset público [Trending Youtube Video Statistics (113 Countries)](https://www.kaggle.com/datasets/asaniczka/trending-youtube-videos-113-countries), mas também aceita um CSV próprio.
+
+Na sidebar da página, use **Baixar Dataset Kaggle** para descarregar e guardar o dataset em `storage/data/niches/`, ou carregue um CSV e clique em **Usar CSV carregado**. A cache é mantida localmente e o carregador valida as colunas mínimas `title`, `publish_date`, `country`, `view_count`, `like_count` e `comment_count`. Não são necessárias credenciais Kaggle hardcoded: o KaggleHub obtém o dataset público e guarda o resultado na cache local.
+
+O painel permite seleccionar número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. **Analisar Nichos** aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados filtrados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters. O download/cache dos dados é feito de forma lazy e os CSVs não são versionados pelo Git.
+
+As dependências adicionais são instaladas pelo fluxo normal do pacote: `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.29 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Armazenamento local
 
@@ -146,6 +157,8 @@ storage/
 │   └── settings.json
 ├── music/             # músicas locais para o modo Apenas Música
 ├── voice_previews/    # amostras isoladas do teste de vozes
+├── data/
+│   └── niches/        # dataset Kaggle cacheado e CSVs enviados ao Niche Finder
 ├── skills/            # skill MoneyPrinterTurbo guardada pelo utilizador
 ├── metadata_cleaner/
 │   ├── originals/    # cópias dos vídeos terceiros enviados

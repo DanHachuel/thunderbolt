@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.28
+> **Versão deste manual:** 0.2.29
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.29 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.28 install
+npx --yes @danhachuel/thunderbolt@0.2.29 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -362,18 +362,29 @@ Após iniciar a aplicação, valide o seguinte percurso:
 2. **Blueprints:** coloque um JSON em `~/.thunderbolt/storage/blueprints/importados/` (Windows: `%LOCALAPPDATA%\\THUNDERBOLT\storage\blueprints\importados\`) ou use o carregador da interface.
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
 4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** com um URL `/channel/UC...`, um handle ou uma subpágina `/videos`; o parser resolve o ID, consulta a página pública e tenta o RSS quando necessário. Confirme que o resultado abre o formulário de revisão sem Data API Key. Se o canal não existir ou não fornecer metadados, confirme a mensagem clara e que o formulário de uma pesquisa anterior desaparece. A Data API é opcional e fica separada; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
-5. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote.
-6. **Criação de Vídeos > Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar** dentro da subaba. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
-7. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
-8. **Pipeline > Limpador de Metadados:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos das páginas de criação não são aceites nesta área.
-9. **Configurações > Configurações Técnicas:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
-10. **Criação de Vídeos:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
-11. **Automação:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais** e são usados em novas tarefas. A UI não inicia jobs em segundo plano nesta entrega.
-12. **Configurações > Configurações Técnicas > Teste de vozes:** teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
-13. **Upload directo:** configure manualmente cookies, sessionInfo e INNERTUBE_API_KEY, atribua o `DELEGATED_SESSION_ID` no canal e teste apenas com um vídeo de validação. O método envia chunks de 256 KiB e não extrai cookies do navegador.
-14. **Configurações > MCP > Client MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
-15. **Configurações > MCP > Servidor MCP:** abra a subaba, mantenha o host `127.0.0.1`, active **Servidor MCP ON** e clique em **Guardar e iniciar Servidor MCP**. Confirme o endpoint `/mcp` e o health endpoint `/health`. Mantenha **Permitir ferramentas de escrita** desactivado até precisar que um agente crie lotes.
-16. **Configurações > MCP > Skill:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+5. **Niche Finder:** abra a página na sidebar, clique em **Baixar Dataset Kaggle** ou carregue um CSV próprio e confirme o ficheiro em `storage/data/niches/`. Com um CSV que contenha `title`, `publish_date`, `country`, `view_count`, `like_count` e `comment_count`, clique em **Usar CSV carregado**, escolha 3 clusters e suporte 0,05 e execute **Analisar Nichos**. Confirme as métricas, a tabela de clusters, o gráfico Plotly, as regras de associação e os dados filtrados. Altere país, engagement, datas e tags e confirme que a análise é recalculada.
+6. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote.
+7. **Criação de Vídeos > Vídeos:** verifique o estado `to_do` e os botões **Iniciar** e **Parar** dentro da subaba. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
+8. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
+9. **Pipeline > Limpador de Metadados:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos das páginas de criação não são aceites nesta área.
+10. **Configurações > Configurações Técnicas:** confirme que os caminhos e credenciais estão locais e não aparecem no Git.
+11. **Criação de Vídeos:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
+12. **Automação:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais** e são usados em novas tarefas. A UI não inicia jobs em segundo plano nesta entrega.
+13. **Configurações > Configurações Técnicas > Teste de vozes:** teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
+14. **Upload directo:** configure manualmente cookies, sessionInfo e INNERTUBE_API_KEY, atribua o `DELEGATED_SESSION_ID` no canal e teste apenas com um vídeo de validação. O método envia chunks de 256 KiB e não extrai cookies do navegador.
+15. **Configurações > MCP > Client MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
+16. **Configurações > MCP > Servidor MCP:** abra a subaba, mantenha o host `127.0.0.1`, active **Servidor MCP ON** e clique em **Guardar e iniciar Servidor MCP**. Confirme o endpoint `/mcp` e o health endpoint `/health`. Mantenha **Permitir ferramentas de escrita** desactivado até precisar que um agente crie lotes.
+17. **Configurações > MCP > Skill:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+
+## Niche Finder
+
+A página **Niche Finder** integra a lógica adaptada do projecto open source [johanfortus/Niche-Finder](https://github.com/johanfortus/Niche-Finder), cujo projecto original usa K-Means e FP-Growth sobre o dataset público [Trending Youtube Video Statistics (113 Countries)](https://www.kaggle.com/datasets/asaniczka/trending-youtube-videos-113-countries). No Thunderbolt não existe Flask, rota HTTP adicional, template HTML, JavaScript D3 ou segundo processo; toda a análise é síncrona no Streamlit.
+
+O botão **Baixar Dataset Kaggle** guarda a cópia em `storage/data/niches/`. O carregador usa KaggleHub para obter o dataset público; não existem credenciais hardcoded. Também é possível carregar um CSV próprio e clicar em **Usar CSV carregado**. O esquema mínimo é `title`, `publish_date`, `country`, `view_count`, `like_count` e `comment_count`; `video_tags` é opcional para obter itemsets e regras de associação. A cache utiliza `st.cache_data` para evitar leituras repetidas do mesmo ficheiro.
+
+Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados filtrados; o gráfico de dispersão é criado nativamente com Plotly. A cache de dados e os CSVs locais são ignorados pelo Git.
+
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.29 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
 

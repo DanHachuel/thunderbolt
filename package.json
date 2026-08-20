@@ -1,6 +1,6 @@
 {
   "name": "@danhachuel/thunderbolt",
-  "version": "0.2.28",
+  "version": "0.2.29",
   "description": "Thunderbolt — interface local para operação de canais faceless e motor MoneyPrinterTurbo",
   "main": "scripts/cli.mjs",
   "type": "module",
@@ -9,6 +9,7 @@
   },
   "files": [
     "app/main.py",
+    "app/modules/**/*.py",
     "hermes_ui/*.py",
     "integrations/*.py",
     "integrations/data/*.json",
@@ -18,6 +19,7 @@
     "seed/skills/*.md",
     "README.md",
     "MANUAL-INSTALACAO.md",
+    "THIRD-PARTY-NOTICES.md",
     "requirements.txt",
     "package.json"
   ],
