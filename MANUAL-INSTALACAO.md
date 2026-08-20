@@ -351,8 +351,11 @@ Na primeira execução, a barra lateral apresenta **Início**, **Pipeline**, **A
 | YouTube upload principal | Lógica do `youtube-automation-agent` adaptada e executada dentro do Thunderbolt |
 | OAuth directo de redundância | Caminho alternativo accionado automaticamente se o agente falhar |
 | TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
+| Kaggle Username | Nome da conta Kaggle usada para publicar e executar a kernel remota |
+| Kaggle API Key | Chave da conta Kaggle, guardada mascarada apenas em `storage/state/settings.json` |
+| Slug da kernel Kaggle | Identificador da kernel remota, por padrão `thunderbolt-niche-finder` |
 
-As credenciais devem ser inseridas apenas na configuração local. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
+As credenciais devem ser inseridas apenas na configuração local. A Kaggle API Key é usada somente pelo executor remoto para publicar a kernel, consultar o estado e obter os resultados pequenos; o dataset não é descarregado para `storage/data/niches`. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
 
 ## 9. Testar as áreas principais
 

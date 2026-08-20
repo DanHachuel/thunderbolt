@@ -25,7 +25,7 @@ A primeira versão implementa a camada UI independente com:
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.28
+## Navegação da UI 0.2.32
 
 A barra lateral mantém apenas os cinco níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas. Niche Finder permanece como placeholder vazio nesta versão.
 
@@ -108,9 +108,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.28
+npx.cmd --yes @danhachuel/thunderbolt@0.2.32 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.32 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.32
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
