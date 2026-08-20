@@ -171,3 +171,17 @@ def test_niche_finder_navigation_has_kaggle_and_apify_pages():
     assert 'st.title("Niche Finder Apify")' in source
     assert 'st.form_submit_button("Pesquisar no Apify"' in source
     assert 'Ainda não existe uma pesquisa nesta sessão' in source
+
+
+def test_edition_navigation_has_cleaner_cuts_and_python_editor():
+    source_path = Path(__file__).parents[1] / "app" / "main.py"
+    source = source_path.read_text(encoding="utf-8")
+
+    assert 'edition_items = [' in source
+    assert '("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados")' in source
+    assert '("Cortes", ":material/content_cut:", "Cortes")' in source
+    assert '("Editor Python", ":material/code:", "Editor Python")' in source
+    assert source.index('("Limpador de Metadados", ":material/edit_note:') < source.index('("Cortes", ":material/content_cut:') < source.index('("Editor Python", ":material/code:')
+    assert '"Edição": lambda: render_edit_placeholder("Edição"' in source
+    assert '"Cortes": lambda: render_edit_placeholder("Cortes"' in source
+    assert '"Editor Python": lambda: render_edit_placeholder("Editor Python"' in source

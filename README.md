@@ -11,24 +11,24 @@ A primeira versão implementa a camada UI independente com:
 | Área | Incluído |
 |---|---|
 | Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
-| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas, Upload e Limpador de Metadados |
+| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas e Upload |
 | Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais | Subabas de importação pública sem API Key, Data API opcional e cadastro manual independente |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | Niche Finder | Menu expansível com duas alternativas independentes: Niche Finder Kaggle e Niche Finder Apify, com parâmetros, execução e resultados separados |
+| Edição | Menu expansível abaixo de Automação com Limpador de Metadados funcional, Cortes reservado e Editor Python reservado |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo experimental, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Limpador de Metadados | Upload isolado de vídeos terceiros, limpeza FFmpeg, edição de título/descrição/tags e manifesto JSON |
 | Configurações Técnicas | Provedores LLM, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.36
+## Navegação da UI 0.2.37
 
-A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Upload** e **Limpador de Metadados**. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Pipeline**, **Automação**, **Edição**, **Niche Finder** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 ## Instalação
 
@@ -115,9 +115,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.36 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.36 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.36
+npx.cmd --yes @danhachuel/thunderbolt@0.2.37 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.37 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.37
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:

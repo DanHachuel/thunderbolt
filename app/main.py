@@ -882,6 +882,12 @@ def render_niche_finder_apify():
             st.json({key: value for key, value in last_run.items() if key != "parameters"})
 
 
+def render_edit_placeholder(page_title: str, description: str):
+    st.title(page_title)
+    st.caption(description)
+    st.info("Esta aba está reservada para desenvolvimento futuro e ainda não executa nenhuma operação.")
+
+
 def render_videos():
     st.subheader("Vídeos e backlog")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
@@ -1642,7 +1648,11 @@ def main():
         ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
         ("Upload", ":material/cloud_upload:", "Upload"),
+    ]
+    edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
+        ("Cortes", ":material/content_cut:", "Cortes"),
+        ("Editor Python", ":material/code:", "Editor Python"),
     ]
     settings_items = [
         ("Canais", ":material/ondemand_video:", "Canais"),
@@ -1658,6 +1668,7 @@ def main():
         ("Início", ":material/home:", "Início"),
         ("Pipeline", ":material/account_tree:", "Pipeline"),
         ("Automação", ":material/schedule:", "Automação"),
+        ("Edição", ":material/edit:", "Edição"),
         ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
@@ -1670,7 +1681,7 @@ def main():
         "Configurações Técnicas": "Configurações Técnicas",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + niche_finder_items + settings_items}:
+    if current_page not in {item[0] for item in top_pages + pipeline_items + edition_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
 
@@ -1690,6 +1701,10 @@ def main():
                 with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
                     for child_target, child_icon, child_label in pipeline_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Edição":
+                with st.expander("Edição", expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
+                    for child_target, child_icon, child_label in edition_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Niche Finder":
                 with st.expander("Niche Finder", expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
                     for child_target, child_icon, child_label in niche_finder_items:
@@ -1708,8 +1723,11 @@ def main():
         "Automação": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Niche Finder Apify": render_niche_finder_apify,
-        "Upload": render_upload,
+        "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
         "Limpador de Metadados": render_metadata_cleaner,
+        "Cortes": lambda: render_edit_placeholder("Cortes", "Área reservada para a futura funcionalidade de cortes de vídeo."),
+        "Editor Python": lambda: render_edit_placeholder("Editor Python", "Área reservada para o futuro editor Python."),
+        "Upload": render_upload,
         "Canais": render_channels,
         "Blueprints": render_blueprints,
         "MCP": render_mcp,
