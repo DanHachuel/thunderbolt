@@ -1670,11 +1670,11 @@ def main():
     ]
     top_pages = [
         ("Início", ":material/home:", "Início"),
+        ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Pipeline", ":material/account_tree:", "Pipeline"),
         ("Automação", ":material/schedule:", "Automação"),
         ("Edição", ":material/edit:", "Edição"),
         ("Models AI", ":material/smart_toy:", "Models AI"),
-        ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
     aliases = {

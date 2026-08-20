@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.38
+> **Versão deste manual:** 0.2.39
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.38 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.39 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.38 install
+npx --yes @danhachuel/thunderbolt@0.2.39 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -345,7 +345,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## 8. Configuração inicial da UI
 
-Na primeira execução, a barra lateral apresenta **Início**, **Pipeline**, **Automação**, **Edição**, **Models AI**, **Niche Finder** e **Configurações**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **Models AI** contém **Personagens** e **Redes Sociais**, nessa ordem; ambas estão reservadas para desenvolvimento futuro e não executam operações. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. Abra **Configurações > Configurações Técnicas** e reveja. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. O menu **Configurações** contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica numa área opcional, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
+Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **Models AI** contém **Personagens** e **Redes Sociais**, nessa ordem; ambas estão reservadas para desenvolvimento futuro e não executam operações. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. Abra **Configurações > Configurações Técnicas** e reveja. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. O menu **Configurações** contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica numa área opcional, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
 | Configuração | Finalidade |
 |---|---|
@@ -396,7 +396,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.38 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.39 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

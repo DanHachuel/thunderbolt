@@ -198,3 +198,13 @@ def test_models_ai_navigation_has_characters_and_social_pages():
     assert '"Models AI": lambda: render_edit_placeholder("Models AI"' in source
     assert '"Personagens": lambda: render_edit_placeholder("Personagens"' in source
     assert '"Redes Sociais": lambda: render_edit_placeholder("Redes Sociais"' in source
+
+
+def test_niche_finder_menu_precedes_pipeline_in_top_navigation():
+    source_path = Path(__file__).parents[1] / "app" / "main.py"
+    source = source_path.read_text(encoding="utf-8")
+    top_pages_start = source.index("    top_pages = [")
+    top_pages_end = source.index("    aliases = {", top_pages_start)
+    top_pages = source[top_pages_start:top_pages_end]
+
+    assert top_pages.index('(\"Niche Finder\", ":material/search:", \"Niche Finder\")') < top_pages.index('(\"Pipeline\", ":material/account_tree:", \"Pipeline\")')
