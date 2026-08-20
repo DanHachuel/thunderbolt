@@ -129,9 +129,18 @@ st.markdown("""
 .content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
 .small-muted { color:#8ba6bb; font-size:.85rem; }
-/* Cores dos chips BaseWeb dentro do mesmo campo, identificadas pelo destino e não por posição. */
+/* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */
+[data-testid="stMultiSelectTagsContainer"] span[data-tag] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
+[data-testid="stMultiSelectTagsContainer"] span[data-tag] span[title],
+[data-testid="stMultiSelectTagsContainer"] span[data-tag] button,
+[data-testid="stMultiSelectTagsContainer"] span[data-tag] svg { color:#ffffff !important; fill:#ffffff !important; }
+[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="YouTube"] { background:#ff0000 !important; }
+[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="TikTok"] { background:#000000 !important; }
+[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="Instagram"] { background:#e1306c !important; }
+[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="Facebook Pages"] { background:#1877f2 !important; }
+/* Compatibilidade com versões BaseWeb que usam data-baseweb=tag. */
 [data-testid="stMultiSelect"] [data-baseweb="tag"] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
-[data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="YouTube"]) { background:#ff4b4b !important; }
+[data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="YouTube"]) { background:#ff0000 !important; }
 [data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="TikTok"]) { background:#000000 !important; }
 [data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="Instagram"]) { background:#e1306c !important; }
 [data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="Facebook Pages"]) { background:#1877f2 !important; }

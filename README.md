@@ -104,9 +104,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.24 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.24 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.24
+npx.cmd --yes @danhachuel/thunderbolt@0.2.25 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.25 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.25
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
