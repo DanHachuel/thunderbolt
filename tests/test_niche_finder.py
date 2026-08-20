@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from app.modules.niche_finder.core import run_niche_analysis
-from app.modules.niche_finder.data_loader import DatasetError, load_dataframe, save_uploaded_csv
+from app.modules.niche_finder.data_loader import DatasetError, load_dataframe
 
 
 pytestmark = pytest.mark.filterwarnings("ignore::FutureWarning")
@@ -48,18 +48,8 @@ def niche_csv(tmp_path):
 def test_loader_requires_core_columns(tmp_path):
     path = tmp_path / "invalid.csv"
     pd.DataFrame([{"title": "Only title"}]).to_csv(path, index=False)
-    with pytest.raises(DatasetError, match="colunas"):
+    with pytest.raises(DatasetError, match="colunas necessárias"):
         load_dataframe(path)
-
-
-def test_save_uploaded_csv_validates_and_persists(tmp_path, monkeypatch, niche_csv):
-    from app.modules.niche_finder import data_loader
-
-    monkeypatch.setattr(data_loader, "DATA_DIR", tmp_path / "data" / "niches")
-    saved = save_uploaded_csv(niche_csv.read_bytes(), "my niche.csv")
-    assert saved.exists()
-    assert saved.parent.name == "uploads"
-    assert load_dataframe(saved).shape[0] == 12
 
 
 def test_run_niche_analysis_returns_dataframes_and_filters(niche_csv):

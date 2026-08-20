@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import io
-import re
 import shutil
 from pathlib import Path
-from typing import BinaryIO
 
 import pandas as pd
 
@@ -39,22 +36,12 @@ OPTIONAL_COLUMNS = (
 
 
 class DatasetError(RuntimeError):
-    """Raised when a Niche Finder dataset cannot be read or validated."""
+    """Raised when the automatic Niche Finder dataset cannot be read or validated."""
 
 
 def ensure_data_dir() -> Path:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "uploads").mkdir(parents=True, exist_ok=True)
     return DATA_DIR
-
-
-def _safe_filename(name: str) -> str:
-    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(name or "dataset.csv").name).strip(".-")
-    if not stem:
-        stem = "dataset.csv"
-    if not stem.lower().endswith(".csv"):
-        stem += ".csv"
-    return stem
 
 
 def _find_csv(root: Path) -> Path | None:
@@ -83,51 +70,35 @@ def _download_with_kagglehub() -> Path | None:
     except TypeError:
         downloaded = kagglehub.dataset_download(DEFAULT_DATASET_SLUG)
     except Exception as exc:  # pragma: no cover - depends on network/provider state
-        raise DatasetError(f"O KaggleHub não conseguiu descarregar o dataset: {exc}") from exc
+        raise DatasetError(f"O Thunderbolt não conseguiu preparar os dados automáticos: {exc}") from exc
     source = _find_csv(Path(downloaded))
     if source is None:
-        raise DatasetError("O download KaggleHub terminou sem encontrar um ficheiro CSV.")
+        raise DatasetError("A preparação automática terminou sem encontrar dados compatíveis.")
     return _copy_csv(source, DEFAULT_DATASET_PATH)
 
 
 def download_kaggle_dataset() -> Path:
-    """Download and cache the public Niche-Finder dataset in Thunderbolt storage."""
+    """Prepare and cache the public Niche-Finder dataset without user interaction."""
     ensure_data_dir()
     if DEFAULT_DATASET_PATH.exists() and DEFAULT_DATASET_PATH.stat().st_size > 0:
         return DEFAULT_DATASET_PATH
     if kagglehub is None:
-        raise DatasetError("A dependência kagglehub não está instalada. Execute novamente a instalação do Thunderbolt.")
+        raise DatasetError("O componente automático de dados não está disponível nesta instalação.")
     downloaded = _download_with_kagglehub()
     if downloaded is None:
-        raise DatasetError("O KaggleHub não devolveu um caminho de dataset válido.")
+        raise DatasetError("O componente automático de dados não devolveu um caminho válido.")
     return downloaded
 
 
-def save_uploaded_csv(payload: bytes | BinaryIO, filename: str) -> Path:
-    """Validate and persist an uploaded CSV under the user's local data directory."""
-    ensure_data_dir()
-    raw = payload.read() if hasattr(payload, "read") else payload
-    if not isinstance(raw, (bytes, bytearray)) or not raw:
-        raise DatasetError("O ficheiro CSV enviado está vazio.")
-    try:
-        frame = pd.read_csv(io.BytesIO(raw))
-        validate_dataset(frame)
-    except (OSError, UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
-        raise DatasetError(f"Não foi possível ler o CSV enviado: {exc}") from exc
-    destination = DATA_DIR / "uploads" / _safe_filename(filename)
-    destination.write_bytes(raw)
-    return destination
-
-
 def validate_dataset(frame: pd.DataFrame) -> pd.DataFrame:
-    """Validate the minimal schema and return a normalised copy."""
+    """Validate the internal dataset schema and return a normalised copy."""
     if frame is None or frame.empty:
-        raise DatasetError("O dataset não contém linhas.")
+        raise DatasetError("A fonte automática de dados não contém registos.")
     cleaned = frame.copy()
     cleaned.columns = [str(column).strip() for column in cleaned.columns]
     missing = [column for column in REQUIRED_COLUMNS if column not in cleaned.columns]
     if missing:
-        raise DatasetError("O CSV precisa das colunas: " + ", ".join(missing) + ".")
+        raise DatasetError("A fonte automática não contém as colunas necessárias: " + ", ".join(missing) + ".")
     if "video_tags" not in cleaned.columns:
         cleaned["video_tags"] = ""
     for column in ("view_count", "like_count", "comment_count"):
@@ -138,7 +109,7 @@ def validate_dataset(frame: pd.DataFrame) -> pd.DataFrame:
     cleaned = cleaned.dropna(subset=["publish_date", "view_count", "like_count", "comment_count"])
     cleaned = cleaned[cleaned["title"] != ""].copy()
     if cleaned.empty:
-        raise DatasetError("O dataset não contém linhas válidas depois da normalização.")
+        raise DatasetError("A fonte automática não contém registos válidos depois da normalização.")
     return cleaned.reset_index(drop=True)
 
 
@@ -146,10 +117,5 @@ def load_dataframe(path: str | Path) -> pd.DataFrame:
     try:
         frame = pd.read_csv(path)
     except (OSError, UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
-        raise DatasetError(f"Não foi possível ler o dataset: {exc}") from exc
+        raise DatasetError(f"Não foi possível ler a fonte automática de dados: {exc}") from exc
     return validate_dataset(frame)
-
-
-def list_cached_datasets() -> list[Path]:
-    ensure_data_dir()
-    return sorted(DATA_DIR.glob("**/*.csv"))
