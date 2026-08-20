@@ -83,6 +83,8 @@ DEFAULTS: dict[str, Any] = {
         "youtube_api_key": "",
         "youtube_client_id": "",
         "youtube_client_secret": "",
+        "youtube_batch_accounts": [],
+        "youtube_batch_selected_account_id": "",
         "kaggle_username": "",
         "kaggle_api_key": "",
         "kaggle_kernel_slug": "thunderbolt-niche-finder",

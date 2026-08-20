@@ -4,6 +4,7 @@ import json
 import re
 from datetime import date, datetime
 import sys
+import uuid
 from pathlib import Path
 
 import requests
@@ -33,6 +34,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.youtube_direct_upload import YouTubeDirectUploader
+from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 
@@ -339,7 +341,7 @@ def render_channels():
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
     settings = read_json("settings.json", {})
     youtube = YouTubeAdapter(settings=settings)
-    import_tab, manual_tab = st.tabs(["Importar do YouTube", "Cadastro manual"])
+    import_tab, batch_tab, manual_tab = st.tabs(["Importar do YouTube", "Canais em lote gmail", "Cadastro manual"])
 
     with import_tab:
         st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
@@ -422,6 +424,96 @@ def render_channels():
                         st.rerun()
         else:
             st.info("Introduza um URL, handle ou ID e clique em Buscar no YouTube. Não é necessária API Key na opção pública.")
+
+    with batch_tab:
+        st.caption("Esta subaba usa a conta Google/YouTube seleccionada para listar os canais que ela gere. Não lê a caixa Gmail e não usa e-mails como pesquisa pública.")
+        accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
+        if not accounts:
+            st.info("Configure primeiro uma conta em Configurações > Configurações Técnicas > Contas Google/YouTube para canais em lote.")
+        else:
+            account_ids = [str(account["id"]) for account in accounts]
+            account_labels = {str(account["id"]): f"{account.get('email', 'Conta Google')} — {account.get('label', 'Canais YouTube')}" for account in accounts}
+            default_account_id = str(settings.get("youtube_batch_selected_account_id") or account_ids[0])
+            if default_account_id not in account_ids:
+                default_account_id = account_ids[0]
+            selected_account_id = st.selectbox("Conta Google/YouTube", account_ids, index=account_ids.index(default_account_id), format_func=lambda item: account_labels.get(item, item), key="batch_selected_account_id")
+            selected_account = next(account for account in accounts if str(account["id"]) == selected_account_id)
+            account_status = youtube_batch_account_status(selected_account, STORAGE)
+            (st.success if account_status.ok else st.warning)(account_status.message)
+            auth_cols = st.columns([1, 2])
+            with auth_cols[0]:
+                if st.button("Autorizar conta Google", type="secondary", use_container_width=True, key="batch_authorize_account"):
+                    result = authorize_youtube_batch_account(selected_account, STORAGE)
+                    (st.success if result.ok else st.error)(result.message)
+                    if result.ok:
+                        st.rerun()
+            with auth_cols[1]:
+                st.caption("A autorização é feita no browser do sistema e fica guardada separadamente para esta conta.")
+            batch_key = f"youtube_batch_channels_{selected_account_id}"
+            if st.button("Listar canais desta conta", type="primary", use_container_width=True, key="batch_list_channels"):
+                result = list_youtube_batch_channels(selected_account, STORAGE)
+                st.session_state[batch_key] = result.data.get("channels", []) if result.ok else []
+                st.session_state[f"{batch_key}_message"] = result.message
+                st.session_state[f"{batch_key}_ok"] = result.ok
+            if st.session_state.get(f"{batch_key}_message"):
+                (st.success if st.session_state.get(f"{batch_key}_ok") else st.error)(st.session_state[f"{batch_key}_message"])
+            listed_channels = st.session_state.get(batch_key, [])
+            if listed_channels:
+                channel_by_id = {str(channel.get("youtube_channel_id")): channel for channel in listed_channels if channel.get("youtube_channel_id")}
+                channel_labels = {channel_id: f"{channel.get('name', channel_id)} — {channel.get('handle') or channel_id}" for channel_id, channel in channel_by_id.items()}
+                existing_channels = read_json("channels.json", [])
+                existing_ids = {str(channel.get("youtube_channel_id")) for channel in existing_channels if channel.get("youtube_channel_id")}
+                existing_count = sum(1 for channel_id in channel_by_id if channel_id in existing_ids)
+                st.caption(f"{len(listed_channels)} canal(is) listado(s); {existing_count} já cadastrado(s). A API devolveu a lista da conta autenticada, não uma caixa Gmail.")
+                blueprint_items = blueprint_catalog()
+                blueprint_ids = [item[0] for item in blueprint_items]
+                blueprint_labels = {item[0]: item[1] for item in blueprint_items}
+                voice_options = voice_catalog()
+                with st.form("batch_channel_import_form"):
+                    selected_channel_ids = st.multiselect("Canais a cadastrar", list(channel_by_id), default=list(channel_by_id), format_func=lambda item: channel_labels.get(item, item), key="batch_channel_ids")
+                    defaults_cols = st.columns(4)
+                    with defaults_cols[0]:
+                        batch_blueprint = st.selectbox("Blueprint padrão", blueprint_ids, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="batch_channel_blueprint")
+                    with defaults_cols[1]:
+                        batch_voice = st.selectbox("Voz padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="batch_channel_voice")
+                    with defaults_cols[2]:
+                        batch_language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], key="batch_channel_language")
+                    with defaults_cols[3]:
+                        batch_style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], key="batch_channel_style")
+                    import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", use_container_width=True)
+                if import_selected:
+                    created_names = []
+                    skipped_names = []
+                    failed_names = []
+                    style_value = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(batch_style, batch_style)
+                    for channel_id in selected_channel_ids:
+                        data = channel_by_id[channel_id]
+                        if channel_id in existing_ids:
+                            skipped_names.append(data.get("name", channel_id))
+                            continue
+                        try:
+                            create_channel(data.get("name", channel_id), data.get("url", ""), {
+                                **data,
+                                "youtube_channel_id": channel_id,
+                                "google_account_id": str(selected_account.get("id", "")),
+                                "google_account_email": str(selected_account.get("email", "")),
+                                "blueprint_id": batch_blueprint.strip(),
+                                "default_blueprint_id": batch_blueprint.strip(),
+                                "default_voice": batch_voice.strip(),
+                                "voice": batch_voice.strip(),
+                                "language": batch_language,
+                                "style_wide": style_value,
+                                "last_youtube_sync": now(),
+                            })
+                            created_names.append(data.get("name", channel_id))
+                        except Exception as exc:
+                            failed_names.append(f"{data.get('name', channel_id)}: {exc}")
+                    if created_names:
+                        st.success(f"Canais cadastrados: {', '.join(created_names)}")
+                    if skipped_names:
+                        st.info(f"Já existentes e não duplicados: {', '.join(skipped_names)}")
+                    if failed_names:
+                        st.error(f"Falhas: {'; '.join(failed_names)}")
 
     with manual_tab:
         st.caption("Este fluxo não consulta o YouTube e não exige API Key. Preencha os dados que quiser e guarde o canal localmente.")
@@ -1286,6 +1378,83 @@ def render_settings():
             help=help_text,
             key=f"settings_{key}",
         )
+
+    st.subheader("Contas Google/YouTube — canais em lote")
+    st.caption("Cada registo representa uma conta Google que pode gerir vários canais do YouTube. O e-mail identifica a conta; esta área não lê a caixa Gmail. Cada conta tem Client ID, Client Secret e token OAuth próprios.")
+    batch_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
+    for batch_account in batch_accounts:
+        account_id = str(batch_account["id"])
+        with st.container(border=True):
+            with st.form(f"batch_account_form_{account_id}"):
+                account_cols = st.columns(4)
+                with account_cols[0]:
+                    account_label = st.text_input("Nome da conta", value=str(batch_account.get("label", "Canais YouTube")), key=f"batch_label_{account_id}")
+                with account_cols[1]:
+                    account_email = st.text_input("E-mail/Gmail da conta", value=str(batch_account.get("email", "")), key=f"batch_email_{account_id}")
+                with account_cols[2]:
+                    account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
+                with account_cols[3]:
+                    account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
+                save_account = st.form_submit_button("Guardar conta", type="primary", use_container_width=True)
+            account_status = youtube_batch_account_status(batch_account, STORAGE)
+            status_cols = st.columns([2, 1, 1])
+            with status_cols[0]:
+                (st.success if account_status.ok else st.warning)(account_status.message)
+            with status_cols[1]:
+                if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
+                    result = authorize_youtube_batch_account(batch_account, STORAGE)
+                    (st.success if result.ok else st.error)(result.message)
+                    if result.ok:
+                        st.rerun()
+            with status_cols[2]:
+                if st.button("Remover conta", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                    delete_youtube_batch_token(batch_account, STORAGE)
+                    remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
+                    settings["youtube_batch_accounts"] = remaining_accounts
+                    if settings.get("youtube_batch_selected_account_id") == account_id:
+                        settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
+                    write_json("settings.json", settings)
+                    st.rerun()
+            if save_account:
+                if "@" not in account_email.strip():
+                    st.error("Informe um e-mail Google válido.")
+                elif not account_client_id.strip() or not account_client_secret.strip():
+                    st.error("Informe o Client ID e o Client Secret desta conta.")
+                else:
+                    for existing in batch_accounts:
+                        if str(existing.get("id")) == account_id:
+                            credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
+                            if credentials_changed:
+                                delete_youtube_batch_token(existing, STORAGE)
+                            existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip()})
+                    settings["youtube_batch_accounts"] = batch_accounts
+                    write_json("settings.json", settings)
+                    st.success("Conta Google/YouTube guardada.")
+                    st.rerun()
+    with st.form("add_batch_account_form"):
+        add_cols = st.columns(4)
+        with add_cols[0]:
+            new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
+        with add_cols[1]:
+            new_account_email = st.text_input("E-mail/Gmail", key="new_batch_account_email")
+        with add_cols[2]:
+            new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
+        with add_cols[3]:
+            new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
+        add_account = st.form_submit_button("Adicionar conta Google/YouTube", use_container_width=True)
+    if add_account:
+        if "@" not in new_account_email.strip():
+            st.error("Informe um e-mail Google válido.")
+        elif not new_account_client_id.strip() or not new_account_client_secret.strip():
+            st.error("Informe o Client ID e o Client Secret da nova conta.")
+        else:
+            new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip()}
+            batch_accounts.append(new_account)
+            settings["youtube_batch_accounts"] = batch_accounts
+            settings["youtube_batch_selected_account_id"] = new_account["id"]
+            write_json("settings.json", settings)
+            st.success(f"Conta {new_account['email']} adicionada.")
+            st.rerun()
 
     with st.form("settings_form"):
         st.subheader("Execução local")

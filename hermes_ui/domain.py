@@ -22,6 +22,9 @@ def make_id(prefix: str) -> str:
 def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     channel = {
         "id": make_id("channel"),
+        "youtube_channel_id": "",
+        "google_account_id": "",
+        "google_account_email": "",
         "name": name.strip(),
         "url": url.strip(),
         "handle": "",
