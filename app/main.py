@@ -593,10 +593,11 @@ def render_channels():
             if current_channel_account_id and current_channel_account_id not in channel_account_ids:
                 channel_account_ids.append(current_channel_account_id)
                 youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
-            with st.expander("Upload directo — conta e canal", expanded=False):
+            with st.expander("Upload directo — conta e canal", expanded=True):
+                st.caption("Defina aqui a conta Google deste canal e o DELEGATED_SESSION_ID individual. Os cookies e o sessionInfo token são carregados na área da conta em Configurações Técnicas.")
                 with st.form(f"channel_direct_credentials_{channel['id']}"):
                     channel_account_id = st.selectbox("Conta Google dos cookies/sessionInfo", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel['id']}")
-                    channel_delegated_session_id = st.text_input("DELEGATED_SESSION_ID deste canal", value=str(channel.get("delegated_session_id", "")), type="password", key=f"channel_delegated_session_id_{channel['id']}")
+                    channel_delegated_session_id = st.text_input("DELEGATED_SESSION_ID deste canal (individual)", value=str(channel.get("delegated_session_id", "")), type="password", key=f"channel_delegated_session_id_{channel['id']}")
                     save_channel_direct_credentials = st.form_submit_button("Guardar credenciais deste canal", type="primary")
                 if save_channel_direct_credentials:
                     update_channel(channel["id"], {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", "")), "delegated_session_id": channel_delegated_session_id.strip()})
@@ -1540,11 +1541,12 @@ def render_settings():
 
         direct_account_session_fields = {}
         direct_cookie_uploads = {}
-        with st.expander("Upload directo — sessão YouTube Frontend API"):
+        save_direct_credentials = False
+        with st.expander("Upload directo — sessão YouTube Frontend API", expanded=True):
             st.caption("Os cookies e o sessionInfo token são configurados por conta Google/YouTube. O DELEGATED_SESSION_ID é configurado separadamente em cada canal.")
             direct_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
             if not direct_accounts:
-                st.info("Adicione primeiro uma conta em Contas Google/YouTube — canais em lote. Cada conta terá o seu ficheiro de cookies e sessionInfo token.")
+                st.warning("Ainda não existe uma conta Google/YouTube cadastrada. Adicione primeiro a conta acima; depois deste formulário aparecerão, para cada Gmail, o campo de `sessionInfo token` e o uploader do ficheiro com SID, SSID, HSID, APISID e SAPISID.")
             for direct_account in direct_accounts:
                 direct_account_id = str(direct_account["id"])
                 direct_status = direct_account_status(STORAGE, direct_account)
@@ -1564,6 +1566,8 @@ def render_settings():
                             st.warning("Sem ficheiro de cookies")
                     st.caption("O ficheiro é guardado em storage/youtube_direct_accounts/<conta>/cookies.json. Os valores não são mostrados nem enviados para o Git.")
                     direct_account_session_fields[direct_account_id] = direct_session_info_value
+                if direct_accounts:
+                    save_direct_credentials = st.form_submit_button("Guardar cookies e sessionInfo por conta", type="secondary", use_container_width=True)
 
             with st.container(border=True):
                 st.markdown("**Compatibilidade com instalação antiga — credenciais globais**")
@@ -1710,7 +1714,8 @@ def render_settings():
                 st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
                 st.rerun()
 
-        if st.form_submit_button("Guardar configurações do Thunderbolt", type="primary"):
+        save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
+        if save_all_settings or save_direct_credentials:
             direct_cookie_error = ""
             configured_direct_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
             for direct_account in configured_direct_accounts:

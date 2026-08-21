@@ -27,16 +27,16 @@ A primeira versão implementa a camada UI independente com:
 
 ## Upload directo — credenciais por conta e por canal
 
-O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa dois níveis de configuração. Em **Configurações Técnicas > Upload directo — sessão YouTube Frontend API**, cada conta Google cadastrada possui o seu próprio ficheiro de cookies e o seu próprio `sessionInfo token`. O ficheiro pode ser um JSON exportado do navegador, uma lista JSON de cookies ou um ficheiro Netscape; o Thunderbolt valida e guarda apenas `SID`, `SSID`, `HSID`, `APISID` e `SAPISID` em `storage/youtube_direct_accounts/<id-da-conta>/cookies.json`.
+O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa dois níveis de configuração. Em **Configurações Técnicas > Upload directo — sessão YouTube Frontend API**, o painel fica aberto por defeito e cada conta Google cadastrada possui o seu próprio ficheiro de cookies e o seu próprio `sessionInfo token`. Primeiro adicione a conta em **Contas Google/YouTube — canais em lote**; depois, no painel da conta, surgem o campo `sessionInfo token`, o uploader **Ficheiro de cookies**, o estado do ficheiro e o botão **Guardar cookies e sessionInfo por conta**. O ficheiro pode ser um JSON exportado do navegador, uma lista JSON de cookies ou um ficheiro Netscape; o Thunderbolt valida e guarda apenas `SID`, `SSID`, `HSID`, `APISID` e `SAPISID` em `storage/youtube_direct_accounts/<id-da-conta>/cookies.json`.
 
-Em **Canais > Upload directo — conta e canal**, cada canal é associado à conta Google que fornece os cookies e o `sessionInfo token`, e possui o seu próprio `DELEGATED_SESSION_ID`. O upload lê os cookies e o token da conta associada e envia o ID delegado individual do canal como `pageId`/`onBehalfOfUser`. O botão é bloqueado quando falta qualquer destes elementos. O `INNERTUBE_API_KEY` e o tamanho de chunk continuam nas configurações directas; o tamanho é normalizado para múltiplos de 262144 bytes.
+Em **Canais > Canais cadastrados**, o painel **Upload directo — conta e canal** fica aberto por defeito em cada cartão. Cada canal é associado à conta Google que fornece os cookies e o `sessionInfo token`, e possui o seu próprio `DELEGATED_SESSION_ID` no campo **DELEGATED_SESSION_ID deste canal (individual)**. O upload lê os cookies e o token da conta associada e envia o ID delegado individual do canal como `pageId`/`onBehalfOfUser`. O botão é bloqueado quando falta qualquer destes elementos. O `INNERTUBE_API_KEY` e o tamanho de chunk continuam nas configurações directas; o tamanho é normalizado para múltiplos de 262144 bytes.
 
 Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, o ficheiro é escrito com permissões locais restritas e não é incluído no Git. O Thunderbolt não extrai cookies automaticamente do browser e não envia as credenciais para o GitHub. O método é não oficial e pode deixar de funcionar se o YouTube alterar os endpoints internos.
 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.43
+## Navegação da UI 0.2.44
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -133,9 +133,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.43 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.43 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.43
+npx.cmd --yes @danhachuel/thunderbolt@0.2.44 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.44 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.44
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -159,7 +159,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.43 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.44 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 
