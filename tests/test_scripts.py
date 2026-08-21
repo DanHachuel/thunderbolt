@@ -1,0 +1,83 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from hermes_ui.creative_generation import CreativeGenerationError
+from hermes_ui import script_documents, script_generation
+
+
+def _settings():
+    return {
+        "llm_provider": "openai",
+        "openai_api_key": "test-key",
+        "openai_base_url": "https://llm.example/v1",
+        "openai_model_name": "test-model",
+    }
+
+
+def test_generate_video_script_includes_blueprint_context(monkeypatch):
+    captured = {}
+
+    def fake_chat(settings, system, user):
+        captured["settings"] = settings
+        captured["system"] = system
+        captured["user"] = json.loads(user)
+        return {"title": "As muralhas esquecidas", "summary": "Um roteiro documental", "content": "# Gancho\n\n## Cena 1"}
+
+    monkeypatch.setattr(script_generation, "_chat_json", fake_chat)
+    result = script_generation.generate_script_document(
+        _settings(),
+        document_type="Roteiro de vídeo",
+        title="As muralhas esquecidas",
+        brief="Explicar o mistério de uma cidade antiga.",
+        language="01 – Inglês",
+        channel={"id": "channel-1", "name": "History Vault", "default_blueprint_id": "bp-history"},
+        blueprint={"id": "bp-history", "name": "História", "target_niche": "civilizações antigas"},
+        structure_notes="5 cenas, tom documental",
+    )
+
+    assert result["document_type"] == "video_script"
+    assert result["blueprint_name"] == "História"
+    assert result["content"].startswith("# Gancho")
+    assert captured["user"]["blueprint"]["target_niche"] == "civilizações antigas"
+    assert captured["user"]["structure_notes"] == "5 cenas, tom documental"
+
+
+def test_generate_music_lyrics_requires_brief():
+    with pytest.raises(CreativeGenerationError, match="briefing"):
+        script_generation.generate_script_document(
+            _settings(),
+            document_type="Letra de música",
+            title="",
+            brief="",
+            language="36 – Português (Brasil)",
+        )
+
+
+def test_save_script_document_writes_markdown_and_history(tmp_path, monkeypatch):
+    storage_root = tmp_path / "storage"
+    history = []
+    monkeypatch.setattr(script_documents, "STORAGE", storage_root)
+    monkeypatch.setattr(script_documents, "ensure_storage", lambda: None)
+    monkeypatch.setattr(script_documents, "read_json", lambda _name, _default=None: list(history))
+    monkeypatch.setattr(script_documents, "write_json", lambda _name, value: history.__setitem__(slice(None), value))
+
+    record = script_documents.save_script_document(
+        {
+            "document_type": "music_lyrics",
+            "title": "Canção do Norte",
+            "summary": "Uma viagem interior",
+            "content": "[Verso]\nVento sobre o mar",
+            "language": "36 – Português (Brasil)",
+            "blueprint_name": "Nature Vault",
+            "channel_name": "Canal Musical",
+        }
+    )
+
+    path = Path(record["path"])
+    assert path.parent == storage_root / "scripts"
+    assert path.is_file()
+    assert "Canção do Norte" in path.read_text(encoding="utf-8")
+    assert history[0]["filename"] == path.name
+    assert script_documents.read_script_document(record).endswith("Vento sobre o mar\n")

@@ -24,8 +24,9 @@ DEFAULTS: dict[str, Any] = {
     "uploads.json": [],
     "niche_apify_runs.json": [],
     "metadata_edits.json": [],
-    "python_editor_edits.json": [],
-    "mcp_server.json": {
+        "python_editor_edits.json": [],
+        "scripts.json": [],
+        "mcp_server.json": {
         "enabled": False,
         "host": "127.0.0.1",
         "port": 3031,

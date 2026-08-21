@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.54
+> **Versão deste manual:** 0.2.55
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.54 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.54 install
+npx --yes @danhachuel/thunderbolt@0.2.55 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -428,7 +428,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.54 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -458,9 +458,11 @@ Depois do tópico, clique em **Gerar títulos e thumbnails com IA**. O Thunderbo
 
 No modo **Lote geral**, todos os canais cadastrados são incluídos automaticamente. Não existe selector **Canais incluídos**. O Thunderbolt cria exactamente uma task por canal e cada task recebe briefing, título, thumbnail, Blueprint, voz e contexto próprios. O mesmo tópico não é replicado entre canais.
 
-## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
+## Pipeline: Criação de Vídeos, Criação de Músicas, Roteiros e Automação
 
 O modo `Pexels/Pixabay` representa materiais de stock. Ao seleccionar `full_ia`, o selector `Estilo IA` apresenta os 12 estilos disponíveis. Ao seleccionar `Apenas Música`, a UI obriga a escolher uma música existente, carregar um ficheiro ou solicitar uma música a um endpoint Suno configurado. O vídeo recebe `background_mode=none`, sem fundo Pexels/Pixabay ou IA.
+
+A aba **Roteiros**, colocada entre **Criação de Músicas** e **Upload**, permite seleccionar um canal opcional, um Blueprint, **Roteiro de vídeo** ou **Letra de música**, idioma, tema e estrutura. O botão **Gerar com IA a partir do Blueprint** usa o provider LLM configurado e devolve um rascunho Markdown editável; o utilizador deve rever e clicar em **Guardar documento no storage**. Os ficheiros são guardados em `storage/scripts/` e o índice em `storage/state/scripts.json`; o caminho absoluto aparece no topo da página. Na subaba **Vídeos** de **Criação de Vídeos**, a aplicação mostra a frase `Os vídeos são guardados em <storage>/videos`, que identifica a pasta local dos vídeos.
 
 A aba **Automação Youtube**, dentro do menu expansível **Automação**, lista os canais e vídeos, permite escolher e guardar **Blueprint padrão** e **Voz padrão** por canal, guarda **Automação ON** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais Youtube** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, gera um briefing, título e pacote de thumbnail específicos com o provider LLM configurado, cria o lote agendado na fila e evita duplicar o mesmo canal no mesmo dia. Se a geração não puder ser executada, o erro fica registado e o placeholder antigo não é usado.
 

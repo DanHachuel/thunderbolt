@@ -11,7 +11,7 @@ A primeira versão implementa a camada UI independente com:
 | Área | Incluído |
 |---|---|
 | Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
-| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas e Upload |
+| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas, Roteiros e Upload |
 | Blueprints Youtube | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais Youtube | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
@@ -38,9 +38,9 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.54
+## Navegação da UI 0.2.55
 
-A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 Dentro de **Configurações Técnicas**, a UI está organizada em três subabas, sem numeração visível: **Contas Google/YouTube — canais em lote**, **API Keys** e **Teste de vozes**. A primeira contém cartões expansíveis de contas Google, sessionInfo e documentos de Upload directo; o formulário **Adicionar outra conta Gmail** fica fora dos cartões. **API Keys** reúne execução local, OAuth, LLM, TTS, materiais e restantes credenciais; **Teste de vozes** contém exclusivamente o preview de áudio.
 
@@ -161,9 +161,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.54 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.54 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.54
+npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.55 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.55
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -187,7 +187,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.54 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 
@@ -267,6 +267,10 @@ A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https:/
 ## Pipeline: Criação de Vídeos, Criação de Músicas e Automação Youtube
 
 Em **Criação de Vídeos**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. **Criação de Músicas** reutiliza o mesmo conteúdo e formulário com título próprio. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
+
+A subaba **Roteiros**, entre **Criação de Músicas** e **Upload**, permite escolher um canal opcional, um Blueprint, o tipo **Roteiro de vídeo** ou **Letra de música**, idioma, briefing e notas de estrutura. O botão **Gerar com IA a partir do Blueprint** usa o provider LLM configurado, devolve um rascunho Markdown editável e só guarda o documento quando o utilizador confirmar. Os ficheiros ficam em `storage/scripts/` e o índice do histórico em `storage/state/scripts.json`; a própria página mostra o caminho absoluto correspondente ao storage local.
+
+Na subaba **Vídeos** de **Criação de Vídeos**, a frase `Os vídeos são guardados em <storage>/videos` identifica a pasta real onde os artefactos de vídeo devem ser procurados.
 
 O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais Youtube**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação Youtube**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação Youtube** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
 

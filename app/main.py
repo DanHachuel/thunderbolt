@@ -34,6 +34,8 @@ from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips,
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
+from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
+from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
@@ -1239,6 +1241,150 @@ def render_music_creation():
     render_new_video(page_title="Criação de Músicas")
 
 
+def render_scripts():
+    st.title("Roteiros")
+    st.caption("Produza e guarde roteiros de vídeos ou letras de músicas a partir dos Blueprints do Thunderbolt.")
+    script_dir = script_storage_path()
+    st.info(f"**Ficheiros guardados em:** `{script_dir}` · o conteúdo fica no storage local do Thunderbolt e não é enviado automaticamente para plataformas.")
+
+    create_tab, history_tab = st.tabs(["Novo roteiro/letra", "Histórico guardado"])
+    with create_tab:
+        all_channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict)]
+        active_channels = [channel for channel in all_channels if channel.get("active", True)]
+        channel_options: list[dict[str, Any] | None] = [None] + active_channels
+        selected_channel = st.selectbox(
+            "Canal (opcional)",
+            channel_options,
+            format_func=lambda channel: "Documento independente" if channel is None else str(channel.get("name") or "Canal sem nome"),
+            key="script_channel",
+        )
+        blueprint_options = blueprint_catalog()
+        blueprint_ids = [identifier for identifier, _label in blueprint_options]
+        blueprint_labels = {identifier: label for identifier, label in blueprint_options}
+        selected_blueprint_id = st.selectbox(
+            "Blueprint",
+            blueprint_ids,
+            format_func=lambda identifier: blueprint_labels.get(identifier, "Sem Blueprint padrão"),
+            key="script_blueprint",
+        )
+        selected_blueprint: dict[str, Any] = {}
+        if selected_blueprint_id:
+            for path in list_blueprint_files():
+                try:
+                    blueprint = load_blueprint_file(path)
+                except (OSError, ValueError, json.JSONDecodeError):
+                    continue
+                identifiers = {str(blueprint.get("id") or ""), path.stem, str(blueprint.get("name") or "")}
+                if selected_blueprint_id in identifiers:
+                    selected_blueprint = dict(blueprint)
+                    selected_blueprint.setdefault("id", selected_blueprint_id)
+                    selected_blueprint.setdefault("name", blueprint_labels.get(selected_blueprint_id, selected_blueprint_id))
+                    break
+        if selected_blueprint:
+            st.caption(f"Blueprint aplicado ao contexto: **{selected_blueprint.get('name', selected_blueprint_id)}**")
+        else:
+            st.warning("Sem Blueprint seleccionado: o documento pode ser criado, mas não terá contexto editorial de Blueprint.")
+
+        document_type = st.radio("Tipo de documento", ["Roteiro de vídeo", "Letra de música"], horizontal=True, key="script_document_type")
+        title = st.text_input("Título", key="script_title", placeholder="Ex.: A verdade esquecida sobre…")
+        brief = st.text_area(
+            "Tema ou briefing",
+            key="script_brief",
+            height=120,
+            placeholder="Descreva o tema, a mensagem, o conflito ou a ideia musical que o Blueprint deve orientar.",
+        )
+        language_options = VIDEO_LANGUAGE_OPTIONS
+        language = st.selectbox("Idioma", language_options, key="script_language")
+        structure_notes = st.text_area(
+            "Estrutura e notas opcionais",
+            key="script_structure_notes",
+            height=90,
+            placeholder="Ex.: 6 cenas, narração documental, refrão repetível, atmosfera sombria…",
+        )
+        generate_col, clear_col = st.columns([1.4, 1])
+        with generate_col:
+            generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", use_container_width=True, key="generate_script_document")
+        with clear_col:
+            clear_clicked = st.button("Limpar rascunho", use_container_width=True, key="clear_script_document")
+        if clear_clicked:
+            for key in ("script_draft", "script_draft_title", "script_draft_content", "script_draft_summary"):
+                st.session_state.pop(key, None)
+            st.rerun()
+        if generate_clicked:
+            try:
+                with st.spinner("A gerar o documento com o provider LLM configurado…"):
+                    generated = generate_script_document(
+                        read_json("settings.json", {}),
+                        document_type=document_type,
+                        title=title,
+                        brief=brief,
+                        language=language,
+                        channel=selected_channel or {},
+                        blueprint=selected_blueprint,
+                        structure_notes=structure_notes,
+                    )
+                st.session_state["script_draft"] = generated
+                st.session_state["script_draft_title"] = generated["title"]
+                st.session_state["script_draft_summary"] = generated.get("summary", "")
+                st.session_state["script_draft_content"] = generated["content"]
+                st.success("Rascunho gerado. Reveja e edite o texto antes de guardar.")
+            except CreativeGenerationError as exc:
+                st.error(str(exc))
+
+        draft = st.session_state.get("script_draft")
+        if draft:
+            st.divider()
+            st.subheader("Rascunho editável")
+            if "script_draft_title" not in st.session_state:
+                st.session_state["script_draft_title"] = str(draft.get("title") or title or "Documento")
+            if "script_draft_summary" not in st.session_state:
+                st.session_state["script_draft_summary"] = str(draft.get("summary") or "")
+            if "script_draft_content" not in st.session_state:
+                st.session_state["script_draft_content"] = str(draft.get("content") or "")
+            draft_title = st.text_input("Título do rascunho", key="script_draft_title")
+            draft_summary = st.text_input("Resumo", key="script_draft_summary")
+            draft_content = st.text_area("Conteúdo guardado", height=460, key="script_draft_content")
+            if st.button("Guardar documento no storage", type="primary", use_container_width=True, key="save_script_document"):
+                try:
+                    record = save_script_document(
+                        {
+                            **draft,
+                            "title": draft_title,
+                            "summary": draft_summary,
+                            "content": draft_content,
+                            "document_type": "video_script" if document_type == "Roteiro de vídeo" else "music_lyrics",
+                            "language": language,
+                            "channel_id": str((selected_channel or {}).get("id") or ""),
+                            "channel_name": str((selected_channel or {}).get("name") or "Documento independente"),
+                            "blueprint_id": str(selected_blueprint.get("id") or selected_blueprint_id or ""),
+                            "blueprint_name": str(selected_blueprint.get("name") or blueprint_labels.get(selected_blueprint_id, "SEM BLUEPRINT CONFIGURADO")),
+                        }
+                    )
+                    st.success(f"Documento guardado em `{record['path']}`.")
+                except (OSError, ValueError) as exc:
+                    st.error(f"Não foi possível guardar o documento: {exc}")
+        else:
+            st.caption("Gere um rascunho com IA para o editar aqui, ou seleccione um Blueprint e preencha o briefing para começar.")
+
+    with history_tab:
+        st.caption(f"Histórico persistente: `{script_dir}` · índice em `{STORAGE / 'state' / 'scripts.json'}`")
+        records = list_script_documents()
+        if not records:
+            st.info("Ainda não existem roteiros ou letras guardados.")
+        for record in records[:50]:
+            label = f"{record.get('title', 'Documento')} · {record.get('document_type', 'documento')}"
+            with st.expander(label, expanded=False):
+                st.caption(f"{record.get('created_at', '—')} · {record.get('channel_name', 'Documento independente')} · Blueprint: {record.get('blueprint_name', '—')}")
+                stored_path = Path(str(record.get("path") or ""))
+                content = read_script_document(record)
+                if content:
+                    st.text_area("Conteúdo", value=content, height=220, key=f"stored_script_{record.get('id')}")
+                    if stored_path.is_file():
+                        st.download_button("Descarregar Markdown", data=stored_path.read_bytes(), file_name=stored_path.name, mime="text/markdown", key=f"download_script_{record.get('id')}")
+                else:
+                    st.warning("O ficheiro deste registo já não está disponível no storage.")
+
+
 @st.cache_data(show_spinner=False)
 def _cached_niche_download():
     """Download or reuse the dataset only after the user submits the form."""
@@ -1809,6 +1955,7 @@ def render_python_editor():
 def render_videos():
     st.subheader("Vídeos e backlog")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
+    st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
     tasks = read_json("tasks.json", [])
     if not tasks:
         st.info("Nenhum vídeo criado.")
@@ -2782,6 +2929,7 @@ def main():
     pipeline_items = [
         ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
+        ("Roteiros", ":material/article:", "Roteiros"),
         ("Upload", ":material/cloud_upload:", "Upload"),
     ]
     edition_items = [
@@ -2874,6 +3022,7 @@ def main():
         "Início": render_dashboard,
         "Criação de Vídeos": render_new_video,
         "Criação de Músicas": render_music_creation,
+        "Roteiros": render_scripts,
         "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Niche Finder Apify": render_niche_finder_apify,
