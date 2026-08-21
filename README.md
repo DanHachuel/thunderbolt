@@ -22,12 +22,12 @@ A primeira versão implementa a camada UI independente com:
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados funcional, Cortes reservado e Editor Python inspirado no PYEdit para vídeos e scripts locais |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo via sessão Frontend API com cookies/sessionInfo por conta e DELEGATED_SESSION_ID por canal, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID e Client Secret por conta, cookies SID/SSID/HSID/APISID/SAPISID e sessionInfo por conta, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
+| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID, Client Secret e sessionInfo por conta, repetição dos campos para novas contas, eliminação individual e diagnóstico da URI OAuth, cookies SID/SSID/HSID/APISID/SAPISID no documento JSON, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 ## Upload directo — credenciais por conta e por canal
 
-O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa um único documento JSON por conta Google. Em **Configurações Técnicas > Contas Google/YouTube — canais em lote**, cada cartão Gmail possui apenas o uploader **Documento de credenciais desta conta Google**. Esse documento reúne `SID`, `SSID`, `HSID`, `APISID`, `SAPISID`, `sessionInfo`, `INNERTUBE_API_KEY`, `chunk_size` e o mapa `delegated_session_ids` por canal. A UI não contém inputs separados para nenhum destes valores.
+O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa um único documento JSON por conta Google. Em **Configurações Técnicas > Contas Google/YouTube — canais em lote**, cada cartão Gmail possui o uploader **Documento de credenciais desta conta Google** e o campo específico **sessionInfo token desta conta Google**. O token é guardado por conta e sincronizado no `credentials.json`; o documento continua a reunir `SID`, `SSID`, `HSID`, `APISID`, `INNERTUBE_API_KEY`, `chunk_size` e o mapa `delegated_session_ids` por canal. A UI não contém inputs separados para cookies, INNERTUBE_API_KEY, chunk_size ou DELEGATED_SESSION_ID. O botão **Repetir campos para nova conta** preenche o formulário seguinte com os valores da conta actual, e **Apagar conta** remove a conta, o token OAuth, o documento de credenciais e as associações de canais.
 
 O documento é validado e guardado por Gmail em `storage/youtube_direct_accounts/<id-da-conta>/credentials.json`, com permissões locais restritas. Em **Canais > Canais cadastrados**, a UI apenas associa o canal à conta Google do documento; não mostra nem edita o `DELEGATED_SESSION_ID`. O uploader procura o ID do canal dentro do mapa `delegated_session_ids` do documento e usa-o como `pageId`/`onBehalfOfUser`. O Upload directo fica bloqueado quando faltar qualquer elemento no documento. Não existem campos técnicos do Upload directo na parte inferior de Configurações Técnicas.
 
@@ -36,7 +36,7 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.47
+## Navegação da UI 0.2.48
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -47,6 +47,12 @@ Em **Configurações Técnicas > LLM — providers e modelos**, a área anterior
 A Base URL predefinida para NVIDIA NIM é `https://integrate.api.nvidia.com/v1`. Depois de inserir a API key, clique em **Consultar/actualizar modelos NIM**. O Thunderbolt consulta a Base URL acrescentando `/models`, lê os identificadores do formato OpenAI (`data[].id`) e apresenta-os num selector. O modelo escolhido é guardado em `openai_model_name` e é sincronizado para o `config.toml` do motor.
 
 A consulta só é executada quando o utilizador carrega no botão; a aplicação não envia a API key ao abrir a página. Se o endpoint estiver offline, recusar a credencial ou não disponibilizar `/models`, a UI mostra o erro sem expor a API key e mantém a opção **Escrever modelo manualmente**. Também é possível manter um endpoint local NIM ou outro servidor OpenAI-compatible substituindo a Base URL.
+
+## Contas Google/YouTube e OAuth local
+
+Para autorizar uma conta, use no Google Cloud um cliente OAuth do tipo **Desktop app**. O Thunderbolt usa o loopback local determinístico `http://127.0.0.1:8765/`, abre o browser e guarda o token por conta. Se estiver a usar um cliente do tipo Web application, adicione exactamente essa URI em **Google Cloud > APIs e serviços > Credenciais > URIs de redireccionamento autorizados**; a URI deve incluir a porta e a barra final. O erro `400: redirect_uri_mismatch` significa que a URI registada no cliente Google não coincide exactamente com a enviada pela aplicação.
+
+A área **Contas Google/YouTube — canais em lote** permite manter várias contas. Cada cartão tem e-mail, OAuth Client ID, OAuth Client Secret, sessionInfo e documento de Upload directo. Use **Repetir campos para nova conta** para preparar rapidamente outra conta, ou **Apagar conta** para remover a conta, os tokens e os dados directos associados. O sessionInfo é sincronizado com o documento JSON da própria conta; cookies e os restantes parâmetros de Upload directo permanecem apenas nesse documento.
 
 ## Instalação
 
@@ -133,9 +139,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.47 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.47 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.47
+npx.cmd --yes @danhachuel/thunderbolt@0.2.48 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.48 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.48
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:

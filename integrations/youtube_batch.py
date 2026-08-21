@@ -11,6 +11,36 @@ from typing import Any
 from integrations.platforms import IntegrationResult
 
 BATCH_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
+DEFAULT_LOOPBACK_HOST = "127.0.0.1"
+DEFAULT_LOOPBACK_PORT = 8765
+
+
+def loopback_host() -> str:
+    return _text(os.getenv("THUNDERBOLT_OAUTH_LOOPBACK_HOST")) or DEFAULT_LOOPBACK_HOST
+
+
+def loopback_port() -> int:
+    try:
+        port = int(os.getenv("THUNDERBOLT_OAUTH_LOOPBACK_PORT", str(DEFAULT_LOOPBACK_PORT)))
+    except (TypeError, ValueError):
+        port = DEFAULT_LOOPBACK_PORT
+    return port if 1024 <= port <= 65535 else DEFAULT_LOOPBACK_PORT
+
+
+def loopback_redirect_uri() -> str:
+    return f"http://{loopback_host()}:{loopback_port()}/"
+
+
+def _authorization_error_message(email: str, exc: Exception) -> str:
+    detail = str(exc)
+    if "redirect_uri_mismatch" in detail.lower():
+        return (
+            f"A autorização da conta {email} foi rejeitada pelo Google (redirect_uri_mismatch). "
+            f"Use um cliente OAuth do tipo Desktop app ou adicione exactamente {loopback_redirect_uri()} "
+            "em Google Cloud > APIs e serviços > Credenciais > URIs de redireccionamento autorizados. "
+            "Não use uma URI sem a porta, com localhost diferente ou sem a barra final."
+        )
+    return f"A autorização da conta {email} falhou: {detail}"
 
 
 def _text(value: Any) -> str:
@@ -35,7 +65,7 @@ def _client_config(account: dict[str, Any]) -> dict[str, Any]:
             "client_secret": _text(account.get("client_secret")),
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": ["http://localhost"],
+            "redirect_uris": [loopback_redirect_uri()],
         }
     }
 
@@ -84,8 +114,8 @@ def authorize_account(account: dict[str, Any], storage_root: Path, *, open_brows
     try:
         flow = InstalledAppFlow.from_client_config(_client_config(account), BATCH_SCOPES)
         credentials = flow.run_local_server(
-            host="localhost",
-            port=0,
+            host=loopback_host(),
+            port=loopback_port(),
             open_browser=open_browser,
             access_type="offline",
             prompt="consent",
@@ -95,7 +125,7 @@ def authorize_account(account: dict[str, Any], storage_root: Path, *, open_brows
         _save_credentials(path, credentials)
         return IntegrationResult(True, f"Conta Google autorizada para listagem de canais: {email}.", {"status": "authorized", "email": email, "token_path": str(path)})
     except Exception as exc:
-        return IntegrationResult(False, f"A autorização da conta {email} falhou: {exc}", {"status": "authorization_failed", "email": email})
+        return IntegrationResult(False, _authorization_error_message(email, exc), {"status": "authorization_failed", "email": email, "redirect_uri": loopback_redirect_uri()})
 
 
 def delete_account_token(account: dict[str, Any], storage_root: Path) -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from integrations.platforms import IntegrationResult
+from integrations.youtube_batch import loopback_host, loopback_port, loopback_redirect_uri
 
 
 # Mantemos os mesmos escopos usados pelo youtube-automation-agent.
@@ -111,7 +112,7 @@ class _GoogleYouTubeBase:
                 "client_secret": self.client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost"],
+                "redirect_uris": [loopback_redirect_uri()],
             }
         }
 
@@ -167,8 +168,8 @@ class _GoogleYouTubeBase:
         try:
             flow = InstalledAppFlow.from_client_config(self._client_config(), self.scopes)
             credentials = flow.run_local_server(
-                host="localhost",
-                port=0,
+                host=loopback_host(),
+                port=loopback_port(),
                 open_browser=open_browser,
                 access_type="offline",
                 prompt="consent",
@@ -177,7 +178,17 @@ class _GoogleYouTubeBase:
             self._save_credentials(credentials, nested=self.__class__.__name__ == "YouTubeAutomationAgentUploader")
             return IntegrationResult(True, "Conta YouTube autorizada com sucesso.", {"status": "authorized", "token_path": str(self.token_path)})
         except Exception as exc:
-            return IntegrationResult(False, f"A autorização Google falhou: {exc}", {"status": "authorization_failed"})
+            detail = str(exc)
+            if "redirect_uri_mismatch" in detail.lower():
+                message = (
+                    "A autorização Google foi rejeitada (redirect_uri_mismatch). "
+                    f"Use um cliente OAuth do tipo Desktop app ou adicione exactamente {loopback_redirect_uri()} "
+                    "em Google Cloud > APIs e serviços > Credenciais > URIs de redireccionamento autorizados. "
+                    "Não use uma URI sem a porta, com localhost diferente ou sem a barra final."
+                )
+            else:
+                message = f"A autorização Google falhou: {detail}"
+            return IntegrationResult(False, message, {"status": "authorization_failed", "redirect_uri": loopback_redirect_uri()})
 
     def status(self) -> IntegrationResult:
         if not self.configured:

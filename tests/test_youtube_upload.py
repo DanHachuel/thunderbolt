@@ -28,6 +28,16 @@ def test_agent_metadata_matches_publishing_shape():
     assert payload["status"]["publishAt"].endswith("Z")
 
 
+def test_oauth_uses_fixed_loopback_redirect_uri(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_HOST", raising=False)
+    monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_PORT", raising=False)
+    uploader = YouTubeAutomationAgentUploader(
+        {"youtube_client_id": "oauth-client-id", "youtube_client_secret": "oauth-client-secret"},
+        tmp_path,
+    )
+    assert uploader._client_config()["installed"]["redirect_uris"] == ["http://127.0.0.1:8765/"]
+
+
 def test_oauth_uses_client_pair_without_data_api_key(tmp_path: Path):
     uploader = YouTubeAutomationAgentUploader(
         {"youtube_client_id": "oauth-client-id", "youtube_client_secret": "oauth-client-secret"},

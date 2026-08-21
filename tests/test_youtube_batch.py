@@ -11,6 +11,23 @@ from integrations import youtube_batch
 from integrations.platforms import IntegrationResult
 
 
+def test_loopback_redirect_uri_is_deterministic_and_configurable(monkeypatch):
+    monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_HOST", raising=False)
+    monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_PORT", raising=False)
+    assert youtube_batch.loopback_redirect_uri() == "http://127.0.0.1:8765/"
+    monkeypatch.setenv("THUNDERBOLT_OAUTH_LOOPBACK_HOST", "localhost")
+    monkeypatch.setenv("THUNDERBOLT_OAUTH_LOOPBACK_PORT", "9876")
+    assert youtube_batch.loopback_redirect_uri() == "http://localhost:9876/"
+    assert youtube_batch._client_config({"client_id": "id", "client_secret": "secret"})["installed"]["redirect_uris"] == ["http://localhost:9876/"]
+
+
+def test_redirect_uri_mismatch_message_is_actionable():
+    result = youtube_batch._authorization_error_message("one@example.com", RuntimeError("Error 400: redirect_uri_mismatch"))
+    assert "redirect_uri_mismatch" in result
+    assert "Desktop app" in result
+    assert "http://127.0.0.1:8765/" in result
+
+
 def test_account_key_and_token_path_are_separate_per_account(tmp_path):
     first = {"id": "google_batch_one", "email": "one@example.com"}
     second = {"id": "google_batch_two", "email": "two@example.com"}

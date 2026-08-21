@@ -17,10 +17,13 @@ def test_direct_credentials_are_read_per_account_and_channel_from_document():
     assert 'document_status(STORAGE, selected_channel_account, channel, settings, channels)' in MAIN_SOURCE
     assert 'delegated_session_ids' in MAIN_SOURCE
     assert 'st.text_input("DELEGATED_SESSION_ID deste canal (individual)"' not in MAIN_SOURCE
-    assert 'st.text_input("sessionInfo token desta conta Google"' not in MAIN_SOURCE
+    assert 'sessionInfo token desta conta Google' in MAIN_SOURCE
+    assert 'Repetir campos para nova conta' in MAIN_SOURCE
+    assert 'Apagar conta' in MAIN_SOURCE
     assert 'st.file_uploader("Ficheiro de cookies desta conta Google"' not in MAIN_SOURCE
     assert 'text_setting("INNERTUBE_API_KEY"' not in MAIN_SOURCE
     assert 'number_input("Chunk size' not in MAIN_SOURCE
+    assert 'redirect_uri_mismatch' in MAIN_SOURCE or 'loopback_redirect_uri' in MAIN_SOURCE
 
 
 def test_legacy_cookie_inputs_are_not_rendered():

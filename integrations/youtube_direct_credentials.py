@@ -4,6 +4,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -78,14 +79,16 @@ def parse_cookie_file(content: bytes, filename: str = "cookies.json") -> dict[st
     return {key: pairs[key] for key in COOKIE_KEYS}
 
 
-def parse_credentials_document(content: bytes, filename: str = DIRECT_DOCUMENT_NAME) -> dict[str, Any]:
+def parse_credentials_document(content: bytes, filename: str = DIRECT_DOCUMENT_NAME, *, session_info_override: str = "") -> dict[str, Any]:
     try:
         raw = json.loads(content.decode("utf-8-sig", errors="replace"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError(f"O documento de credenciais {filename} deve ser JSON válido.") from exc
     if not isinstance(raw, dict):
         raise ValueError(f"O documento de credenciais {filename} deve conter um objecto JSON.")
-    document = _normalise_document(raw, {"id": raw.get("account_id", ""), "email": raw.get("email", "")})
+    document = _normalise_document(raw, {"id": raw.get("account_id", ""), "email": raw.get("email", ""), "sessionInfo": session_info_override})
+    if session_info_override.strip():
+        document["sessionInfo"] = session_info_override.strip()
     missing = [key for key in COOKIE_KEYS if not document["cookies"].get(key)]
     if missing:
         raise ValueError(f"Faltam cookies obrigatórios no documento {filename}: {', '.join(missing)}.")
@@ -114,6 +117,10 @@ def _channel_keys(channel: dict[str, Any]) -> list[str]:
     return keys
 
 
+def _account_session_info(account: dict[str, Any]) -> str:
+    return str(account.get("sessionInfo") or account.get("session_info") or account.get("direct_session_info") or "").strip()
+
+
 def _normalise_document(raw: Any, account: dict[str, Any]) -> dict[str, Any]:
     raw = raw if isinstance(raw, dict) else {}
     cookies = _normalise_pairs(raw.get("cookies", raw))
@@ -129,7 +136,7 @@ def _normalise_document(raw: Any, account: dict[str, Any]) -> dict[str, Any]:
     return {
         "account_id": str(raw.get("account_id") or account.get("id") or "").strip(),
         "email": str(raw.get("email") or account.get("email") or "").strip(),
-        "sessionInfo": str(raw.get("sessionInfo") or raw.get("session_info") or raw.get("direct_session_info") or "").strip(),
+        "sessionInfo": str(raw.get("sessionInfo") or raw.get("session_info") or raw.get("direct_session_info") or _account_session_info(account)).strip(),
         "cookies": {key: cookies.get(key, "") for key in COOKIE_KEYS},
         "INNERTUBE_API_KEY": str(raw.get("INNERTUBE_API_KEY") or raw.get("innertube_api_key") or raw.get("direct_innertube_api_key") or "").strip(),
         "chunk_size": _safe_chunk_size(raw.get("chunk_size", raw.get("direct_chunk_size", DEFAULT_CHUNK_SIZE))),
@@ -156,7 +163,7 @@ def _legacy_document(storage_root: Path, account: dict[str, Any], settings: dict
     return _normalise_document({
         "account_id": account.get("id"),
         "email": account.get("email"),
-        "sessionInfo": account.get("direct_session_info") or settings.get("direct_session_info"),
+        "sessionInfo": _account_session_info(account) or settings.get("direct_session_info"),
         "cookies": legacy_cookies,
         "INNERTUBE_API_KEY": settings.get("direct_innertube_api_key"),
         "chunk_size": settings.get("direct_chunk_size", DEFAULT_CHUNK_SIZE),
@@ -189,6 +196,30 @@ def save_credentials_document(storage_root: Path, account: dict[str, Any], docum
     except OSError:
         pass
     return destination
+
+
+def update_credentials_document_session_info(storage_root: Path, account: dict[str, Any], session_info: str) -> Path | None:
+    """Update only sessionInfo in an existing credentials document."""
+    path = credentials_document_path(storage_root, account)
+    if not path.exists():
+        return None
+    raw = _read_json_document(path) or {}
+    document = _normalise_document(raw, {**account, "sessionInfo": session_info})
+    document["sessionInfo"] = str(session_info or "").strip()
+    return save_credentials_document(storage_root, account, document)
+
+
+def delete_credentials_document(storage_root: Path, account: dict[str, Any]) -> None:
+    """Remove all direct-upload credentials belonging only to one Google account."""
+    if not str(account.get("id") or "").strip():
+        return
+    directory = account_directory(storage_root, account)
+    try:
+        shutil.rmtree(directory)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 
 def _read_json_document(path: Path) -> dict[str, Any] | None:

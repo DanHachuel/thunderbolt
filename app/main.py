@@ -36,8 +36,8 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.youtube_direct_upload import YouTubeDirectUploader
-from integrations.youtube_direct_credentials import direct_account_status, document_status, parse_credentials_document, save_credentials_document
-from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels
+from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
+from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL, ModelDiscoveryError, fetch_openai_compatible_models
@@ -1466,6 +1466,13 @@ def render_settings():
                     account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
                 with account_cols[3]:
                     account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
+                account_session_info = st.text_input(
+                    "sessionInfo token desta conta Google",
+                    value=str(batch_account.get("sessionInfo") or batch_account.get("session_info") or batch_account.get("direct_session_info", "")),
+                    type="password",
+                    key=f"batch_session_info_{account_id}",
+                    help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
+                )
                 save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
             direct_status = direct_account_status(STORAGE, batch_account)
             st.markdown("**Credenciais do Upload directo desta conta Google**")
@@ -1498,14 +1505,30 @@ def render_settings():
                     if result.ok:
                         st.rerun()
             with status_cols[2]:
-                if st.button("Remover conta", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
                     delete_youtube_batch_token(batch_account, STORAGE)
+                    delete_credentials_document(STORAGE, batch_account)
                     remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
                     settings["youtube_batch_accounts"] = remaining_accounts
                     if settings.get("youtube_batch_selected_account_id") == account_id:
                         settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
+                    channels = read_json("channels.json", [])
+                    channels_changed = False
+                    for channel in channels:
+                        if str(channel.get("google_account_id") or "") == account_id:
+                            channel.update({"google_account_id": "", "google_account_email": ""})
+                            channels_changed = True
+                    if channels_changed:
+                        write_json("channels.json", channels)
                     write_json("settings.json", settings)
                     st.rerun()
+            if st.button("Repetir campos para nova conta", icon=":material/content_copy:", key=f"batch_repeat_settings_{account_id}", use_container_width=True):
+                st.session_state["new_batch_account_label"] = account_label
+                st.session_state["new_batch_account_email"] = account_email
+                st.session_state["new_batch_account_client_id"] = account_client_id
+                st.session_state["new_batch_account_client_secret"] = account_client_secret
+                st.session_state["new_batch_account_session_info"] = account_session_info
+                st.rerun()
             if save_account:
                 if "@" not in account_email.strip():
                     st.error("Informe um e-mail Google válido.")
@@ -1517,7 +1540,8 @@ def render_settings():
                             credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
                             if credentials_changed:
                                 delete_youtube_batch_token(existing, STORAGE)
-                            existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip()})
+                            existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
+                            update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
                     settings["youtube_batch_accounts"] = batch_accounts
                     write_json("settings.json", settings)
                     st.success("Conta Google/YouTube guardada.")
@@ -1528,7 +1552,7 @@ def render_settings():
                     st.error("Seleccione o documento JSON completo desta conta Google antes de guardar.")
                 else:
                     try:
-                        document = parse_credentials_document(uploaded_document.getvalue(), uploaded_document.name)
+                        document = parse_credentials_document(uploaded_document.getvalue(), uploaded_document.name, session_info_override=account_session_info.strip())
                         document["account_id"] = account_id
                         document["email"] = str(batch_account.get("email", ""))
                         save_credentials_document(STORAGE, batch_account, document)
@@ -1548,8 +1572,9 @@ def render_settings():
             new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
         with add_cols[3]:
             new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
-        new_account_document = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key="new_batch_account_credentials_document", help="Documento JSON único com cookies SID/SSID/HSID/APISID/SAPISID, sessionInfo, INNERTUBE_API_KEY, chunk_size e delegated_session_ids.")
-        st.caption("O documento é guardado em storage/youtube_direct_accounts/<id-da-conta>/credentials.json. Não existem inputs separados para cookies ou sessionInfo.")
+        new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies, INNERTUBE_API_KEY, chunk_size e delegated_session_ids continuam apenas no documento JSON.")
+        new_account_document = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key="new_batch_account_credentials_document", help="Documento JSON único com cookies SID/SSID/HSID/APISID/SAPISID, INNERTUBE_API_KEY, chunk_size e delegated_session_ids. O sessionInfo pode ser preenchido no campo acima ou no documento.")
+        st.caption("O documento é guardado em storage/youtube_direct_accounts/<id-da-conta>/credentials.json. O campo sessionInfo é específico desta conta; os cookies e restantes credenciais continuam apenas no documento.")
         add_account = st.form_submit_button("Adicionar conta Google/YouTube com documento de Upload directo", use_container_width=True)
     if add_account:
         document_error = ""
@@ -1559,14 +1584,14 @@ def render_settings():
             st.error("Informe o Client ID e o Client Secret da nova conta.")
         elif new_account_document is not None:
             try:
-                parse_credentials_document(new_account_document.getvalue(), new_account_document.name)
+                parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
             except ValueError as exc:
                 document_error = str(exc)
                 st.error(document_error)
         if "@" in new_account_email.strip() and new_account_client_id.strip() and new_account_client_secret.strip() and not document_error:
-            new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip()}
+            new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip(), "sessionInfo": new_account_session_info.strip()}
             if new_account_document is not None:
-                document = parse_credentials_document(new_account_document.getvalue(), new_account_document.name)
+                document = parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
                 document["account_id"] = new_account["id"]
                 document["email"] = new_account["email"]
                 save_credentials_document(STORAGE, new_account, document)
@@ -1586,6 +1611,7 @@ def render_settings():
         moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
         st.markdown("**YouTube — OAuth 2.0 e consulta pública**")
         st.caption("Para autorizar uploads, preencha apenas o YouTube OAuth Client ID e o YouTube OAuth Client Secret. Depois, autorize o agente na aba Upload. Estes dados identificam a aplicação OAuth; não são uma Data API Key nem um token de acesso.")
+        st.info(f"OAuth local: use um cliente do tipo Desktop app. Se o Google Cloud pedir uma URI autorizada, registe exactamente `{loopback_redirect_uri()}`.")
         youtube_cols = st.columns(2)
         with youtube_cols[0]:
             youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud. É usado para iniciar a autorização da conta YouTube.")

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from integrations.youtube_direct_credentials import credentials_document_path, direct_account_status, document_status, load_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document
+from integrations.youtube_direct_credentials import credentials_document_path, delete_credentials_document, direct_account_status, document_status, load_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_direct_upload import YouTubeDirectUploader, validate_direct_upload
 
 
@@ -103,6 +103,39 @@ def test_credentials_document_keeps_all_direct_data_per_google_account(tmp_path:
     assert loaded["chunk_size"] == 524288
     assert loaded["delegated_session_ids"]["channel-doc"] == "delegated-document"
     assert status["ready"] is True
+
+
+def test_session_info_override_is_saved_in_credentials_document(tmp_path: Path):
+    account = {"id": "google-session", "email": "session@example.com"}
+    raw = {
+        "account_id": "google-session",
+        "email": "session@example.com",
+        "cookies": {"SID": "sid", "SSID": "ssid", "HSID": "hsid", "APISID": "apisid", "SAPISID": "sapisid"},
+        "INNERTUBE_API_KEY": "innertube",
+        "delegated_session_ids": {},
+    }
+    parsed = parse_credentials_document(json.dumps(raw).encode("utf-8"), "credentials.json", session_info_override="session-from-ui")
+    save_credentials_document(tmp_path, account, parsed)
+    assert load_credentials_document(tmp_path, account)["sessionInfo"] == "session-from-ui"
+    update_credentials_document_session_info(tmp_path, account, "session-updated")
+    assert load_credentials_document(tmp_path, account)["sessionInfo"] == "session-updated"
+
+
+def test_delete_credentials_document_removes_only_selected_account(tmp_path: Path):
+    first = {"id": "google-first", "email": "first@example.com"}
+    second = {"id": "google-second", "email": "second@example.com"}
+    for account in (first, second):
+        save_credentials_document(tmp_path, account, {
+            "account_id": account["id"],
+            "email": account["email"],
+            "sessionInfo": "session",
+            "cookies": {"SID": "sid", "SSID": "ssid", "HSID": "hsid", "APISID": "apisid", "SAPISID": "sapisid"},
+            "INNERTUBE_API_KEY": "innertube",
+            "delegated_session_ids": {},
+        })
+    delete_credentials_document(tmp_path, first)
+    assert not credentials_document_path(tmp_path, first).exists()
+    assert credentials_document_path(tmp_path, second).exists()
 
 
 def test_direct_upload_uses_page_id_and_chunks(tmp_path: Path):
