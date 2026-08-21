@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.52.
+Estado auditado para o release 0.2.53.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -33,6 +33,7 @@ Estado auditado para o release 0.2.52.
 | Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |
 | Editor Python baseado no PYEdit | Concluído como editor local seguro | Vídeos gerados pelos artefactos, selecção de pasta, upload manual, corte, áudio, velocidade, redimensionamento, histórico próprio e edição/guarda de scripts sem execução de código. |
 | Canais em lote por conta Google/YouTube | Concluído como integração OAuth configurável | Contas múltiplas em cartões expansíveis com e-mail, Client ID, Client Secret e sessionInfo próprios; formulário externo para adicionar contas, credentials.json padrão automático, merge de uploads parciais, eliminação individual com limpeza de tokens/documentos/associações, tokens separados, `channels.list(mine=true)` com paginação, selecção, deduplicação por `youtube_channel_id` e importação incremental; não lê Gmail. A associação de canais não depende da completude do documento. |
+| Navegação com Automação expansível e nomes Youtube | Concluído | **Automação** é um menu expansível com **Automação Youtube**; em **Configurações**, as páginas foram renomeadas para **Canais Youtube** e **Blueprints Youtube**, com aliases legados para preservar estados existentes. |
 | Configurações Técnicas organizadas em subabas | Concluído | `render_settings()` apresenta, sem numeração visível e nesta ordem, `Contas Google/YouTube — canais em lote`, `API Keys` e `Teste de vozes`; os blocos de contas, API Keys e preview de voz permanecem isolados. |
 | Cartões expansíveis de contas Google e formulário externo | Concluído | Cada conta é apresentada recolhida como `nome — e-mail`; **Adicionar outra conta Gmail** fica fora dos cartões, após uma divisória. A criação gera `credentials.json`; o uploader faz merge parcial e mantém o alerta de campos em falta. |
 | Associação de canais independente da completude das credenciais | Concluído | A associação `google_account_id` é permitida mesmo sem cookies/sessionInfo/INNERTUBE_API_KEY completos; apenas o Upload directo valida e bloqueia a operação. |

@@ -12,11 +12,11 @@ A primeira versão implementa a camada UI independente com:
 |---|---|
 | Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
 | Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas e Upload |
-| Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
+| Blueprints Youtube | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
-| Canais | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
+| Canais Youtube | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
-| Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
+| Automação | Menu expansível com a subaba **Automação Youtube**, onde ficam os vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | Models AI | Menu expansível com Personagens e Redes Sociais reservados para desenvolvimento futuro |
 | Niche Finder | Menu expansível com duas alternativas independentes: Niche Finder Kaggle e Niche Finder Apify, com parâmetros, execução e resultados separados |
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados funcional, Cortes reservado e Editor Python inspirado no PYEdit para vídeos e scripts locais |
@@ -38,15 +38,15 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.52
+## Navegação da UI 0.2.53
 
-A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 Dentro de **Configurações Técnicas**, a UI está organizada em três subabas, sem numeração visível: **Contas Google/YouTube — canais em lote**, **API Keys** e **Teste de vozes**. A primeira contém cartões expansíveis de contas Google, sessionInfo e documentos de Upload directo; o formulário **Adicionar outra conta Gmail** fica fora dos cartões. **API Keys** reúne execução local, OAuth, LLM, TTS, materiais e restantes credenciais; **Teste de vozes** contém exclusivamente o preview de áudio.
 
-## Canais — edição por cartão e vídeos recentes
+## Canais Youtube — edição por cartão e vídeos recentes
 
-A página **Canais** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Canais de Referência / Nicho**, **Prompts do Canal** (Blueprint padrão), **Narrador** (voz padrão), conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.
+A página **Canais Youtube** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Canais de Referência / Nicho**, **Prompts do Canal** (Blueprint padrão), **Narrador** (voz padrão), conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.
 
 Os blocos do cartão usam a nomenclatura solicitada: **Prompts do Canal**, **Canais de Referência** e **Narrador**. Os botões de acção abrem o mesmo editor persistente, sem criar um segundo canal nem perder as associações existentes.
 
@@ -226,9 +226,9 @@ storage/
 
 Para usar outro local, defina `THUNDERBOLT_STORAGE_DIR`. O estado é escrito de forma atómica e ficheiros JSON inválidos são preservados com cópia `.corrupt-*` antes de serem recriados.
 
-## Blueprints e Brandings
+## Blueprints Youtube e Brandings
 
-Coloque ficheiros `.json` em `storage/blueprints/canais`, `storage/blueprints/nichos` ou `storage/blueprints/importados`. A aba **Blueprints** relê a pasta e mostra o conteúdo estruturado. A instalação já inclui 13 Blueprints seed, copiados apenas quando o ficheiro ainda não existe; actualizações não substituem Blueprints locais. Também é possível importar através do carregador da própria interface.
+Coloque ficheiros `.json` em `storage/blueprints/canais`, `storage/blueprints/nichos` ou `storage/blueprints/importados`. A aba **Blueprints Youtube** relê a pasta e mostra o conteúdo estruturado. A instalação já inclui 13 Blueprints seed, copiados apenas quando o ficheiro ainda não existe; actualizações não substituem Blueprints locais. Também é possível importar através do carregador da própria interface.
 
 A mesma aba possui a subaba **Brandings**. No formulário **Criar blueprint a partir de link**, cole um link de canal, informe o **Nome do Blueprint**, o nicho e o idioma e escolha entre **Apenas Blueprint** ou **Blueprint + Branding completo**. O nome é guardado no campo `name` do JSON e também é usado no nome do ficheiro. O primeiro modo grava o blueprint forense local; o segundo grava também um ficheiro de Branding com identidade do canal, handle, descrição, hashtags, keywords, prompts de imagem de perfil e banner, direcção visual de thumbnails, assets e checklist de revisão.
 
@@ -242,7 +242,7 @@ A descrição segue a composição do workflow de referência: preview, secção
 
 ## Canais YouTube
 
-A aba **Canais** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando uma **YouTube Data API Key própria** estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`; essa chave é distinta do OAuth Client ID e Client Secret.
+A aba **Canais Youtube** está dividida em dois fluxos independentes. Em **Importar do YouTube**, o método padrão **Página pública — sem API Key** consulta a página pública do canal e preenche nome, ID, handle, URL, descrição e thumbnail quando esses dados estão disponíveis. A opção **YouTube Data API — API Key opcional** pode ser escolhida para métricas oficiais quando uma **YouTube Data API Key própria** estiver configurada em **Configurações** ou em `YOUTUBE_API_KEY`; essa chave é distinta do OAuth Client ID e Client Secret.
 
 Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo, Blueprint padrão, voz padrão, `DELEGATED_SESSION_ID` e configuração de Automação. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar. A resolução pública aceita URLs `/channel/UC...`, handles e subpáginas; quando existe um ID mas o HTML não traz todos os dados, tenta o feed RSS público. Se o YouTube responder que o canal não existe ou não fornecer metadados, a UI mostra uma mensagem clara e não mantém o formulário de uma pesquisa anterior. Cada cartão de canal tem **Activo** e, logo abaixo, **Apagar canal**, com confirmação; tarefas e artefactos não são apagados.
 
@@ -256,11 +256,11 @@ Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separad
 
 A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Ela usa cookies, `sessionInfo`, `INNERTUBE_API_KEY` e `DELEGATED_SESSION_ID` fornecidos manualmente pelo utilizador, cria o vídeo através do endpoint interno e envia o ficheiro em chunks de 256 KiB. Este caminho é experimental, não extrai cookies automaticamente e fica separado do agente YouTube principal.
 
-## Pipeline: Criação de Vídeos, Criação de Músicas e Automação
+## Pipeline: Criação de Vídeos, Criação de Músicas e Automação Youtube
 
 Em **Criação de Vídeos**, o estilo visual `Pexels/Pixabay` é o modo de materiais, `full_ia` abre o selector **Estilo IA** com os 12 estilos solicitados e **Apenas Música** exige um áudio local, um upload musical ou um pedido ao endpoint Suno configurado. **Criação de Músicas** reutiliza o mesmo conteúdo e formulário com título próprio. Neste último modo, a task fica com `background_mode=none`: não são gerados fundos Pexels/Pixabay nem fundos IA.
 
-O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
+O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais Youtube**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação Youtube**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação Youtube** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
 
 ## Teste de vozes
 

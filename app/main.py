@@ -490,7 +490,7 @@ def render_dashboard():
 
 
 def render_blueprints():
-    st.title("Blueprints")
+    st.title("Blueprints Youtube")
     st.caption(f"Biblioteca local lida directamente de `{BLUEPRINTS}`")
     blueprint_tab, branding_tab = st.tabs(["Blueprints", "Brandings"])
     with blueprint_tab:
@@ -588,7 +588,7 @@ def render_blueprints():
 
 
 def render_channels():
-    st.title("Canais")
+    st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
     settings = read_json("settings.json", {})
     youtube = YouTubeAdapter(settings=settings)
@@ -1651,7 +1651,7 @@ def render_videos():
 
 
 def render_automation():
-    st.title("Automação")
+    st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
     worker_status = load_worker_status()
     local_now = datetime.now().astimezone()
@@ -2601,14 +2601,17 @@ def main():
         ("Redes Sociais", ":material/share:", "Redes Sociais"),
     ]
     settings_items = [
-        ("Canais", ":material/ondemand_video:", "Canais"),
-        ("Blueprints", ":material/library_books:", "Blueprints"),
+        ("Canais Youtube", ":material/ondemand_video:", "Canais Youtube"),
+        ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
         ("MCP", ":material/hub:", "MCP"),
         ("Configurações Técnicas", ":material/settings:", "Configurações Técnicas"),
     ]
     niche_finder_items = [
         ("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle"),
         ("Niche Finder Apify", ":material/api:", "Niche Finder Apify"),
+    ]
+    automation_items = [
+        ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
     ]
     top_pages = [
         ("Início", ":material/home:", "Início"),
@@ -2625,10 +2628,13 @@ def main():
         "Vídeos": "Criação de Vídeos",
         "Limpador de metadado": "Limpador de Metadados",
         "Niche Finder": "Niche Finder Kaggle",
+        "Automação": "Automação Youtube",
+        "Canais": "Canais Youtube",
+        "Blueprints": "Blueprints Youtube",
         "Configurações Técnicas": "Configurações Técnicas",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
+    if current_page not in {item[0] for item in top_pages + pipeline_items + automation_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
 
@@ -2647,6 +2653,10 @@ def main():
             if target == "Pipeline":
                 with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
                     for child_target, child_icon, child_label in pipeline_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Automação":
+                with st.expander("Automação", expanded=current_page in {item[0] for item in automation_items}, icon=":material/schedule:"):
+                    for child_target, child_icon, child_label in automation_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Edição":
                 with st.expander("Edição", expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
@@ -2671,7 +2681,7 @@ def main():
         "Início": render_dashboard,
         "Criação de Vídeos": render_new_video,
         "Criação de Músicas": render_music_creation,
-        "Automação": render_automation,
+        "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Niche Finder Apify": render_niche_finder_apify,
         "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
@@ -2682,8 +2692,8 @@ def main():
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Upload": render_upload,
-        "Canais": render_channels,
-        "Blueprints": render_blueprints,
+        "Canais Youtube": render_channels,
+        "Blueprints Youtube": render_blueprints,
         "MCP": render_mcp,
         "Configurações Técnicas": render_settings,
     }
