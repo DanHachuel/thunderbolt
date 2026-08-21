@@ -14,7 +14,7 @@ A primeira versão implementa a camada UI independente com:
 | Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas e Upload |
 | Blueprints | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
-| Canais | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente |
+| Canais | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Lista de vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | Models AI | Menu expansível com Personagens e Redes Sociais reservados para desenvolvimento futuro |
@@ -36,11 +36,19 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.50
+## Navegação da UI 0.2.51
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas** e **Upload**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais**, **Blueprints**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 Dentro de **Configurações Técnicas**, a UI está organizada em três subabas, sem numeração visível: **Contas Google/YouTube — canais em lote**, **API Keys** e **Teste de vozes**. A primeira contém contas Google, sessionInfo e documentos de Upload directo; **API Keys** reúne execução local, OAuth, LLM, TTS, materiais e restantes credenciais; **Teste de vozes** contém exclusivamente o preview de áudio.
+
+## Canais — edição por cartão e vídeos recentes
+
+A página **Canais** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Canais de Referência / Nicho**, **Prompts do Canal** (Blueprint padrão), **Narrador** (voz padrão), conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.
+
+Os blocos do cartão usam a nomenclatura solicitada: **Prompts do Canal**, **Canais de Referência** e **Narrador**. Os botões de acção abrem o mesmo editor persistente, sem criar um segundo canal nem perder as associações existentes.
+
+Abaixo do cartão, a secção **Últimos 10 vídeos publicados** usa o feed público RSS do YouTube, sem Data API Key. O carregamento ocorre quando se clica em **Actualizar últimos 10 vídeos**, evitando chamadas automáticas ao abrir a página. Os vídeos ficam guardados em `storage/state/channel_videos.json` e podem ser apresentados em **Lista** ou **Kanban**, nos grupos Planejamento, Produção, Finalizado e Agendado/Publicado. Cada vídeo tem **Editar vídeo** para alterar localmente o título, estado, data, URL e notas. A fonte pública não substitui o vídeo nem publica alterações no YouTube; os campos editáveis são overrides locais de gestão.
 
 ## Criação de Vídeos — geração editorial por canal
 

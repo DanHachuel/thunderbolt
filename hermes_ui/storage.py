@@ -16,8 +16,9 @@ NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 
 DEFAULTS: dict[str, Any] = {
-    "channels.json": [],
-    "tasks.json": [],
+        "channels.json": [],
+        "channel_videos.json": [],
+        "tasks.json": [],
     "queues.json": {"niche": [], "blueprint": [], "brand": [], "script": [], "title": [], "thumbnail": [], "video": [], "edit": [], "upload": []},
     "batches.json": [],
     "uploads.json": [],

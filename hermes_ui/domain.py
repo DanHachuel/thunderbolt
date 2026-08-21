@@ -29,6 +29,8 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "url": url.strip(),
         "handle": "",
         "description": "",
+        "niche": "",
+        "reference_channels": [],
         "thumbnail_url": "",
         "subscriber_count": None,
         "video_count": None,
@@ -182,6 +184,18 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
     queues["script"].extend(task["id"] for task in created)
     write_json("queues.json", queues)
     return created
+
+
+def update_channel_video(video_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    """Actualizar um vídeo remoto sincronizado ou um override local de vídeo do canal."""
+    videos = read_json("channel_videos.json", [])
+    for video in videos:
+        if video.get("id") == video_id:
+            video.update(updates)
+            video["updated_at"] = now()
+            write_json("channel_videos.json", videos)
+            return video
+    return None
 
 
 def update_task(task_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:

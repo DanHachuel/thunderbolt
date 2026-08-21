@@ -20,7 +20,7 @@ try:
 except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, STORAGE, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
@@ -35,7 +35,7 @@ from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
-from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
+from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
@@ -300,6 +300,172 @@ def channel_default_options(channel: dict) -> tuple[list[str], dict[str, str], s
     return blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice
 
 
+def channel_niche_label(channel: dict) -> str:
+    """Return the channel niche/reference label shown under the channel name."""
+    niche = str(channel.get("niche") or "").strip()
+    if niche:
+        return niche
+    references = channel.get("reference_channels")
+    if isinstance(references, list):
+        values = [str(item).strip() for item in references if str(item).strip()]
+        if values:
+            return ", ".join(values)
+    blueprint = blueprint_for_channel(channel)
+    metadata = blueprint.get("metadata") if isinstance(blueprint.get("metadata"), dict) else {}
+    return str(blueprint.get("target_niche") or blueprint.get("niche") or metadata.get("target_niche") or metadata.get("niche") or "SEM NICHO CONFIGURADO").strip()
+
+
+def _merge_channel_videos(channel_id: str, videos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    existing = read_json("channel_videos.json", [])
+    if not isinstance(existing, list):
+        existing = []
+    other_channels = [item for item in existing if isinstance(item, dict) and str(item.get("channel_id")) != str(channel_id)]
+    current_by_id = {str(item.get("id")): item for item in existing if isinstance(item, dict) and str(item.get("channel_id")) == str(channel_id)}
+    merged: list[dict[str, Any]] = []
+    for video in videos:
+        item = dict(current_by_id.get(str(video.get("id")), {}))
+        item.update(video)
+        item["channel_id"] = str(channel_id)
+        item.setdefault("status", "publicado")
+        merged.append(item)
+    write_json("channel_videos.json", other_channels + merged)
+    return merged
+
+
+def channel_videos_for(channel: dict, limit: int = 10) -> list[dict[str, Any]]:
+    channel_id = str(channel.get("id") or "")
+    stored = read_json("channel_videos.json", [])
+    videos = [item for item in stored if isinstance(item, dict) and str(item.get("channel_id")) == channel_id]
+    videos.sort(key=lambda item: str(item.get("published_at") or item.get("created_at") or ""), reverse=True)
+    return videos[:limit]
+
+
+def render_channel_video_editor(video: dict, channel_id: str) -> None:
+    video_id = str(video.get("id") or "")
+    edit_key = f"channel_video_edit_{video_id}"
+    if st.button("Editar vídeo", key=f"edit_channel_video_{video_id}", use_container_width=True):
+        st.session_state[edit_key] = True
+        st.rerun()
+    if st.session_state.get(edit_key):
+        with st.form(f"channel_video_form_{video_id}"):
+            edited_title = st.text_input("Título", value=str(video.get("title") or ""))
+            edited_status = st.selectbox("Estado", ["planejamento", "produção", "finalizado", "agendado", "publicado"], index=["planejamento", "produção", "finalizado", "agendado", "publicado"].index(str(video.get("status") or "publicado")) if str(video.get("status") or "publicado") in {"planejamento", "produção", "finalizado", "agendado", "publicado"} else 4)
+            edited_date = st.text_input("Data de publicação", value=str(video.get("published_at") or ""))
+            edited_url = st.text_input("URL", value=str(video.get("url") or ""))
+            edited_notes = st.text_area("Notas", value=str(video.get("notes") or ""), height=80)
+            save_video = st.form_submit_button("Guardar alteração", type="primary")
+        if save_video:
+            update_channel_video(video_id, {"title": edited_title.strip(), "status": edited_status, "published_at": edited_date.strip(), "url": edited_url.strip(), "notes": edited_notes.strip()})
+            st.session_state.pop(edit_key, None)
+            st.success("Vídeo actualizado.")
+            st.rerun()
+
+
+def render_channel_videos(channel: dict) -> None:
+    channel_id = str(channel.get("id") or "")
+    st.markdown("### Últimos 10 vídeos publicados")
+    st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
+    refresh_col, view_col = st.columns([1.4, 1])
+    with refresh_col:
+        if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
+            result = fetch_channel_videos_public(channel, limit=10)
+            if result.ok:
+                videos = _merge_channel_videos(channel_id, result.data.get("videos", []))
+                st.session_state[f"channel_videos_{channel_id}"] = videos
+                st.success(result.message)
+                st.rerun()
+            else:
+                st.warning(result.message)
+    with view_col:
+        view_mode = st.radio("Vista", ["Lista", "Kanban"], horizontal=True, key=f"channel_videos_view_{channel_id}", label_visibility="collapsed")
+    videos = st.session_state.get(f"channel_videos_{channel_id}") or channel_videos_for(channel, limit=10)
+    if not videos:
+        st.info("Ainda não existem vídeos sincronizados. Clique em **Actualizar últimos 10 vídeos**.")
+        return
+    if view_mode == "Lista":
+        for video in videos[:10]:
+            with st.container(border=True):
+                cols = st.columns([0.7, 3.4, 1.4, 1.1])
+                with cols[0]:
+                    if video.get("thumbnail_url"):
+                        st.image(video["thumbnail_url"], width=64)
+                    else:
+                        st.markdown("### YT")
+                with cols[1]:
+                    st.write(f"**{video.get('title', 'Vídeo sem título')}**")
+                    st.caption(f"{video.get('published_at') or 'Sem data'} · {video.get('url') or 'Sem URL'}")
+                with cols[2]:
+                    st.caption(str(video.get("status") or "publicado").title())
+                with cols[3]:
+                    render_channel_video_editor(video, channel_id)
+    else:
+        columns = st.columns(4)
+        groups = [("planejamento", "Planejamento"), ("produção", "Produção"), ("finalizado", "Finalizado"), ("publicado", "Agendado/Publicado")]
+        for column, (status_key, label) in zip(columns, groups):
+            with column:
+                st.markdown(f"**{label}**")
+                group = [video for video in videos[:10] if str(video.get("status") or "publicado").lower() in ({status_key} if status_key != "publicado" else {"publicado", "agendado"})]
+                if not group:
+                    st.caption("Sem vídeos")
+                for video in group:
+                    with st.container(border=True):
+                        st.write(f"**{video.get('title', 'Vídeo sem título')}**")
+                        st.caption(video.get("published_at") or "Sem data")
+                        render_channel_video_editor(video, channel_id)
+
+
+def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], youtube_account_labels: dict[str, str], youtube_accounts_by_id: dict[str, dict[str, Any]]) -> None:
+    channel_id = str(channel["id"])
+    blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
+    account_ids = list(youtube_account_ids)
+    current_account = str(channel.get("google_account_id") or "")
+    if current_account and current_account not in account_ids:
+        account_ids.append(current_account)
+        youtube_account_labels[current_account] = "Conta Google não configurada"
+    with st.form(f"channel_edit_form_{channel_id}"):
+        st.subheader("Editar canal")
+        edit_cols = st.columns(2)
+        with edit_cols[0]:
+            edited_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
+            edited_url = st.text_input("URL", value=str(channel.get("url") or ""))
+            edited_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
+            edited_language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=["Português", "English", "Español", "Français", "Deutsch"].index(channel.get("language")) if channel.get("language") in {"Português", "English", "Español", "Français", "Deutsch"} else 0)
+            style_options = ["Pexels/Pixabay", "full_ia", "Apenas Música"]
+            style_value = {"pexels": "Pexels/Pixabay", "music": "Apenas Música"}.get(str(channel.get("style_wide") or "pexels"), str(channel.get("style_wide") or "Pexels/Pixabay"))
+            edited_style = st.selectbox("Estilo wide", style_options, index=style_options.index(style_value) if style_value in style_options else 0)
+            edited_niche = st.text_input("Canais de Referência / Nicho", value=str(channel.get("niche") or channel_niche_label(channel) if channel_niche_label(channel) != "SEM NICHO CONFIGURADO" else "") )
+        with edit_cols[1]:
+            edited_blueprint = st.selectbox("Prompts do Canal", blueprint_ids, index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"))
+            edited_voice = st.selectbox("Narrador", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
+            edited_account = st.selectbox("Conta Google para Upload directo", account_ids, index=account_ids.index(current_account) if current_account in account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"))
+            edited_description = st.text_area("Descrição", value=str(channel.get("description") or ""), height=100)
+            edited_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"edit_automation_{channel_id}")
+            edited_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
+        save_channel = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
+        cancel_edit = st.form_submit_button("Cancelar edição")
+    if cancel_edit:
+        st.session_state.pop(f"edit_channel_{channel_id}", None)
+        st.rerun()
+    if save_channel:
+        if not edited_name.strip():
+            st.error("Informe o nome do canal.")
+        elif not valid_hhmm(edited_time):
+            st.error("O horário diário deve estar no formato HH:MM.")
+        else:
+            update_channel(channel_id, {
+                "name": edited_name.strip(), "url": edited_url.strip(), "handle": edited_handle.strip(), "language": edited_language,
+                "style_wide": {"Pexels/Pixabay": "pexels", "Apenas Música": "music"}.get(edited_style, edited_style),
+                "niche": edited_niche.strip(), "reference_channels": [item.strip() for item in re.split(r"[,|]", edited_niche) if item.strip()],
+                "default_blueprint_id": edited_blueprint.strip(), "blueprint_id": edited_blueprint.strip(),
+                "default_voice": edited_voice.strip(), "voice": edited_voice.strip(),
+                "google_account_id": edited_account.strip(), "google_account_email": str(youtube_accounts_by_id.get(edited_account, {}).get("email", "")),
+                "description": edited_description.strip(), "automation_on": bool(edited_automation), "automation_time": edited_time.strip(),
+            })
+            st.session_state.pop(f"edit_channel_{channel_id}", None)
+            st.success("Canal actualizado.")
+            st.rerun()
+
+
 def render_dashboard():
     st.title("Thunderbolt")
     st.caption("Interface local para operação e automação de conteúdo faceless")
@@ -482,6 +648,7 @@ def render_channels():
                 automation_on = st.toggle("Automação ON", value=bool(imported.get("automation_on", False)), key="yt_import_automation_on")
                 automation_time = st.text_input("Horário diário (HH:MM)", value=imported.get("automation_time", "00:00"), key="yt_import_automation_time")
                 description = st.text_area("Descrição", value=imported.get("description", ""), key="yt_import_description")
+                niche = st.text_input("Canais de Referência / Nicho", value=imported.get("niche", ""), key="yt_import_niche")
                 metrics = st.columns(3)
                 with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=int(imported.get("subscriber_count") or 0), key="yt_import_subscribers")
                 with metrics[1]: video_count = st.number_input("Vídeos", min_value=0, value=int(imported.get("video_count") or 0), key="yt_import_videos")
@@ -497,6 +664,8 @@ def render_channels():
                             **imported,
                             "handle": handle.strip(),
                             "description": description.strip(),
+                            "niche": niche.strip(),
+                            "reference_channels": [item.strip() for item in re.split(r"[,|]", niche) if item.strip()],
                             "language": language,
                             "style_wide": {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style, style),
                             "blueprint_id": blueprint.strip(),
@@ -615,6 +784,7 @@ def render_channels():
             url = st.text_input("URL do canal", placeholder="https://youtube.com/@seucanal", key="manual_channel_url")
             handle = st.text_input("Handle", placeholder="@seucanal", key="manual_channel_handle")
             description = st.text_area("Descrição", key="manual_channel_description")
+            niche = st.text_input("Canais de Referência / Nicho", placeholder="Ex.: História militar, mistérios, ciência", key="manual_channel_niche")
             language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="manual_channel_language")
             style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="manual_channel_style")
             manual_blueprint_items = blueprint_catalog()
@@ -642,6 +812,8 @@ def render_channels():
                     channel = create_channel(name, url, {
                         "handle": handle.strip(),
                         "description": description.strip(),
+                        "niche": niche.strip(),
+                        "reference_channels": [item.strip() for item in re.split(r"[,|]", niche) if item.strip()],
                         "language": language,
                         "style_wide": {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style, style),
                         "blueprint_id": blueprint.strip(),
@@ -667,98 +839,93 @@ def render_channels():
         st.info("Nenhum canal cadastrado.")
         return
     for channel in channels:
+        channel_id = str(channel["id"])
+        edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
+            header_cols = st.columns([0.7, 3.5, 1.3, 1.3, 1.5])
+            with header_cols[0]:
+                if channel.get("thumbnail_url"):
+                    st.image(channel["thumbnail_url"], width=64)
+                else:
+                    st.markdown("### YT")
+            with header_cols[1]:
+                st.write(f"**{channel.get('name', 'Sem nome')}**")
+                st.caption(channel_niche_label(channel))
+                st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
+            with header_cols[2]:
+                st.metric("Inscritos", channel.get("subscriber_count") if channel.get("subscriber_count") is not None else "—")
+            with header_cols[3]:
+                st.metric("Vídeos", channel.get("video_count") if channel.get("video_count") is not None else "—")
+            with header_cols[4]:
+                active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel_id}")
+                if active != channel.get("active"):
+                    update_channel(channel_id, {"active": active})
+                    st.rerun()
+                action_cols = st.columns(2)
+                with action_cols[0]:
+                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+                with action_cols[1]:
+                    delete_key = f"delete_pending_{channel_id}"
+                    if st.button("Apagar", key=f"delete_{channel_id}", use_container_width=True):
+                        st.session_state[delete_key] = True
+                        st.rerun()
+            if st.session_state.get(edit_key):
+                render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
+            else:
+                summary = channel_blueprint_summary(channel)
+                block_cols = st.columns(3)
+                with block_cols[0]:
+                    st.markdown(f"**Prompts do Canal**\n\n{summary['name']}")
+                    if st.button("Editar Prompts", key=f"edit_prompts_{channel_id}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+                with block_cols[1]:
+                    st.markdown(f"**Canais de Referência**\n\n{channel_niche_label(channel)}")
+                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+                with block_cols[2]:
+                    st.markdown(f"**Narrador**\n\n{summary['voice'] or 'Sem voz padrão'}")
+                    if st.button("Configurar Narrador", key=f"edit_voice_{channel_id}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+
             channel_account_ids = list(youtube_account_ids)
             current_channel_account_id = str(channel.get("google_account_id", ""))
             if current_channel_account_id and current_channel_account_id not in channel_account_ids:
                 channel_account_ids.append(current_channel_account_id)
                 youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
-            st.markdown("**Upload directo — documento da conta deste canal**")
-            st.caption("O DELEGATED_SESSION_ID deste canal é individual, mas fica apenas no documento JSON da conta Google. A UI não mostra nem edita esse valor; associe apenas o canal à conta que contém o documento.")
-            with st.form(f"channel_direct_credentials_{channel['id']}"):
-                channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel['id']}")
-                save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", use_container_width=True)
-            selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
-            if selected_channel_account:
-                selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
-                if selected_account_status["ready"]:
-                    st.success("Documento da conta completo e DELEGATED_SESSION_ID deste canal encontrado no documento.")
-                elif not selected_account_status["document_exists"]:
-                    st.warning("A conta seleccionada ainda não tem documento JSON de credenciais.")
+            with st.expander("Upload directo — documento da conta deste canal", expanded=False):
+                st.caption("O DELEGATED_SESSION_ID deste canal é individual, mas fica apenas no documento JSON da conta Google. A UI não mostra nem edita esse valor; associe apenas o canal à conta que contém o documento.")
+                with st.form(f"channel_direct_credentials_{channel_id}"):
+                    channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel_id}")
+                    save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", use_container_width=True)
+                selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
+                if selected_channel_account:
+                    selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
+                    if selected_account_status["ready"]:
+                        st.success("Documento da conta completo e DELEGATED_SESSION_ID deste canal encontrado no documento.")
+                    elif not selected_account_status["document_exists"]:
+                        st.warning("A conta seleccionada ainda não tem documento JSON de credenciais.")
+                    else:
+                        missing_channel_parts = list(selected_account_status["missing_cookies"])
+                        if not selected_account_status["has_session_info"]:
+                            missing_channel_parts.append("sessionInfo")
+                        if not selected_account_status["has_innertube_api_key"]:
+                            missing_channel_parts.append("INNERTUBE_API_KEY")
+                        if not selected_account_status["has_delegated_session_id"]:
+                            missing_channel_parts.append("DELEGATED_SESSION_ID deste canal")
+                        st.warning(f"Documento incompleto: {', '.join(missing_channel_parts)}")
                 else:
-                    missing_channel_parts = list(selected_account_status["missing_cookies"])
-                    if not selected_account_status["has_session_info"]:
-                        missing_channel_parts.append("sessionInfo")
-                    if not selected_account_status["has_innertube_api_key"]:
-                        missing_channel_parts.append("INNERTUBE_API_KEY")
-                    if not selected_account_status["has_delegated_session_id"]:
-                        missing_channel_parts.append("DELEGATED_SESSION_ID deste canal")
-                    st.warning(f"Documento incompleto: {', '.join(missing_channel_parts)}")
-            else:
-                st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
-            if save_channel_direct_credentials:
-                update_channel(channel["id"], {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", ""))})
-                st.success("Conta Google associada ao canal. O DELEGATED_SESSION_ID continua exclusivamente no documento da conta.")
-                st.rerun()
-            cols = st.columns([0.6, 2.2, 1.2, 1.2, 1.2, 1])
-            with cols[0]:
-                if channel.get("thumbnail_url"):
-                    st.image(channel["thumbnail_url"], width=54)
-                else:
-                    st.markdown("### YT")
-            with cols[1]:
-                st.write(f"**{channel.get('name', 'Sem nome')}**")
-                st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
-            with cols[2]: st.metric("Inscritos", channel.get("subscriber_count") if channel.get("subscriber_count") is not None else "—")
-            with cols[3]: st.metric("Vídeos", channel.get("video_count") if channel.get("video_count") is not None else "—")
-            with cols[4]: st.metric("Backlog", channel.get("backlog_total", 0))
-            with cols[5]:
-                active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel['id']}")
-                if active != channel.get("active"):
-                    update_channel(channel["id"], {"active": active})
+                    st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
+                if save_channel_direct_credentials:
+                    update_channel(channel_id, {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", ""))})
+                    st.success("Conta Google associada ao canal. O DELEGATED_SESSION_ID continua exclusivamente no documento da conta.")
                     st.rerun()
-                delete_key = f"delete_pending_{channel['id']}"
-                if not st.session_state.get(delete_key, False):
-                    if st.button("Apagar canal", key=f"delete_{channel['id']}", use_container_width=True):
-                        st.session_state[delete_key] = True
-                        st.rerun()
-                else:
-                    st.warning("As tarefas, vídeos e artefactos relacionados serão preservados.")
-                    confirm_col, cancel_col = st.columns(2)
-                    with confirm_col:
-                        if st.button("Confirmar apagar", key=f"confirm_delete_{channel['id']}", type="primary", use_container_width=True):
-                            removed = delete_channel(channel["id"])
-                            st.session_state.pop(delete_key, None)
-                            if removed:
-                                st.success(f"Canal {removed.get('name', 'seleccionado')} apagado.")
-                            st.rerun()
-                    with cancel_col:
-                        if st.button("Cancelar", key=f"cancel_delete_{channel['id']}", use_container_width=True):
-                            st.session_state.pop(delete_key, None)
-                            st.rerun()
-            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            with st.expander("Definir Blueprint e voz padrão", expanded=False):
-                editor_cols = st.columns(2)
-                with editor_cols[0]:
-                    channel_blueprint = st.selectbox(
-                        "Blueprint padrão",
-                        blueprint_ids,
-                        index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
-                        format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
-                        key=f"channel_default_blueprint_{channel['id']}",
-                    )
-                with editor_cols[1]:
-                    channel_voice = st.selectbox(
-                        "Voz padrão",
-                        voice_options,
-                        index=voice_options.index(current_voice) if current_voice in voice_options else 0,
-                        format_func=lambda item: item or "Sem voz padrão",
-                        key=f"channel_default_voice_{channel['id']}",
-                    )
-                if st.button("Guardar Blueprint e voz", key=f"save_channel_defaults_{channel['id']}", type="primary"):
-                    set_channel_defaults(channel["id"], channel_blueprint, channel_voice)
-                    st.success("Blueprint padrão e voz padrão guardados para este canal.")
-                    st.rerun()
+
+            render_channel_videos(channel)
 
 
 def render_new_video(page_title: str = "Criação de Vídeos"):

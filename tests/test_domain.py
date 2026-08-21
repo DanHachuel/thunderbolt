@@ -192,3 +192,24 @@ def test_general_batch_always_creates_one_task_per_channel(tmp_path, monkeypatch
     assert {task["channel_id"] for task in tasks} == {channel["id"] for channel in channels}
     assert all(task["topic"] == "Contexto" for task in tasks)
     assert len({task["id"] for task in tasks}) == 3
+
+
+def test_update_channel_video_persists_local_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("THUNDERBOLT_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import update_channel_video
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.write_json("channel_videos.json", [
+        {"id": "youtube_video1", "channel_id": "channel_a", "title": "Título antigo", "status": "publicado"},
+        {"id": "youtube_video2", "channel_id": "channel_b", "title": "Outro canal", "status": "publicado"},
+    ])
+
+    updated = update_channel_video("youtube_video1", {"title": "Título editado", "status": "finalizado"})
+
+    assert updated["title"] == "Título editado"
+    assert updated["status"] == "finalizado"
+    stored = storage.read_json("channel_videos.json", [])
+    assert stored[1]["title"] == "Outro canal"

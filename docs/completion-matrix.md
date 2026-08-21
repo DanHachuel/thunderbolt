@@ -1,11 +1,15 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.50.
+Estado auditado para o release 0.2.51.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
 | UI Streamlit, launcher npx, storage local, Blueprints, Brandings, Canais e Novo vídeo base | Parcialmente concluído | Estrutura existente e publicada. |
 | Importação pública de canais sem API Key, Data API opcional e cadastro manual | Concluído | `render_channels()` e `YouTubeAdapter.fetch_channel_public()`. |
+| Edição persistente dos canais após cadastro | Concluído | Cartões com **Editar**, editor de nome/URL/handle/idioma/estilo, nicho, Blueprint/Prompts do Canal, voz/Narrador, conta Google, descrição e Automação. |
+| Canais de Referência/Nicho visível no cartão | Concluído | `niche` e `reference_channels` persistidos; o valor aparece abaixo do nome e tem fallback para metadata do Blueprint. |
+| Últimos 10 vídeos do canal fora da Criação de Vídeos | Concluído como consulta pública | Feed RSS público sem Data API Key, guardado em `storage/state/channel_videos.json`, com actualização manual. |
+| Vídeos do canal em Lista/Kanban com alteração | Concluído como gestão local | Vistas Lista e Kanban por estado; cada item permite editar título, estado, data, URL e notas sem publicar automaticamente no YouTube. |
 | Vídeos como subaba de Novo vídeo | Concluído | `render_new_video()` cria as subabas. |
 | YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`. |
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |

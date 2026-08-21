@@ -125,3 +125,32 @@ def test_api_lookup_reports_optional_key_instead_of_blocking_public_flow():
     assert result.data["status"] == "api_key_not_configured"
     assert "Data API Key própria" in result.message
     assert "OAuth Client ID" in result.message
+
+
+def test_fetch_channel_videos_public_reads_latest_atom_entries_without_api_key(monkeypatch):
+    feed = """<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">
+      <title>Canal Vídeos</title><yt:channelId>UCVIDEOS123</yt:channelId>
+      <entry><id>yt:video:video1</id><yt:videoId>video1</yt:videoId><title>Vídeo 1</title><published>2026-08-21T08:00:00+00:00</published><updated>2026-08-21T08:01:00+00:00</updated><link rel="alternate" href="https://www.youtube.com/watch?v=video1"/><media:group><media:thumbnail url="https://img.example/video1.jpg"/></media:group></entry>
+      <entry><id>yt:video:video2</id><yt:videoId>video2</yt:videoId><title>Vídeo 2</title><published>2026-08-20T08:00:00+00:00</published><updated>2026-08-20T08:01:00+00:00</updated><link rel="alternate" href="https://www.youtube.com/watch?v=video2"/></entry>
+    </feed>"""
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: FakeResponse(feed))
+
+    result = YouTubeAdapter(settings={}).fetch_channel_videos_public({"youtube_channel_id": "UCVIDEOS123"}, limit=10)
+
+    assert result.ok
+    assert len(result.data["videos"]) == 2
+    assert result.data["videos"][0]["id"] == "youtube_video1"
+    assert result.data["videos"][0]["title"] == "Vídeo 1"
+    assert result.data["videos"][0]["thumbnail_url"].endswith("video1.jpg")
+    assert result.data["videos"][1]["url"].endswith("video2")
+
+
+def test_fetch_channel_videos_public_caps_result_at_ten(monkeypatch):
+    entries = "".join(f"<entry><yt:videoId>video{index}</yt:videoId><title>Vídeo {index}</title></entry>" for index in range(15))
+    feed = f'<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">{entries}</feed>'
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: FakeResponse(feed))
+
+    result = YouTubeAdapter(settings={}).fetch_channel_videos_public("UCVIDEOS123", limit=50)
+
+    assert result.ok
+    assert len(result.data["videos"]) == 10

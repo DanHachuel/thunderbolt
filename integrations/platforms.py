@@ -238,6 +238,80 @@ def _public_feed_data(channel_id: str, headers: dict[str, str]) -> dict[str, Any
         return {}
 
 
+def fetch_channel_videos_public(channel_ref: str | dict[str, Any], limit: int = 10) -> "IntegrationResult":
+    """Fetch the latest public channel videos from YouTube's Atom feed without an API key."""
+    if isinstance(channel_ref, dict):
+        source = str(channel_ref.get("youtube_channel_id") or channel_ref.get("url") or "").strip()
+    else:
+        source = str(channel_ref or "").strip()
+    if not source:
+        return IntegrationResult(False, "Este canal ainda não tem ID ou URL pública do YouTube.", {"videos": []})
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Accept": "application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8",
+    }
+    channel_id = _channel_id_from_source(source)
+    if not channel_id and source.startswith(("http://", "https://")):
+        for page_url in _public_page_candidates(source):
+            try:
+                response = requests.get(page_url, headers=headers, timeout=12, allow_redirects=True)
+                response.raise_for_status()
+            except requests.RequestException:
+                continue
+            document = response.text or ""
+            channel_id = _channel_id_from_document(document, str(getattr(response, "url", "") or page_url))
+            if channel_id:
+                break
+    if not channel_id:
+        return IntegrationResult(False, "Não foi possível resolver o ID público do canal para carregar os vídeos.", {"videos": []})
+    feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    try:
+        response = requests.get(feed_url, headers=headers, timeout=12)
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+    except (requests.RequestException, ET.ParseError, ValueError) as exc:
+        return IntegrationResult(False, f"Não foi possível carregar os vídeos públicos do canal: {exc}", {"channel_id": channel_id, "videos": []})
+    namespace = {
+        "yt": "http://www.youtube.com/xml/schemas/2015",
+        "atom": "http://www.w3.org/2005/Atom",
+        "media": "http://search.yahoo.com/mrss/",
+    }
+    videos: list[dict[str, Any]] = []
+    max_items = max(1, min(10, int(limit or 10)))
+    for entry in root.findall("atom:entry", namespace)[:max_items]:
+        video_id = entry.findtext("yt:videoId", default="", namespaces=namespace).strip()
+        title = entry.findtext("atom:title", default="", namespaces=namespace).strip()
+        published_at = entry.findtext("atom:published", default="", namespaces=namespace).strip()
+        updated_at = entry.findtext("atom:updated", default="", namespaces=namespace).strip()
+        link = ""
+        for candidate in entry.findall("atom:link", namespace):
+            if candidate.attrib.get("rel", "alternate") == "alternate":
+                link = candidate.attrib.get("href", "")
+                break
+        if not link and video_id:
+            link = f"https://www.youtube.com/watch?v={video_id}"
+        thumbnail = ""
+        media_group = entry.find("media:group", namespace)
+        if media_group is not None:
+            media_thumbnail = media_group.find("media:thumbnail", namespace)
+            if media_thumbnail is not None:
+                thumbnail = str(media_thumbnail.attrib.get("url", ""))
+        videos.append({
+            "id": f"youtube_{video_id}" if video_id else f"youtube_{len(videos)}",
+            "youtube_video_id": video_id,
+            "channel_id": channel_id,
+            "title": title or "Vídeo sem título",
+            "published_at": published_at,
+            "updated_at": updated_at,
+            "url": link,
+            "thumbnail_url": thumbnail,
+            "source": "youtube_public_rss",
+            "status": "publicado",
+        })
+    return IntegrationResult(True, f"{len(videos)} vídeo(s) público(s) carregado(s) sem API Key.", {"channel_id": channel_id, "videos": videos})
+
+
 @dataclass
 class IntegrationResult:
     ok: bool
@@ -384,6 +458,9 @@ class YouTubeAdapter:
         if direct_id:
             data["youtube_id"] = direct_id
         return IntegrationResult(False, f"Não foi possível obter dados públicos do YouTube sem API Key. {last_error or 'Confirme o URL/handle ou use Cadastro manual.'}".strip(), data)
+
+    def fetch_channel_videos_public(self, channel_ref: str | dict[str, Any], limit: int = 10) -> IntegrationResult:
+        return fetch_channel_videos_public(channel_ref, limit=limit)
 
     def fetch_channel(self, value: str) -> IntegrationResult:
         ref = self.extract_channel_ref(value)
