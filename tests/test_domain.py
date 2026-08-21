@@ -73,9 +73,11 @@ def test_blueprint_creation_modes(tmp_path, monkeypatch):
     assert blueprint_path.exists()
     assert branding_path is None
 
-    blueprint2, branding2 = blueprints.create_blueprint_from_link("https://www.youtube.com/@canal", "filosofia", "Português (pt-BR)", True)
+    blueprint2, branding2 = blueprints.create_blueprint_from_link("https://www.youtube.com/@canal", "filosofia", "Português (pt-BR)", True, "Canal Exemplo", "Meu Blueprint Filosofia")
+    assert blueprint2["name"] == "Meu Blueprint Filosofia"
     assert branding2 is not None
-    _, branding_path2 = blueprints.save_generated_blueprint(blueprint2, branding2)
+    blueprint_path2, branding_path2 = blueprints.save_generated_blueprint(blueprint2, branding2)
+    assert blueprint_path2.name.startswith("meu-blueprint-filosofia-")
     assert branding_path2 is not None and branding_path2.exists()
     assert len(blueprints.list_branding_files()) == 1
 

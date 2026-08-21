@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.46.
+Estado auditado para o release 0.2.47.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -23,6 +23,7 @@ Estado auditado para o release 0.2.46.
 | UI sem campos técnicos de Upload directo | Concluído | A UI mostra apenas o uploader do documento por Gmail e a associação do canal à conta; não renderiza inputs separados de cookies, sessionInfo, INNERTUBE_API_KEY, chunk size ou DELEGATED_SESSION_ID. |
 | `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | O ID delegado é lido do documento JSON da conta pelo identificador do canal; Blueprint e voz continuam com selectors próprios da pipeline. |
 | Agendamento real em segundo plano | Fora do escopo actual de UI | O worker de Automação é local e baseado no relógio; não é usado pelo Niche Finder Apify. |
+| Blueprints com nome personalizado na criação a partir de link | Concluído | O formulário exige `Nome do Blueprint`; `create_blueprint_from_link()` persiste o valor em `name` e `save_generated_blueprint()` usa-o no nome do ficheiro JSON, inclusive no fluxo com Branding completo. |
 | Niche Finder Kaggle e Niche Finder Apify | Concluído como alternativas independentes | Kaggle usa `app/modules/niche_finder/core.py` e `data_loader.py`; Apify usa `app/modules/niche_finder/apify.py`, `summarizer.py`, estado `niche_apify_runs.json` e credencial própria. |
 | Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |
 | Editor Python baseado no PYEdit | Concluído como editor local seguro | Vídeos gerados pelos artefactos, selecção de pasta, upload manual, corte, áudio, velocidade, redimensionamento, histórico próprio e edição/guarda de scripts sem execução de código. |

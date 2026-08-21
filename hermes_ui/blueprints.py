@@ -42,14 +42,15 @@ def parse_youtube_link(url: str) -> dict[str, str]:
     return {"original_url": value, "video_id": video_id, "channel_ref": channel_ref, "input_type": input_type}
 
 
-def create_blueprint_from_link(url: str, niche: str, language: str, include_branding: bool, channel_name: str = "") -> tuple[dict[str, Any], dict[str, Any] | None]:
+def create_blueprint_from_link(url: str, niche: str, language: str, include_branding: bool, channel_name: str = "", blueprint_name: str = "") -> tuple[dict[str, Any], dict[str, Any] | None]:
     parsed = parse_youtube_link(url)
     base_name = channel_name.strip() or parsed["channel_ref"] or "Canal analisado"
+    display_name = blueprint_name.strip() or f"Blueprint — {base_name}"
     timestamp = datetime.now(timezone.utc).isoformat()
     blueprint_id = f"bp_{uuid.uuid4().hex[:10]}"
     blueprint = {
         "id": blueprint_id,
-        "name": f"Blueprint — {base_name}",
+        "name": display_name,
         "metadata": {
             "task_type": "forensic_content_blueprint",
             "source_url": parsed["original_url"],

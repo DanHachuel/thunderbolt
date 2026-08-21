@@ -254,21 +254,25 @@ def render_blueprints():
         st.subheader("Criar blueprint a partir de link")
         with st.form("create_blueprint_from_link"):
             source_url = st.text_input("Link do canal ou vídeo YouTube", placeholder="https://www.youtube.com/@canal ou https://youtu.be/video")
+            blueprint_name = st.text_input("Nome do Blueprint", placeholder="Ex.: Filosofia sombria — Canal X")
             channel_name = st.text_input("Nome do canal, se conhecido")
             niche = st.text_input("Nicho alvo", placeholder="Ex.: filosofia, história, finanças pessoais")
             language = st.selectbox("Idioma do blueprint", ["Português (pt-BR)", "English", "Español"])
             creation_type = st.radio("O que deseja criar?", ["Apenas Blueprint", "Blueprint + Branding completo"], horizontal=True)
             create_submitted = st.form_submit_button("Criar a partir do link", type="primary")
         if create_submitted:
-            try:
-                blueprint, branding = create_blueprint_from_link(source_url, niche, language, creation_type == "Blueprint + Branding completo", channel_name)
-                blueprint_path, branding_path = save_generated_blueprint(blueprint, branding)
-                st.success(f"Blueprint criado: {blueprint_path.name}")
-                if branding_path:
-                    st.success(f"Branding completo criado: {branding_path.name}")
-                st.rerun()
-            except ValueError as exc:
-                st.error(str(exc))
+            if not blueprint_name.strip():
+                st.error("Informe o nome do Blueprint antes de criar.")
+            else:
+                try:
+                    blueprint, branding = create_blueprint_from_link(source_url, niche, language, creation_type == "Blueprint + Branding completo", channel_name, blueprint_name)
+                    blueprint_path, branding_path = save_generated_blueprint(blueprint, branding)
+                    st.success(f"Blueprint criado: {blueprint_path.name}")
+                    if branding_path:
+                        st.success(f"Branding completo criado: {branding_path.name}")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
         st.divider()
         st.subheader("Importar blueprint JSON")
         uploaded = st.file_uploader("Subir novo blueprint JSON", type=["json"], key="blueprint_upload")
