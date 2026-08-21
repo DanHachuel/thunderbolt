@@ -22,7 +22,7 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.automation_worker import load_worker_status
-from hermes_ui.storage import BLUEPRINTS, STORAGE, ensure_storage, list_blueprint_files, load_blueprint_file, now, read_json, write_json
+from hermes_ui.storage import BLUEPRINTS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -708,6 +708,78 @@ def render_blueprints():
                     st.json(data)
             except Exception as exc:
                 with st.expander(f"Inválido — {path.name}"):
+                    st.error(str(exc))
+
+
+def render_tiktok_prompt_masters():
+    st.title("Prompts Master")
+    st.caption(f"Biblioteca exclusiva para vídeos TikTok. Os ficheiros ficam em `{TIKTOK_PROMPT_MASTERS}` e nunca entram na pasta de Blueprints YouTube.")
+
+    upload_tab, library_tab = st.tabs(["Upload", "Biblioteca"])
+    with upload_tab:
+        st.subheader("Adicionar Prompt Master")
+        st.info("Use ficheiros Markdown `.md`. Cada Prompt Master é guardado como um ficheiro independente no storage TikTok.")
+        uploaded_prompt = st.file_uploader("Subir Prompt Master (.md)", type=["md"], key="tiktok_prompt_master_upload")
+        if uploaded_prompt is not None:
+            uploaded_name = Path(uploaded_prompt.name).stem
+            prompt_name = st.text_input("Nome do Prompt Master", value=uploaded_name, key="tiktok_prompt_master_name")
+            replace_prompt = st.checkbox("Permitir substituir um ficheiro existente", key="tiktok_prompt_master_replace")
+            if st.button("Guardar Prompt Master", type="primary", use_container_width=True, key="save_tiktok_prompt_master"):
+                safe_stem = re.sub(r"[^A-Za-z0-9À-ÿ._-]+", "-", prompt_name.strip() or uploaded_name).strip(".-") or "prompt-master"
+                destination = TIKTOK_PROMPT_MASTERS / f"{safe_stem}.md"
+                if destination.exists() and not replace_prompt:
+                    st.warning("Já existe um Prompt Master com esse nome. Active a substituição para o actualizar.")
+                else:
+                    try:
+                        content = uploaded_prompt.getvalue().decode("utf-8-sig")
+                        if not content.strip():
+                            raise ValueError("O ficheiro Markdown está vazio.")
+                        destination.write_text(content.rstrip() + "\n", encoding="utf-8")
+                        st.success(f"Prompt Master guardado em `{destination}`.")
+                        st.rerun()
+                    except UnicodeDecodeError:
+                        st.error("O ficheiro deve estar codificado em UTF-8.")
+                    except OSError as exc:
+                        st.error(f"Não foi possível guardar o Prompt Master: {exc}")
+
+    with library_tab:
+        files = list_prompt_master_files()
+        st.subheader(f"Prompts Master existentes ({len(files)})")
+        search = st.text_input("Pesquisar Prompt Master", key="tiktok_prompt_master_search", placeholder="Nome ou conteúdo")
+        visible_files: list[Path] = []
+        for path in files:
+            try:
+                content = load_prompt_master_file(path)
+            except (OSError, ValueError):
+                content = ""
+            if search and search.lower() not in f"{path.name}\n{content}".lower():
+                continue
+            visible_files.append(path)
+        if not visible_files:
+            st.info("Ainda não existem Prompt Master que correspondam à pesquisa.")
+        for path in visible_files:
+            try:
+                content = load_prompt_master_file(path)
+                heading = next((line.lstrip("#").strip() for line in content.splitlines() if line.startswith("#")), path.stem)
+                with st.expander(f"{heading} — {path.name}", expanded=False):
+                    st.caption(f"Ficheiro TikTok: `{path}`")
+                    edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
+                    prompt_cols = st.columns(3)
+                    with prompt_cols[0]:
+                        if st.button("Guardar alterações", type="primary", use_container_width=True, key=f"save_prompt_master_{path.stem}"):
+                            path.write_text(edited_content.rstrip() + "\n", encoding="utf-8")
+                            st.success("Prompt Master actualizado.")
+                            st.rerun()
+                    with prompt_cols[1]:
+                        st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"download_prompt_master_{path.stem}")
+                    with prompt_cols[2]:
+                        if st.button("Apagar", use_container_width=True, key=f"delete_prompt_master_{path.stem}"):
+                            path.unlink(missing_ok=True)
+                            st.success("Prompt Master removido da biblioteca TikTok.")
+                            st.rerun()
+                    st.markdown(content)
+            except (OSError, ValueError) as exc:
+                with st.expander(f"Ficheiro inválido — {path.name}"):
                     st.error(str(exc))
 
 
@@ -3276,6 +3348,9 @@ def main():
         ("Roteiros", ":material/article:", "Roteiros"),
         ("Upload", ":material/cloud_upload:", "Upload"),
     ]
+    pipeline_tiktok_items = [
+        ("Prompts Master", ":material/auto_awesome:", "Prompts Master"),
+    ]
     edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
         ("Cortes", ":material/content_cut:", "Cortes"),
@@ -3302,6 +3377,7 @@ def main():
         ("Início", ":material/home:", "Início"),
         ("Niche Finder", ":material/search:", "Niche Finder"),
         ("Pipeline", ":material/account_tree:", "Pipeline"),
+        ("Pipeline TikTok", ":material/video_library:", "Pipeline TikTok"),
         ("Automação", ":material/schedule:", "Automação"),
         ("Edição", ":material/edit:", "Edição"),
         ("Models AI", ":material/smart_toy:", "Models AI"),
@@ -3319,7 +3395,7 @@ def main():
         "Configurações Técnicas": "Configurações Técnicas",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + automation_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
+    if current_page not in {item[0] for item in top_pages + pipeline_items + pipeline_tiktok_items + automation_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
 
@@ -3338,6 +3414,10 @@ def main():
             if target == "Pipeline":
                 with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
                     for child_target, child_icon, child_label in pipeline_items:
+                        render_nav_button(child_target, child_icon, child_label, child=True)
+            elif target == "Pipeline TikTok":
+                with st.expander("Pipeline TikTok", expanded=current_page in {item[0] for item in pipeline_tiktok_items}, icon=":material/video_library:"):
+                    for child_target, child_icon, child_label in pipeline_tiktok_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Automação":
                 with st.expander("Automação", expanded=current_page in {item[0] for item in automation_items}, icon=":material/schedule:"):
@@ -3367,6 +3447,7 @@ def main():
         "Criação de Vídeos": render_new_video,
         "Criação de Músicas": render_music_creation,
         "Roteiros": render_scripts,
+        "Prompts Master": render_tiktok_prompt_masters,
         "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Niche Finder Apify": render_niche_finder_apify,

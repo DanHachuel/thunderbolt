@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
+TIKTOK_PROMPT_MASTERS = STORAGE / "tiktok" / "prompts_master"
 NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 
@@ -239,7 +240,7 @@ def seed_blueprints() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     for filename, default in DEFAULTS.items():
@@ -303,3 +304,16 @@ def load_blueprint_file(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("O blueprint deve ser um objecto JSON.")
     return data
+
+
+def list_prompt_master_files() -> list[Path]:
+    """List only Markdown Prompt Master files stored in the TikTok area."""
+    ensure_storage()
+    return sorted(TIKTOK_PROMPT_MASTERS.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def load_prompt_master_file(path: Path) -> str:
+    """Read a Prompt Master Markdown file without touching YouTube Blueprints."""
+    if path.parent.resolve() != TIKTOK_PROMPT_MASTERS.resolve():
+        raise ValueError("O Prompt Master deve pertencer ao storage TikTok dedicado.")
+    return path.read_text(encoding="utf-8")
