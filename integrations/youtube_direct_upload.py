@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from integrations.youtube_direct_credentials import COOKIE_KEYS, delegated_session_id, load_credentials_document
+from integrations.youtube_direct_credentials import COOKIE_KEYS, account_innertube_api_key, delegated_session_id, load_credentials_document
 from urllib.parse import quote
 
 import requests
@@ -49,7 +49,8 @@ def _session_info(settings: dict[str, Any], channel: dict[str, Any], account: di
 
 
 def _innertube_api_key(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str:
-    return str(_direct_document(settings, channel, account, storage_root).get("INNERTUBE_API_KEY", "") or "").strip()
+    document = _direct_document(settings, channel, account, storage_root)
+    return account_innertube_api_key(account, document, settings)
 
 
 def _delegated_session(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str:
@@ -96,7 +97,7 @@ def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], sett
     if not _session_info(settings, channel, account, storage_root):
         return "Falta sessionInfo no documento de credenciais da conta."
     if not _innertube_api_key(settings, channel, account, storage_root):
-        return "Falta INNERTUBE_API_KEY no documento de credenciais da conta."
+        return "Falta INNERTUBE_API_KEY no cartão da conta Google/YouTube."
     if not _delegated_session(settings, channel, account, storage_root):
         return "Falta DELEGATED_SESSION_ID deste canal no documento de credenciais da conta."
     return None

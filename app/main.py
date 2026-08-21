@@ -42,7 +42,7 @@ from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdap
 from integrations.postiz import PostizAdapter
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
-from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
+from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -2571,7 +2571,7 @@ def render_settings():
             account_email_snapshot = str(batch_account.get("email") or "sem e-mail")
             account_label_snapshot = str(batch_account.get("label") or "Canais YouTube")
             ensure_credentials_document(STORAGE, batch_account, settings, channel_state)
-            direct_status = direct_account_status(STORAGE, batch_account)
+            direct_status = direct_account_status(STORAGE, batch_account, settings)
             missing_document_parts = list(direct_status.get("missing_cookies", []))
             if not direct_status.get("has_session_info"):
                 missing_document_parts.append("sessionInfo")
@@ -2679,6 +2679,31 @@ def render_settings():
             st.info("Contas que ainda precisam de dados no documento: " + ", ".join(youtube_accounts_missing_document))
 
         st.divider()
+        st.markdown("### INNERTUBE_API_KEY")
+        st.caption("Esta chave pertence à conta Google/YouTube seleccionada e fica guardada na configuração da conta. Não faz parte do documento de cookies/credenciais e não é editada no separador API Keys.")
+        account_key_options = [str(account.get("id")) for account in batch_accounts if account.get("id")]
+        account_key_labels = {str(account.get("id")): f"{account.get('label', 'Canais YouTube')} — {account.get('email', 'sem e-mail')}" for account in batch_accounts if account.get("id")}
+        if account_key_options:
+            with st.form("innertube_api_key_form"):
+                selected_key_account_id = st.selectbox("Conta Google/YouTube", account_key_options, format_func=lambda value: account_key_labels.get(value, value), key="innertube_key_account")
+                selected_key_account = next(account for account in batch_accounts if str(account.get("id")) == selected_key_account_id)
+                current_innertube_api_key = direct_account_status(STORAGE, selected_key_account, settings).get("innertube_api_key", "")
+                innertube_api_key_value = st.text_input("INNERTUBE_API_KEY", value=current_innertube_api_key, type="password", key=f"innertube_api_key_{selected_key_account_id}", help="Chave usada pelo Upload directo desta conta. Guarde-a aqui, separada do documento de cookies.")
+                save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY", type="primary", use_container_width=True)
+            if save_innertube_api_key:
+                selected_key_account["innertube_api_key"] = innertube_api_key_value.strip()
+                selected_key_account.pop("INNERTUBE_API_KEY", None)
+                settings.pop("direct_innertube_api_key", None)
+                settings["youtube_batch_accounts"] = batch_accounts
+                write_json("settings.json", settings)
+                document = load_credentials_document(STORAGE, selected_key_account, settings, channel_state, create=True)
+                save_credentials_document(STORAGE, selected_key_account, document)
+                st.success("INNERTUBE_API_KEY guardada na configuração da conta Google/YouTube, fora do documento de cookies.")
+                st.rerun()
+        else:
+            st.info("Adicione primeiro uma conta Google/YouTube para configurar a INNERTUBE_API_KEY.")
+
+        st.divider()
         st.markdown("### Adicionar outra conta Gmail")
         st.caption("Este formulário fica fora dos cartões das contas existentes. A associação de canais não depende da completude deste documento; ela apenas ficará pendente para Upload directo até os campos serem preenchidos.")
         with st.form("add_batch_account_form"):
@@ -2689,7 +2714,7 @@ def render_settings():
                 new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
             with add_cols[1]:
                 new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
-                new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies, INNERTUBE_API_KEY, chunk_size e delegated_session_ids continuam apenas no documento.")
+                new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
                 new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
             add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
         if add_account:
@@ -2762,10 +2787,6 @@ def render_settings():
             with st.expander("Consulta oficial de métricas — opcional"):
                 st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
                 youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
-
-            st.caption("As credenciais e parâmetros do Upload directo — cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e DELEGATED_SESSION_ID — são lidos exclusivamente do documento JSON por conta Google. Não são editados nesta UI.")
-            direct_innertube_api_key = str(settings.get("direct_innertube_api_key", "") or "")
-            direct_chunk_size = int(settings.get("direct_chunk_size", 262144) or 262144)
 
             with st.expander("Serviço, materiais e rede"):
                 cols = st.columns(2)
@@ -2917,7 +2938,6 @@ def render_settings():
                     "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
                     "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
                     "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                    "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
                     "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                     "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
                     "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,

@@ -101,8 +101,7 @@ def parse_credentials_document(content: bytes, filename: str = DIRECT_DOCUMENT_N
         raise ValueError(f"Faltam cookies obrigatórios no documento {filename}: {', '.join(missing)}.")
     if not document["sessionInfo"]:
         raise ValueError(f"Falta sessionInfo no documento {filename}.")
-    if not document["INNERTUBE_API_KEY"]:
-        raise ValueError(f"Falta INNERTUBE_API_KEY no documento {filename}.")
+    # INNERTUBE_API_KEY é configurada separadamente na UI de Contas Google/YouTube.
     return document
 
 
@@ -126,6 +125,20 @@ def _channel_keys(channel: dict[str, Any]) -> list[str]:
 
 def _account_session_info(account: dict[str, Any]) -> str:
     return str(account.get("sessionInfo") or account.get("session_info") or account.get("direct_session_info") or "").strip()
+
+
+def account_innertube_api_key(account: dict[str, Any] | None, document: dict[str, Any] | None = None, settings: dict[str, Any] | None = None) -> str:
+    """Return the account-level key; document value is only a legacy migration fallback."""
+    account = account or {}
+    document = document or {}
+    settings = settings or {}
+    return str(
+        account.get("innertube_api_key")
+        or account.get("INNERTUBE_API_KEY")
+        or settings.get("direct_innertube_api_key")
+        or document.get("INNERTUBE_API_KEY")
+        or ""
+    ).strip()
 
 
 def _normalise_document(raw: Any, account: dict[str, Any]) -> dict[str, Any]:
@@ -187,7 +200,7 @@ def save_credentials_document(storage_root: Path, account: dict[str, Any], docum
         "email": normalised["email"],
         "sessionInfo": normalised["sessionInfo"],
         "cookies": normalised["cookies"],
-        "INNERTUBE_API_KEY": normalised["INNERTUBE_API_KEY"],
+        # INNERTUBE_API_KEY não pertence ao documento de cookies/credenciais.
         "chunk_size": normalised["chunk_size"],
         "delegated_session_ids": normalised["delegated_session_ids"],
     }
@@ -277,7 +290,7 @@ def merge_credentials_document(
 
     The upload may contain only cookies or the full Frontend API document. Existing
     non-empty values are preserved, so uploading cookies never discards sessionInfo,
-    INNERTUBE_API_KEY, chunk_size or delegated channel IDs.
+    chunk_size or delegated channel IDs. INNERTUBE_API_KEY is configured separately.
     """
     try:
         raw = json.loads(content.decode("utf-8-sig", errors="replace"))
@@ -295,8 +308,8 @@ def merge_credentials_document(
     incoming_session = _placeholder_to_empty(session_info_override) or incoming.get("sessionInfo", "")
     if incoming_session:
         merged["sessionInfo"] = incoming_session
-    if incoming.get("INNERTUBE_API_KEY"):
-        merged["INNERTUBE_API_KEY"] = incoming["INNERTUBE_API_KEY"]
+    # INNERTUBE_API_KEY recebida num JSON é deliberadamente ignorada: a fonte oficial
+    # é a configuração separada da secção Contas Google/YouTube.
     if "chunk_size" in raw:
         merged["chunk_size"] = incoming["chunk_size"]
     for key, value in incoming.get("delegated_session_ids", {}).items():
@@ -325,14 +338,16 @@ def document_status(storage_root: Path, account: dict[str, Any], channel: dict[s
     document = load_credentials_document(storage_root, account, settings, channels, create=True)
     missing_cookies = [key for key in COOKIE_KEYS if not document["cookies"].get(key)]
     delegated = delegated_session_id(document, channel or {}) if channel else ""
+    innertube_api_key = account_innertube_api_key(account, document, settings)
     return {
         "document_file": str(path),
         "document_exists": path.exists(),
         "missing_cookies": missing_cookies,
         "has_session_info": bool(document.get("sessionInfo")),
-        "has_innertube_api_key": bool(document.get("INNERTUBE_API_KEY")),
+        "has_innertube_api_key": bool(innertube_api_key),
+        "innertube_api_key": innertube_api_key,
         "has_delegated_session_id": bool(delegated) if channel is not None else None,
-        "ready": not missing_cookies and bool(document.get("sessionInfo")) and bool(document.get("INNERTUBE_API_KEY")) and (channel is None or bool(delegated)),
+        "ready": not missing_cookies and bool(document.get("sessionInfo")) and bool(innertube_api_key) and (channel is None or bool(delegated)),
     }
 
 
@@ -364,9 +379,9 @@ def save_cookie_file(storage_root: Path, account: dict[str, Any], content: bytes
     return destination
 
 
-def direct_account_status(storage_root: Path, account: dict[str, Any]) -> dict[str, Any]:
-    """Backward-compatible account status; the source of truth is credentials.json."""
-    status = document_status(storage_root, account)
+def direct_account_status(storage_root: Path, account: dict[str, Any], settings: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return account status; cookies stay in credentials.json and the API key is separate."""
+    status = document_status(storage_root, account, settings=settings)
     return {
         "cookie_file": status["document_file"],
         "document_exists": status["document_exists"],
@@ -374,6 +389,7 @@ def direct_account_status(storage_root: Path, account: dict[str, Any]) -> dict[s
         "missing_cookies": status["missing_cookies"],
         "has_session_info": status["has_session_info"],
         "has_innertube_api_key": status["has_innertube_api_key"],
+        "innertube_api_key": status.get("innertube_api_key", ""),
         "ready": status["ready"],
         "document_file": status["document_file"],
     }

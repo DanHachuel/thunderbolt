@@ -81,14 +81,14 @@ def test_direct_upload_uses_account_credentials_and_channel_page_id(tmp_path: Pa
 
 
 def test_credentials_document_keeps_all_direct_data_per_google_account(tmp_path: Path):
-    account = {"id": "google-doc", "email": "doc@example.com"}
+    account = {"id": "google-doc", "email": "doc@example.com", "innertube_api_key": "innertube-account"}
     channel = {"id": "channel-doc", "google_account_id": "google-doc"}
     raw = {
         "account_id": "google-doc",
         "email": "doc@example.com",
         "sessionInfo": "session-document",
         "cookies": {"SID": "sid", "SSID": "ssid", "HSID": "hsid", "APISID": "apisid", "SAPISID": "sapisid"},
-        "INNERTUBE_API_KEY": "innertube-document",
+        "INNERTUBE_API_KEY": "legacy-document-value",
         "chunk_size": 524288,
         "delegated_session_ids": {"channel-doc": "delegated-document"},
     }
@@ -99,7 +99,8 @@ def test_credentials_document_keeps_all_direct_data_per_google_account(tmp_path:
     assert credentials_document_path(tmp_path, account).name == "credentials.json"
     assert loaded["cookies"]["SID"] == "sid"
     assert loaded["sessionInfo"] == "session-document"
-    assert loaded["INNERTUBE_API_KEY"] == "innertube-document"
+    assert "INNERTUBE_API_KEY" not in json.loads(credentials_document_path(tmp_path, account).read_text(encoding="utf-8"))
+    assert loaded.get("INNERTUBE_API_KEY", "") == ""
     assert loaded["chunk_size"] == 524288
     assert loaded["delegated_session_ids"]["channel-doc"] == "delegated-document"
     assert status["ready"] is True
@@ -139,7 +140,7 @@ def test_delete_credentials_document_removes_only_selected_account(tmp_path: Pat
 
 
 def test_merge_credentials_document_preserves_existing_fields_and_strips_placeholders(tmp_path: Path):
-    account = {"id": "google-merge", "email": "merge@example.com"}
+    account = {"id": "google-merge", "email": "merge@example.com", "innertube_api_key": "innertube-account"}
     existing = {
         "account_id": "google-merge",
         "email": "merge@example.com",
@@ -162,14 +163,14 @@ def test_merge_credentials_document_preserves_existing_fields_and_strips_placeho
     assert merged_path == credentials_document_path(tmp_path, account)
     merged = load_credentials_document(tmp_path, account)
     assert merged["sessionInfo"] == "session-existing"
-    assert merged["INNERTUBE_API_KEY"] == "innertube-existing"
+    assert merged.get("INNERTUBE_API_KEY", "") == ""
     assert merged["cookies"]["SID"] == "sid-new"
     assert merged["cookies"]["SSID"] == "ssid-existing"
     assert merged["delegated_session_ids"]["channel-merge"] == "delegated-existing"
 
     saved = load_credentials_document(tmp_path, account)
     assert saved["sessionInfo"] == "session-existing"
-    assert saved["INNERTUBE_API_KEY"] == "innertube-existing"
+    assert saved.get("INNERTUBE_API_KEY", "") == ""
     assert saved["cookies"]["SSID"] == "ssid-existing"
 
 
