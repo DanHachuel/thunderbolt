@@ -2223,6 +2223,68 @@ def render_upload_postiz():
                 (st.success if result.ok else st.error)(result.message)
 
 
+UPLOAD_DESTINATION_TARGET_KEYS = {
+    "TikTok": "tiktok_profiles",
+    "Instagram": "instagram_profiles",
+    "Facebook Pages": "facebook_pages",
+}
+
+
+def upload_target_label(target: Any) -> str:
+    if isinstance(target, dict):
+        name = str(target.get("name") or target.get("label") or target.get("title") or target.get("username") or target.get("id") or "Sem nome")
+        handle = str(target.get("handle") or target.get("username") or target.get("url") or "")
+        return f"{name} — {handle}" if handle and handle not in name else name
+    return str(target)
+
+
+def upload_target_reference(target: Any) -> dict[str, str] | str | None:
+    if target is None:
+        return None
+    if isinstance(target, dict):
+        public_fields = ("id", "name", "label", "handle", "username", "url")
+        return {field: str(target[field]) for field in public_fields if target.get(field)}
+    return str(target)
+
+
+def upload_targets_for_destination(destination: str, channels: list[dict[str, Any]], settings: dict[str, Any]) -> list[Any]:
+    if destination == "YouTube":
+        return [channel for channel in channels if isinstance(channel, dict) and channel.get("id") and channel.get("active", True)]
+    setting_key = UPLOAD_DESTINATION_TARGET_KEYS.get(destination)
+    if not setting_key:
+        return []
+    configured_targets = settings.get(setting_key, [])
+    if not isinstance(configured_targets, list):
+        return []
+    targets: list[Any] = []
+    for target in configured_targets:
+        if isinstance(target, dict) and target.get("id"):
+            targets.append(target)
+        elif isinstance(target, str) and target.strip():
+            targets.append(target.strip())
+    return targets
+
+
+def render_upload_destination_target(destination: str, channels: list[dict[str, Any]], settings: dict[str, Any]) -> Any | None:
+    options = upload_targets_for_destination(destination, channels, settings)
+    destination_key = re.sub(r"[^a-z0-9]+", "_", destination.lower()).strip("_")
+    select_label = "Canal" if destination == "YouTube" else "Perfil / página"
+    empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else f"Nenhum {destination} configurado"
+    if not options:
+        st.selectbox(select_label, [empty_label], disabled=True, key=f"upload_target_{destination_key}")
+        if destination == "YouTube":
+            st.caption("Cadastre ou liste pelo menos um canal YouTube antes de escolher o destino de envio.")
+        else:
+            st.caption(f"A lista de {destination} será ligada numa etapa própria de credenciais/API.")
+        return None
+    return st.selectbox(
+        select_label,
+        options,
+        format_func=upload_target_label,
+        key=f"upload_target_{destination_key}",
+    )
+
+
 def render_upload_conventional():
     st.title("Upload")
     settings = read_json("settings.json", {})
@@ -2233,6 +2295,12 @@ def render_upload_conventional():
     postiz = PostizAdapter(settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
     destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"], key="upload_destinations", placeholder="Seleccione os destinos")
+    upload_targets: dict[str, Any | None] = {}
+    if destination:
+        st.markdown("**Onde enviar**")
+        for target_destination in destination:
+            with st.container(border=True):
+                upload_targets[target_destination] = render_upload_destination_target(target_destination, channels, settings)
 
     if "Instagram" in destination:
         st.info("Instagram está disponível no front end. A publicação real será ligada numa etapa de credenciais/API própria.")
@@ -2277,7 +2345,8 @@ def render_upload_conventional():
             thumbnail_path = artifacts.get("thumbnail") or artifacts.get("cover", "")
             captions_path = artifacts.get("captions") or artifacts.get("subtitle", "")
             st.caption(video_path or "Sem caminho de vídeo registado")
-            channel = channel_map.get(str(task.get("channel_id")), {})
+            selected_youtube_channel = upload_targets.get("YouTube") if "YouTube" in destination else None
+            channel = selected_youtube_channel or channel_map.get(str(task.get("channel_id")), {})
             account = direct_accounts.get(str(channel.get("google_account_id", "")))
             if "YouTube" in destination:
                 title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
@@ -2292,7 +2361,9 @@ def render_upload_conventional():
                     language = st.text_input("Idioma", value="pt-BR", key=f"yt_language_{task['id']}")
                 quota_count = official_upload_count(channel, account)
                 st.caption(f"API Oficial hoje: {quota_count}/{OFFICIAL_DAILY_LIMIT} envios nesta conta Gmail.")
-                if st.button("Enviar pelo fluxo recomendado", type="primary", key=f"upload_youtube_{task['id']}"):
+                if not selected_youtube_channel:
+                    st.caption("Seleccione primeiro um canal YouTube no selector acima para activar este envio.")
+                if st.button("Enviar pelo fluxo recomendado", type="primary", key=f"upload_youtube_{task['id']}", disabled=not selected_youtube_channel, help="Escolha o canal YouTube no selector acima." if not selected_youtube_channel else None):
                     tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
                     result = upload_with_default_route(
                         settings,
@@ -2312,6 +2383,7 @@ def render_upload_conventional():
                     record = {
                         "task_id": task.get("id"),
                         "destination": "YouTube",
+                        "target": upload_target_reference(channel),
                         "status": "published" if result.ok else "failed",
                         "message": result.message,
                         "data": result.data,
@@ -2324,8 +2396,21 @@ def render_upload_conventional():
                     if result.data.get("attempts"):
                         with st.expander("Detalhes dos mecanismos de upload"):
                             st.json(result.data["attempts"])
-            if "TikTok" in destination and st.button("Enviar para TikTok", key=f"upload_tiktok_{task['id']}"):
+            tiktok_target = upload_targets.get("TikTok") if "TikTok" in destination else None
+            if "TikTok" in destination and st.button("Enviar para TikTok", key=f"upload_tiktok_{task['id']}", disabled=not tiktok_target, help="Escolha o perfil TikTok no selector acima." if not tiktok_target else None):
                 result = TikTokAdapter(settings).upload_video(video_path, task.get("title") or task.get("topic", ""))
+                record = {
+                    "task_id": task.get("id"),
+                    "destination": "TikTok",
+                    "target": upload_target_reference(tiktok_target),
+                    "status": "published" if result.ok else "failed",
+                    "message": result.message,
+                    "data": result.data,
+                    "created_at": now(),
+                }
+                uploads = read_json("uploads.json", [])
+                uploads.append(record)
+                write_json("uploads.json", uploads)
                 (st.success if result.ok else st.warning)(result.message)
             if "Instagram" in destination:
                 st.button("Preparar Instagram", key=f"upload_instagram_{task['id']}", disabled=True, help="UI preparada; publicação Instagram ainda não está activa.")
