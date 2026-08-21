@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.51
+> **Versão deste manual:** 0.2.52
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.51 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.52 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.51 install
+npx --yes @danhachuel/thunderbolt@0.2.52 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -428,7 +428,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.51 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.52 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -466,13 +466,13 @@ A área **Teste de vozes**, dentro de **Configurações > Configurações Técni
 
 ## Upload directo
 
-Em **Configurações > Configurações Técnicas > Contas Google/YouTube — canais em lote**, cada cartão Gmail mostra o uploader **Documento de credenciais desta conta Google** e o input **sessionInfo token desta conta Google**. O documento JSON único contém cookies, INNERTUBE_API_KEY, chunk_size e o mapa de IDs delegados por canal; o sessionInfo preenchido na conta é sincronizado no mesmo ficheiro, guardado em `storage/youtube_direct_accounts/<id-da-conta>/credentials.json`.
+Em **Configurações > Configurações Técnicas > Contas Google/YouTube — canais em lote**, cada conta aparece como um expander identificado por nome e e-mail. Dentro dele existe o uploader **Subir documento de cookies/credenciais** e o input **sessionInfo token desta conta Google**. O documento JSON único contém cookies, INNERTUBE_API_KEY, chunk_size e o mapa de IDs delegados por canal; o sessionInfo preenchido na conta é sincronizado no mesmo ficheiro, guardado em `storage/youtube_direct_accounts/<id-da-conta>/credentials.json`.
 
 Em **Canais > Canais cadastrados**, a secção **Upload directo — documento da conta deste canal** mostra apenas a conta Google associada e confirma se o documento contém o ID delegado desse canal. O `DELEGATED_SESSION_ID` permanece exclusivamente no mapa do documento; o upload bloqueia a operação se faltar qualquer elemento técnico.
 
-A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Cada conta Google tem um único `credentials.json`, com cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e `delegated_session_ids` por canal. O parser aceita o documento JSON completo, valida os cinco cookies obrigatórios e grava-o fora de `storage/state/`, com permissões locais restritas.
+A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Cada conta Google tem um único `credentials.json`, criado automaticamente ao adicionar a conta, com cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e `delegated_session_ids` por canal. O uploader aceita um documento JSON completo ou parcial; o merge actualiza somente os valores presentes e preserva os restantes. O documento é guardado fora de `storage/state/`, com permissões locais restritas.
 
-Associe cada canal à conta Google correcta em **Canais**; não introduza o ID delegado na UI. No momento do upload, o Thunderbolt lê o documento da conta, encontra o `DELEGATED_SESSION_ID` pela chave do canal e bloqueia a operação se faltar conta, documento válido, cookies, sessionInfo, INNERTUBE_API_KEY, ID delegado ou vídeo elegível. O tamanho de chunk é normalizado para múltiplos de 262144 bytes. O método é uma integração não oficial de sessão do YouTube; não extraia cookies automaticamente, não os coloque no repositório e não os partilhe.
+Associe cada canal à conta Google correcta em **Canais**; não introduza o ID delegado na UI. A associação do canal é permitida mesmo que o documento esteja incompleto. No momento do upload, o Thunderbolt lê o documento da conta, encontra o `DELEGATED_SESSION_ID` pela chave do canal e bloqueia apenas a operação se faltar conta, documento válido, cookies, sessionInfo, INNERTUBE_API_KEY, ID delegado ou vídeo elegível. O tamanho de chunk é normalizado para múltiplos de 262144 bytes. O método é uma integração não oficial de sessão do YouTube; não extraia cookies automaticamente, não os coloque no repositório e não os partilhe.
 
 ## MCP e integrações externas
 

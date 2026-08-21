@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from integrations.youtube_direct_credentials import credentials_document_path, delete_credentials_document, direct_account_status, document_status, load_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document, update_credentials_document_session_info
+from integrations.youtube_direct_credentials import credentials_document_path, delete_credentials_document, direct_account_status, document_status, load_credentials_document, merge_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_direct_upload import YouTubeDirectUploader, validate_direct_upload
 
 
@@ -136,6 +136,41 @@ def test_delete_credentials_document_removes_only_selected_account(tmp_path: Pat
     delete_credentials_document(tmp_path, first)
     assert not credentials_document_path(tmp_path, first).exists()
     assert credentials_document_path(tmp_path, second).exists()
+
+
+def test_merge_credentials_document_preserves_existing_fields_and_strips_placeholders(tmp_path: Path):
+    account = {"id": "google-merge", "email": "merge@example.com"}
+    existing = {
+        "account_id": "google-merge",
+        "email": "merge@example.com",
+        "sessionInfo": "session-existing",
+        "cookies": {"SID": "sid-existing", "SSID": "ssid-existing", "HSID": "hsid-existing", "APISID": "apisid-existing", "SAPISID": "sapisid-existing"},
+        "INNERTUBE_API_KEY": "innertube-existing",
+        "chunk_size": 524288,
+        "delegated_session_ids": {"channel-merge": "delegated-existing"},
+    }
+    save_credentials_document(tmp_path, account, existing)
+    partial_upload = {
+        "account_id": "google-merge",
+        "email": "merge@example.com",
+        "sessionInfo": "...",
+        "cookies": {"SID": "sid-new", "SSID": "...", "HSID": "hsid-new", "APISID": "apisid-new", "SAPISID": "sapisid-new"},
+        "INNERTUBE_API_KEY": "...",
+    }
+
+    merged_path = merge_credentials_document(tmp_path, account, json.dumps(partial_upload).encode("utf-8"), "cookies-only.json")
+    assert merged_path == credentials_document_path(tmp_path, account)
+    merged = load_credentials_document(tmp_path, account)
+    assert merged["sessionInfo"] == "session-existing"
+    assert merged["INNERTUBE_API_KEY"] == "innertube-existing"
+    assert merged["cookies"]["SID"] == "sid-new"
+    assert merged["cookies"]["SSID"] == "ssid-existing"
+    assert merged["delegated_session_ids"]["channel-merge"] == "delegated-existing"
+
+    saved = load_credentials_document(tmp_path, account)
+    assert saved["sessionInfo"] == "session-existing"
+    assert saved["INNERTUBE_API_KEY"] == "innertube-existing"
+    assert saved["cookies"]["SSID"] == "ssid-existing"
 
 
 def test_direct_upload_uses_page_id_and_chunks(tmp_path: Path):

@@ -32,6 +32,13 @@ def cookie_file_path(storage_root: Path, account: dict[str, Any]) -> Path:
     return account_directory(storage_root, account) / "cookies.json"
 
 
+def _placeholder_to_empty(value: Any) -> str:
+    text = str(value or "").strip()
+    if text in {"...", "…", "<preencher>", "<valor>"}:
+        return ""
+    return text
+
+
 def _normalise_pairs(value: Any) -> dict[str, str]:
     pairs: dict[str, str] = {}
     if isinstance(value, dict):
@@ -40,13 +47,13 @@ def _normalise_pairs(value: Any) -> dict[str, str]:
         for key, item in value.items():
             key_text = str(key).strip()
             if key_text in COOKIE_KEYS:
-                pairs[key_text] = str(item or "").strip()
+                pairs[key_text] = _placeholder_to_empty(item)
         return pairs
     if isinstance(value, list):
         for item in value:
             if isinstance(item, dict):
                 name = str(item.get("name") or item.get("key") or "").strip()
-                content = str(item.get("value") or "").strip()
+                content = _placeholder_to_empty(item.get("value"))
                 if name in COOKIE_KEYS:
                     pairs[name] = content
         return pairs
@@ -130,15 +137,15 @@ def _normalise_document(raw: Any, account: dict[str, Any]) -> dict[str, Any]:
         for key, value in delegated_raw.items():
             if isinstance(value, dict):
                 value = value.get("DELEGATED_SESSION_ID") or value.get("delegated_session_id") or ""
-            value = str(value or "").strip()
+            value = _placeholder_to_empty(value)
             if value:
                 delegated[str(key)] = value
     return {
         "account_id": str(raw.get("account_id") or account.get("id") or "").strip(),
         "email": str(raw.get("email") or account.get("email") or "").strip(),
-        "sessionInfo": str(raw.get("sessionInfo") or raw.get("session_info") or raw.get("direct_session_info") or _account_session_info(account)).strip(),
+        "sessionInfo": _placeholder_to_empty(raw.get("sessionInfo") or raw.get("session_info") or raw.get("direct_session_info") or _account_session_info(account)),
         "cookies": {key: cookies.get(key, "") for key in COOKIE_KEYS},
-        "INNERTUBE_API_KEY": str(raw.get("INNERTUBE_API_KEY") or raw.get("innertube_api_key") or raw.get("direct_innertube_api_key") or "").strip(),
+        "INNERTUBE_API_KEY": _placeholder_to_empty(raw.get("INNERTUBE_API_KEY") or raw.get("innertube_api_key") or raw.get("direct_innertube_api_key") or ""),
         "chunk_size": _safe_chunk_size(raw.get("chunk_size", raw.get("direct_chunk_size", DEFAULT_CHUNK_SIZE))),
         "delegated_session_ids": delegated,
     }
@@ -255,6 +262,49 @@ def load_credentials_document(storage_root: Path, account: dict[str, Any], setti
 def ensure_credentials_document(storage_root: Path, account: dict[str, Any], settings: dict[str, Any] | None = None, channels: list[dict[str, Any]] | None = None) -> Path:
     load_credentials_document(storage_root, account, settings, channels, create=True)
     return credentials_document_path(storage_root, account)
+
+
+def merge_credentials_document(
+    storage_root: Path,
+    account: dict[str, Any],
+    content: bytes,
+    filename: str = DIRECT_DOCUMENT_NAME,
+    *,
+    session_info_override: str = "",
+    channels: list[dict[str, Any]] | None = None,
+) -> Path:
+    """Merge a complete or partial credentials JSON into the account document.
+
+    The upload may contain only cookies or the full Frontend API document. Existing
+    non-empty values are preserved, so uploading cookies never discards sessionInfo,
+    INNERTUBE_API_KEY, chunk_size or delegated channel IDs.
+    """
+    try:
+        raw = json.loads(content.decode("utf-8-sig", errors="replace"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"O documento de credenciais {filename} deve ser JSON válido.") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"O documento de credenciais {filename} deve conter um objecto JSON.")
+
+    current = load_credentials_document(storage_root, account, channels=channels, create=True)
+    incoming = _normalise_document(raw, {**account, "sessionInfo": session_info_override})
+    merged = _normalise_document(current, account)
+    for key in COOKIE_KEYS:
+        if incoming["cookies"].get(key):
+            merged["cookies"][key] = incoming["cookies"][key]
+    incoming_session = _placeholder_to_empty(session_info_override) or incoming.get("sessionInfo", "")
+    if incoming_session:
+        merged["sessionInfo"] = incoming_session
+    if incoming.get("INNERTUBE_API_KEY"):
+        merged["INNERTUBE_API_KEY"] = incoming["INNERTUBE_API_KEY"]
+    if "chunk_size" in raw:
+        merged["chunk_size"] = incoming["chunk_size"]
+    for key, value in incoming.get("delegated_session_ids", {}).items():
+        if value:
+            merged["delegated_session_ids"][str(key)] = value
+    merged["account_id"] = str(account.get("id") or merged.get("account_id") or "")
+    merged["email"] = str(account.get("email") or merged.get("email") or "")
+    return save_credentials_document(storage_root, account, merged)
 
 
 def delegated_session_id(document: dict[str, Any], channel: dict[str, Any]) -> str:
