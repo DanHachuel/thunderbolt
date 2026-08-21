@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 
-from integrations.youtube_direct_credentials import direct_account_status, parse_cookie_file, save_cookie_file
+from integrations.youtube_direct_credentials import credentials_document_path, direct_account_status, document_status, load_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document
 from integrations.youtube_direct_upload import YouTubeDirectUploader, validate_direct_upload
 
 
@@ -59,8 +60,9 @@ def test_cookie_file_is_saved_per_google_account(tmp_path: Path):
     path = save_cookie_file(tmp_path, account, b'{"SID":"sid","SSID":"ssid","HSID":"hsid","APISID":"apisid","SAPISID":"sapisid"}')
     assert path == tmp_path / "youtube_direct_accounts" / "google-one" / "cookies.json"
     status = direct_account_status(tmp_path, account)
-    assert status["ready"] is True
+    assert status["cookie_file_exists"] is True
     assert status["missing_cookies"] == []
+    assert status["ready"] is False
 
 
 def test_direct_upload_uses_account_credentials_and_channel_page_id(tmp_path: Path):
@@ -75,6 +77,32 @@ def test_direct_upload_uses_account_credentials_and_channel_page_id(tmp_path: Pa
     create_call = next(call for call in session.calls if "createvideo" in call[0])
     assert '"token": "session-from-account"' in create_call[1]["data"]
     assert create_call[1]["headers"]["Cookie"].find("sid-account") >= 0
+
+
+
+def test_credentials_document_keeps_all_direct_data_per_google_account(tmp_path: Path):
+    account = {"id": "google-doc", "email": "doc@example.com"}
+    channel = {"id": "channel-doc", "google_account_id": "google-doc"}
+    raw = {
+        "account_id": "google-doc",
+        "email": "doc@example.com",
+        "sessionInfo": "session-document",
+        "cookies": {"SID": "sid", "SSID": "ssid", "HSID": "hsid", "APISID": "apisid", "SAPISID": "sapisid"},
+        "INNERTUBE_API_KEY": "innertube-document",
+        "chunk_size": 524288,
+        "delegated_session_ids": {"channel-doc": "delegated-document"},
+    }
+    parsed = parse_credentials_document(json.dumps(raw).encode("utf-8"), "credentials.json")
+    save_credentials_document(tmp_path, account, parsed)
+    loaded = load_credentials_document(tmp_path, account, channels=[channel])
+    status = document_status(tmp_path, account, channel, channels=[channel])
+    assert credentials_document_path(tmp_path, account).name == "credentials.json"
+    assert loaded["cookies"]["SID"] == "sid"
+    assert loaded["sessionInfo"] == "session-document"
+    assert loaded["INNERTUBE_API_KEY"] == "innertube-document"
+    assert loaded["chunk_size"] == 524288
+    assert loaded["delegated_session_ids"]["channel-doc"] == "delegated-document"
+    assert status["ready"] is True
 
 
 def test_direct_upload_uses_page_id_and_chunks(tmp_path: Path):

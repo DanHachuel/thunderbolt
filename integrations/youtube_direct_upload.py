@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from integrations.youtube_direct_credentials import COOKIE_KEYS, load_cookie_file
+from integrations.youtube_direct_credentials import COOKIE_KEYS, delegated_session_id, load_credentials_document
 from urllib.parse import quote
 
 import requests
@@ -26,18 +26,37 @@ class DirectUploadResult:
     data: dict[str, Any]
 
 
-def _cookie_settings(settings: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> dict[str, str]:
+def _direct_document(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None, storage_root: Path | None) -> dict[str, Any]:
     if account is not None and storage_root is not None:
-        account_cookies = load_cookie_file(storage_root, account)
-        if account_cookies:
-            return {key: str(account_cookies.get(key, "") or "").strip() for key in COOKIE_KEYS}
-    return {key: str(settings.get(f"direct_cookie_{key.lower()}", "") or "").strip() for key in COOKIE_KEYS}
+        return load_credentials_document(storage_root, account, settings, [channel], create=True)
+    return {
+        "cookies": {key: str(settings.get(f"direct_cookie_{key.lower()}", "") or "").strip() for key in COOKIE_KEYS},
+        "sessionInfo": str(settings.get("direct_session_info", "") or "").strip(),
+        "INNERTUBE_API_KEY": str(settings.get("direct_innertube_api_key", "") or "").strip(),
+        "chunk_size": int(settings.get("direct_chunk_size", CHUNK_GRANULARITY) or CHUNK_GRANULARITY),
+        "delegated_session_ids": {str(channel.get("id") or ""): str(channel.get("delegated_session_id") or "").strip()},
+    }
 
 
-def _session_info(settings: dict[str, Any], account: dict[str, Any] | None = None) -> str:
-    if account is not None:
-        return str(account.get("direct_session_info", "") or "").strip()
-    return str(settings.get("direct_session_info", "") or "").strip()
+def _cookie_settings(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> dict[str, str]:
+    document = _direct_document(settings, channel, account, storage_root)
+    cookies = document.get("cookies", {})
+    return {key: str(cookies.get(key, "") or "").strip() for key in COOKIE_KEYS}
+
+
+def _session_info(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str:
+    return str(_direct_document(settings, channel, account, storage_root).get("sessionInfo", "") or "").strip()
+
+
+def _innertube_api_key(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str:
+    return str(_direct_document(settings, channel, account, storage_root).get("INNERTUBE_API_KEY", "") or "").strip()
+
+
+def _delegated_session(settings: dict[str, Any], channel: dict[str, Any], account: dict[str, Any] | None = None, storage_root: Path | None = None) -> str:
+    document = _direct_document(settings, channel, account, storage_root)
+    if account is not None and storage_root is not None:
+        return delegated_session_id(document, channel) or str(channel.get("delegated_session_id") or "").strip()
+    return str(channel.get("delegated_session_id") or "").strip()
 
 
 def _cookie_header(cookies: dict[str, str]) -> str:
@@ -70,15 +89,16 @@ def validate_direct_upload(video_path: str | Path, channel: dict[str, Any], sett
         return "Formato de vídeo não suportado pelo upload directo."
     if path.stat().st_size <= 0:
         return "O ficheiro de vídeo está vazio."
-    missing_cookies = [key for key, value in _cookie_settings(settings, account, storage_root).items() if not value]
+    cookies = _cookie_settings(settings, channel, account, storage_root)
+    missing_cookies = [key for key, value in cookies.items() if not value]
     if missing_cookies:
-        return f"Faltam cookies de sessão para upload directo: {', '.join(missing_cookies)}."
-    if not _session_info(settings, account):
-        return "Configure o token sessionInfo do upload directo."
-    if not str(settings.get("direct_innertube_api_key", "") or "").strip():
-        return "Configure o INNERTUBE_API_KEY do upload directo."
-    if not str(channel.get("delegated_session_id", "") or "").strip():
-        return "Este canal não tem DELEGATED_SESSION_ID configurado."
+        return f"Faltam cookies no documento de credenciais da conta: {', '.join(missing_cookies)}."
+    if not _session_info(settings, channel, account, storage_root):
+        return "Falta sessionInfo no documento de credenciais da conta."
+    if not _innertube_api_key(settings, channel, account, storage_root):
+        return "Falta INNERTUBE_API_KEY no documento de credenciais da conta."
+    if not _delegated_session(settings, channel, account, storage_root):
+        return "Falta DELEGATED_SESSION_ID deste canal no documento de credenciais da conta."
     return None
 
 
@@ -89,8 +109,11 @@ class YouTubeDirectUploader:
         self.account = account
         self.storage_root = storage_root
         self.session = session or requests.Session()
-        self.cookies = _cookie_settings(settings, account, storage_root)
-        self.session_info = _session_info(settings, account)
+        self.document = _direct_document(settings, channel, account, storage_root)
+        self.cookies = _cookie_settings(settings, channel, account, storage_root)
+        self.session_info = _session_info(settings, channel, account, storage_root)
+        self.delegated_session_id = _delegated_session(settings, channel, account, storage_root)
+        self.innertube_api_key = _innertube_api_key(settings, channel, account, storage_root)
         self.cookie_header = _cookie_header(self.cookies)
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
         self.inner_tube = _innertube_id()
@@ -139,12 +162,11 @@ class YouTubeDirectUploader:
             "context": {
                 "client": {"clientName": 62, "clientVersion": "1.20210806.02.00", "hl": "pt-BR", "gl": "BR", "experimentsToken": "", "utcOffsetMinutes": 0},
                 "request": {"sessionInfo": {"token": self.session_info}},
-                "user": {"onBehalfOfUser": str(self.channel.get("delegated_session_id", ""))},
+                "user": {"onBehalfOfUser": self.delegated_session_id},
             },
         }
-        api_key = str(self.settings.get("direct_innertube_api_key", "")).strip()
-        endpoint = f"https://studio.youtube.com/youtubei/v1/upload/createvideo?alt=json&key={quote(api_key)}"
-        headers = {**self._base_headers(), "Content-Type": "application/json", "X-Youtube-Client-Name": "62", "X-Youtube-Client-Version": "1.20210806.02.00", "X-Goog-PageId": str(self.channel.get("delegated_session_id", "")), "Authorization": f"SAPISIDHASH {_sapishash(self.cookies['SAPISID'])}"}
+        endpoint = f"https://studio.youtube.com/youtubei/v1/upload/createvideo?alt=json&key={quote(self.innertube_api_key)}"
+        headers = {**self._base_headers(), "Content-Type": "application/json", "X-Youtube-Client-Name": "62", "X-Youtube-Client-Version": "1.20210806.02.00", "X-Goog-PageId": self.delegated_session_id, "Authorization": f"SAPISIDHASH {_sapishash(self.cookies['SAPISID'])}"}
         response = self.session.post(endpoint, headers=headers, data=json.dumps(payload), timeout=60)
         response.raise_for_status()
         body = response.json() if response.content else {}
@@ -169,7 +191,7 @@ class YouTubeDirectUploader:
                 response.raise_for_status()
                 offset += len(chunk)
 
-    def upload(self, video_path: str | Path, *, title: str, description: str = "", visibility: str = "private", chunk_size: int = CHUNK_GRANULARITY) -> DirectUploadResult:
+    def upload(self, video_path: str | Path, *, title: str, description: str = "", visibility: str = "private", chunk_size: int | None = None) -> DirectUploadResult:
         path = Path(video_path)
         validation_error = validate_direct_upload(path, self.channel, self.settings, self.account, self.storage_root)
         if validation_error:
@@ -177,7 +199,8 @@ class YouTubeDirectUploader:
         try:
             self.describe_file(path)
             self.create_video(title, description, visibility)
-            self.upload_chunks(path, chunk_size)
+            configured_chunk_size = int(chunk_size or self.document.get("chunk_size") or CHUNK_GRANULARITY)
+            self.upload_chunks(path, configured_chunk_size)
             return DirectUploadResult(True, f"Upload directo concluído: {self.video_id}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id, "page_id": self.channel.get("delegated_session_id", ""), "google_account_id": (self.account or {}).get("id", "")})
         except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
             return DirectUploadResult(False, f"Upload directo falhou: {exc}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id})

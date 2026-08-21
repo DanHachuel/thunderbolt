@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.45.
+Estado auditado para o release 0.2.46.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -19,9 +19,9 @@ Estado auditado para o release 0.2.45.
 | Área de teste de vozes em Configurações | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download. |
 | OpenAI/ NVIDIA NIM — descoberta de modelos OpenAI-compatible | Concluído | `integrations/openai_model_discovery.py` consulta explicitamente `/models`, valida `data[].id`, envia Bearer API key sem a expor, apresenta selector e mantém fallback manual; `openai_model_name` continua sincronizado com o MoneyPrinterTurbo. A chamada do modelo manual usa `help`, compatível com o Streamlit suportado, e não `help_text`. |
 | Upload directo via YouTube-Video-Upload-Frontend-Api | Concluído como adaptador experimental | `integrations/youtube_direct_upload.py`, sessão manual, metadata e chunks múltiplos de 256 KiB; credenciais directas passam a ser lidas por conta Google associada. |
-| Upload directo com cookies/sessionInfo por conta e `DELEGATED_SESSION_ID` por canal | Concluído | `integrations/youtube_direct_credentials.py` aceita JSON/lista JSON/Netscape, valida SID/SSID/HSID/APISID/SAPISID e guarda em `storage/youtube_direct_accounts/<account-id>/cookies.json`; `direct_session_info` fica na conta Google e `delegated_session_id` no canal; o upload bloqueia credenciais incompletas. |
-| Campos de credenciais directas visíveis em Canais e Configurações Técnicas | Concluído | Os expanders `Upload directo — conta e canal` e `Upload directo — sessão YouTube Frontend API` abrem por defeito; cada canal mostra `DELEGATED_SESSION_ID deste canal (individual)` e cada conta mostra `sessionInfo token`, `Ficheiro de cookies`, estado e botão `Guardar cookies e sessionInfo por conta`. |
-| `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | Campos por canal, selectors e propagação para tasks. |
+| Upload directo com documento JSON completo por conta Google | Concluído | `integrations/youtube_direct_credentials.py` valida `credentials.json` com SID/SSID/HSID/APISID/SAPISID, `sessionInfo`, `INNERTUBE_API_KEY`, `chunk_size` e `delegated_session_ids` por canal; guarda em `storage/youtube_direct_accounts/<account-id>/credentials.json`; o upload lê exclusivamente este documento. |
+| UI sem campos técnicos de Upload directo | Concluído | A UI mostra apenas o uploader do documento por Gmail e a associação do canal à conta; não renderiza inputs separados de cookies, sessionInfo, INNERTUBE_API_KEY, chunk size ou DELEGATED_SESSION_ID. |
+| `DELEGATED_SESSION_ID`, Blueprint padrão e voz padrão por canal | Concluído | O ID delegado é lido do documento JSON da conta pelo identificador do canal; Blueprint e voz continuam com selectors próprios da pipeline. |
 | Agendamento real em segundo plano | Fora do escopo actual de UI | O worker de Automação é local e baseado no relógio; não é usado pelo Niche Finder Apify. |
 | Niche Finder Kaggle e Niche Finder Apify | Concluído como alternativas independentes | Kaggle usa `app/modules/niche_finder/core.py` e `data_loader.py`; Apify usa `app/modules/niche_finder/apify.py`, `summarizer.py`, estado `niche_apify_runs.json` e credencial própria. |
 | Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |

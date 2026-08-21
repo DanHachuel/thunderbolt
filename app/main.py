@@ -7,6 +7,7 @@ from datetime import date, datetime
 import sys
 import uuid
 from pathlib import Path
+from typing import Any
 
 import requests
 import streamlit as st
@@ -35,7 +36,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.youtube_direct_upload import YouTubeDirectUploader
-from integrations.youtube_direct_credentials import COOKIE_KEYS as DIRECT_COOKIE_KEYS, direct_account_status, save_cookie_file
+from integrations.youtube_direct_credentials import direct_account_status, document_status, parse_credentials_document, save_credentials_document
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -396,7 +397,7 @@ def render_channels():
                 voice = st.selectbox("Voz padrão do canal", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key="yt_import_voice")
                 imported_account_id = str(imported.get("google_account_id", ""))
                 google_account_id = st.selectbox("Conta Google para Upload directo", youtube_account_ids, index=youtube_account_ids.index(imported_account_id) if imported_account_id in youtube_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item), key="yt_import_google_account_id")
-                delegated_session_id = st.text_input("DELEGATED_SESSION_ID", value=imported.get("delegated_session_id", ""), type="password", key="yt_import_delegated_session_id")
+                st.caption("O DELEGATED_SESSION_ID é lido exclusivamente do documento JSON da conta Google associada.")
                 automation_on = st.toggle("Automação ON", value=bool(imported.get("automation_on", False)), key="yt_import_automation_on")
                 automation_time = st.text_input("Horário diário (HH:MM)", value=imported.get("automation_time", "00:00"), key="yt_import_automation_time")
                 description = st.text_area("Descrição", value=imported.get("description", ""), key="yt_import_description")
@@ -421,7 +422,6 @@ def render_channels():
                             "default_blueprint_id": blueprint.strip(),
                             "default_voice": voice.strip(),
                             "voice": voice.strip(),
-                            "delegated_session_id": delegated_session_id.strip(),
                             "google_account_id": google_account_id.strip(),
                             "google_account_email": str(youtube_accounts_by_id.get(google_account_id, {}).get("email", "")),
                             "automation_on": bool(automation_on),
@@ -543,7 +543,7 @@ def render_channels():
             voice_options = voice_catalog()
             voice = st.selectbox("Voz padrão do canal", voice_options, format_func=lambda item: item or "Sem voz padrão", key="manual_channel_voice")
             google_account_id = st.selectbox("Conta Google para Upload directo", youtube_account_ids, format_func=lambda item: youtube_account_labels.get(item, item), key="manual_channel_google_account_id")
-            delegated_session_id = st.text_input("DELEGATED_SESSION_ID", type="password", key="manual_channel_delegated_session_id")
+            st.caption("O DELEGATED_SESSION_ID é lido exclusivamente do documento JSON da conta Google associada.")
             automation_on = st.toggle("Automação ON", value=False, key="manual_channel_automation_on")
             automation_time = st.text_input("Horário diário (HH:MM)", value="00:00", key="manual_channel_automation_time")
             thumbnail_url = st.text_input("URL da imagem do canal", key="manual_channel_thumbnail")
@@ -567,7 +567,6 @@ def render_channels():
                         "default_blueprint_id": blueprint.strip(),
                         "default_voice": voice.strip(),
                         "voice": voice.strip(),
-                        "delegated_session_id": delegated_session_id.strip(),
                         "google_account_id": google_account_id.strip(),
                         "google_account_email": str(youtube_accounts_by_id.get(google_account_id, {}).get("email", "")),
                         "automation_on": bool(automation_on),
@@ -593,16 +592,33 @@ def render_channels():
             if current_channel_account_id and current_channel_account_id not in channel_account_ids:
                 channel_account_ids.append(current_channel_account_id)
                 youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
-            with st.expander("Upload directo — conta e canal", expanded=True):
-                st.caption("Defina aqui a conta Google deste canal e o DELEGATED_SESSION_ID individual. Os cookies e o sessionInfo token são carregados na área da conta em Configurações Técnicas.")
-                with st.form(f"channel_direct_credentials_{channel['id']}"):
-                    channel_account_id = st.selectbox("Conta Google dos cookies/sessionInfo", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel['id']}")
-                    channel_delegated_session_id = st.text_input("DELEGATED_SESSION_ID deste canal (individual)", value=str(channel.get("delegated_session_id", "")), type="password", key=f"channel_delegated_session_id_{channel['id']}")
-                    save_channel_direct_credentials = st.form_submit_button("Guardar credenciais deste canal", type="primary")
-                if save_channel_direct_credentials:
-                    update_channel(channel["id"], {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", "")), "delegated_session_id": channel_delegated_session_id.strip()})
-                    st.success("Conta Google e DELEGATED_SESSION_ID guardados neste canal.")
-                    st.rerun()
+            st.markdown("**Upload directo — documento da conta deste canal**")
+            st.caption("O DELEGATED_SESSION_ID deste canal é individual, mas fica apenas no documento JSON da conta Google. A UI não mostra nem edita esse valor; associe apenas o canal à conta que contém o documento.")
+            with st.form(f"channel_direct_credentials_{channel['id']}"):
+                channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel['id']}")
+                save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", use_container_width=True)
+            selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
+            if selected_channel_account:
+                selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
+                if selected_account_status["ready"]:
+                    st.success("Documento da conta completo e DELEGATED_SESSION_ID deste canal encontrado no documento.")
+                elif not selected_account_status["document_exists"]:
+                    st.warning("A conta seleccionada ainda não tem documento JSON de credenciais.")
+                else:
+                    missing_channel_parts = list(selected_account_status["missing_cookies"])
+                    if not selected_account_status["has_session_info"]:
+                        missing_channel_parts.append("sessionInfo")
+                    if not selected_account_status["has_innertube_api_key"]:
+                        missing_channel_parts.append("INNERTUBE_API_KEY")
+                    if not selected_account_status["has_delegated_session_id"]:
+                        missing_channel_parts.append("DELEGATED_SESSION_ID deste canal")
+                    st.warning(f"Documento incompleto: {', '.join(missing_channel_parts)}")
+            else:
+                st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
+            if save_channel_direct_credentials:
+                update_channel(channel["id"], {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", ""))})
+                st.success("Conta Google associada ao canal. O DELEGATED_SESSION_ID continua exclusivamente no documento da conta.")
+                st.rerun()
             cols = st.columns([0.6, 2.2, 1.2, 1.2, 1.2, 1])
             with cols[0]:
                 if channel.get("thumbnail_url"):
@@ -1276,31 +1292,35 @@ def render_upload_direct():
             st.write(f"**{task.get('topic', 'Sem tópico')}** — {task.get('channel_name', 'Canal')}")
             st.caption(video_path or "Sem caminho de vídeo registado")
             account = direct_accounts.get(str(channel.get("google_account_id", "")))
-            if not channel.get("delegated_session_id"):
-                st.warning("Este canal não tem DELEGATED_SESSION_ID configurado na aba Canais.")
+            credential_status = document_status(STORAGE, account, channel, settings, channels) if account else None
             if not account:
-                st.warning("Este canal não tem uma conta Google associada. Configure-a em Canais > Upload directo — conta e canal.")
-            elif not direct_account_status(STORAGE, account)["ready"]:
-                st.warning("A conta Google deste canal não tem cookies completos e sessionInfo token configurados em Configurações Técnicas.")
-            elif channel.get("delegated_session_id"):
-                st.caption(f"Credenciais directas: {account.get('email', 'conta Google')} · DELEGATED_SESSION_ID configurado")
+                st.warning("Este canal não tem uma conta Google associada. Associe a conta no cartão deste canal em Canais cadastrados.")
+            elif not credential_status["ready"]:
+                missing_direct_parts = list(credential_status["missing_cookies"])
+                if not credential_status["has_session_info"]:
+                    missing_direct_parts.append("sessionInfo")
+                if not credential_status["has_innertube_api_key"]:
+                    missing_direct_parts.append("INNERTUBE_API_KEY")
+                if not credential_status["has_delegated_session_id"]:
+                    missing_direct_parts.append("DELEGATED_SESSION_ID deste canal")
+                st.warning(f"Documento de credenciais incompleto: {', '.join(missing_direct_parts)}")
+            else:
+                st.caption(f"Documento de credenciais pronto: {account.get('email', 'conta Google')} · dados do canal encontrados no documento")
             direct_cols = st.columns([2.2, 1, 1])
             with direct_cols[0]:
                 title = st.text_input("Título", value=task.get("topic", "Vídeo Thunderbolt"), key=f"direct_title_{task['id']}")
             with direct_cols[1]:
                 privacy = st.selectbox("Privacidade", ["private", "unlisted", "public"], key=f"direct_privacy_{task['id']}")
             with direct_cols[2]:
-                chunk_size = st.number_input("Chunk bytes", min_value=262144, step=262144, value=int(settings.get("direct_chunk_size", 262144)), key=f"direct_chunk_{task['id']}")
+                st.caption("Chunk size lido do documento JSON da conta")
             description = st.text_area("Descrição", value=task.get("description", ""), key=f"direct_description_{task['id']}", height=90)
             if st.button("Enviar por Upload directo", type="primary", key=f"direct_upload_{task['id']}"):
                 if not account:
-                    st.error("Associe primeiro este canal a uma conta Google em Canais.")
-                elif not channel.get("delegated_session_id"):
-                    st.error("Configure primeiro o DELEGATED_SESSION_ID individual deste canal em Canais.")
-                elif not direct_account_status(STORAGE, account)["ready"]:
-                    st.error("Configure primeiro o ficheiro de cookies e o sessionInfo token desta conta em Configurações Técnicas.")
+                    st.error("Associe primeiro este canal a uma conta Google no cartão Upload directo — credenciais deste canal em Canais cadastrados.")
+                elif not document_status(STORAGE, account, channel, settings, channels)["ready"]:
+                    st.error("Complete o documento JSON desta conta, incluindo cookies, sessionInfo, INNERTUBE_API_KEY e DELEGATED_SESSION_ID deste canal.")
                 else:
-                    result = YouTubeDirectUploader(settings, channel, account=account, storage_root=STORAGE).upload(video_path, title=title, description=description, visibility=privacy, chunk_size=int(chunk_size))
+                    result = YouTubeDirectUploader(settings, channel, account=account, storage_root=STORAGE).upload(video_path, title=title, description=description, visibility=privacy)
                     record = {"task_id": task.get("id"), "channel_id": channel.get("id"), "google_account_id": account.get("id", ""), "destination": "YouTube direct frontend", "status": "published" if result.ok else "failed", "message": result.message, "data": result.data, "created_at": now()}
                     uploads = read_json("uploads.json", [])
                     uploads.append(record)
@@ -1427,6 +1447,8 @@ def render_settings():
     st.subheader("Contas Google/YouTube — canais em lote")
     st.caption("Cada registo representa uma conta Google que pode gerir vários canais do YouTube. O e-mail identifica a conta; esta área não lê a caixa Gmail. Cada conta tem Client ID, Client Secret e token OAuth próprios.")
     batch_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
+    direct_document_uploads: dict[str, Any] = {}
+    direct_account_save_buttons: dict[str, bool] = {}
     for batch_account in batch_accounts:
         account_id = str(batch_account["id"])
         with st.container(border=True):
@@ -1440,7 +1462,27 @@ def render_settings():
                     account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
                 with account_cols[3]:
                     account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
-                save_account = st.form_submit_button("Guardar conta", type="primary", use_container_width=True)
+                save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
+            direct_status = direct_account_status(STORAGE, batch_account)
+            st.markdown("**Credenciais do Upload directo desta conta Google**")
+            st.caption("Estas credenciais pertencem apenas a este Gmail. O ficheiro contém SID, SSID, HSID, APISID e SAPISID e é guardado por ID da conta.")
+            direct_account_cols = st.columns([2.4, 1])
+            with direct_account_cols[0]:
+                direct_document_uploads[account_id] = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key=f"direct_credentials_document_{account_id}", help="Documento JSON com cookies SID/SSID/HSID/APISID/SAPISID, sessionInfo token, INNERTUBE_API_KEY, chunk_size e mapa delegated_session_ids.")
+            with direct_account_cols[1]:
+                if direct_status["document_exists"] and direct_status["ready"]:
+                    st.success("Documento completo")
+                elif direct_status["document_exists"]:
+                    missing_document_parts = list(direct_status["missing_cookies"])
+                    if not direct_status["has_session_info"]:
+                        missing_document_parts.append("sessionInfo")
+                    if not direct_status["has_innertube_api_key"]:
+                        missing_document_parts.append("INNERTUBE_API_KEY")
+                    st.warning(f"Documento incompleto: {', '.join(missing_document_parts)}")
+                else:
+                    st.warning("Sem documento de credenciais")
+            st.caption("Documento guardado em: storage/youtube_direct_accounts/<id-da-conta>/credentials.json")
+            direct_account_save_buttons[account_id] = st.button("Guardar documento de Upload directo desta conta", type="secondary", use_container_width=True, key=f"save_direct_account_{account_id}")
             account_status = youtube_batch_account_status(batch_account, STORAGE)
             status_cols = st.columns([2, 1, 1])
             with status_cols[0]:
@@ -1476,7 +1518,23 @@ def render_settings():
                     write_json("settings.json", settings)
                     st.success("Conta Google/YouTube guardada.")
                     st.rerun()
+            if direct_account_save_buttons.get(account_id):
+                uploaded_document = direct_document_uploads.get(account_id)
+                if uploaded_document is None:
+                    st.error("Seleccione o documento JSON completo desta conta Google antes de guardar.")
+                else:
+                    try:
+                        document = parse_credentials_document(uploaded_document.getvalue(), uploaded_document.name)
+                        document["account_id"] = account_id
+                        document["email"] = str(batch_account.get("email", ""))
+                        save_credentials_document(STORAGE, batch_account, document)
+                        st.success("Documento de Upload directo guardado exclusivamente para esta conta Google.")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
     with st.form("add_batch_account_form"):
+        st.markdown("**Credenciais do Upload directo desta conta Google**")
+        st.caption("Estes campos pertencem a este Gmail. O ficheiro será guardado numa pasta exclusiva da conta e nunca será uma configuração global.")
         add_cols = st.columns(4)
         with add_cols[0]:
             new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
@@ -1486,19 +1544,36 @@ def render_settings():
             new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
         with add_cols[3]:
             new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
-        add_account = st.form_submit_button("Adicionar conta Google/YouTube", use_container_width=True)
+        new_account_document = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key="new_batch_account_credentials_document", help="Documento JSON único com cookies SID/SSID/HSID/APISID/SAPISID, sessionInfo, INNERTUBE_API_KEY, chunk_size e delegated_session_ids.")
+        st.caption("O documento é guardado em storage/youtube_direct_accounts/<id-da-conta>/credentials.json. Não existem inputs separados para cookies ou sessionInfo.")
+        add_account = st.form_submit_button("Adicionar conta Google/YouTube com documento de Upload directo", use_container_width=True)
     if add_account:
+        document_error = ""
         if "@" not in new_account_email.strip():
             st.error("Informe um e-mail Google válido.")
         elif not new_account_client_id.strip() or not new_account_client_secret.strip():
             st.error("Informe o Client ID e o Client Secret da nova conta.")
-        else:
+        elif new_account_document is not None:
+            try:
+                parse_credentials_document(new_account_document.getvalue(), new_account_document.name)
+            except ValueError as exc:
+                document_error = str(exc)
+                st.error(document_error)
+        if "@" in new_account_email.strip() and new_account_client_id.strip() and new_account_client_secret.strip() and not document_error:
             new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip()}
+            if new_account_document is not None:
+                document = parse_credentials_document(new_account_document.getvalue(), new_account_document.name)
+                document["account_id"] = new_account["id"]
+                document["email"] = new_account["email"]
+                save_credentials_document(STORAGE, new_account, document)
             batch_accounts.append(new_account)
             settings["youtube_batch_accounts"] = batch_accounts
             settings["youtube_batch_selected_account_id"] = new_account["id"]
             write_json("settings.json", settings)
-            st.success(f"Conta {new_account['email']} adicionada.")
+            if new_account_document is not None:
+                st.success(f"Conta {new_account['email']} adicionada com documento de Upload directo por Gmail.")
+            else:
+                st.warning(f"Conta {new_account['email']} adicionada. Carregue o documento completo no cartão desta conta antes do Upload directo.")
             st.rerun()
 
     with st.form("settings_form"):
@@ -1539,51 +1614,9 @@ def render_settings():
             st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
             youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
 
-        direct_account_session_fields = {}
-        direct_cookie_uploads = {}
-        save_direct_credentials = False
-        with st.expander("Upload directo — sessão YouTube Frontend API", expanded=True):
-            st.caption("Os cookies e o sessionInfo token são configurados por conta Google/YouTube. O DELEGATED_SESSION_ID é configurado separadamente em cada canal.")
-            direct_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
-            if not direct_accounts:
-                st.warning("Ainda não existe uma conta Google/YouTube cadastrada. Adicione primeiro a conta acima; depois deste formulário aparecerão, para cada Gmail, o campo de `sessionInfo token` e o uploader do ficheiro com SID, SSID, HSID, APISID e SAPISID.")
-            for direct_account in direct_accounts:
-                direct_account_id = str(direct_account["id"])
-                direct_status = direct_account_status(STORAGE, direct_account)
-                with st.container(border=True):
-                    st.markdown(f"**{direct_account.get('label', 'Canais YouTube')}** — `{direct_account.get('email', 'sem e-mail')}`")
-                    direct_account_cols = st.columns([1.6, 1.6, 1])
-                    with direct_account_cols[0]:
-                        direct_session_info_value = st.text_input("sessionInfo token", value=str(direct_account.get("direct_session_info", "")), type="password", key=f"direct_session_info_{direct_account_id}")
-                    with direct_account_cols[1]:
-                        direct_cookie_uploads[direct_account_id] = st.file_uploader("Ficheiro de cookies", type=["json", "txt", "cookies", "tsv"], key=f"direct_cookie_file_{direct_account_id}", help="JSON de cookies do navegador ou ficheiro Netscape com SID, SSID, HSID, APISID e SAPISID.")
-                    with direct_account_cols[2]:
-                        if direct_status["cookie_file_exists"] and not direct_status["missing_cookies"]:
-                            st.success("Cookies guardados")
-                        elif direct_status["cookie_file_exists"]:
-                            st.warning(f"Faltam: {', '.join(direct_status['missing_cookies'])}")
-                        else:
-                            st.warning("Sem ficheiro de cookies")
-                    st.caption("O ficheiro é guardado em storage/youtube_direct_accounts/<conta>/cookies.json. Os valores não são mostrados nem enviados para o Git.")
-                    direct_account_session_fields[direct_account_id] = direct_session_info_value
-                if direct_accounts:
-                    save_direct_credentials = st.form_submit_button("Guardar cookies e sessionInfo por conta", type="secondary", use_container_width=True)
-
-            with st.container(border=True):
-                st.markdown("**Compatibilidade com instalação antiga — credenciais globais**")
-                st.caption("Use apenas para manter instalações antigas. Quando houver uma conta Google configurada, o Upload directo usa o ficheiro e o sessionInfo dessa conta.")
-                direct_cookie_cols = st.columns(3)
-                with direct_cookie_cols[0]:
-                    direct_cookie_sid = text_setting("SID", "direct_cookie_sid", secret=True)
-                    direct_cookie_ssid = text_setting("SSID", "direct_cookie_ssid", secret=True)
-                with direct_cookie_cols[1]:
-                    direct_cookie_hsid = text_setting("HSID", "direct_cookie_hsid", secret=True)
-                    direct_cookie_apisid = text_setting("APISID", "direct_cookie_apisid", secret=True)
-                with direct_cookie_cols[2]:
-                    direct_cookie_sapisid = text_setting("SAPISID", "direct_cookie_sapisid", secret=True)
-                    direct_session_info = text_setting("sessionInfo token global", "direct_session_info", secret=True)
-            direct_innertube_api_key = text_setting("INNERTUBE_API_KEY", "direct_innertube_api_key", secret=True)
-            direct_chunk_size = st.number_input("Chunk size (múltiplo de 262144)", min_value=262144, step=262144, value=int(settings.get("direct_chunk_size", 262144)))
+        st.caption("As credenciais e parâmetros do Upload directo — cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e DELEGATED_SESSION_ID — são lidos exclusivamente do documento JSON por conta Google. Não são editados nesta UI.")
+        direct_innertube_api_key = str(settings.get("direct_innertube_api_key", "") or "")
+        direct_chunk_size = int(settings.get("direct_chunk_size", 262144) or 262144)
 
         with st.expander("Serviço, materiais e rede"):
             cols = st.columns(2)
@@ -1715,27 +1748,13 @@ def render_settings():
                 st.rerun()
 
         save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
-        if save_all_settings or save_direct_credentials:
-            direct_cookie_error = ""
-            configured_direct_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
-            for direct_account in configured_direct_accounts:
-                direct_account_id = str(direct_account["id"])
-                direct_account["direct_session_info"] = str(direct_account_session_fields.get(direct_account_id, direct_account.get("direct_session_info", "")) or "").strip()
-                uploaded_cookie_file = direct_cookie_uploads.get(direct_account_id)
-                if uploaded_cookie_file is not None:
-                    try:
-                        save_cookie_file(STORAGE, direct_account, uploaded_cookie_file.getvalue(), uploaded_cookie_file.name)
-                    except ValueError as exc:
-                        direct_cookie_error = str(exc)
-            settings["youtube_batch_accounts"] = configured_direct_accounts
-            if direct_cookie_error:
-                st.error(direct_cookie_error)
+        if save_all_settings:
             settings.update({
                 "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
                 "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
                 "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
                 "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                "direct_cookie_sid": direct_cookie_sid, "direct_cookie_ssid": direct_cookie_ssid, "direct_cookie_hsid": direct_cookie_hsid, "direct_cookie_apisid": direct_cookie_apisid, "direct_cookie_sapisid": direct_cookie_sapisid, "direct_session_info": direct_session_info, "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
+                "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
                 "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                 "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
                 "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
@@ -1754,17 +1773,14 @@ def render_settings():
                 "upload_post_auto_upload": upload_post_auto_upload,
             })
             write_json("settings.json", settings)
-            if direct_cookie_error:
-                st.warning("As restantes configurações foram guardadas, mas o ficheiro de cookies não foi substituído. Corrija o ficheiro e tente novamente.")
-            else:
-                try:
-                    synced = sync_moneyprinter_config(settings, moneyprinter_path)
-                    if synced:
-                        st.success(f"Configurações guardadas e sincronizadas com {synced}")
-                    else:
-                        st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
-                except Exception as exc:
-                    st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+            try:
+                synced = sync_moneyprinter_config(settings, moneyprinter_path)
+                if synced:
+                    st.success(f"Configurações guardadas e sincronizadas com {synced}")
+                else:
+                    st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
+            except Exception as exc:
+                st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
 
     st.divider()
     st.subheader("Teste de vozes")
