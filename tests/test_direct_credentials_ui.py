@@ -26,6 +26,13 @@ def test_direct_credentials_are_read_per_account_and_channel_from_document():
     assert 'redirect_uri_mismatch' in MAIN_SOURCE or 'loopback_redirect_uri' in MAIN_SOURCE
 
 
+def test_technical_settings_are_split_into_three_unnumbered_tabs():
+    expected = 'st.tabs(["Contas Google/YouTube — canais em lote", "API Keys", "Teste de vozes"])'
+    assert expected in MAIN_SOURCE
+    assert 'st.subheader("API Keys")' in MAIN_SOURCE
+    assert 'st.subheader("Execução local")' not in MAIN_SOURCE
+
+
 def test_legacy_cookie_inputs_are_not_rendered():
     for label in ("SID global legado", "SSID global legado", "HSID global legado", "APISID global legado", "SAPISID global legado", "sessionInfo token global legado"):
         assert label not in MAIN_SOURCE

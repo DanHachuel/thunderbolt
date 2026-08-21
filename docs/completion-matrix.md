@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.48.
+Estado auditado para o release 0.2.49.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -29,6 +29,7 @@ Estado auditado para o release 0.2.48.
 | Niche Finder Apify baseado no YTB Outlier Finder | Concluído como integração configurável | Actor Apify, polling, dataset, normalização SRT, VSC Ratio, sumarização LLM opcional e exportação JSON/CSV; não grava automaticamente no Airtable do workflow. |
 | Editor Python baseado no PYEdit | Concluído como editor local seguro | Vídeos gerados pelos artefactos, selecção de pasta, upload manual, corte, áudio, velocidade, redimensionamento, histórico próprio e edição/guarda de scripts sem execução de código. |
 | Canais em lote por conta Google/YouTube | Concluído como integração OAuth configurável | Contas múltiplas com e-mail, Client ID, Client Secret e sessionInfo próprios; botão de repetição de campos, eliminação individual com limpeza de tokens/documentos/associações, tokens separados, `channels.list(mine=true)` com paginação, selecção, deduplicação por `youtube_channel_id` e importação incremental; não lê Gmail. |
+| Configurações Técnicas organizadas em subabas | Concluído | `render_settings()` apresenta, sem numeração visível e nesta ordem, `Contas Google/YouTube — canais em lote`, `API Keys` e `Teste de vozes`; os blocos de contas, API Keys e preview de voz permanecem isolados. |
 
 ## Regra de release
 

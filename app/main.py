@@ -1448,402 +1448,406 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    st.subheader("Contas Google/YouTube — canais em lote")
-    st.caption("Cada registo representa uma conta Google que pode gerir vários canais do YouTube. O e-mail identifica a conta; esta área não lê a caixa Gmail. Cada conta tem Client ID, Client Secret e token OAuth próprios.")
-    batch_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
-    direct_document_uploads: dict[str, Any] = {}
-    direct_account_save_buttons: dict[str, bool] = {}
-    for batch_account in batch_accounts:
-        account_id = str(batch_account["id"])
-        with st.container(border=True):
-            with st.form(f"batch_account_form_{account_id}"):
-                account_cols = st.columns(4)
-                with account_cols[0]:
-                    account_label = st.text_input("Nome da conta", value=str(batch_account.get("label", "Canais YouTube")), key=f"batch_label_{account_id}")
-                with account_cols[1]:
-                    account_email = st.text_input("E-mail/Gmail da conta", value=str(batch_account.get("email", "")), key=f"batch_email_{account_id}")
-                with account_cols[2]:
-                    account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
-                with account_cols[3]:
-                    account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
-                account_session_info = st.text_input(
-                    "sessionInfo token desta conta Google",
-                    value=str(batch_account.get("sessionInfo") or batch_account.get("session_info") or batch_account.get("direct_session_info", "")),
-                    type="password",
-                    key=f"batch_session_info_{account_id}",
-                    help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
-                )
-                save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
-            direct_status = direct_account_status(STORAGE, batch_account)
+    google_accounts_tab, api_keys_tab, voice_test_tab = st.tabs(["Contas Google/YouTube — canais em lote", "API Keys", "Teste de vozes"])
+
+    with google_accounts_tab:
+        st.subheader("Contas Google/YouTube — canais em lote")
+        st.caption("Cada registo representa uma conta Google que pode gerir vários canais do YouTube. O e-mail identifica a conta; esta área não lê a caixa Gmail. Cada conta tem Client ID, Client Secret e token OAuth próprios.")
+        batch_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
+        direct_document_uploads: dict[str, Any] = {}
+        direct_account_save_buttons: dict[str, bool] = {}
+        for batch_account in batch_accounts:
+            account_id = str(batch_account["id"])
+            with st.container(border=True):
+                with st.form(f"batch_account_form_{account_id}"):
+                    account_cols = st.columns(4)
+                    with account_cols[0]:
+                        account_label = st.text_input("Nome da conta", value=str(batch_account.get("label", "Canais YouTube")), key=f"batch_label_{account_id}")
+                    with account_cols[1]:
+                        account_email = st.text_input("E-mail/Gmail da conta", value=str(batch_account.get("email", "")), key=f"batch_email_{account_id}")
+                    with account_cols[2]:
+                        account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
+                    with account_cols[3]:
+                        account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
+                    account_session_info = st.text_input(
+                        "sessionInfo token desta conta Google",
+                        value=str(batch_account.get("sessionInfo") or batch_account.get("session_info") or batch_account.get("direct_session_info", "")),
+                        type="password",
+                        key=f"batch_session_info_{account_id}",
+                        help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
+                    )
+                    save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
+                direct_status = direct_account_status(STORAGE, batch_account)
+                st.markdown("**Credenciais do Upload directo desta conta Google**")
+                st.caption("Estas credenciais pertencem apenas a este Gmail. O ficheiro contém SID, SSID, HSID, APISID e SAPISID e é guardado por ID da conta.")
+                direct_account_cols = st.columns([2.4, 1])
+                with direct_account_cols[0]:
+                    direct_document_uploads[account_id] = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key=f"direct_credentials_document_{account_id}", help="Documento JSON com cookies SID/SSID/HSID/APISID/SAPISID, sessionInfo token, INNERTUBE_API_KEY, chunk_size e mapa delegated_session_ids.")
+                with direct_account_cols[1]:
+                    if direct_status["document_exists"] and direct_status["ready"]:
+                        st.success("Documento completo")
+                    elif direct_status["document_exists"]:
+                        missing_document_parts = list(direct_status["missing_cookies"])
+                        if not direct_status["has_session_info"]:
+                            missing_document_parts.append("sessionInfo")
+                        if not direct_status["has_innertube_api_key"]:
+                            missing_document_parts.append("INNERTUBE_API_KEY")
+                        st.warning(f"Documento incompleto: {', '.join(missing_document_parts)}")
+                    else:
+                        st.warning("Sem documento de credenciais")
+                st.caption("Documento guardado em: storage/youtube_direct_accounts/<id-da-conta>/credentials.json")
+                direct_account_save_buttons[account_id] = st.button("Guardar documento de Upload directo desta conta", type="secondary", use_container_width=True, key=f"save_direct_account_{account_id}")
+                account_status = youtube_batch_account_status(batch_account, STORAGE)
+                status_cols = st.columns([2, 1, 1])
+                with status_cols[0]:
+                    (st.success if account_status.ok else st.warning)(account_status.message)
+                with status_cols[1]:
+                    if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
+                        result = authorize_youtube_batch_account(batch_account, STORAGE)
+                        (st.success if result.ok else st.error)(result.message)
+                        if result.ok:
+                            st.rerun()
+                with status_cols[2]:
+                    if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                        delete_youtube_batch_token(batch_account, STORAGE)
+                        delete_credentials_document(STORAGE, batch_account)
+                        remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
+                        settings["youtube_batch_accounts"] = remaining_accounts
+                        if settings.get("youtube_batch_selected_account_id") == account_id:
+                            settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
+                        channels = read_json("channels.json", [])
+                        channels_changed = False
+                        for channel in channels:
+                            if str(channel.get("google_account_id") or "") == account_id:
+                                channel.update({"google_account_id": "", "google_account_email": ""})
+                                channels_changed = True
+                        if channels_changed:
+                            write_json("channels.json", channels)
+                        write_json("settings.json", settings)
+                        st.rerun()
+                if st.button("Repetir campos para nova conta", icon=":material/content_copy:", key=f"batch_repeat_settings_{account_id}", use_container_width=True):
+                    st.session_state["new_batch_account_label"] = account_label
+                    st.session_state["new_batch_account_email"] = account_email
+                    st.session_state["new_batch_account_client_id"] = account_client_id
+                    st.session_state["new_batch_account_client_secret"] = account_client_secret
+                    st.session_state["new_batch_account_session_info"] = account_session_info
+                    st.rerun()
+                if save_account:
+                    if "@" not in account_email.strip():
+                        st.error("Informe um e-mail Google válido.")
+                    elif not account_client_id.strip() or not account_client_secret.strip():
+                        st.error("Informe o Client ID e o Client Secret desta conta.")
+                    else:
+                        for existing in batch_accounts:
+                            if str(existing.get("id")) == account_id:
+                                credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
+                                if credentials_changed:
+                                    delete_youtube_batch_token(existing, STORAGE)
+                                existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
+                                update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
+                        settings["youtube_batch_accounts"] = batch_accounts
+                        write_json("settings.json", settings)
+                        st.success("Conta Google/YouTube guardada.")
+                        st.rerun()
+                if direct_account_save_buttons.get(account_id):
+                    uploaded_document = direct_document_uploads.get(account_id)
+                    if uploaded_document is None:
+                        st.error("Seleccione o documento JSON completo desta conta Google antes de guardar.")
+                    else:
+                        try:
+                            document = parse_credentials_document(uploaded_document.getvalue(), uploaded_document.name, session_info_override=account_session_info.strip())
+                            document["account_id"] = account_id
+                            document["email"] = str(batch_account.get("email", ""))
+                            save_credentials_document(STORAGE, batch_account, document)
+                            st.success("Documento de Upload directo guardado exclusivamente para esta conta Google.")
+                            st.rerun()
+                        except ValueError as exc:
+                            st.error(str(exc))
+        with st.form("add_batch_account_form"):
             st.markdown("**Credenciais do Upload directo desta conta Google**")
-            st.caption("Estas credenciais pertencem apenas a este Gmail. O ficheiro contém SID, SSID, HSID, APISID e SAPISID e é guardado por ID da conta.")
-            direct_account_cols = st.columns([2.4, 1])
-            with direct_account_cols[0]:
-                direct_document_uploads[account_id] = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key=f"direct_credentials_document_{account_id}", help="Documento JSON com cookies SID/SSID/HSID/APISID/SAPISID, sessionInfo token, INNERTUBE_API_KEY, chunk_size e mapa delegated_session_ids.")
-            with direct_account_cols[1]:
-                if direct_status["document_exists"] and direct_status["ready"]:
-                    st.success("Documento completo")
-                elif direct_status["document_exists"]:
-                    missing_document_parts = list(direct_status["missing_cookies"])
-                    if not direct_status["has_session_info"]:
-                        missing_document_parts.append("sessionInfo")
-                    if not direct_status["has_innertube_api_key"]:
-                        missing_document_parts.append("INNERTUBE_API_KEY")
-                    st.warning(f"Documento incompleto: {', '.join(missing_document_parts)}")
+            st.caption("Estes campos pertencem a este Gmail. O ficheiro será guardado numa pasta exclusiva da conta e nunca será uma configuração global.")
+            add_cols = st.columns(4)
+            with add_cols[0]:
+                new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
+            with add_cols[1]:
+                new_account_email = st.text_input("E-mail/Gmail", key="new_batch_account_email")
+            with add_cols[2]:
+                new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
+            with add_cols[3]:
+                new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
+            new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies, INNERTUBE_API_KEY, chunk_size e delegated_session_ids continuam apenas no documento JSON.")
+            new_account_document = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key="new_batch_account_credentials_document", help="Documento JSON único com cookies SID/SSID/HSID/APISID/SAPISID, INNERTUBE_API_KEY, chunk_size e delegated_session_ids. O sessionInfo pode ser preenchido no campo acima ou no documento.")
+            st.caption("O documento é guardado em storage/youtube_direct_accounts/<id-da-conta>/credentials.json. O campo sessionInfo é específico desta conta; os cookies e restantes credenciais continuam apenas no documento.")
+            add_account = st.form_submit_button("Adicionar conta Google/YouTube com documento de Upload directo", use_container_width=True)
+        if add_account:
+            document_error = ""
+            if "@" not in new_account_email.strip():
+                st.error("Informe um e-mail Google válido.")
+            elif not new_account_client_id.strip() or not new_account_client_secret.strip():
+                st.error("Informe o Client ID e o Client Secret da nova conta.")
+            elif new_account_document is not None:
+                try:
+                    parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
+                except ValueError as exc:
+                    document_error = str(exc)
+                    st.error(document_error)
+            if "@" in new_account_email.strip() and new_account_client_id.strip() and new_account_client_secret.strip() and not document_error:
+                new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip(), "sessionInfo": new_account_session_info.strip()}
+                if new_account_document is not None:
+                    document = parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
+                    document["account_id"] = new_account["id"]
+                    document["email"] = new_account["email"]
+                    save_credentials_document(STORAGE, new_account, document)
+                batch_accounts.append(new_account)
+                settings["youtube_batch_accounts"] = batch_accounts
+                settings["youtube_batch_selected_account_id"] = new_account["id"]
+                write_json("settings.json", settings)
+                if new_account_document is not None:
+                    st.success(f"Conta {new_account['email']} adicionada com documento de Upload directo por Gmail.")
                 else:
-                    st.warning("Sem documento de credenciais")
-            st.caption("Documento guardado em: storage/youtube_direct_accounts/<id-da-conta>/credentials.json")
-            direct_account_save_buttons[account_id] = st.button("Guardar documento de Upload directo desta conta", type="secondary", use_container_width=True, key=f"save_direct_account_{account_id}")
-            account_status = youtube_batch_account_status(batch_account, STORAGE)
-            status_cols = st.columns([2, 1, 1])
-            with status_cols[0]:
-                (st.success if account_status.ok else st.warning)(account_status.message)
-            with status_cols[1]:
-                if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
-                    result = authorize_youtube_batch_account(batch_account, STORAGE)
-                    (st.success if result.ok else st.error)(result.message)
-                    if result.ok:
-                        st.rerun()
-            with status_cols[2]:
-                if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
-                    delete_youtube_batch_token(batch_account, STORAGE)
-                    delete_credentials_document(STORAGE, batch_account)
-                    remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
-                    settings["youtube_batch_accounts"] = remaining_accounts
-                    if settings.get("youtube_batch_selected_account_id") == account_id:
-                        settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
-                    channels = read_json("channels.json", [])
-                    channels_changed = False
-                    for channel in channels:
-                        if str(channel.get("google_account_id") or "") == account_id:
-                            channel.update({"google_account_id": "", "google_account_email": ""})
-                            channels_changed = True
-                    if channels_changed:
-                        write_json("channels.json", channels)
-                    write_json("settings.json", settings)
-                    st.rerun()
-            if st.button("Repetir campos para nova conta", icon=":material/content_copy:", key=f"batch_repeat_settings_{account_id}", use_container_width=True):
-                st.session_state["new_batch_account_label"] = account_label
-                st.session_state["new_batch_account_email"] = account_email
-                st.session_state["new_batch_account_client_id"] = account_client_id
-                st.session_state["new_batch_account_client_secret"] = account_client_secret
-                st.session_state["new_batch_account_session_info"] = account_session_info
+                    st.warning(f"Conta {new_account['email']} adicionada. Carregue o documento completo no cartão desta conta antes do Upload directo.")
                 st.rerun()
-            if save_account:
-                if "@" not in account_email.strip():
-                    st.error("Informe um e-mail Google válido.")
-                elif not account_client_id.strip() or not account_client_secret.strip():
-                    st.error("Informe o Client ID e o Client Secret desta conta.")
-                else:
-                    for existing in batch_accounts:
-                        if str(existing.get("id")) == account_id:
-                            credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
-                            if credentials_changed:
-                                delete_youtube_batch_token(existing, STORAGE)
-                            existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
-                            update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
-                    settings["youtube_batch_accounts"] = batch_accounts
-                    write_json("settings.json", settings)
-                    st.success("Conta Google/YouTube guardada.")
-                    st.rerun()
-            if direct_account_save_buttons.get(account_id):
-                uploaded_document = direct_document_uploads.get(account_id)
-                if uploaded_document is None:
-                    st.error("Seleccione o documento JSON completo desta conta Google antes de guardar.")
-                else:
-                    try:
-                        document = parse_credentials_document(uploaded_document.getvalue(), uploaded_document.name, session_info_override=account_session_info.strip())
-                        document["account_id"] = account_id
-                        document["email"] = str(batch_account.get("email", ""))
-                        save_credentials_document(STORAGE, batch_account, document)
-                        st.success("Documento de Upload directo guardado exclusivamente para esta conta Google.")
-                        st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
-    with st.form("add_batch_account_form"):
-        st.markdown("**Credenciais do Upload directo desta conta Google**")
-        st.caption("Estes campos pertencem a este Gmail. O ficheiro será guardado numa pasta exclusiva da conta e nunca será uma configuração global.")
-        add_cols = st.columns(4)
-        with add_cols[0]:
-            new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
-        with add_cols[1]:
-            new_account_email = st.text_input("E-mail/Gmail", key="new_batch_account_email")
-        with add_cols[2]:
-            new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
-        with add_cols[3]:
-            new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
-        new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies, INNERTUBE_API_KEY, chunk_size e delegated_session_ids continuam apenas no documento JSON.")
-        new_account_document = st.file_uploader("Documento de credenciais desta conta Google", type=["json"], key="new_batch_account_credentials_document", help="Documento JSON único com cookies SID/SSID/HSID/APISID/SAPISID, INNERTUBE_API_KEY, chunk_size e delegated_session_ids. O sessionInfo pode ser preenchido no campo acima ou no documento.")
-        st.caption("O documento é guardado em storage/youtube_direct_accounts/<id-da-conta>/credentials.json. O campo sessionInfo é específico desta conta; os cookies e restantes credenciais continuam apenas no documento.")
-        add_account = st.form_submit_button("Adicionar conta Google/YouTube com documento de Upload directo", use_container_width=True)
-    if add_account:
-        document_error = ""
-        if "@" not in new_account_email.strip():
-            st.error("Informe um e-mail Google válido.")
-        elif not new_account_client_id.strip() or not new_account_client_secret.strip():
-            st.error("Informe o Client ID e o Client Secret da nova conta.")
-        elif new_account_document is not None:
-            try:
-                parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
-            except ValueError as exc:
-                document_error = str(exc)
-                st.error(document_error)
-        if "@" in new_account_email.strip() and new_account_client_id.strip() and new_account_client_secret.strip() and not document_error:
-            new_account = {"id": f"google_batch_{uuid.uuid4().hex[:12]}", "label": new_account_label.strip() or "Canais YouTube", "email": new_account_email.strip(), "client_id": new_account_client_id.strip(), "client_secret": new_account_client_secret.strip(), "sessionInfo": new_account_session_info.strip()}
-            if new_account_document is not None:
-                document = parse_credentials_document(new_account_document.getvalue(), new_account_document.name, session_info_override=new_account_session_info.strip())
-                document["account_id"] = new_account["id"]
-                document["email"] = new_account["email"]
-                save_credentials_document(STORAGE, new_account, document)
-            batch_accounts.append(new_account)
-            settings["youtube_batch_accounts"] = batch_accounts
-            settings["youtube_batch_selected_account_id"] = new_account["id"]
-            write_json("settings.json", settings)
-            if new_account_document is not None:
-                st.success(f"Conta {new_account['email']} adicionada com documento de Upload directo por Gmail.")
-            else:
-                st.warning(f"Conta {new_account['email']} adicionada. Carregue o documento completo no cartão desta conta antes do Upload directo.")
-            st.rerun()
 
-    with st.form("settings_form"):
-        st.subheader("Execução local")
-        port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-        moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-        st.markdown("**YouTube — OAuth 2.0 e consulta pública**")
-        st.caption("Para autorizar uploads, preencha apenas o YouTube OAuth Client ID e o YouTube OAuth Client Secret. Depois, autorize o agente na aba Upload. Estes dados identificam a aplicação OAuth; não são uma Data API Key nem um token de acesso.")
-        st.info(f"OAuth local: use um cliente do tipo Desktop app. Se o Google Cloud pedir uma URI autorizada, registe exactamente `{loopback_redirect_uri()}`.")
-        youtube_cols = st.columns(2)
-        with youtube_cols[0]:
-            youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud. É usado para iniciar a autorização da conta YouTube.")
-        with youtube_cols[1]:
-            youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0. Não é uma API Key.")
+    with api_keys_tab:
+        with st.form("settings_form"):
+            st.subheader("API Keys")
+            port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
+            moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
+            st.markdown("**YouTube — OAuth 2.0 e consulta pública**")
+            st.caption("Para autorizar uploads, preencha apenas o YouTube OAuth Client ID e o YouTube OAuth Client Secret. Depois, autorize o agente na aba Upload. Estes dados identificam a aplicação OAuth; não são uma Data API Key nem um token de acesso.")
+            st.info(f"OAuth local: use um cliente do tipo Desktop app. Se o Google Cloud pedir uma URI autorizada, registe exactamente `{loopback_redirect_uri()}`.")
+            youtube_cols = st.columns(2)
+            with youtube_cols[0]:
+                youtube_client_id = text_setting("YouTube OAuth Client ID", "youtube_client_id", help_text="Client ID do OAuth 2.0 criado no Google Cloud. É usado para iniciar a autorização da conta YouTube.")
+            with youtube_cols[1]:
+                youtube_client_secret = text_setting("YouTube OAuth Client Secret", "youtube_client_secret", secret=True, help_text="Client Secret do mesmo cliente OAuth 2.0. Não é uma API Key.")
 
-        with st.expander("Niche Finder — execução remota no Kaggle", expanded=True):
-            st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
-            kaggle_cols = st.columns(3)
-            with kaggle_cols[0]:
-                kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
-            with kaggle_cols[1]:
-                kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
-            with kaggle_cols[2]:
-                kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
+            with st.expander("Niche Finder — execução remota no Kaggle", expanded=True):
+                st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
+                kaggle_cols = st.columns(3)
+                with kaggle_cols[0]:
+                    kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
+                with kaggle_cols[1]:
+                    kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
+                with kaggle_cols[2]:
+                    kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
 
-        with st.expander("Niche Finder — execução através da Apify", expanded=True):
-            st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
-            apify_cols = st.columns(4)
-            with apify_cols[0]:
-                apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
-            with apify_cols[1]:
-                apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
-            with apify_cols[2]:
-                apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
-            with apify_cols[3]:
-                apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
+            with st.expander("Niche Finder — execução através da Apify", expanded=True):
+                st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
+                apify_cols = st.columns(4)
+                with apify_cols[0]:
+                    apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
+                with apify_cols[1]:
+                    apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
+                with apify_cols[2]:
+                    apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
+                with apify_cols[3]:
+                    apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
 
-        with st.expander("Consulta oficial de métricas — opcional"):
-            st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
-            youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
+            with st.expander("Consulta oficial de métricas — opcional"):
+                st.caption("A YouTube Data API Key é uma credencial Google Cloud separada do OAuth. Só é necessária se escolher o método YouTube Data API para consultar métricas oficiais. Não é necessária para Página pública — sem API Key, para autorizar OAuth ou para fazer upload.")
+                youtube_api_key = text_setting("YouTube Data API Key (opcional)", "youtube_api_key", secret=True, help_text="Credencial separada, criada em Google Cloud > APIs e serviços > Credenciais > Chave de API. Não cole aqui o Client ID nem o Client Secret.")
 
-        st.caption("As credenciais e parâmetros do Upload directo — cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e DELEGATED_SESSION_ID — são lidos exclusivamente do documento JSON por conta Google. Não são editados nesta UI.")
-        direct_innertube_api_key = str(settings.get("direct_innertube_api_key", "") or "")
-        direct_chunk_size = int(settings.get("direct_chunk_size", 262144) or 262144)
+            st.caption("As credenciais e parâmetros do Upload directo — cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e DELEGATED_SESSION_ID — são lidos exclusivamente do documento JSON por conta Google. Não são editados nesta UI.")
+            direct_innertube_api_key = str(settings.get("direct_innertube_api_key", "") or "")
+            direct_chunk_size = int(settings.get("direct_chunk_size", 262144) or 262144)
 
-        with st.expander("Serviço, materiais e rede"):
-            cols = st.columns(2)
-            with cols[0]:
-                log_level = st.selectbox("Log level", ["DEBUG", "INFO", "WARNING", "ERROR"], index=["DEBUG", "INFO", "WARNING", "ERROR"].index(settings.get("log_level", "DEBUG")) if settings.get("log_level", "DEBUG") in ["DEBUG", "INFO", "WARNING", "ERROR"] else 0)
-                listen_host = text_setting("API listen host", "listen_host")
-                listen_port = st.number_input("API listen port", 1, 65535, int(settings.get("listen_port", 8080)))
-                video_source = st.selectbox("Fonte de materiais", ["pexels", "pixabay", "coverr", "loomloom", "local"], index=["pexels", "pixabay", "coverr", "loomloom", "local"].index(settings.get("video_source", "pexels")) if settings.get("video_source", "pexels") in ["pexels", "pixabay", "coverr", "loomloom", "local"] else 0)
-            with cols[1]:
-                endpoint = text_setting("Endpoint público", "endpoint")
-                proxy_http = text_setting("Proxy HTTP", "proxy_http")
-                proxy_https = text_setting("Proxy HTTPS", "proxy_https")
-                match_materials_to_script = st.checkbox("Alinhar materiais ao roteiro", bool(settings.get("match_materials_to_script", False)))
-
-        with st.expander("LLM — providers e modelos", expanded=True):
-            provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
-            llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
-            st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
-            st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
-            openai_cols = st.columns(3)
-            with openai_cols[0]:
-                openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
-            with openai_cols[1]:
-                openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
-            with openai_cols[2]:
-                cached_catalog = st.session_state.get("openai_model_catalog", {})
-                catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
-                cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
-                current_model_name = str(settings.get("openai_model_name", "") or "")
-                manual_option = "__manual_model__"
-                if cached_models:
-                    model_options = [manual_option, *cached_models]
-                    model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
-                    selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
-                    if selected_model == manual_option:
-                        openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
-                    else:
-                        openai_model_name = selected_model
-                else:
-                    openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
-            refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
-            if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
-                st.warning(str(cached_catalog["error"]))
-            elif cached_models:
-                st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
-            else:
-                st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
-            llm_fields = [
-                ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
-                ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
-                ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
-                ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
-                ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
-                ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
-                ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
-            ]
-            for label, prefix, has_key in llm_fields:
-                st.markdown(f"**{label}**")
-                cols = st.columns(3)
+            with st.expander("Serviço, materiais e rede"):
+                cols = st.columns(2)
                 with cols[0]:
-                    if has_key:
-                        settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
-                    else:
-                        settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
+                    log_level = st.selectbox("Log level", ["DEBUG", "INFO", "WARNING", "ERROR"], index=["DEBUG", "INFO", "WARNING", "ERROR"].index(settings.get("log_level", "DEBUG")) if settings.get("log_level", "DEBUG") in ["DEBUG", "INFO", "WARNING", "ERROR"] else 0)
+                    listen_host = text_setting("API listen host", "listen_host")
+                    listen_port = st.number_input("API listen port", 1, 65535, int(settings.get("listen_port", 8080)))
+                    video_source = st.selectbox("Fonte de materiais", ["pexels", "pixabay", "coverr", "loomloom", "local"], index=["pexels", "pixabay", "coverr", "loomloom", "local"].index(settings.get("video_source", "pexels")) if settings.get("video_source", "pexels") in ["pexels", "pixabay", "coverr", "loomloom", "local"] else 0)
                 with cols[1]:
-                    settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
-                with cols[2]:
-                    settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
+                    endpoint = text_setting("Endpoint público", "endpoint")
+                    proxy_http = text_setting("Proxy HTTP", "proxy_http")
+                    proxy_https = text_setting("Proxy HTTPS", "proxy_https")
+                    match_materials_to_script = st.checkbox("Alinhar materiais ao roteiro", bool(settings.get("match_materials_to_script", False)))
 
-        with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
-            cols = st.columns(2)
-            with cols[0]:
-                azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
-                azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
-                siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
-                minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
-                minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
-                minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
-                minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
-            with cols[1]:
-                elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
-                elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
-                chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
-                chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
-                chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
-                sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
-                sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
-                st.markdown("**Suno — agente musical opcional**")
-                suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
-                suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
-                suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
-
-        with st.expander("Vídeo, materiais, Whisper e FFmpeg"):
-            cols = st.columns(2)
-            with cols[0]:
-                pexels_api_keys = text_setting("Pexels API keys", "pexels_api_keys", secret=True, help_text="Separe várias chaves por vírgula para rotação.")
-                pixabay_api_keys = text_setting("Pixabay API keys", "pixabay_api_keys", secret=True)
-                coverr_api_keys = text_setting("Coverr API keys", "coverr_api_keys", secret=True)
-                twelvelabs_api_keys = text_setting("TwelveLabs API keys", "twelvelabs_api_keys", secret=True)
-                material_directory = text_setting("Pasta de materiais", "material_directory")
-            with cols[1]:
-                subtitle_provider = st.selectbox("Subtitle provider", ["edge", "whisper", ""], index=["edge", "whisper", ""].index(settings.get("subtitle_provider", "edge")) if settings.get("subtitle_provider", "edge") in ["edge", "whisper", ""] else 0)
-                ffmpeg_path = text_setting("Caminho FFmpeg", "ffmpeg_path")
-                video_codec = text_setting("Codec de vídeo", "video_codec")
-                whisper_model_size = text_setting("Whisper model", "whisper_model_size")
-                whisper_device = st.selectbox("Whisper device", ["cpu", "cuda"], index=0 if settings.get("whisper_device", "cpu") == "cpu" else 1)
-                whisper_compute_type = text_setting("Whisper compute type", "whisper_compute_type")
-
-        with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
-            st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
-            tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
-            tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
-
-        with st.expander("Publicação através do Upload-Post"):
-            upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
-            upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
-            upload_post_username = text_setting("Upload-Post username", "upload_post_username")
-            upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
-            upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
-
-        if refresh_openai_models:
-            try:
-                discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
-                st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
-                st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
-                st.rerun()
-            except ModelDiscoveryError as exc:
-                st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
-                st.rerun()
-
-        save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
-        if save_all_settings:
-            settings.update({
-                "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
-                "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
-                "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
-                "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
-                "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
-                "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
-                "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
-                "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
-                "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
-                "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
-                "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
-                "pexels_api_keys": pexels_api_keys, "pixabay_api_keys": pixabay_api_keys, "coverr_api_keys": coverr_api_keys, "twelvelabs_api_keys": twelvelabs_api_keys,
-                "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
-                "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint, "subtitle_provider": subtitle_provider,
-                "ffmpeg_path": ffmpeg_path, "video_codec": video_codec, "material_directory": material_directory,
-                "whisper_model_size": whisper_model_size, "whisper_device": whisper_device, "whisper_compute_type": whisper_compute_type,
-                "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
-                "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
-                "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
-                "upload_post_auto_upload": upload_post_auto_upload,
-            })
-            write_json("settings.json", settings)
-            try:
-                synced = sync_moneyprinter_config(settings, moneyprinter_path)
-                if synced:
-                    st.success(f"Configurações guardadas e sincronizadas com {synced}")
+            with st.expander("LLM — providers e modelos", expanded=True):
+                provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
+                llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
+                st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
+                st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
+                openai_cols = st.columns(3)
+                with openai_cols[0]:
+                    openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
+                with openai_cols[1]:
+                    openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
+                with openai_cols[2]:
+                    cached_catalog = st.session_state.get("openai_model_catalog", {})
+                    catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
+                    cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
+                    current_model_name = str(settings.get("openai_model_name", "") or "")
+                    manual_option = "__manual_model__"
+                    if cached_models:
+                        model_options = [manual_option, *cached_models]
+                        model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
+                        selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
+                        if selected_model == manual_option:
+                            openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
+                        else:
+                            openai_model_name = selected_model
+                    else:
+                        openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
+                refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
+                if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
+                    st.warning(str(cached_catalog["error"]))
+                elif cached_models:
+                    st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
                 else:
-                    st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
-            except Exception as exc:
-                st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+                    st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
+                llm_fields = [
+                    ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
+                    ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
+                    ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
+                    ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
+                    ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
+                    ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
+                    ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
+                ]
+                for label, prefix, has_key in llm_fields:
+                    st.markdown(f"**{label}**")
+                    cols = st.columns(3)
+                    with cols[0]:
+                        if has_key:
+                            settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
+                        else:
+                            settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
+                    with cols[1]:
+                        settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
+                    with cols[2]:
+                        settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
 
-    st.divider()
-    st.subheader("Teste de vozes")
-    st.caption("Este painel é exclusivamente um preview. O áudio gerado não altera vídeos, tarefas, Blueprints ou a configuração da pipeline.")
-    preview_cols = st.columns([1.1, 2.2, 1.2])
-    with preview_cols[0]:
-        preview_provider = st.selectbox("Provider", ["edge", "azure_speech", "elevenlabs", "minimax", "siliconflow", "gemini", "chatterbox"], index=0, key="voice_preview_provider")
-    with preview_cols[1]:
-        if preview_provider in {"edge", "azure_speech"}:
-            preview_voice_options = voice_catalog(settings.get("voice_preview_voice", "en-US-AriaNeural-Female"))
-            preview_voice = st.selectbox("Voz", preview_voice_options, index=preview_voice_options.index(settings.get("voice_preview_voice", "en-US-AriaNeural-Female")) if settings.get("voice_preview_voice", "en-US-AriaNeural-Female") in preview_voice_options else 0, format_func=lambda item: item or "Escolha uma voz", key="voice_preview_voice")
-        else:
-            preview_voice = st.text_input("Voice ID", value=settings.get("voice_preview_voice", ""), key="voice_preview_voice_text")
-    with preview_cols[2]:
-        preview_rate = st.selectbox("Velocidade", ["-20%", "-10%", "+0%", "+10%", "+20%"], index=2, key="voice_preview_rate")
-    preview_text = st.text_area("Texto de teste", value=DEFAULT_SAMPLE, max_chars=1000, height=110, key="voice_preview_text")
-    if st.button("Testar voz", type="primary", key="voice_preview_generate"):
-        st.session_state.pop("voice_preview_path", None)
-        try:
-            preview_path = synthesize_preview(preview_text, preview_provider, preview_voice, settings, preview_rate)
-            st.session_state["voice_preview_path"] = str(preview_path)
-            st.success("Amostra de voz gerada. Este ficheiro é apenas um preview.")
-        except Exception as exc:
-            st.error(f"Não foi possível gerar o preview: {exc}")
-    preview_value = str(st.session_state.get("voice_preview_path", "") or "").strip()
-    loaded_preview = load_preview_file(preview_value)
-    if loaded_preview:
-        preview_path, preview_data = loaded_preview
-        st.audio(preview_data, format="audio/mpeg")
-        st.download_button("Descarregar amostra", data=preview_data, file_name=preview_path.name, mime="audio/mpeg", key="voice_preview_download")
-    elif preview_value:
-        st.session_state.pop("voice_preview_path", None)
-        st.warning("A amostra de voz anterior não é um ficheiro de áudio legível e foi removida do estado local. Teste a voz novamente.")
+            with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
+                cols = st.columns(2)
+                with cols[0]:
+                    azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
+                    azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
+                    siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                    minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                    minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
+                    minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
+                    minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
+                with cols[1]:
+                    elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                    elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
+                    chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
+                    chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                    chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
+                    sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                    sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+                    st.markdown("**Suno — agente musical opcional**")
+                    suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                    suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
+                    suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
+
+            with st.expander("Vídeo, materiais, Whisper e FFmpeg"):
+                cols = st.columns(2)
+                with cols[0]:
+                    pexels_api_keys = text_setting("Pexels API keys", "pexels_api_keys", secret=True, help_text="Separe várias chaves por vírgula para rotação.")
+                    pixabay_api_keys = text_setting("Pixabay API keys", "pixabay_api_keys", secret=True)
+                    coverr_api_keys = text_setting("Coverr API keys", "coverr_api_keys", secret=True)
+                    twelvelabs_api_keys = text_setting("TwelveLabs API keys", "twelvelabs_api_keys", secret=True)
+                    material_directory = text_setting("Pasta de materiais", "material_directory")
+                with cols[1]:
+                    subtitle_provider = st.selectbox("Subtitle provider", ["edge", "whisper", ""], index=["edge", "whisper", ""].index(settings.get("subtitle_provider", "edge")) if settings.get("subtitle_provider", "edge") in ["edge", "whisper", ""] else 0)
+                    ffmpeg_path = text_setting("Caminho FFmpeg", "ffmpeg_path")
+                    video_codec = text_setting("Codec de vídeo", "video_codec")
+                    whisper_model_size = text_setting("Whisper model", "whisper_model_size")
+                    whisper_device = st.selectbox("Whisper device", ["cpu", "cuda"], index=0 if settings.get("whisper_device", "cpu") == "cpu" else 1)
+                    whisper_compute_type = text_setting("Whisper compute type", "whisper_compute_type")
+
+            with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
+                st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
+                tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
+                tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
+
+            with st.expander("Publicação através do Upload-Post"):
+                upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
+                upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
+                upload_post_username = text_setting("Upload-Post username", "upload_post_username")
+                upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
+                upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+
+            if refresh_openai_models:
+                try:
+                    discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
+                    st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
+                    st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
+                    st.rerun()
+                except ModelDiscoveryError as exc:
+                    st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
+                    st.rerun()
+
+            save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
+            if save_all_settings:
+                settings.update({
+                    "port": port, "moneyprinter_path": moneyprinter_path, "youtube_api_key": youtube_api_key,
+                    "youtube_client_id": youtube_client_id, "youtube_client_secret": youtube_client_secret,
+                    "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
+                    "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
+                    "direct_innertube_api_key": direct_innertube_api_key, "direct_chunk_size": direct_chunk_size,
+                    "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
+                    "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
+                    "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
+                    "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
+                    "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
+                    "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
+                    "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
+                    "pexels_api_keys": pexels_api_keys, "pixabay_api_keys": pixabay_api_keys, "coverr_api_keys": coverr_api_keys, "twelvelabs_api_keys": twelvelabs_api_keys,
+                    "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
+                    "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint, "subtitle_provider": subtitle_provider,
+                    "ffmpeg_path": ffmpeg_path, "video_codec": video_codec, "material_directory": material_directory,
+                    "whisper_model_size": whisper_model_size, "whisper_device": whisper_device, "whisper_compute_type": whisper_compute_type,
+                    "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
+                    "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
+                    "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
+                    "upload_post_auto_upload": upload_post_auto_upload,
+                })
+                write_json("settings.json", settings)
+                try:
+                    synced = sync_moneyprinter_config(settings, moneyprinter_path)
+                    if synced:
+                        st.success(f"Configurações guardadas e sincronizadas com {synced}")
+                    else:
+                        st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
+                except Exception as exc:
+                    st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+
+    with voice_test_tab:
+        st.subheader("Teste de vozes")
+        st.caption("Este painel é exclusivamente um preview. O áudio gerado não altera vídeos, tarefas, Blueprints ou a configuração da pipeline.")
+        preview_cols = st.columns([1.1, 2.2, 1.2])
+        with preview_cols[0]:
+            preview_provider = st.selectbox("Provider", ["edge", "azure_speech", "elevenlabs", "minimax", "siliconflow", "gemini", "chatterbox"], index=0, key="voice_preview_provider")
+        with preview_cols[1]:
+            if preview_provider in {"edge", "azure_speech"}:
+                preview_voice_options = voice_catalog(settings.get("voice_preview_voice", "en-US-AriaNeural-Female"))
+                preview_voice = st.selectbox("Voz", preview_voice_options, index=preview_voice_options.index(settings.get("voice_preview_voice", "en-US-AriaNeural-Female")) if settings.get("voice_preview_voice", "en-US-AriaNeural-Female") in preview_voice_options else 0, format_func=lambda item: item or "Escolha uma voz", key="voice_preview_voice")
+            else:
+                preview_voice = st.text_input("Voice ID", value=settings.get("voice_preview_voice", ""), key="voice_preview_voice_text")
+        with preview_cols[2]:
+            preview_rate = st.selectbox("Velocidade", ["-20%", "-10%", "+0%", "+10%", "+20%"], index=2, key="voice_preview_rate")
+        preview_text = st.text_area("Texto de teste", value=DEFAULT_SAMPLE, max_chars=1000, height=110, key="voice_preview_text")
+        if st.button("Testar voz", type="primary", key="voice_preview_generate"):
+            st.session_state.pop("voice_preview_path", None)
+            try:
+                preview_path = synthesize_preview(preview_text, preview_provider, preview_voice, settings, preview_rate)
+                st.session_state["voice_preview_path"] = str(preview_path)
+                st.success("Amostra de voz gerada. Este ficheiro é apenas um preview.")
+            except Exception as exc:
+                st.error(f"Não foi possível gerar o preview: {exc}")
+        preview_value = str(st.session_state.get("voice_preview_path", "") or "").strip()
+        loaded_preview = load_preview_file(preview_value)
+        if loaded_preview:
+            preview_path, preview_data = loaded_preview
+            st.audio(preview_data, format="audio/mpeg")
+            st.download_button("Descarregar amostra", data=preview_data, file_name=preview_path.name, mime="audio/mpeg", key="voice_preview_download")
+        elif preview_value:
+            st.session_state.pop("voice_preview_path", None)
+            st.warning("A amostra de voz anterior não é um ficheiro de áudio legível e foi removida do estado local. Teste a voz novamente.")
 
 
 def render_mcp():
