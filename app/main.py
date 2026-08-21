@@ -1619,7 +1619,7 @@ def render_settings():
                     model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
                     selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
                     if selected_model == manual_option:
-                        openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help_text="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
+                        openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
                     else:
                         openai_model_name = selected_model
                 else:

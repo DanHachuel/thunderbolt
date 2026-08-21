@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.44
+> **Versão deste manual:** 0.2.45
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.44 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.45 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.44 install
+npx --yes @danhachuel/thunderbolt@0.2.45 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -371,7 +371,7 @@ As credenciais devem ser inseridas apenas na configuração local. A Kaggle API 
 
 ## OpenAI/ NVIDIA NIM — API key, Base URL e modelo
 
-A secção **LLM — providers e modelos** mantém o provider técnico `openai`, mas a área visual passou a chamar-se **OpenAI/ NVIDIA NIM — API key, Base URL e modelo**. Isto permite usar a API oficial da OpenAI, a API pública NVIDIA NIM/NVIDIA Build ou qualquer servidor local OpenAI-compatible sem alterar o restante fluxo do MoneyPrinterTurbo.
+A secção **LLM — providers e modelos** mantém o provider técnico `openai`, mas a área visual passou a chamar-se **OpenAI/ NVIDIA NIM — API key, Base URL e modelo**. Isto permite usar a API oficial da OpenAI, a API pública NVIDIA NIM/NVIDIA Build ou qualquer servidor local OpenAI-compatible sem alterar o restante fluxo do MoneyPrinterTurbo. O campo de modelo manual utiliza o parâmetro `help` compatível com as versões de Streamlit instaladas pelo Thunderbolt; não utiliza `help_text`.
 
 Para usar NVIDIA NIM, abra **Configurações > Configurações Técnicas**, mantenha ou preencha a Base URL `https://integrate.api.nvidia.com/v1` e introduza a API key do NVIDIA Build. Clique em **Consultar/actualizar modelos NIM**. O Thunderbolt executa a consulta apenas nesse momento, acrescentando `/models` à Base URL, envia a API key como `Authorization: Bearer ...` e interpreta a resposta OpenAI-compatible `data[].id`. Os IDs devolvidos aparecem num selector; ao escolher um, o valor é guardado em `openai_model_name` e continua a ser enviado para o `config.toml` do MoneyPrinterTurbo.
 
@@ -418,7 +418,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.44 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.45 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

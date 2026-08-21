@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from integrations.openai_model_discovery import (
@@ -69,3 +71,9 @@ def test_normalize_model_ids_rejects_invalid_response():
         normalize_model_ids({"object": "list"})
     with pytest.raises(ModelDiscoveryError, match="nenhum identificador"):
         normalize_model_ids({"data": [{"object": "model"}]})
+
+
+def test_llm_manual_model_input_uses_streamlit_help_keyword():
+    main_source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+    assert 'help_text="Ex.: nvidia_nim/minimaxai/minimax-m3"' not in main_source
+    assert 'help="Ex.: nvidia_nim/minimaxai/minimax-m3"' in main_source
