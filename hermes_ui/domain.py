@@ -154,6 +154,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "music_path": payload.get("music_path", options.get("music_path", "")),
                 "music_source": payload.get("music_source", options.get("music_source", "")),
                 "background_mode": payload.get("background_mode", options.get("background_mode", "stock")),
+                "generation_settings": payload.get("generation_settings", options.get("generation_settings", {})),
                 "blueprint_id": payload.get("blueprint_id") or channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
                 "blueprint_name": payload.get("blueprint_name", ""),
                 "voice": payload.get("voice") or channel.get("default_voice") or channel.get("voice", ""),

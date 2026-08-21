@@ -68,6 +68,8 @@ def test_video_language_options_match_requested_order():
     assert actual[17].startswith("16 – Irlandês")
 
 
-def test_new_video_uses_language_options_constant():
+def test_video_creation_and_scripts_use_language_options_constant():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
-    assert 'st.selectbox("Idioma", VIDEO_LANGUAGE_OPTIONS' in source
+    assert '"Script Language"' in source
+    assert "VIDEO_LANGUAGE_OPTIONS" in source
+    assert 'key=f"{prefix}_script_language"' in source

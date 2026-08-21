@@ -120,6 +120,21 @@ VIDEO_LANGUAGE_OPTIONS = [
     "50 – Hausa",
 ]
 
+# Mantemos estes valores separados para que Criação de Vídeos e Roteiros partilhem
+# exactamente os mesmos selectores sem alterar a lista histórica de idiomas.
+VIDEO_FORMAT_OPTIONS = ["wide", "shorts", "music"]
+VIDEO_CONCATENATION_OPTIONS = ["Random Concatenation (Recommended)", "Sequential Concatenation"]
+VIDEO_TRANSITION_OPTIONS = ["None", "Fade", "Dissolve"]
+VIDEO_ENCODER_OPTIONS = ["Default (Recommended)", "H.264", "H.265"]
+VOICEOVER_MODE_OPTIONS = ["Auto", "Upload", "None"]
+VOICEOVER_SERVICE_OPTIONS = ["Azure TTS V1"]
+VOICEOVER_VOLUME_OPTIONS = ["20%", "40%", "60%", "80%", "100%"]
+VOICEOVER_SPEED_OPTIONS = ["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"]
+BACKGROUND_MUSIC_SOURCE_OPTIONS = ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API", "Random Background Music", "Sem música"]
+BACKGROUND_MUSIC_VOLUME_OPTIONS = ["0%", "10%", "20%", "30%", "50%", "75%", "100%"]
+SUBTITLE_FONT_OPTIONS = ["MicrosoftYaHeiBold.ttc", "Arial.ttf", "DejaVuSans.ttf"]
+SUBTITLE_POSITION_OPTIONS = ["Bottom (Recommended)", "Top", "Center"]
+
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
@@ -298,6 +313,101 @@ def voice_catalog(current: str = "") -> list[str]:
         if candidate and candidate not in voices:
             voices.append(candidate)
     return voices
+
+
+def render_video_generation_settings(prefix: str, *, current_language: str = "") -> dict[str, Any]:
+    """Render the shared MoneyPrinter-style settings and return a serializable payload."""
+    settings: dict[str, Any] = {}
+    st.markdown("### Video Subject Settings")
+    subject_cols = st.columns(2)
+    with subject_cols[0]:
+        settings["video_subject"] = st.text_input(
+            "Video Subject",
+            value=str(st.session_state.get(f"{prefix}_video_subject", "")),
+            key=f"{prefix}_video_subject",
+            placeholder="Ex.: How AI is changing everyday life",
+        )
+        settings["script_language"] = st.selectbox(
+            "Script Language",
+            VIDEO_LANGUAGE_OPTIONS,
+            index=VIDEO_LANGUAGE_OPTIONS.index(current_language) if current_language in VIDEO_LANGUAGE_OPTIONS else 0,
+            key=f"{prefix}_script_language",
+        )
+    with subject_cols[1]:
+        with st.expander("Advanced Script Settings", expanded=False):
+            settings["script_structure_notes"] = st.text_area(
+                "Estrutura e notas opcionais",
+                value=str(st.session_state.get(f"{prefix}_script_structure_notes", "")),
+                key=f"{prefix}_script_structure_notes",
+                height=100,
+                placeholder="Ex.: gancho forte, 6 cenas, narração documental…",
+            )
+        settings["generate_script_with_ai"] = st.checkbox("Generate Script & Keywords with AI", value=True, key=f"{prefix}_generate_script_with_ai")
+    settings["video_script"] = st.text_area(
+        "Video Script (Optional)",
+        value=str(st.session_state.get(f"{prefix}_video_script", "")),
+        key=f"{prefix}_video_script",
+        height=130,
+    )
+    settings["video_keywords"] = st.text_area(
+        "Video Keywords (English, Optional)",
+        value=str(st.session_state.get(f"{prefix}_video_keywords", "")),
+        key=f"{prefix}_video_keywords",
+        height=90,
+    )
+
+    st.markdown("### Video Settings")
+    video_cols = st.columns(2)
+    with video_cols[0]:
+        settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
+        if settings["video_source"] == "full_ia":
+            settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
+        else:
+            settings["style_ia"] = ""
+        settings["video_format"] = st.selectbox("Formato", VIDEO_FORMAT_OPTIONS, key=f"{prefix}_video_format")
+        settings["video_concatenation_mode"] = st.selectbox("Video Concatenation Mode", VIDEO_CONCATENATION_OPTIONS, key=f"{prefix}_video_concatenation")
+        settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
+        settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
+    with video_cols[1]:
+        settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
+        settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
+        settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
+        settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
+
+    st.markdown("### Audio Settings")
+    audio_cols = st.columns(2)
+    with audio_cols[0]:
+        settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
+        settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
+        current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
+        voice_options = voice_catalog(current_voice)
+        settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
+        volume_speed_cols = st.columns(2)
+        with volume_speed_cols[0]:
+            settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
+        with volume_speed_cols[1]:
+            settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
+        st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
+    with audio_cols[1]:
+        settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
+        settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
+
+    st.markdown("### Subtitle Settings")
+    subtitle_cols = st.columns(2)
+    with subtitle_cols[0]:
+        settings["enable_subtitles"] = st.checkbox("Enable Subtitles", value=True, key=f"{prefix}_enable_subtitles")
+        settings["subtitle_font"] = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, key=f"{prefix}_subtitle_font")
+        settings["subtitle_position"] = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, key=f"{prefix}_subtitle_position")
+        settings["subtitle_color"] = st.color_picker("Color", "#FFFFFF", key=f"{prefix}_subtitle_color")
+        settings["subtitle_background"] = st.checkbox("Background", value=True, key=f"{prefix}_subtitle_background")
+        settings["subtitle_background_color"] = st.color_picker("Background Color", "#000000", key=f"{prefix}_subtitle_background_color")
+        settings["subtitle_rounded_background"] = st.checkbox("Rounded Background", value=False, key=f"{prefix}_subtitle_rounded_background")
+    with subtitle_cols[1]:
+        settings["subtitle_font_size"] = st.slider("Font Size", min_value=12, max_value=96, value=60, key=f"{prefix}_subtitle_font_size")
+        settings["subtitle_outline"] = st.color_picker("Outline", "#000000", key=f"{prefix}_subtitle_outline")
+        settings["subtitle_outline_width"] = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=1.5, step=0.25, key=f"{prefix}_subtitle_outline_width")
+        st.button("Restore Subtitle Defaults", key=f"{prefix}_restore_subtitle_defaults", disabled=True, help="Os valores predefinidos já estão activos nesta configuração.")
+    return settings
 
 
 def channel_default_options(channel: dict) -> tuple[list[str], dict[str, str], str, list[str], str]:
@@ -959,6 +1069,11 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
             )
             mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
             selected_one: dict[str, Any] | None = None
+            legacy_language = st.session_state.get("video_language")
+            legacy_language_map = {"Português": "36 – Português (Brasil)", "English": "01 – Inglês", "Español": "41 – Espanhol (LatAm)"}
+            if legacy_language not in VIDEO_LANGUAGE_OPTIONS:
+                st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
+            generation_settings: dict[str, Any] = {}
             if mode == "general":
                 selected = [str(channel["id"]) for channel in all_channels if channel.get("id")]
                 st.info(f"**Lote geral:** será criada exactamente uma tarefa para cada um dos {len(selected)} canais cadastrados. Cada canal receberá um tema, título e thumbnail próprios; não existe selecção parcial.")
@@ -999,6 +1114,10 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             st.write(f"**{channel.get('name', 'Canal')}**")
                             st.caption(f"{result.get('niche', '')} · {result.get('angle', '')}")
                             st.text_area("Briefing gerado", value=result.get("topic", ""), key=f"new_video_general_topic_{channel['id']}", height=80)
+                generation_settings = render_video_generation_settings(
+                    "new_video",
+                    current_language=str(st.session_state.get("video_language") or ""),
+                )
             else:
                 if not active_channels:
                     st.warning("Não existem canais activos disponíveis para os modos de canal específico.")
@@ -1006,8 +1125,12 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                 else:
                     selected_one = st.selectbox("Canal", active_channels, format_func=lambda c: c["name"], key="new_video_channel")
                     selected = [selected_one["id"]]
-                    # Intentionally sits between Canal and Estilo wide, as requested.
+                    # Intentionally sits between Canal and the generation settings, as requested.
                     render_channel_blueprint_panel(selected_one)
+                    generation_settings = render_video_generation_settings(
+                        "new_video",
+                        current_language=str(st.session_state.get("video_language") or ""),
+                    )
                 topic = st.text_area(
                     "Tópico ou briefing",
                     value=st.session_state.get("new_video_topic", ""),
@@ -1034,8 +1157,13 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         meta = st.session_state["new_video_topic_meta"]
                         st.caption(f"Origem: IA · Nicho: {meta.get('niche', '—')} · Ângulo: {meta.get('angle', '—')}")
 
-            wide_style_label = st.selectbox("Estilo wide", WIDE_STYLE_OPTIONS, key="new_video_style_wide")
-            style_ia = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key="new_video_style_ia") if wide_style_label == "full_ia" else ""
+            if not generation_settings:
+                generation_settings = render_video_generation_settings(
+                    "new_video",
+                    current_language=str(st.session_state.get("video_language") or ""),
+                )
+            wide_style_label = generation_settings["video_source"]
+            style_ia = generation_settings.get("style_ia", "")
             music_path = ""
             music_source = ""
             if wide_style_label == "Apenas Música":
@@ -1162,12 +1290,8 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
 
             with st.form("new_video_form"):
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
-                legacy_language = st.session_state.get("video_language")
-                legacy_language_map = {"Português": "36 – Português (Brasil)", "English": "01 – Inglês", "Español": "41 – Espanhol (LatAm)"}
-                if legacy_language not in VIDEO_LANGUAGE_OPTIONS:
-                    st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
-                language = st.selectbox("Idioma", VIDEO_LANGUAGE_OPTIONS, key="video_language")
-                fmt = st.selectbox("Formato", ["wide", "shorts", "music"], key="new_video_format")
+                language = generation_settings["script_language"]
+                fmt = generation_settings["video_format"]
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
             if submitted:
                 style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
@@ -1213,8 +1337,8 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             st.session_state["new_video_general_topics"] = {cid: {"topic": payload["topic"], "topic_source": payload.get("topic_source", "llm")} for cid, payload in payloads.items()}
                     if len(payloads) == len(selected):
                         batch_topic = "Lote geral — um vídeo independente por canal"
-                        channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source} for cid, payload in payloads.items()}
-                        batch = create_batch("general", selected, batch_topic, 1, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "topic_source": "llm", "channel_payloads": channel_payloads})
+                        channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings} for cid, payload in payloads.items()}
+                        batch = create_batch("general", selected, batch_topic, 1, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": "llm", "channel_payloads": channel_payloads})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote geral {batch['id']} criado com {len(tasks)} tarefas independentes, uma por canal.")
                 else:
@@ -1230,8 +1354,8 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             except CreativeGenerationError as exc:
                                 st.warning(f"Título/thumbnail automáticos pendentes: {exc} A tarefa será criada com o tópico como título e sem ficheiro de thumbnail.")
                                 payload = {"topic": topic_value, "title": topic_value, "topic_source": "manual", "thumbnail_status": "pending_provider", "thumbnail_variants": [], "thumbnail_variant": {}, "thumbnail_prompt": "", "thumbnail_text": ""}
-                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or ("llm" if st.session_state.get("new_video_topic_meta") else "manual"), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source})
-                        batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
+                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or ("llm" if st.session_state.get("new_video_topic_meta") else "manual"), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
+                        batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
     with videos_tab:
@@ -1295,14 +1419,13 @@ def render_scripts():
             height=120,
             placeholder="Descreva o tema, a mensagem, o conflito ou a ideia musical que o Blueprint deve orientar.",
         )
-        language_options = VIDEO_LANGUAGE_OPTIONS
-        language = st.selectbox("Idioma", language_options, key="script_language")
-        structure_notes = st.text_area(
-            "Estrutura e notas opcionais",
-            key="script_structure_notes",
-            height=90,
-            placeholder="Ex.: 6 cenas, narração documental, refrão repetível, atmosfera sombria…",
+        legacy_script_language = str(st.session_state.get("script_language") or "")
+        script_settings = render_video_generation_settings(
+            "pipeline_scripts",
+            current_language=legacy_script_language if legacy_script_language in VIDEO_LANGUAGE_OPTIONS else "",
         )
+        language = script_settings["script_language"]
+        structure_notes = script_settings["script_structure_notes"]
         generate_col, clear_col = st.columns([1.4, 1])
         with generate_col:
             generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", use_container_width=True, key="generate_script_document")
@@ -1324,6 +1447,7 @@ def render_scripts():
                         channel=selected_channel or {},
                         blueprint=selected_blueprint,
                         structure_notes=structure_notes,
+                        generation_settings=script_settings,
                     )
                 st.session_state["script_draft"] = generated
                 st.session_state["script_draft_title"] = generated["title"]
@@ -1356,6 +1480,7 @@ def render_scripts():
                             "content": draft_content,
                             "document_type": "video_script" if document_type == "Roteiro de vídeo" else "music_lyrics",
                             "language": language,
+                            "generation_settings": script_settings,
                             "channel_id": str((selected_channel or {}).get("id") or ""),
                             "channel_name": str((selected_channel or {}).get("name") or "Documento independente"),
                             "blueprint_id": str(selected_blueprint.get("id") or selected_blueprint_id or ""),

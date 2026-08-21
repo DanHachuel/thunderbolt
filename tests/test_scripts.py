@@ -35,6 +35,7 @@ def test_generate_video_script_includes_blueprint_context(monkeypatch):
         channel={"id": "channel-1", "name": "History Vault", "default_blueprint_id": "bp-history"},
         blueprint={"id": "bp-history", "name": "História", "target_niche": "civilizações antigas"},
         structure_notes="5 cenas, tom documental",
+        generation_settings={"video_format": "shorts", "enable_subtitles": True, "voice": "en-US-AriaNeural-Female"},
     )
 
     assert result["document_type"] == "video_script"
@@ -42,6 +43,8 @@ def test_generate_video_script_includes_blueprint_context(monkeypatch):
     assert result["content"].startswith("# Gancho")
     assert captured["user"]["blueprint"]["target_niche"] == "civilizações antigas"
     assert captured["user"]["structure_notes"] == "5 cenas, tom documental"
+    assert captured["user"]["generation_settings"]["video_format"] == "shorts"
+    assert result["generation_settings"]["enable_subtitles"] is True
 
 
 def test_generate_music_lyrics_requires_brief():

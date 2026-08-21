@@ -24,6 +24,7 @@ def generate_script_document(
     channel: dict[str, Any] | None = None,
     blueprint: dict[str, Any] | None = None,
     structure_notes: str = "",
+    generation_settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate an editable Markdown document from the configured LLM.
 
@@ -38,6 +39,7 @@ def generate_script_document(
 
     channel_context_value = channel_context(channel or {}, blueprint or {})
     blueprint_payload = blueprint or {}
+    generation_settings_payload = generation_settings or {}
     if normalized_type == "video_script":
         output_requirements = {
             "content": "roteiro completo em Markdown, com título, gancho, cenas, narração e indicações visuais/sonoras",
@@ -69,6 +71,7 @@ def generate_script_document(
             "channel": channel_context_value,
             "blueprint": blueprint_payload,
             "structure_notes": structure_notes.strip(),
+            "generation_settings": generation_settings_payload,
             "output_requirements": output_requirements,
         },
         ensure_ascii=False,
@@ -87,5 +90,6 @@ def generate_script_document(
         "blueprint_name": str(blueprint_payload.get("name") or "SEM BLUEPRINT CONFIGURADO"),
         "channel_id": str((channel or {}).get("id") or ""),
         "channel_name": str((channel or {}).get("name") or "Documento independente"),
+        "generation_settings": generation_settings_payload,
         "generated_by": "configured_llm",
     }
