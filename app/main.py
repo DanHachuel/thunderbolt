@@ -39,6 +39,8 @@ from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
+from integrations.postiz import PostizAdapter
+from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
@@ -2136,17 +2138,99 @@ def render_upload_direct():
 
 def render_upload():
     st.title("Upload")
-    upload_tab, direct_tab = st.tabs(["Upload convencional", "Upload directo"])
+    upload_tab, direct_tab, postiz_tab = st.tabs(["Upload convencional", "Upload directo", "Postiz"])
     with direct_tab:
         render_upload_direct()
+    with postiz_tab:
+        render_upload_postiz()
     with upload_tab:
         render_upload_conventional()
+
+
+def render_upload_postiz():
+    st.subheader("Upload para Postiz")
+    st.caption("O Thunderbolt envia primeiro o MP4 para o Postiz e cria um post na integração seleccionada. A API key e o servidor são configurados em Configurações Técnicas.")
+    settings = read_json("settings.json", {})
+    postiz = PostizAdapter(settings)
+    if not settings.get("postiz_enabled"):
+        st.warning("Postiz está desactivado. Active-o em Configurações Técnicas > API Keys e guarde a API key antes de enviar.")
+    if not postiz.api_key:
+        st.info("Nenhuma API key Postiz configurada.")
+        return
+
+    integration_catalog = st.session_state.get("postiz_integrations", [])
+    integration_ids = [str(item.get("id")) for item in integration_catalog if isinstance(item, dict) and item.get("id")]
+    integration_labels = {
+        str(item.get("id")): " — ".join(str(value) for value in [item.get("name") or item.get("provider") or item.get("type") or "Integração", item.get("username") or item.get("profile") or item.get("identifier") or ""] if value)
+        for item in integration_catalog if isinstance(item, dict) and item.get("id")
+    }
+    integration_default = str(settings.get("postiz_integration_id", "") or "")
+    if st.button("Carregar integrações Postiz", key="postiz_load_integrations"):
+        result = postiz.list_integrations()
+        if result.ok:
+            st.session_state["postiz_integrations"] = result.data.get("integrations", [])
+            st.success(result.message)
+            st.rerun()
+        st.error(result.message)
+    if integration_ids:
+        selected_integration = st.selectbox(
+            "Canal/integração Postiz",
+            integration_ids,
+            index=integration_ids.index(integration_default) if integration_default in integration_ids else 0,
+            format_func=lambda value: integration_labels.get(value, value),
+            key="postiz_upload_integration",
+        )
+        st.caption("Para alterar a integração padrão, guarde o ID seleccionado em Configurações Técnicas.")
+    else:
+        selected_integration = st.text_input("ID da integração Postiz", value=integration_default, key="postiz_upload_integration_manual", help="Carregue as integrações para seleccionar uma conta ou introduza o ID devolvido pela API do Postiz.").strip()
+        st.info("Carregue as integrações para descobrir os canais Postiz ligados à sua conta.")
+
+    tasks = [task for task in read_json("tasks.json", []) if task.get("state") == "done" or task.get("artifacts", {}).get("video")]
+    if not tasks:
+        st.info("Não há vídeos prontos para enviar para o Postiz.")
+        return
+    for task in tasks:
+        artifacts = task.get("artifacts", {}) or {}
+        video_path = artifacts.get("video", "")
+        thumbnail_path = artifacts.get("thumbnail") or artifacts.get("cover", "")
+        with st.container(border=True):
+            st.write(f"**{task.get('topic', 'Vídeo Thunderbolt')}** — {task.get('channel_name', 'Canal')}")
+            st.caption(video_path or "Sem caminho de vídeo registado")
+            title = st.text_input("Título Postiz", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"postiz_title_{task['id']}")
+            description = st.text_area("Descrição Postiz", value=task.get("description", ""), key=f"postiz_description_{task['id']}", height=90)
+            visibility = st.selectbox("Visibilidade YouTube no Postiz", ["private", "unlisted", "public"], key=f"postiz_visibility_{task['id']}")
+            if st.button("Enviar vídeo para Postiz", type="primary", key=f"postiz_upload_{task['id']}"):
+                result = postiz.publish_video(
+                    video_path,
+                    integration_id=selected_integration,
+                    title=title,
+                    description=description,
+                    visibility=visibility,
+                    tags=task.get("tags", []) if isinstance(task.get("tags", []), list) else [tag.strip() for tag in str(task.get("tags", "")).split(",") if tag.strip()],
+                    thumbnail_path=thumbnail_path,
+                )
+                record = {
+                    "task_id": task.get("id"),
+                    "destination": "Postiz",
+                    "status": "published" if result.ok else "failed",
+                    "message": result.message,
+                    "data": result.data,
+                    "created_at": now(),
+                }
+                uploads = read_json("uploads.json", [])
+                uploads.append(record)
+                write_json("uploads.json", uploads)
+                (st.success if result.ok else st.error)(result.message)
 
 
 def render_upload_conventional():
     st.title("Upload")
     settings = read_json("settings.json", {})
     youtube = YouTubeAdapter(settings=settings)
+    channels = read_json("channels.json", [])
+    channel_map = {str(channel.get("id")): channel for channel in channels if channel.get("id")}
+    direct_accounts = {str(account.get("id")): account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")}
+    postiz = PostizAdapter(settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
     destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"], key="upload_destinations", placeholder="Seleccione os destinos")
 
@@ -2156,9 +2240,14 @@ def render_upload_conventional():
         st.info("Facebook Pages está disponível no front end. A publicação real será ligada numa etapa de credenciais/API própria.")
 
     if "YouTube" in destination:
-        st.markdown("**YouTube — youtube-automation-agent (principal)**")
-        st.caption("O Thunderbolt executa internamente a lógica do PublishingSchedulingAgent: OAuth, upload resumível, metadados, thumbnail e legendas. O OAuth directo é usado apenas como redundância se o caminho principal falhar.")
+        st.markdown("**YouTube — fluxo recomendado de envio**")
+        st.caption("Ordem automática: 1. API Oficial — até 5 envios bem-sucedidos por dia e por conta Gmail; 2. Upload directo — sessão interna YouTube; 3. Postiz — fallback final configurável.")
         status = youtube.upload_status()
+        if settings.get("postiz_enabled"):
+            postiz_status = postiz.status()
+            (st.success if postiz_status.ok else st.warning)(postiz_status.message)
+        else:
+            st.caption("Postiz está desactivado; active-o em Configurações Técnicas para o usar como fallback final.")
         status_cols = st.columns(2)
         with status_cols[0]:
             (st.success if status["agent"].ok else st.warning)(f"Agente: {status['agent'].message}")
@@ -2188,6 +2277,8 @@ def render_upload_conventional():
             thumbnail_path = artifacts.get("thumbnail") or artifacts.get("cover", "")
             captions_path = artifacts.get("captions") or artifacts.get("subtitle", "")
             st.caption(video_path or "Sem caminho de vídeo registado")
+            channel = channel_map.get(str(task.get("channel_id")), {})
+            account = direct_accounts.get(str(channel.get("google_account_id", "")))
             if "YouTube" in destination:
                 title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
                 description = st.text_area("Descrição", value=task.get("description", ""), key=f"yt_description_{task['id']}", height=100)
@@ -2199,10 +2290,16 @@ def render_upload_conventional():
                     category_id = st.text_input("Category ID", value="22", key=f"yt_category_{task['id']}")
                 with yt_cols[2]:
                     language = st.text_input("Idioma", value="pt-BR", key=f"yt_language_{task['id']}")
-                if st.button("Publicar no YouTube", type="primary", key=f"upload_youtube_{task['id']}"):
+                quota_count = official_upload_count(channel, account)
+                st.caption(f"API Oficial hoje: {quota_count}/{OFFICIAL_DAILY_LIMIT} envios nesta conta Gmail.")
+                if st.button("Enviar pelo fluxo recomendado", type="primary", key=f"upload_youtube_{task['id']}"):
                     tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
-                    result = youtube.upload_video(
-                        video_path,
+                    result = upload_with_default_route(
+                        settings,
+                        storage_root=STORAGE,
+                        channel=channel,
+                        account=account,
+                        video_path=video_path,
                         title=title,
                         description=description,
                         tags=tags,
@@ -2579,6 +2676,20 @@ def render_settings():
                 upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
                 upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
 
+            with st.expander("Postiz — API key, integração e MCP", expanded=True):
+                st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
+                postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
+                postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
+                postiz_cols = st.columns(2)
+                with postiz_cols[0]:
+                    postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
+                    postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
+                    postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
+                with postiz_cols[1]:
+                    postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
+                    postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
+                st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
+
             if refresh_openai_models:
                 try:
                     discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
@@ -2613,6 +2724,9 @@ def render_settings():
                     "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
                     "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
                     "upload_post_auto_upload": upload_post_auto_upload,
+                    "postiz_enabled": postiz_enabled, "postiz_api_key": postiz_api_key, "postiz_base_url": postiz_base_url.strip() or "https://api.postiz.com/public/v1",
+                    "postiz_mcp_url": postiz_mcp_url.strip() or "https://api.postiz.com/mcp", "postiz_mode": postiz_mode,
+                    "postiz_integration_id": postiz_integration_id.strip(), "postiz_auto_publish": bool(postiz_auto_publish),
                 })
                 write_json("settings.json", settings)
                 try:

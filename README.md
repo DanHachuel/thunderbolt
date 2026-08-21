@@ -20,9 +20,9 @@ A primeira versão implementa a camada UI independente com:
 | Models AI | Menu expansível com Personagens e Redes Sociais reservados para desenvolvimento futuro |
 | Niche Finder | Menu expansível com duas alternativas independentes: Niche Finder Kaggle e Niche Finder Apify, com parâmetros, execução e resultados separados |
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados, Clip Generator local em Cortes e Editor Python inspirado no PYEdit para vídeos e scripts locais |
-| Upload | YouTube via `youtube-automation-agent` adaptado internamente, OAuth directo de redundância, Upload directo via sessão Frontend API com cookies/sessionInfo por conta e DELEGATED_SESSION_ID por canal, TikTok, Instagram e Facebook Pages no front end |
+| Upload | YouTube via `youtube-automation-agent` adaptado internamente, fallback ordenado API Oficial → Upload directo → Postiz, upload de MP4 para Postiz via API key/MCP configurável, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID, Client Secret e sessionInfo por conta, cartões expansíveis por nome/e-mail, documento credentials.json criado automaticamente e eliminação individual, cookies SID/SSID/HSID/APISID/SAPISID no documento JSON, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, TikTok Client ID/Secret e Upload-Post |
+| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID, Client Secret e sessionInfo por conta, cartões expansíveis por nome/e-mail, documento credentials.json criado automaticamente e eliminação individual, cookies SID/SSID/HSID/APISID/SAPISID no documento JSON, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, Postiz API key/Base URL/MCP URL/integração padrão, TikTok Client ID/Secret e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 ## Upload directo — credenciais por conta e por canal
@@ -38,7 +38,7 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.55
+## Navegação da UI 0.2.56
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Automação**, **Edição**, **Models AI** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **Models AI** é expansível e contém **Personagens** e **Redes Sociais**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP** e **Configurações Técnicas**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -161,9 +161,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.55 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.55
+npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.56 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.56
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -187,7 +187,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.55 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 
@@ -254,13 +254,17 @@ A aba **Canais Youtube** está dividida em dois fluxos independentes. Em **Impor
 
 Em **Cadastro manual**, nenhum pedido ao YouTube é feito e não existe qualquer dependência de API Key. O utilizador pode preencher nome, URL, handle, descrição, métricas, thumbnail, idioma, estilo, Blueprint padrão, voz padrão, `DELEGATED_SESSION_ID` e configuração de Automação. A importação pública nunca grava automaticamente: os dados aparecem num formulário de revisão antes de guardar. A resolução pública aceita URLs `/channel/UC...`, handles e subpáginas; quando existe um ID mas o HTML não traz todos os dados, tenta o feed RSS público. Se o YouTube responder que o canal não existe ou não fornecer metadados, a UI mostra uma mensagem clara e não mantém o formulário de uma pesquisa anterior. Cada cartão de canal tem **Activo** e, logo abaixo, **Apagar canal**, com confirmação; tarefas e artefactos não são apagados.
 
-## Upload YouTube
+## Upload YouTube e fallback Postiz
 
 O Upload usa como caminho **principal** a lógica do `PublishingSchedulingAgent` do [youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), adaptada para Python e executada dentro do processo Streamlit do Thunderbolt. Não é necessário instalar ou iniciar um segundo servidor Node. O fluxo valida o MP4 real, constrói `snippet/status`, faz upload resumível e tenta enviar thumbnail e legendas.
 
 Na aba **Upload**, configure primeiro apenas o **YouTube OAuth Client ID** e o **YouTube OAuth Client Secret** em **Configurações**. Em seguida, use **Autorizar agente YouTube**. O navegador local abrirá a autorização Google e o token será guardado apenas em `storage/state/youtube_agent_tokens.json`. Se a publicação principal falhar, o Thunderbolt tenta automaticamente o **OAuth directo de redundância**, usando o token local compatível; a Data API Key nunca é usada para autorizar ou publicar.
 
 Use **Autorizar fallback OAuth** apenas se precisar de uma autorização separada para o caminho de redundância. Os resultados guardam no histórico local qual mecanismo foi utilizado e as tentativas realizadas, sem guardar segredos.
+
+A subaba **Postiz**, dentro de **Upload**, permite carregar as integrações ligadas através de `GET /integrations`, enviar um MP4 para `POST /upload` e criar o post YouTube em `POST /posts`. A API key é enviada como valor bruto do cabeçalho `Authorization`; a base cloud é `https://api.postiz.com/public/v1` e pode ser substituída por uma instalação self-hosted. O modo MCP guarda também a URL Streamable HTTP configurável para uso futuro/alternativo.
+
+O botão principal de YouTube usa a ordem **API Oficial → Upload directo → Postiz**. A API Oficial tem um contador local de cinco envios bem-sucedidos por dia por conta Gmail; quando a quota é atingida, ou o método falha, o Thunderbolt tenta o documento de sessão do Upload directo. Só depois de esse caminho falhar tenta o Postiz, desde que esteja activo, tenha API key e tenha um ID de integração configurado.
 
 A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Ela usa cookies, `sessionInfo`, `INNERTUBE_API_KEY` e `DELEGATED_SESSION_ID` fornecidos manualmente pelo utilizador, cria o vídeo através do endpoint interno e envia o ficheiro em chunks de 256 KiB. Este caminho é experimental, não extrai cookies automaticamente e fica separado do agente YouTube principal.
 

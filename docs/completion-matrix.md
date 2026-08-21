@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.55.
+Estado auditado para o release 0.2.56.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -12,13 +12,14 @@ Estado auditado para o release 0.2.55.
 | Últimos 10 vídeos do canal fora da Criação de Vídeos | Concluído como consulta pública | Feed RSS público sem Data API Key, guardado em `storage/state/channel_videos.json`, com actualização manual. |
 | Vídeos do canal em Lista/Kanban com alteração | Concluído como gestão local | Vistas Lista e Kanban por estado; cada item permite editar título, estado, data, URL e notas sem publicar automaticamente no YouTube. |
 | Vídeos como subaba de Novo vídeo | Concluído | `render_new_video()` cria as subabas e mostra o caminho real de `storage/videos`. |
-| YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`. |
+| YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`; o fluxo recomendado usa API Oficial, depois Upload directo e, no fim, Postiz. O contador local limita a API Oficial a cinco envios bem-sucedidos por dia por conta Gmail. |
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |
 | Lista ampliada de idiomas | Concluído | `VIDEO_LANGUAGE_OPTIONS`, com os rótulos na ordem solicitada. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
 | Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. |
 | Instagram e Facebook Pages no Upload | Concluído como UI | Destinos, chips rosa/azul e botões desactivados para publicação futura. |
+| Upload para Postiz por API key/MCP | Concluído como integração configurável | Aba **Postiz** em Upload, `PostizAdapter` com `GET /integrations`, `POST /upload` para MP4 e `POST /posts` para YouTube; campos de API key, Base URL, MCP URL e integração padrão em Configurações Técnicas. |
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
 | Área de teste de vozes em Configurações | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download. |
