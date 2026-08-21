@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.49.
+Estado auditado para o release 0.2.50.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -12,7 +12,7 @@ Estado auditado para o release 0.2.49.
 | Lista ampliada de idiomas | Concluído | `VIDEO_LANGUAGE_OPTIONS`, com os rótulos na ordem solicitada. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
-| Aba Automação com toggle e horário diário por canal | Concluído como UI | Renderer, estado por canal e validação HH:MM; não inicia worker em segundo plano, conforme pedido “apenas UI por enquanto”. |
+| Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. |
 | Instagram e Facebook Pages no Upload | Concluído como UI | Destinos, chips rosa/azul e botões desactivados para publicação futura. |
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
@@ -30,10 +30,13 @@ Estado auditado para o release 0.2.49.
 | Editor Python baseado no PYEdit | Concluído como editor local seguro | Vídeos gerados pelos artefactos, selecção de pasta, upload manual, corte, áudio, velocidade, redimensionamento, histórico próprio e edição/guarda de scripts sem execução de código. |
 | Canais em lote por conta Google/YouTube | Concluído como integração OAuth configurável | Contas múltiplas com e-mail, Client ID, Client Secret e sessionInfo próprios; botão de repetição de campos, eliminação individual com limpeza de tokens/documentos/associações, tokens separados, `channels.list(mine=true)` com paginação, selecção, deduplicação por `youtube_channel_id` e importação incremental; não lê Gmail. |
 | Configurações Técnicas organizadas em subabas | Concluído | `render_settings()` apresenta, sem numeração visível e nesta ordem, `Contas Google/YouTube — canais em lote`, `API Keys` e `Teste de vozes`; os blocos de contas, API Keys e preview de voz permanecem isolados. |
+| Geração de tópico/briefing por IA na Criação de Vídeos | Concluído como integração configurável | `hermes_ui/creative_generation.py` usa o provider OpenAI-compatible de API Keys, incorpora Blueprint/descrição/idioma/voz e só chama o endpoint depois do botão ou do horário do worker; falhas são accionáveis e não produzem placeholder. |
+| Título automático e pacote de thumbnail | Concluído como integração configurável | O serviço exige 20+ candidatos de título e 3–5 variantes de thumbnail, aplica as referências em `seed/references/`, persiste título, scores, conceito, overlay, composição, prompt e estado; o PNG final depende de provider de imagem configurado e nunca é falsificado. |
+| Lote geral por canal independente | Concluído | O modo geral remove `Canais incluídos`, usa todos os canais cadastrados e cria exactamente uma task por canal com `options.channel_payloads`, tópico, título, thumbnail, Blueprint e voz próprios. |
 
 ## Regra de release
 
-A publicação directa Instagram/Facebook continua deliberadamente desactivada: o requisito do checklist pede apenas a camada de front end. A Automação também é apenas UI, sem worker agendado. Suno e Upload directo dependem de endpoints/sessões fornecidos pelo utilizador e recusam execução quando faltam credenciais.
+A publicação directa Instagram/Facebook continua deliberadamente desactivada: o requisito do checklist pede apenas a camada de front end. A Automação tem worker local baseado no relógio do computador e usa o serviço criativo quando o provider LLM está configurado; Suno, Upload directo e a geração final de imagens dependem de endpoints/sessões/providers fornecidos pelo utilizador e recusam execução quando faltam credenciais.
 
 
 Nenhum release será descrito como final enquanto os itens marcados como pendentes nesta matriz não estiverem implementados, testados ou explicitamente classificados como dependências externas pelo utilizador.

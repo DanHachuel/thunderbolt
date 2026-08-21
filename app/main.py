@@ -34,6 +34,7 @@ from hermes_ui.mcp import detect_local_service, install_skill_locally, load_inte
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
@@ -189,6 +190,82 @@ def blueprint_catalog() -> list[tuple[str, str]]:
         except (OSError, ValueError, json.JSONDecodeError):
             continue
     return options
+
+
+def blueprint_for_channel(channel: dict) -> dict[str, Any]:
+    """Resolve a channel Blueprint by id, filename stem or display name."""
+    blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
+    if not blueprint_id:
+        return {}
+    for path in list_blueprint_files():
+        try:
+            data = load_blueprint_file(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        identifiers = {str(data.get("id") or ""), path.stem, str(data.get("name") or "")}
+        if blueprint_id in identifiers:
+            resolved = dict(data)
+            resolved.setdefault("id", blueprint_id)
+            resolved.setdefault("name", str(data.get("name") or path.stem))
+            return resolved
+    return {"id": blueprint_id, "name": blueprint_id}
+
+
+def channel_blueprint_summary(channel: dict) -> dict[str, str]:
+    blueprint = blueprint_for_channel(channel)
+    configured_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
+    if not configured_id:
+        return {"id": "", "name": "SEM BLUEPRINT CONFIGURADO", "voice": str(channel.get("default_voice") or channel.get("voice") or "")}
+    return {
+        "id": configured_id,
+        "name": str(blueprint.get("name") or configured_id),
+        "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
+    }
+
+
+def render_channel_blueprint_panel(channel: dict, *, compact: bool = False) -> None:
+    summary = channel_blueprint_summary(channel)
+    voice = summary["voice"] or "Sem voz padrão"
+    if summary["name"] == "SEM BLUEPRINT CONFIGURADO":
+        st.warning("**SEM BLUEPRINT CONFIGURADO** · configure um Blueprint padrão na aba Canais.")
+    elif compact:
+        st.caption(f"**Blueprint:** {summary['name']} · **Voz:** {voice}")
+    else:
+        st.info(f"**Blueprint utilizado pelo canal:** {summary['name']} · `{summary['id']}` · **Voz:** {voice}")
+
+
+def creative_payload_from_result(channel: dict, topic: str, creative: dict, topic_source: str = "manual") -> dict[str, Any]:
+    variant = creative.get("thumbnail_variant") or {}
+    return {
+        "topic": topic.strip(),
+        "topic_source": topic_source,
+        "title": str(creative.get("title") or topic).strip(),
+        "title_candidates": creative.get("title_candidates") or [],
+        "thumbnail_variant": variant,
+        "thumbnail_variants": creative.get("thumbnail_variants") or [],
+        "thumbnail_prompt": str(variant.get("image_prompt") or ""),
+        "thumbnail_text": str(variant.get("overlay_text") or ""),
+        "thumbnail_status": str(creative.get("thumbnail_status") or "prompt_ready"),
+        "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
+        "blueprint_name": str(channel_blueprint_summary(channel).get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
+        "ai_generation": {"creative": creative},
+    }
+
+
+def generate_topic_for_ui(settings: dict[str, Any], channel: dict, user_context: str = "") -> dict[str, Any]:
+    return generate_topic_for_channel(settings, channel, blueprint_for_channel(channel), user_context=user_context)
+
+
+def generate_creative_for_ui(settings: dict[str, Any], channel: dict, topic: str, topic_source: str = "manual") -> dict[str, Any]:
+    creative = generate_creative_package(
+        settings,
+        channel,
+        topic,
+        blueprint_for_channel(channel),
+        language=str(channel.get("language") or "Português"),
+    )
+    return creative_payload_from_result(channel, topic, creative, topic_source=topic_source)
 
 
 def valid_hhmm(value: str) -> bool:
@@ -688,17 +765,94 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
     st.title(page_title)
     create_tab, videos_tab = st.tabs(["Criar vídeo", "Vídeos"])
     with create_tab:
-        channels = channel_options()
-        if not channels:
+        all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict)]
+        active_channels = [c for c in all_channels if c.get("active", True)]
+        if not all_channels:
             st.warning("Cadastre pelo menos um canal antes de criar vídeos.")
         else:
-            mode_label = st.radio("Modo de criação", ["Canal específico", "Lote no mesmo canal", "Lote geral"], horizontal=True, key="new_video_mode")
+            mode_label = st.radio(
+                "Modo de criação",
+                ["Canal específico", "Lote no mesmo canal", "Lote geral"],
+                horizontal=True,
+                key="new_video_mode",
+            )
             mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
+            selected_one: dict[str, Any] | None = None
             if mode == "general":
-                selected = st.multiselect("Canais incluídos", [c["id"] for c in channels], default=[c["id"] for c in channels], format_func=lambda cid: next(c["name"] for c in channels if c["id"] == cid), key="new_video_channels_general")
+                selected = [str(channel["id"]) for channel in all_channels if channel.get("id")]
+                st.info(f"**Lote geral:** será criada exactamente uma tarefa para cada um dos {len(selected)} canais cadastrados. Cada canal receberá um tema, título e thumbnail próprios; não existe selecção parcial.")
+                with st.container(border=True):
+                    st.subheader("Canais que serão processados")
+                    for channel in all_channels:
+                        summary = channel_blueprint_summary(channel)
+                        status = "Activo" if channel.get("active", True) else "Inactivo"
+                        st.caption(f"**{channel.get('name', 'Canal')}** · {status} · Blueprint: **{summary['name']}** · Voz: {summary['voice'] or 'Sem voz padrão'}")
+                general_context = st.text_area(
+                    "Contexto opcional para todos os canais",
+                    value=st.session_state.get("new_video_general_context", ""),
+                    key="new_video_general_context",
+                    placeholder="Opcional: campanha, época, evento ou restrição editorial comum. O tema final será individual por canal.",
+                )
+                if st.button("Gerar tópicos individuais para todos os canais", key="new_video_generate_general_topics", use_container_width=True):
+                    settings = read_json("settings.json", {})
+                    generated_topics: dict[str, dict[str, Any]] = {}
+                    errors: list[str] = []
+                    with st.spinner("A gerar um briefing específico para cada canal…"):
+                        for channel in all_channels:
+                            try:
+                                generated_topics[channel["id"]] = generate_topic_for_ui(settings, channel, general_context)
+                            except CreativeGenerationError as exc:
+                                errors.append(f"{channel.get('name', 'Canal')}: {exc}")
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        st.session_state["new_video_general_topics"] = generated_topics
+                        st.success(f"Foram gerados {len(generated_topics)} briefings independentes.")
+                general_topics = st.session_state.get("new_video_general_topics", {})
+                if general_topics:
+                    st.subheader("Briefings por canal")
+                    for channel in all_channels:
+                        result = general_topics.get(channel["id"])
+                        if result:
+                            st.write(f"**{channel.get('name', 'Canal')}**")
+                            st.caption(f"{result.get('niche', '')} · {result.get('angle', '')}")
+                            st.text_area("Briefing gerado", value=result.get("topic", ""), key=f"new_video_general_topic_{channel['id']}", height=80)
             else:
-                selected_one = st.selectbox("Canal", channels, format_func=lambda c: c["name"], key="new_video_channel")
-                selected = [selected_one["id"]]
+                if not active_channels:
+                    st.warning("Não existem canais activos disponíveis para os modos de canal específico.")
+                    selected = []
+                else:
+                    selected_one = st.selectbox("Canal", active_channels, format_func=lambda c: c["name"], key="new_video_channel")
+                    selected = [selected_one["id"]]
+                    # Intentionally sits between Canal and Estilo wide, as requested.
+                    render_channel_blueprint_panel(selected_one)
+                topic = st.text_area(
+                    "Tópico ou briefing",
+                    value=st.session_state.get("new_video_topic", ""),
+                    key="new_video_topic",
+                    placeholder="Escreva um briefing ou gere-o com IA; não é obrigatório escrever manualmente.",
+                    help="Pode escrever o tema ou usar o botão abaixo para gerar um briefing específico com o Blueprint e o nicho do canal.",
+                )
+                topic_cols = st.columns([1, 1.8])
+                with topic_cols[0]:
+                    if st.button("Gerar tópico/briefing com IA", key="new_video_generate_topic", use_container_width=True):
+                        if selected_one is None:
+                            st.error("Seleccione primeiro um canal.")
+                        else:
+                            try:
+                                result = generate_topic_for_ui(read_json("settings.json", {}), selected_one, topic)
+                                st.session_state["new_video_topic"] = result["topic"]
+                                st.session_state["new_video_topic_meta"] = result
+                                st.success("Briefing gerado; reveja e edite o texto antes de criar as tarefas.")
+                                st.rerun()
+                            except CreativeGenerationError as exc:
+                                st.error(str(exc))
+                with topic_cols[1]:
+                    if st.session_state.get("new_video_topic_meta"):
+                        meta = st.session_state["new_video_topic_meta"]
+                        st.caption(f"Origem: IA · Nicho: {meta.get('niche', '—')} · Ângulo: {meta.get('angle', '—')}")
+
             wide_style_label = st.selectbox("Estilo wide", WIDE_STYLE_OPTIONS, key="new_video_style_wide")
             style_ia = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key="new_video_style_ia") if wide_style_label == "full_ia" else ""
             music_path = ""
@@ -725,7 +879,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     music_path = st.session_state.get("new_video_music_path", "")
                 else:
                     suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="new_video_suno_prompt")
-                    suno_title = st.text_input("Título da música", value=topic if "topic" in locals() else "Thunderbolt music", key="new_video_suno_title")
+                    suno_title = st.text_input("Título da música", value=st.session_state.get("new_video_topic") or "Thunderbolt music", key="new_video_suno_title")
                     if st.button("Solicitar música no Suno", key="new_video_suno_request", use_container_width=True):
                         suno_result = request_suno_generation(read_json("settings.json", {}), suno_prompt, suno_title)
                         (st.success if suno_result["ok"] else st.error)(suno_result["message"])
@@ -740,32 +894,165 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             except (OSError, requests.RequestException, ValueError) as exc:
                                 st.warning(f"Pedido criado, mas não foi possível descarregar o áudio: {exc}")
                     music_path = st.session_state.get("new_video_music_path", "")
+
+            payloads: dict[str, dict[str, Any]] = {}
+            if mode == "general":
+                existing_topics = st.session_state.get("new_video_general_topics", {})
+                payloads = dict(st.session_state.get("new_video_general_payloads", {}))
+                if st.button("Gerar títulos e thumbnails para todos os canais", key="new_video_generate_general_creative", use_container_width=True):
+                    settings = read_json("settings.json", {})
+                    new_payloads: dict[str, dict[str, Any]] = {}
+                    errors: list[str] = []
+                    with st.spinner("A gerar títulos e thumbnails independentes por canal…"):
+                        for channel in all_channels:
+                            try:
+                                topic_result = existing_topics.get(channel["id"])
+                                if not topic_result:
+                                    topic_result = generate_topic_for_ui(settings, channel, general_context)
+                                generated = generate_creative_for_ui(settings, channel, topic_result["topic"], topic_source="llm")
+                                generated["ai_generation"]["topic"] = topic_result
+                                new_payloads[channel["id"]] = generated
+                            except CreativeGenerationError as exc:
+                                errors.append(f"{channel.get('name', 'Canal')}: {exc}")
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        st.session_state["new_video_general_topics"] = {cid: {"topic": item["topic"], "topic_source": "llm"} for cid, item in new_payloads.items()}
+                        st.session_state["new_video_general_payloads"] = new_payloads
+                        payloads = new_payloads
+                        st.success(f"Pacote criativo pronto para {len(new_payloads)} canais.")
+                payloads = st.session_state.get("new_video_general_payloads", payloads)
+                for channel in all_channels:
+                    payload = payloads.get(channel["id"])
+                    if not payload:
+                        continue
+                    with st.expander(f"{channel.get('name', 'Canal')} — título e thumbnail", expanded=False):
+                        title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
+                        if title_options:
+                            selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"new_video_general_title_{channel['id']}")
+                            payload["title"] = selected_title
+                        variants = payload.get("thumbnail_variants", [])
+                        if variants:
+                            labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
+                            selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"new_video_general_thumbnail_{channel['id']}")
+                            variant = variants[labels.index(selected_variant_label)]
+                            payload["thumbnail_variant"] = variant
+                            payload["thumbnail_prompt"] = variant.get("image_prompt", "")
+                            payload["thumbnail_text"] = variant.get("overlay_text", "")
+                            st.caption(f"{variant.get('composition', '')} · {variant.get('color_palette', '')}")
+                        st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
+            else:
+                topic_for_creative = str(st.session_state.get("new_video_topic", "") or "").strip()
+                if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", use_container_width=True):
+                    if selected_one is None:
+                        st.error("Seleccione primeiro um canal.")
+                    elif not topic_for_creative:
+                        st.error("Escreva ou gere primeiro um tópico/briefing.")
+                    else:
+                        try:
+                            generated = generate_creative_for_ui(read_json("settings.json", {}), selected_one, topic_for_creative, topic_source="llm" if st.session_state.get("new_video_topic_meta") else "manual")
+                            st.session_state["new_video_creative_payload"] = generated
+                            st.success("Título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
+                            st.rerun()
+                        except CreativeGenerationError as exc:
+                            st.error(str(exc))
+                payload = st.session_state.get("new_video_creative_payload")
+                if payload:
+                    st.subheader("Título e Thumbnail automáticos")
+                    title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
+                    if title_options:
+                        selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key="new_video_title_choice")
+                        payload["title"] = selected_title
+                        with st.expander(f"Ver {len(title_options)} candidatos de título"):
+                            st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
+                    variants = payload.get("thumbnail_variants", [])
+                    if variants:
+                        labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
+                        selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key="new_video_thumbnail_choice")
+                        variant = variants[labels.index(selected_variant_label)]
+                        payload["thumbnail_variant"] = variant
+                        payload["thumbnail_prompt"] = variant.get("image_prompt", "")
+                        payload["thumbnail_text"] = variant.get("overlay_text", "")
+                        st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
+                        st.code(variant.get("image_prompt", ""), language="text")
+                        st.info("Prompt de thumbnail pronto — a imagem será criada quando existir um provider de imagem configurado; não é criado um ficheiro falso.")
+                    st.session_state["new_video_creative_payload"] = payload
+
             with st.form("new_video_form"):
-                topic = st.text_area("Tópico ou briefing", placeholder="Ex.: A história pouco conhecida por trás de...")
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
                 legacy_language = st.session_state.get("video_language")
-                legacy_language_map = {
-                    "Português": "36 – Português (Brasil)",
-                    "English": "01 – Inglês",
-                    "Español": "41 – Espanhol (LatAm)",
-                }
+                legacy_language_map = {"Português": "36 – Português (Brasil)", "English": "01 – Inglês", "Español": "41 – Espanhol (LatAm)"}
                 if legacy_language not in VIDEO_LANGUAGE_OPTIONS:
                     st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
                 language = st.selectbox("Idioma", VIDEO_LANGUAGE_OPTIONS, key="video_language")
-                fmt = st.selectbox("Formato", ["wide", "shorts", "music"])
+                fmt = st.selectbox("Formato", ["wide", "shorts", "music"], key="new_video_format")
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
             if submitted:
-                if not topic.strip() or not selected:
-                    st.error("Informe um tópico e seleccione pelo menos um canal.")
+                style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
+                if style == "music" and not music_path:
+                    st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
+                    st.stop()
+                if mode == "general":
+                    payloads = dict(st.session_state.get("new_video_general_payloads", {}))
+                    topics = dict(st.session_state.get("new_video_general_topics", {}))
+                    channels_by_id = {str(channel["id"]): channel for channel in all_channels}
+                    payloads_need_refresh = len(payloads) != len(selected) or any(
+                        str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip()
+                        and str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip() != str((payloads.get(channel_id) or {}).get("topic") or "").strip()
+                        for channel_id in selected
+                    )
+                    if payloads_need_refresh:
+                        settings = read_json("settings.json", {})
+                        generated_payloads: dict[str, dict[str, Any]] = {}
+                        errors: list[str] = []
+                        with st.spinner("A gerar automaticamente um pacote criativo independente para cada canal…"):
+                            for channel_id in selected:
+                                channel = channels_by_id[channel_id]
+                                edited_topic = str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip()
+                                topic_result = topics.get(channel_id) or {}
+                                try:
+                                    if not edited_topic:
+                                        topic_result = generate_topic_for_ui(settings, channel, general_context)
+                                        edited_topic = topic_result["topic"]
+                                    else:
+                                        topic_result = {**topic_result, "topic": edited_topic, "topic_source": topic_result.get("topic_source", "manual")}
+                                    generated = generate_creative_for_ui(settings, channel, edited_topic, topic_source=topic_result.get("topic_source", "llm"))
+                                    generated["ai_generation"]["topic"] = topic_result
+                                    generated_payloads[channel_id] = generated
+                                except CreativeGenerationError as exc:
+                                    errors.append(f"{channel.get('name', 'Canal')}: {exc}")
+                        if errors:
+                            for error in errors:
+                                st.error(error)
+                            st.error("O Lote geral não foi criado porque faltou gerar o conteúdo específico de pelo menos um canal.")
+                        else:
+                            payloads = generated_payloads
+                            st.session_state["new_video_general_payloads"] = payloads
+                            st.session_state["new_video_general_topics"] = {cid: {"topic": payload["topic"], "topic_source": payload.get("topic_source", "llm")} for cid, payload in payloads.items()}
+                    if len(payloads) == len(selected):
+                        batch_topic = "Lote geral — um vídeo independente por canal"
+                        channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source} for cid, payload in payloads.items()}
+                        batch = create_batch("general", selected, batch_topic, 1, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "topic_source": "llm", "channel_payloads": channel_payloads})
+                        tasks = create_tasks_for_batch(batch)
+                        st.success(f"Lote geral {batch['id']} criado com {len(tasks)} tarefas independentes, uma por canal.")
                 else:
-                    quantity = int(quantity if mode == "same_channel" else 1)
-                    style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
-                    if style == "music" and not music_path:
-                        st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
-                        st.stop()
-                    batch = create_batch(mode, selected, topic, quantity, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source})
-                    tasks = create_tasks_for_batch(batch)
-                    st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
+                    topic_value = str(st.session_state.get("new_video_topic", "") or "").strip()
+                    if not topic_value or not selected:
+                        st.error("Escreva ou gere um tópico e seleccione um canal.")
+                    else:
+                        quantity_value = int(quantity if mode == "same_channel" else 1)
+                        payload = dict(st.session_state.get("new_video_creative_payload") or {})
+                        if not payload.get("title") or not payload.get("thumbnail_variants"):
+                            try:
+                                payload = generate_creative_for_ui(read_json("settings.json", {}), selected_one or {}, topic_value, topic_source="llm" if st.session_state.get("new_video_topic_meta") else "manual")
+                            except CreativeGenerationError as exc:
+                                st.warning(f"Título/thumbnail automáticos pendentes: {exc} A tarefa será criada com o tópico como título e sem ficheiro de thumbnail.")
+                                payload = {"topic": topic_value, "title": topic_value, "topic_source": "manual", "thumbnail_status": "pending_provider", "thumbnail_variants": [], "thumbnail_variant": {}, "thumbnail_prompt": "", "thumbnail_text": ""}
+                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or ("llm" if st.session_state.get("new_video_topic_meta") else "manual"), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source})
+                        batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
+                        tasks = create_tasks_for_batch(batch)
+                        st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
     with videos_tab:
         render_videos()
 
@@ -1173,8 +1460,16 @@ def render_videos():
         with st.container(border=True):
             cols = st.columns([2.2, 1, 1, 1.2, 1.8])
             with cols[0]:
-                st.write(f"**{task.get('topic', 'Sem tópico')}**")
+                st.write(f"**{task.get('title') or task.get('topic', 'Sem título')}**")
+                st.caption(f"Tópico: {task.get('topic', 'Sem tópico')}")
                 st.caption(f"{task.get('channel_name')} · {task.get('id')}")
+                thumbnail_path = (task.get('artifacts') or {}).get('thumbnail', '')
+                if thumbnail_path and Path(thumbnail_path).is_file():
+                    st.image(thumbnail_path, width=180)
+                else:
+                    status = task.get('thumbnail_status', 'not_generated')
+                    prompt_note = ' · prompt pronto' if task.get('thumbnail_prompt') else ''
+                    st.caption(f"Thumbnail: {status}{prompt_note}")
             with cols[1]: st.write(task.get("format", "wide"))
             with cols[2]: st.write(task.get("stage", "—"))
             with cols[3]: st.write(task.get("state", "—"))
@@ -1312,7 +1607,7 @@ def render_upload_direct():
                 st.caption(f"Documento de credenciais pronto: {account.get('email', 'conta Google')} · dados do canal encontrados no documento")
             direct_cols = st.columns([2.2, 1, 1])
             with direct_cols[0]:
-                title = st.text_input("Título", value=task.get("topic", "Vídeo Thunderbolt"), key=f"direct_title_{task['id']}")
+                title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"direct_title_{task['id']}")
             with direct_cols[1]:
                 privacy = st.selectbox("Privacidade", ["private", "unlisted", "public"], key=f"direct_privacy_{task['id']}")
             with direct_cols[2]:
@@ -1387,7 +1682,7 @@ def render_upload_conventional():
             captions_path = artifacts.get("captions") or artifacts.get("subtitle", "")
             st.caption(video_path or "Sem caminho de vídeo registado")
             if "YouTube" in destination:
-                title = st.text_input("Título", value=task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
+                title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
                 description = st.text_area("Descrição", value=task.get("description", ""), key=f"yt_description_{task['id']}", height=100)
                 tags_raw = st.text_input("Tags separadas por vírgula", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"yt_tags_{task['id']}")
                 yt_cols = st.columns(3)
@@ -1426,7 +1721,7 @@ def render_upload_conventional():
                         with st.expander("Detalhes dos mecanismos de upload"):
                             st.json(result.data["attempts"])
             if "TikTok" in destination and st.button("Enviar para TikTok", key=f"upload_tiktok_{task['id']}"):
-                result = TikTokAdapter(settings).upload_video(video_path, task.get("topic", ""))
+                result = TikTokAdapter(settings).upload_video(video_path, task.get("title") or task.get("topic", ""))
                 (st.success if result.ok else st.warning)(result.message)
             if "Instagram" in destination:
                 st.button("Preparar Instagram", key=f"upload_instagram_{task['id']}", disabled=True, help="UI preparada; publicação Instagram ainda não está activa.")

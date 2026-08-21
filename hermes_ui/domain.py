@@ -108,39 +108,66 @@ def create_batch(mode: str, channel_ids: list[str], topic: str, quantity: int, o
 
 
 def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expand a batch into tasks, allowing independent payloads for each channel."""
     tasks = read_json("tasks.json", [])
     channels = {c["id"]: c for c in read_json("channels.json", [])}
-    target_channels = batch["channel_ids"]
-    count = batch["quantity"]
-    if batch["mode"] == "general":
+    options = batch.get("options") or {}
+    channel_payloads = options.get("channel_payloads") or {}
+    target_channels = batch.get("channel_ids") or []
+    count = max(1, int(batch.get("quantity") or 1))
+    if batch.get("mode") == "general":
         count = 1
     created: list[dict[str, Any]] = []
     for channel_id in target_channels:
+        channel = channels.get(channel_id, {})
+        payload = channel_payloads.get(channel_id) if isinstance(channel_payloads, dict) else None
+        payload = payload if isinstance(payload, dict) else {}
         for index in range(count):
-            channel = channels.get(channel_id, {})
+            default_topic = str(batch.get("topic") or "").strip()
+            if count == 1:
+                topic = str(payload.get("topic") or default_topic).strip()
+            else:
+                topic = str(payload.get("topic") or f"{default_topic} — variação {index + 1}").strip()
+            if not topic:
+                topic = f"Vídeo para {channel.get('name', 'Canal')}"
+            title = str(payload.get("title") or topic).strip()
+            artifacts = dict(payload.get("artifacts") or {})
+            thumbnail_path = str(payload.get("thumbnail_path") or "").strip()
+            if thumbnail_path:
+                artifacts.setdefault("thumbnail", thumbnail_path)
             task = {
                 "id": make_id("video"),
                 "batch_id": batch["id"],
-                "creation_mode": batch["mode"],
+                "creation_mode": batch.get("mode", "single"),
                 "channel_id": channel_id,
                 "channel_name": channel.get("name", "Canal"),
-                "topic": batch["topic"] if count == 1 else f"{batch['topic']} — variação {index + 1}",
-                "language": batch["options"].get("language", channel.get("language", "Português")),
-                "format": batch["options"].get("format", "wide"),
-                "style_wide": batch["options"].get("style_wide", channel.get("style_wide", "pexels")),
-                "style_ia": batch["options"].get("style_ia", ""),
-                "music_mode": batch["options"].get("music_mode", False),
-                "music_path": batch["options"].get("music_path", ""),
-                "music_source": batch["options"].get("music_source", ""),
-                "background_mode": batch["options"].get("background_mode", "stock"),
-                "blueprint_id": channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
-                "voice": channel.get("default_voice") or channel.get("voice", ""),
+                "topic": topic,
+                "title": title,
+                "topic_source": str(payload.get("topic_source") or options.get("topic_source") or "manual"),
+                "language": payload.get("language", options.get("language", channel.get("language", "Português"))),
+                "format": payload.get("format", options.get("format", "wide")),
+                "style_wide": payload.get("style_wide", options.get("style_wide", channel.get("style_wide", "pexels"))),
+                "style_ia": payload.get("style_ia", options.get("style_ia", "")),
+                "music_mode": payload.get("music_mode", options.get("music_mode", False)),
+                "music_path": payload.get("music_path", options.get("music_path", "")),
+                "music_source": payload.get("music_source", options.get("music_source", "")),
+                "background_mode": payload.get("background_mode", options.get("background_mode", "stock")),
+                "blueprint_id": payload.get("blueprint_id") or channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
+                "blueprint_name": payload.get("blueprint_name", ""),
+                "voice": payload.get("voice") or channel.get("default_voice") or channel.get("voice", ""),
                 "automation_on": bool(channel.get("automation_on", False)),
                 "automation_time": channel.get("automation_time", "00:00"),
+                "thumbnail_variant": payload.get("thumbnail_variant", {}),
+                "thumbnail_variants": payload.get("thumbnail_variants", []),
+                "thumbnail_prompt": payload.get("thumbnail_prompt", ""),
+                "thumbnail_text": payload.get("thumbnail_text", ""),
+                "thumbnail_status": payload.get("thumbnail_status", "not_generated"),
+                "title_candidates": payload.get("title_candidates", []),
+                "ai_generation": payload.get("ai_generation", {}),
                 "stage": "script",
                 "state": "to_do",
                 "progress": 0,
-                "artifacts": {},
+                "artifacts": artifacts,
                 "error": None,
                 "created_at": now(),
                 "updated_at": now(),
@@ -148,10 +175,12 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
             tasks.append(task)
             created.append(task)
     write_json("tasks.json", tasks)
-    for task in created:
-        queues = read_json("queues.json", {})
-        queues.setdefault("script", []).append(task["id"])
-        write_json("queues.json", queues)
+    queues = read_json("queues.json", {})
+    if not isinstance(queues, dict):
+        queues = {}
+    queues.setdefault("script", [])
+    queues["script"].extend(task["id"] for task in created)
+    write_json("queues.json", queues)
     return created
 
 

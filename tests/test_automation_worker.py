@@ -16,9 +16,11 @@ def _use_temp_storage(tmp_path, monkeypatch):
 
 def test_worker_uses_local_clock_and_creates_daily_batch(tmp_path, monkeypatch):
     storage = _use_temp_storage(tmp_path, monkeypatch)
+    from hermes_ui import automation_worker
     from hermes_ui.automation_worker import run_once
     from hermes_ui.domain import create_channel
 
+    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: ("Tema específico de História", {"topic": "Tema específico de História", "topic_source": "llm", "title": "Título específico", "blueprint_id": "bp_worker", "blueprint_name": "Blueprint Worker", "voice": "pt-BR-FranciscaNeural-Female", "thumbnail_status": "prompt_ready"}))
     local_now = datetime.now().astimezone().replace(hour=8, minute=30, second=0, microsecond=0)
     channel = create_channel(
         "Canal worker",
@@ -44,13 +46,17 @@ def test_worker_uses_local_clock_and_creates_daily_batch(tmp_path, monkeypatch):
     assert all(task["blueprint_id"] == "bp_worker" for task in tasks)
     assert all(task["voice"] == "pt-BR-FranciscaNeural-Female" for task in tasks)
     assert all(task["automation_time"] == "08:30" for task in tasks)
+    assert all(task["topic_source"] == "llm" for task in tasks)
+    assert all(task["title"] == "Título específico" for task in tasks)
 
 
 def test_worker_does_not_duplicate_same_channel_on_same_day(tmp_path, monkeypatch):
     storage = _use_temp_storage(tmp_path, monkeypatch)
+    from hermes_ui import automation_worker
     from hermes_ui.automation_worker import run_once
     from hermes_ui.domain import create_channel
 
+    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: ("Tema específico sem duplicados", {"topic": "Tema específico sem duplicados", "topic_source": "llm", "title": "Título diário", "thumbnail_status": "prompt_ready"}))
     local_now = datetime.now().astimezone().replace(hour=9, minute=5, second=0, microsecond=0)
     channel = create_channel("Canal sem duplicados", metadata={"automation_on": True, "automation_time": "09:05"})
 
@@ -79,3 +85,22 @@ def test_worker_requires_active_channel_and_exact_local_hhmm(tmp_path, monkeypat
     assert result["created"] == []
     assert storage.read_json("batches.json", []) == []
     assert storage.read_json("tasks.json", []) == []
+
+
+def test_worker_does_not_create_placeholder_when_creative_generation_fails(tmp_path, monkeypatch):
+    storage = _use_temp_storage(tmp_path, monkeypatch)
+    from hermes_ui import automation_worker
+    from hermes_ui.automation_worker import run_once
+    from hermes_ui.domain import create_channel
+
+    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: (_ for _ in ()).throw(RuntimeError("provider LLM não configurado")))
+    local_now = datetime.now().astimezone().replace(hour=11, minute=0, second=0, microsecond=0)
+    create_channel("Canal sem provider", metadata={"automation_on": True, "automation_time": "11:00"})
+
+    result = run_once(local_now)
+
+    assert result["ok"] is False
+    assert "provider LLM" in result["error"]
+    assert storage.read_json("batches.json", []) == []
+    assert storage.read_json("tasks.json", []) == []
+    assert "Geração automática" not in result["error"]

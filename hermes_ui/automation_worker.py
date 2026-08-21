@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import storage
+from .creative_generation import generate_creative_package, generate_topic_for_channel
 from .domain import create_batch, create_tasks_for_batch
 
 WORKER_STATE_FILE = "automation_worker.json"
@@ -127,9 +128,50 @@ def _daily_quantity(channel: dict[str, Any]) -> int:
         return 1
 
 
-def _automation_topic(channel: dict[str, Any]) -> str:
-    topic = str(channel.get("automation_topic") or "").strip()
-    return topic or f"Geração automática — {channel.get('name') or 'Canal'}"
+def _blueprint_for_channel(channel: dict[str, Any]) -> dict[str, Any]:
+    blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
+    if not blueprint_id:
+        return {}
+    for path in storage.list_blueprint_files():
+        try:
+            data = storage.load_blueprint_file(path)
+        except (OSError, ValueError):
+            continue
+        identifiers = {str(data.get("id") or ""), path.stem, str(data.get("name") or "")}
+        if blueprint_id in identifiers:
+            return data
+    return {}
+
+
+def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    settings = storage.read_json("settings.json", {})
+    blueprint = _blueprint_for_channel(channel)
+    user_context = str(channel.get("automation_topic") or "").strip()
+    topic_package = generate_topic_for_channel(settings, channel, blueprint, user_context=user_context)
+    creative = generate_creative_package(
+        settings,
+        channel,
+        topic_package["topic"],
+        blueprint,
+        language=str(channel.get("language") or "Português"),
+    )
+    variant = creative["thumbnail_variant"]
+    payload = {
+        "topic": topic_package["topic"],
+        "topic_source": "llm",
+        "title": creative["title"],
+        "title_candidates": creative["title_candidates"],
+        "thumbnail_variant": variant,
+        "thumbnail_variants": creative["thumbnail_variants"],
+        "thumbnail_prompt": variant.get("image_prompt", ""),
+        "thumbnail_text": variant.get("overlay_text", ""),
+        "thumbnail_status": creative.get("thumbnail_status", "prompt_ready"),
+        "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
+        "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
+        "ai_generation": {"topic": topic_package, "creative": creative},
+    }
+    return topic_package["topic"], payload
 
 
 def _batch_for_day(channel_id: str, day: str) -> dict[str, Any] | None:
@@ -155,6 +197,7 @@ def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, 
     date_key = when.date().isoformat()
     style_wide = str(channel.get("style_wide") or "pexels")
     music_mode = style_wide == "music"
+    topic, payload = _creative_payload(channel)
     options = {
         "language": channel.get("language") or "Português",
         "format": "wide",
@@ -164,17 +207,13 @@ def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, 
         "background_mode": "none" if music_mode else ("ai" if style_wide == "full_ia" else "stock"),
         "music_path": channel.get("music_path") or "",
         "music_source": channel.get("music_source") or "",
+        "topic_source": "llm",
+        "channel_payloads": {channel_id: payload},
         "automation_worker": True,
         "automation_date": date_key,
         "automation_scheduled_at": _local_iso(when),
     }
-    batch = create_batch(
-        "single",
-        [channel_id],
-        _automation_topic(channel),
-        _daily_quantity(channel),
-        options,
-    )
+    batch = create_batch("single", [channel_id], topic, _daily_quantity(channel), options)
     tasks = create_tasks_for_batch(batch)
     return {"batch": batch, "tasks": tasks, "channel_id": channel_id}
 

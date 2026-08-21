@@ -146,3 +146,49 @@ def test_delete_channel_removes_only_selected_channel(tmp_path, monkeypatch):
     assert [item["id"] for item in storage.read_json("channels.json")] == [second["id"]]
     assert storage.read_json("tasks.json")[0]["channel_id"] == first["id"]
     assert delete_channel("channel_inexistente") is None
+
+
+def test_general_batch_uses_independent_channel_payloads(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import create_batch, create_channel, create_tasks_for_batch
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    first = create_channel("Canal História", metadata={"default_blueprint_id": "bp_history"})
+    second = create_channel("Canal Ciência", metadata={"default_blueprint_id": "bp_science"})
+    payloads = {
+        first["id"]: {"topic": "A queda de uma civilização esquecida", "title": "A Civilização que Desapareceu sem Explicação", "blueprint_id": "bp_history", "thumbnail_text": "DESAPARECEU", "thumbnail_status": "prompt_ready"},
+        second["id"]: {"topic": "O experimento que mudou a física", "title": "O Experimento que Mudou a Física", "blueprint_id": "bp_science", "thumbnail_text": "MUDOU TUDO", "thumbnail_status": "prompt_ready"},
+    }
+    batch = create_batch("general", [first["id"], second["id"]], "Lote geral — um vídeo independente por canal", 1, {"channel_payloads": payloads, "topic_source": "llm"})
+
+    tasks = create_tasks_for_batch(batch)
+
+    assert len(tasks) == 2
+    assert {task["topic"] for task in tasks} == {"A queda de uma civilização esquecida", "O experimento que mudou a física"}
+    assert {task["title"] for task in tasks} == {"A Civilização que Desapareceu sem Explicação", "O Experimento que Mudou a Física"}
+    assert {task["blueprint_id"] for task in tasks} == {"bp_history", "bp_science"}
+    assert {task["thumbnail_text"] for task in tasks} == {"DESAPARECEU", "MUDOU TUDO"}
+    assert all(task["topic_source"] == "llm" for task in tasks)
+    assert all(task["creation_mode"] == "general" for task in tasks)
+
+
+def test_general_batch_always_creates_one_task_per_channel(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import create_batch, create_channel, create_tasks_for_batch
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    channels = [create_channel(f"Canal {index}") for index in range(3)]
+    batch = create_batch("general", [channel["id"] for channel in channels], "Contexto", 99, {})
+
+    tasks = create_tasks_for_batch(batch)
+
+    assert len(tasks) == 3
+    assert {task["channel_id"] for task in tasks} == {channel["id"] for channel in channels}
+    assert all(task["topic"] == "Contexto" for task in tasks)
+    assert len({task["id"] for task in tasks}) == 3
