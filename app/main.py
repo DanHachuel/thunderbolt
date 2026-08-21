@@ -30,6 +30,7 @@ from app.modules.niche_finder.summarizer import summarize_items
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
+from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
@@ -150,7 +151,16 @@ st.markdown("""
 .content-label { color:#8ba6bb; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
 .content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
-.small-muted { color:#8ba6bb; font-size:.85rem; }
+ .small-muted { color:#8ba6bb; font-size:.85rem; }
+.tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid #263d50; border-radius:18px; background:radial-gradient(circle at 50% 0, rgba(164,126,55,.16), transparent 58%), linear-gradient(145deg, rgba(17,27,37,.98), rgba(9,15,22,.98)); box-shadow:0 18px 48px rgba(0,0,0,.18); }
+.tb-cuts-hero .tb-cuts-kicker { color:#c59b55; font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; font-weight:700; }
+.tb-cuts-hero h2 { color:#f5f0e8; font-family:Georgia,serif; font-size:2rem; font-weight:500; margin:.42rem 0 .25rem; text-transform:lowercase; }
+.tb-cuts-hero p { color:#9cafbf; margin:0 auto; max-width:620px; font-size:.9rem; }
+[data-testid="stRadio"] [role="radiogroup"] { gap:.6rem; }
+[data-testid="stRadio"] label { border:1px solid #2a4052; border-radius:12px; padding:.65rem .8rem; background:#101b25; min-height:4.3rem; }
+[data-testid="stRadio"] label:has(input:checked) { border-color:#c59b55; background:linear-gradient(145deg, rgba(96,71,33,.42), rgba(17,27,37,.95)); }
+[data-testid="stStatusWidget"] { border-color:#2a4052 !important; background:#101b25 !important; }
+
 /* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */
 [data-testid="stMultiSelectTagsContainer"] span[data-tag] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
 [data-testid="stMultiSelectTagsContainer"] span[data-tag] span[title],
@@ -1485,6 +1495,189 @@ def render_edit_placeholder(page_title: str, description: str):
     st.info("Esta aba está reservada para desenvolvimento futuro e ainda não executa nenhuma operação.")
 
 
+def render_cuts():
+    st.title("Cortes")
+    st.caption("Crie clips verticais, quadrados ou horizontais a partir de vídeos longos, com um fluxo local inspirado no Clip Generator do OpenShorts.")
+
+    st.markdown(
+        "<div class='tb-cuts-hero'><div class='tb-cuts-kicker'>01 · CLIP GENERATOR</div><h2>Create Viral Shorts</h2><p>Escolha um vídeo longo, defina o formato e gere clips locais sem sobrescrever a fonte.</p></div>",
+        unsafe_allow_html=True,
+    )
+
+    source_path = None
+    source_tab, url_tab, generated_tab, folder_tab = st.tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])
+    with source_tab:
+        uploaded_video = st.file_uploader(
+            "Clique para carregar ou arraste um vídeo",
+            type=sorted(extension.lstrip(".") for extension in VIDEO_EXTENSIONS),
+            key="cuts_video_upload",
+            help="MP4, MOV, MKV, WEBM e formatos suportados pelo FFmpeg. O original fica preservado.",
+        )
+        if uploaded_video is not None:
+            try:
+                source_path = store_uploaded_video(uploaded_video.name, uploaded_video.getvalue())
+                st.session_state["cuts_source_path"] = str(source_path)
+                st.session_state["cuts_source_label"] = f"Upload · {uploaded_video.name}"
+            except CutsError as exc:
+                st.error(str(exc))
+    with url_tab:
+        url_value = st.text_input("URL directa do vídeo", placeholder="https://exemplo.com/video.mp4", key="cuts_video_url")
+        st.caption("A URL deve apontar directamente para um ficheiro de vídeo HTTP/HTTPS. O download só ocorre depois de clicar no botão.")
+        if st.button("Descarregar vídeo", key="cuts_download_url", use_container_width=True):
+            try:
+                source_path = download_direct_video_url(url_value)
+                st.session_state["cuts_source_path"] = str(source_path)
+                st.session_state["cuts_source_label"] = f"URL · {url_value}"
+                st.success("Vídeo descarregado e pronto para análise.")
+            except CutsError as exc:
+                st.error(str(exc))
+    with generated_tab:
+        generated_paths = list_cut_generated_videos(read_json("tasks.json", []))
+        if not generated_paths:
+            st.info("Ainda não existem vídeos gerados com caminho registado na pipeline.")
+        else:
+            generated_labels = [f"{path.name} — {path}" for path in generated_paths]
+            selected_generated = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: generated_labels[index], key="cuts_generated_index")
+            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", use_container_width=True):
+                source_path = generated_paths[selected_generated]
+                st.session_state["cuts_source_path"] = str(source_path)
+                st.session_state["cuts_source_label"] = f"Pipeline · {source_path.name}"
+    with folder_tab:
+        folder_value = st.text_input("Pasta de vídeos", value=str(STORAGE / "videos"), key="cuts_video_folder")
+        folder_paths = list_cut_video_files(folder_value)
+        if not folder_paths:
+            st.info("Não foram encontrados vídeos nessa pasta.")
+        else:
+            folder_labels = [f"{path.name} — {path}" for path in folder_paths]
+            selected_folder = st.selectbox("Vídeo da pasta", range(len(folder_paths)), format_func=lambda index: folder_labels[index], key="cuts_folder_index")
+            if st.button("Usar vídeo da pasta", key="cuts_use_folder", use_container_width=True):
+                source_path = folder_paths[selected_folder]
+                st.session_state["cuts_source_path"] = str(source_path)
+                st.session_state["cuts_source_label"] = f"Pasta local · {source_path.name}"
+
+    stored_source = st.session_state.get("cuts_source_path", "")
+    if not source_path and stored_source:
+        candidate = Path(stored_source)
+        if candidate.is_file():
+            source_path = candidate
+    if source_path and source_path.is_file():
+        st.markdown(f"**Fonte seleccionada:** `{st.session_state.get('cuts_source_label', source_path.name)}`")
+        source_cols = st.columns([1.4, 1])
+        with source_cols[0]:
+            st.video(str(source_path))
+        with source_cols[1]:
+            st.caption(f"{source_path.name}")
+            st.caption(f"{source_path.stat().st_size / (1024 * 1024):.2f} MB")
+            st.caption("A fonte original não é alterada.")
+    else:
+        st.info("Escolha um ficheiro, descarregue uma URL, seleccione um vídeo gerado ou indique uma pasta local.")
+
+    with st.container(border=True):
+        st.markdown("**Output format**")
+        format_options = ["9:16", "1:1", "16:9"]
+        output_format = st.radio(
+            "Formato de saída",
+            format_options,
+            format_func=lambda value: {"9:16": "9:16\\nShorts · Reels · TikTok", "1:1": "1:1\\nFeed posts", "16:9": "16:9\\nYouTube · landscape"}[value],
+            horizontal=True,
+            key="cuts_output_format",
+            label_visibility="collapsed",
+        )
+        with st.expander("advanced options", expanded=False):
+            strategy_label = st.selectbox("Estratégia", ["Automático · segmentos locais", "Manual · um intervalo"], key="cuts_strategy")
+            strategy = "manual" if strategy_label.startswith("Manual") else "automatic"
+            options_cols = st.columns(3)
+            with options_cols[0]:
+                max_clips = st.number_input("Número máximo de clips", min_value=1, max_value=20, value=3, step=1, key="cuts_max_clips")
+            with options_cols[1]:
+                min_duration = st.number_input("Duração mínima (s)", min_value=1.0, max_value=600.0, value=15.0, step=1.0, key="cuts_min_duration")
+            with options_cols[2]:
+                max_duration = st.number_input("Duração máxima (s)", min_value=1.0, max_value=600.0, value=60.0, step=1.0, key="cuts_max_duration")
+            manual_start = manual_end = 0.0
+            if strategy == "manual":
+                manual_cols = st.columns(2)
+                with manual_cols[0]:
+                    manual_start = st.number_input("Início do intervalo (s)", min_value=0.0, value=0.0, step=0.5, key="cuts_manual_start")
+                with manual_cols[1]:
+                    manual_end = st.number_input("Fim do intervalo (s)", min_value=0.5, value=30.0, step=0.5, key="cuts_manual_end")
+            st.caption("O modo automático cria segmentos locais distribuídos pelo vídeo. A selecção viral por IA fica disponível como extensão quando houver transcrição/provider configurado.")
+
+        rights_confirmed = st.checkbox(
+            "Confirmo que possuo os direitos ou autorização para processar este conteúdo.",
+            key="cuts_rights_confirmed",
+        )
+        generate_button = st.button(
+            "Gerar Clips",
+            type="primary",
+            use_container_width=True,
+            disabled=not (source_path and source_path.is_file() and rights_confirmed),
+            key="cuts_generate_button",
+        )
+
+    if generate_button and source_path and source_path.is_file():
+        settings = read_json("settings.json", {})
+        with st.status("A analisar e a gerar clips…", expanded=True) as status:
+            st.write("A validar fonte e parâmetros…")
+            try:
+                record = generate_clips(
+                    source_path,
+                    output_format=output_format,
+                    strategy=strategy,
+                    max_clips=int(max_clips),
+                    min_duration=float(min_duration),
+                    max_duration=float(max_duration),
+                    rights_confirmed=rights_confirmed,
+                    ffmpeg_path=settings.get("ffmpeg_path", ""),
+                    manual_start=float(manual_start),
+                    manual_end=float(manual_end) if strategy == "manual" else None,
+                )
+                st.session_state["cuts_last_run"] = record
+                status.update(label="Clips gerados", state="complete", expanded=False)
+            except CutsError as exc:
+                status.update(label="A geração falhou", state="error", expanded=True)
+                st.error(str(exc))
+
+    last_run = st.session_state.get("cuts_last_run")
+    if last_run:
+        st.divider()
+        status_label = {"complete": "CONCLUÍDO", "processing": "A PROCESSAR", "error": "ERRO"}.get(last_run.get("status"), str(last_run.get("status", "—")).upper())
+        st.markdown(f"### Live Analysis · `{status_label}`")
+        if last_run.get("status") == "complete":
+            clips = [clip for clip in last_run.get("clips", []) if Path(str(clip.get("path", ""))).is_file()]
+            result_cols = st.columns([3, 1, 1])
+            with result_cols[0]:
+                st.subheader("Generated Shorts")
+            with result_cols[1]:
+                st.metric("Clips", len(clips))
+            with result_cols[2]:
+                st.metric("Formato", last_run.get("output_format", "—"))
+            for index in range(0, len(clips), 3):
+                clip_cols = st.columns(3)
+                for col, clip in zip(clip_cols, clips[index:index + 3]):
+                    with col:
+                        with st.container(border=True):
+                            st.caption(f"Clip {clip.get('index', '—')} · {float(clip.get('duration', 0)):.1f}s")
+                            st.video(str(clip["path"]))
+                            st.download_button("Descarregar clip", data=Path(clip["path"]).read_bytes(), file_name=clip["name"], mime="video/mp4", key=f"cuts_download_{last_run['id']}_{clip['index']}", use_container_width=True)
+            try:
+                _, archive_bytes = zip_cut_run(last_run)
+                st.download_button("Descarregar todos os clips (ZIP)", data=archive_bytes, file_name=f"{last_run['id']}.zip", mime="application/zip", key=f"cuts_download_zip_{last_run['id']}", use_container_width=True)
+            except CutsError as exc:
+                st.warning(str(exc))
+            st.download_button("Descarregar manifesto JSON", data=cut_manifest_bytes(last_run), file_name=f"{last_run['id']}.json", mime="application/json", key=f"cuts_download_manifest_{last_run['id']}", use_container_width=True)
+        elif last_run.get("error"):
+            st.error(last_run["error"])
+
+    runs = list_cut_runs()
+    if runs:
+        with st.expander("Histórico do Clip Generator"):
+            st.dataframe(
+                [{"Data": run.get("created_at", "—"), "Fonte": run.get("source_name", "—"), "Formato": run.get("output_format", "—"), "Clips": len(run.get("clips", [])), "Estado": run.get("status", "—")} for run in runs[:20]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
 def render_python_editor():
     st.title("Editor Python")
     st.caption("Editor local inspirado no PYEdit para scripts Python e edição manual de vídeos do Thunderbolt.")
@@ -2686,7 +2879,7 @@ def main():
         "Niche Finder Apify": render_niche_finder_apify,
         "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
         "Limpador de Metadados": render_metadata_cleaner,
-        "Cortes": lambda: render_edit_placeholder("Cortes", "Área reservada para a futura funcionalidade de cortes de vídeo."),
+        "Cortes": render_cuts,
         "Editor Python": render_python_editor,
         "Models AI": lambda: render_edit_placeholder("Models AI", "Seleccione uma das abas Models AI no menu expansível."),
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),

@@ -183,7 +183,9 @@ def test_edition_navigation_has_cleaner_cuts_and_python_editor():
     assert '("Editor Python", ":material/code:", "Editor Python")' in source
     assert source.index('("Limpador de Metadados", ":material/edit_note:') < source.index('("Cortes", ":material/content_cut:') < source.index('("Editor Python", ":material/code:')
     assert '"Edição": lambda: render_edit_placeholder("Edição"' in source
-    assert '"Cortes": lambda: render_edit_placeholder("Cortes"' in source
+    assert '"Cortes": render_cuts' in source
+    assert 'def render_cuts()' in source
+    assert 'Gerar Clips' in source
     assert '"Editor Python": render_python_editor' in source
 
 
