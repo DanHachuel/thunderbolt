@@ -44,3 +44,14 @@ def test_prompt_master_ui_has_upload_library_editor_and_actions():
     assert '_render_card_pencil(f"rename_prompt_masters_' in MAIN_SOURCE
     assert '_render_library_name_editor("blueprints", path, title)' in MAIN_SOURCE
     assert '_render_library_name_editor("prompt_masters", path, heading)' in MAIN_SOURCE
+
+
+def test_library_cards_show_only_display_names_without_paths_or_extensions():
+    assert 'with st.expander(title):' in MAIN_SOURCE
+    assert 'with st.expander(heading, expanded=False):' in MAIN_SOURCE
+    assert 'st.caption(f"Ficheiro: {path}")' not in MAIN_SOURCE
+    assert 'st.caption(f"Ficheiro TikTok: `{path}`")' not in MAIN_SOURCE
+    assert 'with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}")' not in MAIN_SOURCE
+    assert 'with st.expander(f"{heading} — {path.name}", expanded=False)' not in MAIN_SOURCE
+    assert 'with st.expander(f"Inválido — {path.stem}")' in MAIN_SOURCE
+    assert 'with st.expander(f"Ficheiro inválido — {path.stem}")' in MAIN_SOURCE

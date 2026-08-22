@@ -711,14 +711,13 @@ def render_blueprints():
                 card_key = _library_card_key("blueprints", path)
                 header_cols = st.columns([0.93, 0.07], vertical_alignment="center")
                 with header_cols[0]:
-                    with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}"):
-                        st.caption(f"Ficheiro: {path}")
+                    with st.expander(title):
                         st.json(data)
                 with header_cols[1]:
                     _render_card_pencil(f"rename_blueprints_{card_key}")
                 _render_library_name_editor("blueprints", path, title)
             except Exception as exc:
-                with st.expander(f"Inválido — {path.name}"):
+                with st.expander(f"Inválido — {path.stem}"):
                     st.error(str(exc))
     with branding_tab:
         st.subheader("Brandings completos")
@@ -751,7 +750,7 @@ def render_blueprints():
                     st.caption(f"Blueprint associado: {data.get('blueprint_id') or 'não associado'}")
                     st.json(data)
             except Exception as exc:
-                with st.expander(f"Inválido — {path.name}"):
+                with st.expander(f"Inválido — {path.stem}"):
                     st.error(str(exc))
 
 
@@ -963,8 +962,7 @@ def render_tiktok_prompt_masters():
                 card_key = _library_card_key("prompt_masters", path)
                 header_cols = st.columns([0.93, 0.07], vertical_alignment="center")
                 with header_cols[0]:
-                    with st.expander(f"{heading} — {path.name}", expanded=False):
-                        st.caption(f"Ficheiro TikTok: `{path}`")
+                    with st.expander(heading, expanded=False):
                         edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
                         prompt_cols = st.columns(3)
                         with prompt_cols[0]:
@@ -984,7 +982,7 @@ def render_tiktok_prompt_masters():
                     _render_card_pencil(f"rename_prompt_masters_{card_key}")
                 _render_library_name_editor("prompt_masters", path, heading)
             except (OSError, ValueError) as exc:
-                with st.expander(f"Ficheiro inválido — {path.name}"):
+                with st.expander(f"Ficheiro inválido — {path.stem}"):
                     st.error(str(exc))
 
 
