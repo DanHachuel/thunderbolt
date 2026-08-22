@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.86
+> **Versão deste manual:** 0.2.87
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -197,6 +197,10 @@ O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTur
 No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra o rótulo **Language** acima do selector. Cada opção apresenta o nome e o código, acompanhados por uma imagem SVG local da bandeira; não depende de emojis nem de siglas da fonte do sistema. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O dashboard inicial, o interior das páginas e as abas da barra lateral usam o mesmo idioma seleccionado. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mantém o catálogo de vídeo independente, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
 Todas as subabas internas e o conteúdo das páginas também são traduzidos nos dez idiomas. Isso inclui títulos, subtítulos, descrições, labels, placeholders, opções, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML. Valores técnicos, IDs, URLs, nomes de ficheiros e dados introduzidos pelo utilizador permanecem inalterados. As subabas internas traduzidas incluem: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais e Client MCP/Servidor MCP/Skill. A ordem e as chaves internas dos widgets permanecem estáveis.
+
+### Temas Light e Dark
+
+A aplicação usa o mecanismo nativo de temas do Streamlit e é distribuída com `.streamlit/config.toml`, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O ficheiro define uma base **Light** legível; o utilizador pode seleccionar **Dark** no menu nativo do Streamlit. Os componentes próprios da UI herdam as cores do tema activo através de `currentColor` e `color-mix`, sem forçar fundos, cartões ou textos da paleta escura. O toolbar nativo, o indicador de execução, **Deploy** e o menu principal continuam sem sobreposições CSS.
 
 ## 4. Diagnóstico antes de iniciar
 

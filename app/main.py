@@ -149,45 +149,50 @@ st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initi
 
 st.markdown("""
 <style>
-:root { --accent:#35a7ff; --bg:#0b1118; --card:#121b26; }
-[data-testid="stAppViewContainer"] { background: radial-gradient(circle at top right, #13283b 0, #0b1118 42%); }
-[data-testid="stSidebar"] { background:#091018; border-right:1px solid #1d3448; }
+/*
+   MoneyPrinterTurbo deixa a maior parte das cores a cargo do tema nativo do
+   Streamlit. O Thunderbolt segue o mesmo princípio: componentes próprios usam
+   currentColor/color-mix e nunca uma paleta escura fixa.
+*/
+:root { --tb-accent:#35a7ff; --tb-gold:#c59b55; }
+[data-testid="stAppViewContainer"] { background:transparent; color:inherit; }
+[data-testid="stSidebar"] { background:color-mix(in srgb, currentColor 4%, transparent); border-right:1px solid color-mix(in srgb, currentColor 16%, transparent); }
 [data-testid="stSidebar"] .block-container { padding-top:0.28rem; padding-bottom:0.45rem; }
 [data-testid="stSidebar"] > div:first-child { padding-top:0.28rem; }
 [data-testid="stSidebar"] .tb-brand { display:flex; align-items:baseline; gap:0.42rem; margin:0 0 0.68rem 0; white-space:nowrap; }
-[data-testid="stSidebar"] .tb-brand-name { color:#f4f8fb; font-size:1.38rem; line-height:1.15; font-weight:750; letter-spacing:-0.02em; }
-[data-testid="stSidebar"] .tb-brand-version { color:#8ba6bb; font-size:0.92rem; line-height:1; font-weight:500; }
+[data-testid="stSidebar"] .tb-brand-name { color:inherit; font-size:1.38rem; line-height:1.15; font-weight:750; letter-spacing:-0.02em; }
+[data-testid="stSidebar"] .tb-brand-version { color:inherit; opacity:.62; font-size:0.92rem; line-height:1; font-weight:500; }
 [data-testid="stSidebar"] [data-testid="stButton"] { margin:0.025rem 0 !important; }
 [data-testid="stSidebar"] [data-testid="stButton"] button { min-height:1.72rem; height:1.72rem; justify-content:flex-start !important; text-align:left !important; padding:0.10rem 0.52rem; border-radius:7px; border:1px solid transparent; font-size:0.86rem; font-weight:550; }
 [data-testid="stSidebar"] [data-testid="stButton"] button > div { width:100% !important; justify-content:flex-start !important; text-align:left !important; }
 [data-testid="stSidebar"] [data-testid="stButton"] button [data-testid="stMarkdownContainer"] { flex:1 1 auto !important; width:100% !important; text-align:left !important; }
 [data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1; width:100%; text-align:left !important; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:#e7edf2; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:#1c252e; border-color:#2d3944; color:#ffffff; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#292929; color:#ffffff; border-color:#3a3a3a; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:#343434; color:#ffffff; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span { color:#ffffff; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:#e7edf2; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:color-mix(in srgb, currentColor 8%, transparent); border-color:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:color-mix(in srgb, currentColor 12%, transparent); color:inherit; border-color:color-mix(in srgb, currentColor 22%, transparent); }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span,
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:inherit; }
 [data-testid="stSidebar"] [data-testid="stExpander"] { border:0 !important; background:transparent !important; margin:0.02rem 0 !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] details { border:0 !important; background:transparent !important; }
-[data-testid="stSidebar"] [data-testid="stExpander"] summary { min-height:1.72rem; padding:0.10rem 0.52rem !important; border-radius:7px; color:#e7edf2; font-size:0.86rem; font-weight:650; }
-[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background:#1c252e; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary { min-height:1.72rem; padding:0.10rem 0.52rem !important; border-radius:7px; color:inherit; font-size:0.86rem; font-weight:650; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background:color-mix(in srgb, currentColor 8%, transparent); }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
-.content-card { padding: 1rem 1.1rem; border:1px solid #20384d; border-radius:14px; background:rgba(18,27,38,.92); min-height:110px; }
-.content-label { color:#8ba6bb; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
-.content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
-.stage { border-left:3px solid #35a7ff; padding:.65rem .8rem; margin:.4rem 0; background:#101d2a; border-radius:8px; }
- .small-muted { color:#8ba6bb; font-size:.85rem; }
-.tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid #263d50; border-radius:18px; background:radial-gradient(circle at 50% 0, rgba(164,126,55,.16), transparent 58%), linear-gradient(145deg, rgba(17,27,37,.98), rgba(9,15,22,.98)); box-shadow:0 18px 48px rgba(0,0,0,.18); }
-.tb-cuts-hero .tb-cuts-kicker { color:#c59b55; font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; font-weight:700; }
-.tb-cuts-hero h2 { color:#f5f0e8; font-family:Georgia,serif; font-size:2rem; font-weight:500; margin:.42rem 0 .25rem; text-transform:lowercase; }
-.tb-cuts-hero p { color:#9cafbf; margin:0 auto; max-width:620px; font-size:.9rem; }
+.content-card { padding:1rem 1.1rem; border:1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius:14px; background:color-mix(in srgb, currentColor 4%, transparent); min-height:110px; }
+.content-label { color:inherit; opacity:.62; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
+.content-value { color:inherit; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
+.stage { border-left:3px solid var(--tb-accent); padding:.65rem .8rem; margin:.4rem 0; background:color-mix(in srgb, currentColor 4%, transparent); border-radius:8px; }
+.small-muted { color:inherit; opacity:.65; font-size:.85rem; }
+.tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:18px; background:radial-gradient(circle at 50% 0, color-mix(in srgb, var(--tb-gold) 16%, transparent), transparent 58%), color-mix(in srgb, currentColor 4%, transparent); box-shadow:0 18px 48px color-mix(in srgb, currentColor 12%, transparent); }
+.tb-cuts-hero .tb-cuts-kicker { color:var(--tb-gold); font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; font-weight:700; }
+.tb-cuts-hero h2 { color:inherit; font-family:Georgia,serif; font-size:2rem; font-weight:500; margin:.42rem 0 .25rem; text-transform:lowercase; }
+.tb-cuts-hero p { color:inherit; opacity:.68; margin:0 auto; max-width:620px; font-size:.9rem; }
 [data-testid="stRadio"] [role="radiogroup"] { gap:.6rem; }
-[data-testid="stRadio"] label { border:1px solid #2a4052; border-radius:12px; padding:.65rem .8rem; background:#101b25; min-height:4.3rem; }
-[data-testid="stRadio"] label:has(input:checked) { border-color:#c59b55; background:linear-gradient(145deg, rgba(96,71,33,.42), rgba(17,27,37,.95)); }
-[data-testid="stStatusWidget"] { border-color:#2a4052 !important; background:#101b25 !important; }
+[data-testid="stRadio"] label { border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:12px; padding:.65rem .8rem; background:color-mix(in srgb, currentColor 4%, transparent); min-height:4.3rem; }
+[data-testid="stRadio"] label:has(input:checked) { border-color:var(--tb-gold); background:linear-gradient(145deg, color-mix(in srgb, var(--tb-gold) 24%, transparent), color-mix(in srgb, currentColor 6%, transparent)); }
+[data-testid="stStatusWidget"] { border-color:color-mix(in srgb, currentColor 18%, transparent) !important; background:color-mix(in srgb, currentColor 4%, transparent) !important; }
 /* O menu de idiomas usa layout nativo da aplicação; o toolbar do Streamlit não é alterado. */
 
 /* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */

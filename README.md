@@ -52,7 +52,11 @@ O Thunderbolt mantém os idiomas históricos da criação de vídeos e acrescent
 
 No topo da área principal da aplicação existe o menu nativo de idioma no padrão do MoneyPrinterTurbo, sem sobrepor o toolbar do Streamlit. O selector mostra o rótulo visível **Language** acima do campo, cada opção aparece como **nome do idioma + código**, e a bandeira é uma imagem SVG local real, não um emoji ou sigla dependente da fonte do sistema. Ao escolher outra opção, a preferência é guardada em `storage/state/settings.json` como `ui_language`, e a navegação lateral e o dashboard inicial actualizam-se sem alterar o idioma seleccionado para os vídeos. O indicador de execução, o botão **Deploy** e o menu principal do Streamlit permanecem totalmente nativos e clicáveis.
 
-## Navegação da UI 0.2.86
+## Temas claro e escuro
+
+A UI suporta os temas **Light** e **Dark** através do mecanismo nativo do Streamlit. A configuração distribuída em `.streamlit/config.toml` define uma base clara, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo), e o menu nativo continua responsável pela preferência do utilizador. O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para que a sidebar, cartões, estados, radio cards, expanders e o hero de Cortes acompanhem o tema activo. As cores de identidade dos chips de plataformas e das bandeiras são intencionais e não são substituídas pelo tema.
+
+## Navegação da UI 0.2.87
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
