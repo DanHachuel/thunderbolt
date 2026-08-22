@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.88.
+Estado auditado para o release 0.2.89.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -15,7 +15,7 @@ Estado auditado para o release 0.2.88.
 | YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`; o fluxo recomendado usa API Oficial, depois Upload directo e, no fim, Postiz. O contador local limita a API Oficial a cinco envios bem-sucedidos por dia por conta Gmail. |
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |
 | Idiomas MoneyPrinterTurbo, navegação, subabas e conteúdo interno | Concluído | `hermes_ui/languages.py` fornece os códigos `en`, `zh`, `de`, `vi`, `tr`, `pt`, `ru`, `es`, `id` e `it`, com normalização legada, assets SVG locais das bandeiras e labels sem siglas de emoji. O selector nativo mostra `Language` acima do campo, persiste `ui_language` e não altera `video_language`. O dashboard, a navegação lateral, as 31 labels de abas/subabas e o conteúdo interno dos renderers usam o idioma seleccionado através da camada global de widgets e `render_localized_tabs`, incluindo títulos, campos, placeholders, opções, botões, avisos, estados, métricas e Markdown/HTML. O toolbar do Streamlit não é manipulado. |
-| Suporte de temas Light e Dark | Concluído | `.streamlit/config.toml` define Dark como default absoluto e é incluído no pacote npm; a UI mostra o selector persistente `Theme` com `Dark` e `Light`, guarda a escolha em `ui_theme`, e o CSS próprio usa variáveis semânticas, `currentColor`/`color-mix` e transparência para acompanhar o tema seleccionado, preservando o toolbar nativo e as cores intencionais dos chips de plataformas. |
+| Suporte de temas Light e Dark | Concluído | `.streamlit/config.toml` define Dark como base inicial e é incluído no pacote npm; a alternância Light/Dark permanece exclusivamente no menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe selector Theme dentro da página; o CSS próprio usa `currentColor`/`color-mix` e transparência, preservando o toolbar nativo e as cores intencionais dos chips de plataformas. |
 | Tutorial Supabase em AI Influencers | Concluído | Nova página **Tutorial Supabase** em `AI Influencers`, com tabelas `plans`/`posts`, bucket `instagram-images`, imagens do guia original e link de fonte; as duas frases promocionais do Skool foram omitidas. |
 | Lista histórica ampliada de idiomas de vídeo | Concluído | `VIDEO_LANGUAGE_OPTIONS` continua preservada para tarefas e Blueprints antigos; `VIDEO_LANGUAGE_SELECTION_OPTIONS` acrescenta os códigos MoneyPrinterTurbo, mostra bandeiras e sincroniza `ui.video_language`. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |

@@ -144,70 +144,9 @@ BACKGROUND_MUSIC_VOLUME_OPTIONS = ["0%", "10%", "20%", "30%", "50%", "75%", "100
 SUBTITLE_FONT_OPTIONS = ["MicrosoftYaHeiBold.ttc", "Arial.ttf", "DejaVuSans.ttf"]
 SUBTITLE_POSITION_OPTIONS = ["Bottom (Recommended)", "Top", "Center"]
 
-UI_THEME_VALUES = ("dark", "light")
-UI_THEME_PALETTES = {
-    "dark": {
-        "background": "#0B1118",
-        "sidebar": "#091018",
-        "surface": "#121B26",
-        "text": "#F4F8FB",
-        "muted": "#9CAFBF",
-        "border": "#2A4052",
-    },
-    "light": {
-        "background": "#FFFFFF",
-        "sidebar": "#F3F6FA",
-        "surface": "#FFFFFF",
-        "text": "#16202A",
-        "muted": "#526273",
-        "border": "#C9D2DC",
-    },
-}
-
-
-def normalize_ui_theme(value: Any) -> str:
-    return "light" if str(value or "").strip().casefold() in {"light", "claro", "clara", "浅色", "hell", "sáng", "açık", "светлая", "terang", "chiaro"} else "dark"
-
-
-def current_ui_theme() -> str:
-    settings = read_json("settings.json", {})
-    stored = st.session_state.get("ui_theme")
-    if stored is None:
-        stored = settings.get("ui_theme")
-    normalized = normalize_ui_theme(stored) if stored is not None else "dark"
-    st.session_state["ui_theme"] = normalized
-    return normalized
-
-
-
-def save_ui_theme(value: str) -> str:
-    normalized = normalize_ui_theme(value)
-    settings = read_json("settings.json", {})
-    settings["ui_theme"] = normalized
-    write_json("settings.json", settings)
-    st.session_state["ui_theme"] = normalized
-    return normalized
-
-
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
-ui_theme = current_ui_theme()
-theme_palette = UI_THEME_PALETTES[ui_theme]
-st.markdown(
-    f"""<style>
-    :root {{
-        --tb-theme-background: {theme_palette["background"]};
-        --tb-theme-sidebar: {theme_palette["sidebar"]};
-        --tb-theme-surface: {theme_palette["surface"]};
-        --tb-theme-text: {theme_palette["text"]};
-        --tb-theme-muted: {theme_palette["muted"]};
-        --tb-theme-border: {theme_palette["border"]};
-        color-scheme: {ui_theme};
-    }}
-    </style>""",
-    unsafe_allow_html=True,
-)
 st.markdown("""
 <style>
 /*
@@ -216,32 +155,8 @@ st.markdown("""
    currentColor/color-mix e nunca uma paleta escura fixa.
 */
 :root { --tb-accent:#35a7ff; --tb-gold:#c59b55; }
-html, body { background:var(--tb-theme-background); color:var(--tb-theme-text); }
-[data-testid="stApp"] { background:var(--tb-theme-background); color:var(--tb-theme-text); }
-[data-testid="stHeader"] { background:var(--tb-theme-background); }
-[data-testid="stAppViewContainer"] { background:var(--tb-theme-background); color:var(--tb-theme-text); }
-[data-testid="stSidebar"] { background:var(--tb-theme-sidebar); color:var(--tb-theme-text); border-right:1px solid var(--tb-theme-border); }
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-testid="stNumberInput"] input,
-[data-testid="stDateInput"] input,
-[data-testid="stTimeInput"] input,
-[data-testid="stSelectbox"] [data-baseweb="select"] > div,
-[data-testid="stMultiSelect"] [data-baseweb="select"] > div,
-[data-testid="stColorPicker"] input { color:var(--tb-theme-text) !important; background:var(--tb-theme-surface) !important; border-color:var(--tb-theme-border) !important; }
-[data-testid="stFileUploader"] section,
-[data-testid="stAlert"],
-[data-testid="stDataFrame"],
-[data-testid="stTable"],
-[data-testid="stExpander"] details { color:var(--tb-theme-text); background:var(--tb-theme-surface); border-color:var(--tb-theme-border); }
-[data-testid="stButton"] button,
-[data-testid="stFormSubmitButton"] button { color:var(--tb-theme-text); background:var(--tb-theme-surface); border-color:var(--tb-theme-border); }
-[data-testid="stButton"] button:hover,
-[data-testid="stFormSubmitButton"] button:hover { color:var(--tb-theme-text); background:color-mix(in srgb, var(--tb-theme-text) 9%, var(--tb-theme-surface)); border-color:var(--tb-accent); }
-[data-testid="stTabs"] [data-baseweb="tab"],
-[data-testid="stTabs"] button { color:var(--tb-theme-text); }
-[data-testid="stSidebar"] [data-testid="stTextInput"] input,
-[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div { background:var(--tb-theme-surface) !important; }
+[data-testid="stAppViewContainer"] { background:transparent; color:inherit; }
+[data-testid="stSidebar"] { background:color-mix(in srgb, currentColor 4%, transparent); border-right:1px solid color-mix(in srgb, currentColor 16%, transparent); }
 [data-testid="stSidebar"] .block-container { padding-top:0.28rem; padding-bottom:0.45rem; }
 [data-testid="stSidebar"] > div:first-child { padding-top:0.28rem; }
 [data-testid="stSidebar"] .tb-brand { display:flex; align-items:baseline; gap:0.42rem; margin:0 0 0.68rem 0; white-space:nowrap; }
@@ -368,29 +283,6 @@ def render_localized_tabs(labels: list[str], language: str | None = None):
     return st.tabs(localized_tab_labels(labels, language))
 
 
-def ui_theme_label(value: str, language: str | None = None) -> str:
-    normalized = normalize_ui_theme(value)
-    selected_language = language_code(language or current_ui_language())
-    return ui_text("Dark" if normalized == "dark" else "Light", selected_language)
-
-
-def render_ui_theme_picker(language: str) -> None:
-    """Render an explicit, persistent Light/Dark selector with Dark as the default."""
-    selected_language = language_code(language)
-    current = current_ui_theme()
-    selected = st.radio(
-        ui_text("Theme", selected_language),
-        list(UI_THEME_VALUES),
-        index=list(UI_THEME_VALUES).index(current),
-        format_func=lambda value: ui_theme_label(value, selected_language),
-        horizontal=True,
-        key="top_ui_theme_selector",
-    )
-    if selected != current:
-        save_ui_theme(selected)
-        st.rerun()
-
-
 def save_ui_language(value: str) -> str:
     normalized = language_code(value)
     settings = read_json("settings.json", {})
@@ -435,9 +327,7 @@ def render_ui_language_picker(language: str) -> None:
         </style>''',
         unsafe_allow_html=True,
     )
-    _spacer, theme_col, language_col = st.columns([3.6, 1.9, 1.5])
-    with theme_col:
-        render_ui_theme_picker(language)
+    _spacer, language_col = st.columns([5.2, 1.5])
     with language_col:
         selected = st.selectbox(
             "Language",

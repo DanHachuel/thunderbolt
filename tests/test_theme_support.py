@@ -18,21 +18,17 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.2.88"' in PACKAGE_SOURCE
+    assert '"version": "0.2.89"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
-def test_theme_selector_is_explicit_persistent_and_dark_by_default():
-    assert 'UI_THEME_VALUES = ("dark", "light")' in MAIN_SOURCE
-    assert 'stored = st.session_state.get("ui_theme")' in MAIN_SOURCE
-    assert 'normalized = normalize_ui_theme(stored) if stored is not None else "dark"' in MAIN_SOURCE
-    assert 'settings["ui_theme"] = normalized' in MAIN_SOURCE
-    assert 'key="top_ui_theme_selector"' in MAIN_SOURCE
-    assert 'render_ui_theme_picker(language)' in MAIN_SOURCE
-    assert 'ui_text("Theme", selected_language)' in MAIN_SOURCE
-    assert 'format_func=lambda value: ui_theme_label(value, selected_language)' in MAIN_SOURCE
-    assert 'color-scheme: {ui_theme};' in MAIN_SOURCE
-    assert 'list(UI_THEME_VALUES).index(current)' in MAIN_SOURCE
+def test_native_streamlit_theme_menu_is_preserved_without_internal_theme_selector():
+    assert 'render_ui_language_picker(ui_language)' in MAIN_SOURCE
+    assert 'render_ui_theme_picker' not in MAIN_SOURCE
+    assert 'top_ui_theme_selector' not in MAIN_SOURCE
+    assert 'theme_col' not in MAIN_SOURCE
+    assert 'stAppDeployButton' not in MAIN_SOURCE
+    assert 'stMainMenu' not in MAIN_SOURCE
 
 
 def test_custom_css_inherits_active_streamlit_theme_instead_of_forcing_dark_palette():
