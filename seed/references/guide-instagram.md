@@ -1,9 +1,5 @@
 # Setting up Instagram for automations with n8n
 
-## [📚 Join our Skool community for support, premium content and more!](https://www.skool.com/ai-agents-az/about?gw8)
-
-### Be part of a growing community and help us create more content like this
-
 ## Convert the Instagram account to a professional account
 
 > [!IMPORTANT]

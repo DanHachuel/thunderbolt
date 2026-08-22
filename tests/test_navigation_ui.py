@@ -66,3 +66,5 @@ def test_tutorial_reference_is_packaged_and_contains_meta_setup_sections():
     assert "pages_show_list" in tutorial
     assert "instagram_content_publish" in tutorial
     assert "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md" in tutorial
+    assert "Join our Skool community" not in tutorial
+    assert "Be part of a growing community" not in tutorial
