@@ -70,6 +70,64 @@ def test_internal_content_labels_translate_in_all_supported_languages():
     assert "Google account" in translate_ui_content("Conta Google para Upload directo", "en")
 
 
+def test_page_content_translation_covers_all_supported_languages():
+    page_examples = {
+        "en": {
+            "Operações notificadas": "Notified operations",
+            "Filtrar palavras-chave nos clusters": "Filter keywords in clusters",
+            "Metadados para a versão limpa": "Metadata for the cleaned version",
+        },
+        "zh": {
+            "Operações notificadas": "已通知的操作",
+            "Plataformas Upload-Post": "Upload-Post 平台",
+            "Histórico de notificações": "通知历史",
+        },
+        "de": {
+            "Operações notificadas": "Benachrichtigte Vorgänge",
+            "Processar em segundo plano": "Im Hintergrund verarbeiten",
+            "Resultado": "Ergebnis",
+        },
+        "vi": {
+            "Operações notificadas": "Hoạt động được thông báo",
+            "Metadados para a versão limpa": "Siêu dữ liệu cho phiên bản đã làm sạch",
+            "Descarregar legendas": "Tải phụ đề",
+        },
+        "tr": {
+            "Operações notificadas": "Bildirim gönderilen işlemler",
+            "Processar em segundo plano": "Arka planda işle",
+            "Resultado": "Sonuç",
+        },
+        "pt": {
+            "Operações notificadas": "Operações notificadas",
+            "Processar em segundo plano": "Processar em segundo plano",
+            "Metadados para a versão limpa": "Metadados para a versão limpa",
+        },
+        "ru": {
+            "Operações notificadas": "Операции с уведомлениями",
+            "Histórico de notificações": "История уведомлений",
+            "Descarregar legendas": "Скачать субтитры",
+        },
+        "es": {
+            "Operações notificadas": "Operaciones notificadas",
+            "Processar em segundo plano": "Procesar en segundo plano",
+            "Resultado": "Resultado",
+        },
+        "id": {
+            "Operações notificadas": "Operasi yang diberi notifikasi",
+            "Histórico de notificações": "Riwayat notifikasi",
+            "Descarregar legendas": "Unduh subtitle",
+        },
+        "it": {
+            "Operações notificadas": "Operazioni notificate",
+            "Processar em segundo plano": "Elabora in background",
+            "Resultado": "Risultato",
+        },
+    }
+    for code, examples in page_examples.items():
+        for source, expected in examples.items():
+            assert translate_ui_content(source, code) == expected
+
+
 def test_global_content_translation_hook_is_installed_before_page_renderers():
     assert "install_streamlit_content_translation()" in MAIN_SOURCE
     assert "_CONTENT_TRANSLATED_STREAMLIT_METHODS" in MAIN_SOURCE
