@@ -2735,8 +2735,6 @@ def render_settings():
             missing_document_parts = list(direct_status.get("missing_cookies", []))
             if not direct_status.get("has_session_info"):
                 missing_document_parts.append("sessionInfo")
-            if not direct_status.get("has_innertube_api_key"):
-                missing_document_parts.append("INNERTUBE_API_KEY")
             if missing_document_parts:
                 youtube_accounts_missing_document.append(account_email_snapshot)
 
