@@ -3797,6 +3797,23 @@ def render_models_ai_tutorial():
         return
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
+def render_supabase_tutorial():
+    tutorial_url = "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-supabase.md"
+    tutorial_path = ROOT / "seed" / "references" / "guide-supabase.md"
+    ui_language = current_ui_language()
+    st.title(ui_text("Tutorial Supabase", ui_language))
+    st.caption(ui_text("Guia de configuração do Supabase para automações com n8n.", ui_language))
+    st.markdown(f"[Abrir fonte original no GitHub]({tutorial_url})")
+    try:
+        tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        tutorial_content = ""
+    if not tutorial_content:
+        st.error("O conteúdo local do tutorial não está disponível. Consulte a fonte original no GitHub.")
+        return
+    st.markdown(tutorial_content, unsafe_allow_html=True)
+
+
 def render_mcp():
     st.title("MCP")
     st.caption("Clientes externos, servidor MCP do Thunderbolt e a skill local ficam separados para evitar confundir funções diferentes.")
@@ -4085,6 +4102,7 @@ def main():
         ("Personagens", ":material/person:", "Personagens"),
         ("Redes Sociais", ":material/share:", "Redes Sociais"),
         ("Tutorial Meta", ":material/menu_book:", "Tutorial Meta"),
+        ("Tutorial Supabase", ":material/storage:", "Tutorial Supabase"),
     ]
     settings_items = [
         ("Canais Youtube", ":material/ondemand_video:", "Canais Youtube"),
@@ -4192,6 +4210,7 @@ def main():
         "Download Mídia": render_media_download,
         "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
+        "Tutorial Supabase": render_supabase_tutorial,
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Upload": render_upload,

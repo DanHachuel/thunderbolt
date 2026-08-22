@@ -114,3 +114,19 @@ def test_language_picker_uses_native_layout_without_touching_streamlit_toolbar()
     assert 'stAppDeployButton' not in MAIN_SOURCE
     assert 'stMainMenu' not in MAIN_SOURCE
     assert 'right:1.5rem' not in MAIN_SOURCE
+
+
+def test_supabase_tutorial_is_packaged_and_added_to_ai_influencers():
+    tutorial_path = Path(__file__).resolve().parents[1] / "seed" / "references" / "guide-supabase.md"
+    tutorial = tutorial_path.read_text(encoding="utf-8")
+    assert "# Guia para criar e configurar uma conta Supabase" in tutorial
+    assert "## 1. Criar as tabelas da base de dados" in tutorial
+    assert "### Criar a tabela `plans`" in tutorial
+    assert "### Criar a tabela `posts`" in tutorial
+    assert "## 2. Criar o bucket de Storage" in tutorial
+    assert "instagram-images" in tutorial
+    assert "Join our Skool community" not in tutorial
+    assert "Be part of a growing community" not in tutorial
+    assert '("Tutorial Supabase", ":material/storage:", "Tutorial Supabase")' in MAIN_SOURCE
+    assert '"Tutorial Supabase": render_supabase_tutorial' in MAIN_SOURCE
+    assert 'guide-supabase.md' in MAIN_SOURCE

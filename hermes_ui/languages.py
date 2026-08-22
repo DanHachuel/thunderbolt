@@ -100,7 +100,7 @@ _CORE_UI_TEXT_KEYS = (
     "Início", "Niche Finder", "Pipeline", "Pipeline TikTok", "Automação", "Edição", "AI Influencers", "Configurações",
     "Criação de Vídeos", "Criação de Músicas", "Roteiros", "Upload", "Prompts Master", "Contas TikTok", "Automação Youtube",
     "Niche Finder Kaggle", "Niche Finder Apify", "Limpador de Metadados", "Cortes", "Editor Python", "Download Mídia",
-    "Personagens", "Redes Sociais", "Tutorial Meta", "Canais Youtube", "Blueprints Youtube", "MCP", "Contas Google",
+    "Personagens", "Redes Sociais", "Tutorial Meta", "Tutorial Supabase", "Canais Youtube", "Blueprints Youtube", "MCP", "Contas Google",
     "Configuração API", "Notificações", "Interface local para operação e automação de conteúdo faceless", "Canais", "activos",
     "Tarefas", "total registado", "A fazer", "na pipeline", "Em execução", "a decorrer", "Concluídos", "artefactos prontos",
     "Falhas", "requerem atenção", "Filas locais e dependências da cascata", "Niche", "Blueprints", "Brand", "Script", "Title",
@@ -181,6 +181,23 @@ TAB_TRANSLATIONS: dict[str, dict[str, str]] = {
 
 for _language_code, _tab_translation in TAB_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_tab_translation)
+
+
+TUTORIAL_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {"Tutorial Supabase": "Tutorial Supabase", "Guia de configuração do Supabase para automações com n8n.": "Guia de configuração do Supabase para automações com n8n."},
+    "en": {"Tutorial Supabase": "Supabase Tutorial", "Guia de configuração do Supabase para automações com n8n.": "Supabase setup guide for n8n automations."},
+    "zh": {"Tutorial Supabase": "Supabase 教程", "Guia de configuração do Supabase para automações com n8n.": "用于 n8n 自动化的 Supabase 配置指南。"},
+    "de": {"Tutorial Supabase": "Supabase-Tutorial", "Guia de configuração do Supabase para automações com n8n.": "Anleitung zur Supabase-Konfiguration für n8n-Automatisierungen."},
+    "vi": {"Tutorial Supabase": "Hướng dẫn Supabase", "Guia de configuração do Supabase para automações com n8n.": "Hướng dẫn cấu hình Supabase cho tự động hóa n8n."},
+    "tr": {"Tutorial Supabase": "Supabase Eğitimi", "Guia de configuração do Supabase para automações com n8n.": "n8n otomasyonları için Supabase yapılandırma rehberi."},
+    "ru": {"Tutorial Supabase": "Руководство Supabase", "Guia de configuração do Supabase para automações com n8n.": "Руководство по настройке Supabase для автоматизации n8n."},
+    "es": {"Tutorial Supabase": "Tutorial de Supabase", "Guia de configuração do Supabase para automações com n8n.": "Guía de configuración de Supabase para automatizaciones con n8n."},
+    "id": {"Tutorial Supabase": "Tutorial Supabase", "Guia de configuração do Supabase para automações com n8n.": "Panduan konfigurasi Supabase untuk otomatisasi n8n."},
+    "it": {"Tutorial Supabase": "Tutorial Supabase", "Guia de configuração do Supabase para automações com n8n.": "Guida alla configurazione di Supabase per le automazioni n8n."},
+}
+
+for _language_code, _tutorial_translation in TUTORIAL_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_tutorial_translation)
 
 
 def ui_text(value: str, language: Any = "pt") -> str:

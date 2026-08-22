@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.84.
+Estado auditado para o release 0.2.85.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -15,6 +15,7 @@ Estado auditado para o release 0.2.84.
 | YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`; o fluxo recomendado usa API Oficial, depois Upload directo e, no fim, Postiz. O contador local limita a API Oficial a cinco envios bem-sucedidos por dia por conta Gmail. |
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |
 | Idiomas MoneyPrinterTurbo, navegação e subabas | Concluído | `hermes_ui/languages.py` fornece os códigos `en`, `zh`, `de`, `vi`, `tr`, `pt`, `ru`, `es`, `id` e `it`, com normalização legada, assets SVG locais das bandeiras e labels sem siglas de emoji. O selector nativo mostra `Language` acima do campo, persiste `ui_language` e não altera `video_language`. O dashboard, a navegação lateral e os 31 labels de abas/subabas usam o idioma seleccionado através de `render_localized_tabs`. O toolbar do Streamlit não é manipulado. |
+| Tutorial Supabase em AI Influencers | Concluído | Nova página **Tutorial Supabase** em `AI Influencers`, com tabelas `plans`/`posts`, bucket `instagram-images`, imagens do guia original e link de fonte; as duas frases promocionais do Skool foram omitidas. |
 | Lista histórica ampliada de idiomas de vídeo | Concluído | `VIDEO_LANGUAGE_OPTIONS` continua preservada para tarefas e Blueprints antigos; `VIDEO_LANGUAGE_SELECTION_OPTIONS` acrescenta os códigos MoneyPrinterTurbo, mostra bandeiras e sincroniza `ui.video_language`. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
