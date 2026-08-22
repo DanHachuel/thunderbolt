@@ -37,6 +37,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
+from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.postiz import PostizAdapter
@@ -1367,11 +1368,30 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         if variants:
                             labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
                             selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"new_video_general_thumbnail_{channel['id']}")
-                            variant = variants[labels.index(selected_variant_label)]
+                            variant_index = labels.index(selected_variant_label)
+                            variant = variants[variant_index]
                             payload["thumbnail_variant"] = variant
                             payload["thumbnail_prompt"] = variant.get("image_prompt", "")
                             payload["thumbnail_text"] = variant.get("overlay_text", "")
                             st.caption(f"{variant.get('composition', '')} · {variant.get('color_palette', '')}")
+                            thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
+                            if st.button("Gerar imagem com Nano Banana", key=f"new_video_general_generate_thumbnail_{channel['id']}", use_container_width=True):
+                                try:
+                                    thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                    variant["image_path"] = thumbnail_path
+                                    payload["thumbnail_path"] = thumbnail_path
+                                    payload["thumbnail_status"] = "generated"
+                                    st.session_state["new_video_general_payloads"] = payloads
+                                    st.success("Thumbnail gerada com Nano Banana.")
+                                    st.rerun()
+                                except ThumbnailGenerationError as exc:
+                                    st.error(str(exc))
+                            if thumbnail_path and Path(thumbnail_path).is_file():
+                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                                payload["thumbnail_path"] = thumbnail_path
+                                payload["thumbnail_status"] = "generated"
+                            else:
+                                st.caption("A imagem ainda não foi gerada. Configure a API key em Configurações Técnicas > API Keys.")
                         st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
             else:
                 topic_for_creative = str(st.session_state.get("new_video_topic", "") or "").strip()
@@ -1401,13 +1421,31 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     if variants:
                         labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
                         selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key="new_video_thumbnail_choice")
-                        variant = variants[labels.index(selected_variant_label)]
+                        variant_index = labels.index(selected_variant_label)
+                        variant = variants[variant_index]
                         payload["thumbnail_variant"] = variant
                         payload["thumbnail_prompt"] = variant.get("image_prompt", "")
                         payload["thumbnail_text"] = variant.get("overlay_text", "")
                         st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
                         st.code(variant.get("image_prompt", ""), language="text")
-                        st.info("Prompt de thumbnail pronto — a imagem será criada quando existir um provider de imagem configurado; não é criado um ficheiro falso.")
+                        thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
+                        if st.button("Gerar imagem da thumbnail com Nano Banana", key="new_video_generate_thumbnail_image", use_container_width=True):
+                            try:
+                                thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                variant["image_path"] = thumbnail_path
+                                payload["thumbnail_path"] = thumbnail_path
+                                payload["thumbnail_status"] = "generated"
+                                st.session_state["new_video_creative_payload"] = payload
+                                st.success("Thumbnail gerada com Nano Banana.")
+                                st.rerun()
+                            except ThumbnailGenerationError as exc:
+                                st.error(str(exc))
+                        if thumbnail_path and Path(thumbnail_path).is_file():
+                            st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                            payload["thumbnail_path"] = thumbnail_path
+                            payload["thumbnail_status"] = "generated"
+                        else:
+                            st.info("Escolha a variante e clique em **Gerar imagem da thumbnail com Nano Banana**. A API key é configurada em Configurações Técnicas > API Keys.")
                     st.session_state["new_video_creative_payload"] = payload
 
             with st.form("new_video_form"):
@@ -2923,6 +2961,16 @@ def render_settings():
                     proxy_https = text_setting("Proxy HTTPS", "proxy_https")
                     match_materials_to_script = st.checkbox("Alinhar materiais ao roteiro", bool(settings.get("match_materials_to_script", False)))
 
+            with st.expander("Nano Banana — geração de thumbnails", expanded=True):
+                st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
+                nano_cols = st.columns(2)
+                with nano_cols[0]:
+                    gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
+                    gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
+                with nano_cols[1]:
+                    gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
+                    gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
+
             with st.expander("LLM — providers e modelos", expanded=True):
                 provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
                 llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
@@ -3063,6 +3111,7 @@ def render_settings():
                     "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
                     "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
                     "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
+                    "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
                     "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
                     "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
                     "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
