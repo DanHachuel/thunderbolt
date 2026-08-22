@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.82.
+Estado auditado para o release 0.2.83.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|

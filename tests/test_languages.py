@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label
+from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, LANGUAGE_FLAG_SVGS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label
 from integrations.moneyprinter_config import build_moneyprinter_config
 
 
@@ -71,3 +71,11 @@ def test_all_supported_ui_languages_cover_dashboard_and_sidebar_keys():
 
     for code in LANGUAGE_CODES:
         assert set(_CORE_UI_TEXT_KEYS).issubset(UI_TRANSLATIONS[code])
+
+
+def test_brazil_flag_svg_uses_official_color_order():
+    brazil = LANGUAGE_FLAG_SVGS["pt"]
+    assert '<rect width="30" height="20" fill="#009c3b"/>' in brazil
+    assert '<path fill="#ffdf00"' in brazil
+    assert '<circle cx="15" cy="10" r="4.2" fill="#002776"/>' in brazil
+    assert '<rect width="30" height="20" fill="#ffdf00"/>' not in brazil
