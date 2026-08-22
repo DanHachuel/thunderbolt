@@ -6,12 +6,22 @@ MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
 STORAGE_SOURCE = (ROOT / "hermes_ui" / "storage.py").read_text(encoding="utf-8")
 
 
-def test_upload_has_postiz_tab_and_uses_postiz_adapter():
-    assert 'st.tabs(["Upload convencional", "Upload directo", "Postiz"])' in MAIN_SOURCE
+def test_upload_has_postiz_and_upload_post_tabs_and_adapters():
+    assert 'st.tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])' in MAIN_SOURCE
     assert "def render_upload_postiz():" in MAIN_SOURCE
+    assert "def render_upload_post():" in MAIN_SOURCE
+    assert "Enviar vídeo pelo Upload-Post" in MAIN_SOURCE
+    assert "UploadPostAdapter(settings)" in MAIN_SOURCE
     assert "Carregar integrações Postiz" in MAIN_SOURCE
     assert "Enviar vídeo para Postiz" in MAIN_SOURCE
     assert "PostizAdapter(settings)" in MAIN_SOURCE
+
+
+def test_upload_post_is_a_separate_fourth_destination():
+    assert 'with upload_post_tab:' in MAIN_SOURCE
+    assert 'render_upload_post()' in MAIN_SOURCE
+    assert 'Processar em segundo plano' in MAIN_SOURCE
+    assert 'Plataformas Upload-Post' in MAIN_SOURCE
 
 
 def test_technical_settings_expose_postiz_api_and_mcp_fields():

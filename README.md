@@ -25,6 +25,14 @@ A primeira versão implementa a camada UI independente com:
 | Configurações | **Contas Google**, **Configuração API** e **Notificações**; API Keys divididas entre **Serviços e modelos** e **Fontes de materiais**, com várias chaves independentes por fonte, além de contas Google/YouTube por cartão, `INNERTUBE_API_KEY` no documento da conta, providers, TTS, Nano Banana, Postiz, TikTok e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
+## Upload-Post — publicação para múltiplas plataformas
+
+A página **Upload** contém quatro subabas: **Upload convencional**, **Upload directo**, **Postiz** e **Upload-Post**. A quarta alternativa usa a API oficial do [Upload-Post](https://docs.upload-post.com/) para enviar um vídeo local para uma ou mais plataformas ligadas ao perfil configurado. Seleccione as plataformas na própria subaba, confirme o título e a descrição e clique em **Enviar vídeo pelo Upload-Post**.
+
+A API key, o username/perfil e a lista inicial de plataformas continuam em **Configuração API > API Keys > Serviços e modelos**, no expander **Publicação através do Upload-Post**. A subaba não pede novamente a credencial. O cliente envia `multipart/form-data` para `https://api.upload-post.com/api/upload`, repete `platform[]` para cada destino e guarda a resposta, o `request_id` e o resultado no histórico local de uploads. A opção **Processar em segundo plano** usa `async_upload=true` quando a API estiver configurada para processamento assíncrono.
+
+O Upload-Post é independente do Postiz: Postiz continua a usar o seu fluxo próprio de asset + post, enquanto Upload-Post publica directamente nas plataformas ligadas ao username configurado. Uma publicação aceite pelo Upload-Post também é reconciliada no centro de **Notificações**.
+
 ## Upload directo — credenciais por conta e por canal
 
 O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa um único documento JSON por conta Google. Em **Configurações > Contas Google > Contas Google/YouTube — canais em lote**, cada conta aparece como um cartão expansível identificado por **nome — e-mail**. Dentro do cartão existe o uploader **Subir documento de cookies/credenciais** e o único campo técnico permitido na UI, **sessionInfo token desta conta Google**. Cookies, `INNERTUBE_API_KEY`, `chunk_size` e `delegated_session_ids` continuam exclusivamente no documento.
@@ -38,7 +46,7 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.76
+## Navegação da UI 0.2.77
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais** e **Tutorial Meta**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -169,9 +177,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.76 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.76
+npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.77 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.77
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -195,7 +203,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em **Configuração API > API Keys > Serviços e modelos**. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em **Configuração API > API Keys > Serviços e modelos**. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 

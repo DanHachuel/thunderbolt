@@ -38,15 +38,15 @@ def _provider_config(settings: dict[str, Any]) -> tuple[str, str, str, str]:
         base_url = base_url or "http://127.0.0.1:11434/v1"
     if not base_url:
         raise CreativeGenerationError(
-            f"O provider LLM '{provider}' não tem Base URL configurada em Configurações Técnicas > API Keys."
+            f"O provider LLM '{provider}' não tem Base URL configurada em Configuração API > API Keys > Serviços e modelos."
         )
     if not model:
         raise CreativeGenerationError(
-            f"O provider LLM '{provider}' não tem modelo configurado em Configurações Técnicas > API Keys."
+            f"O provider LLM '{provider}' não tem modelo configurado em Configuração API > API Keys > Serviços e modelos."
         )
     if provider not in {"ollama", "litellm"} and not key:
         raise CreativeGenerationError(
-            f"Configure a API key do provider LLM '{provider}' em Configurações Técnicas > API Keys."
+            f"Configure a API key do provider LLM '{provider}' em Configuração API > API Keys > Serviços e modelos."
         )
     return provider, key, base_url.rstrip("/"), model
 

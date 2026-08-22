@@ -37,7 +37,7 @@ def _json_response(response: requests.Response, action: str) -> Any:
 def _headers(token: str) -> dict[str, str]:
     token = str(token or "").strip()
     if not token:
-        raise ApifyError("Configure o Apify API Token em Configurações Técnicas antes de iniciar.")
+        raise ApifyError("Configure o Apify API Token em Configuração API > API Keys > Serviços e modelos antes de iniciar.")
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 

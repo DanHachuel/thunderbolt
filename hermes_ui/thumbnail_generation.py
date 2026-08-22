@@ -87,7 +87,7 @@ def generate_thumbnail_image(
 ) -> Path:
     api_key = str(settings.get("gemini_image_api_key") or "").strip()
     if not api_key:
-        raise ThumbnailGenerationError("Configure a API key Nano Banana em Configurações Técnicas > API Keys.")
+        raise ThumbnailGenerationError("Configure a API key Nano Banana em Configuração API > API Keys > Serviços e modelos.")
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
         raise ThumbnailGenerationError("A thumbnail não tem um prompt de imagem para gerar.")

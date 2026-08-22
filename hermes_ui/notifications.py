@@ -36,6 +36,7 @@ EVENT_CATALOG: tuple[dict[str, str], ...] = (
     {"code": "upload_instagram_success", "category": "Upload", "label": "Upload Instagram concluído", "description": "Quando um vídeo for publicado num perfil Instagram."},
     {"code": "upload_facebook_pages_success", "category": "Upload", "label": "Upload Facebook Pages concluído", "description": "Quando um vídeo for publicado numa Facebook Page."},
     {"code": "upload_postiz_success", "category": "Upload", "label": "Upload Postiz concluído", "description": "Quando um vídeo for enviado e publicado através do Postiz."},
+    {"code": "upload_upload_post_success", "category": "Upload", "label": "Upload-Post concluído", "description": "Quando um vídeo for aceite pelo Upload-Post para publicação nas plataformas seleccionadas."},
     {"code": "mcp_operation_completed", "category": "Integrações", "label": "Operação MCP concluída", "description": "Quando uma operação mutável de integração MCP terminar com sucesso."},
 )
 EVENTS_BY_CODE = {item["code"]: item for item in EVENT_CATALOG}
@@ -249,6 +250,8 @@ def _upload_notifications() -> int:
         "facebook pages": "upload_facebook_pages_success",
         "facebook_pages": "upload_facebook_pages_success",
         "postiz": "upload_postiz_success",
+        "upload-post": "upload_upload_post_success",
+        "upload_post": "upload_upload_post_success",
         "youtube direct frontend": "upload_youtube_success",
     }
     for upload in uploads:

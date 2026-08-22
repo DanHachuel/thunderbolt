@@ -87,6 +87,25 @@ def test_upload_automation_and_sensitive_metadata_are_safe(tmp_path):
     assert "Bearer abc" not in serialized
 
 
+def test_upload_post_success_is_reconciled_to_its_own_event(tmp_path):
+    storage = _isolated_storage(tmp_path / "upload-post")
+    from hermes_ui.notifications import list_notifications, reconcile_persisted_notifications
+
+    storage.write_json("uploads.json", [{
+        "id": "upload-post-1",
+        "task_id": "task-1",
+        "destination": "Upload-Post",
+        "status": "published",
+        "target": {"username": "profile", "platforms": ["tiktok", "instagram"]},
+        "data": {"request_id": "request-1"},
+        "created_at": "2026-08-22T12:00:00+00:00",
+    }])
+    assert reconcile_persisted_notifications() == 1
+    entries = list_notifications()
+    assert entries[0]["event_type"] == "upload_upload_post_success"
+    assert entries[0]["metadata"]["destination"] == "Upload-Post"
+
+
 def test_notification_actions_manage_read_state_and_history(tmp_path):
     _isolated_storage(tmp_path / "actions")
     from hermes_ui import notifications

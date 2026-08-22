@@ -45,6 +45,7 @@ from hermes_ui.creative_generation import CreativeGenerationError, generate_crea
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
+from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPTIONS, normalize_upload_post_platforms
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
@@ -2722,11 +2723,13 @@ def render_upload_direct():
 
 def render_upload():
     st.title("Upload")
-    upload_tab, direct_tab, postiz_tab = st.tabs(["Upload convencional", "Upload directo", "Postiz"])
+    upload_tab, direct_tab, postiz_tab, upload_post_tab = st.tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])
     with direct_tab:
         render_upload_direct()
     with postiz_tab:
         render_upload_postiz()
+    with upload_post_tab:
+        render_upload_post()
     with upload_tab:
         render_upload_conventional()
 
@@ -2806,6 +2809,78 @@ def render_upload_postiz():
                 write_json("uploads.json", uploads)
                 reconcile_persisted_notifications()
                 (st.success if result.ok else st.error)(result.message)
+
+
+def render_upload_post():
+    st.subheader("Upload-Post")
+    st.caption("Envie um vídeo para uma ou mais plataformas ligadas ao seu perfil Upload-Post. A API key é lida da Configuração API e nunca é mostrada nesta aba.")
+    settings = read_json("settings.json", {})
+    uploader = UploadPostAdapter(settings)
+    status = uploader.status()
+    if not status.ok:
+        st.warning(status.message)
+        if not uploader.enabled:
+            st.info("Active Upload-Post em Configuração API > API Keys > Serviços e modelos e guarde a configuração.")
+        elif not uploader.api_key:
+            st.info("Introduza a API key do Upload-Post em Configuração API > API Keys > Serviços e modelos.")
+        return
+
+    configured_platforms = normalize_upload_post_platforms(uploader.platforms)
+    selected_platforms = st.multiselect(
+        "Plataformas Upload-Post",
+        list(UPLOAD_POST_PLATFORM_OPTIONS),
+        default=configured_platforms,
+        format_func=lambda value: "Facebook Pages" if value == "facebook" else "X (Twitter)" if value == "x" else value.title(),
+        key="upload_post_platforms_selector",
+        help="Seleccione uma ou mais plataformas já ligadas ao perfil Upload-Post.",
+    )
+    async_upload = st.checkbox(
+        "Processar em segundo plano",
+        value=False,
+        key="upload_post_async_upload",
+        help="Envia async_upload=true para a API e mostra o request ID devolvido, quando existir.",
+    )
+    if not selected_platforms:
+        st.info("Seleccione pelo menos uma plataforma antes de publicar.")
+
+    tasks = [task for task in read_json("tasks.json", []) if task.get("state") == "done" or task.get("artifacts", {}).get("video")]
+    if not tasks:
+        st.info("Não há vídeos prontos para enviar pelo Upload-Post.")
+        return
+    for task in tasks:
+        artifacts = task.get("artifacts", {}) or {}
+        video_path = artifacts.get("video", "")
+        with st.container(border=True):
+            st.write(f"**{task.get('topic', 'Vídeo Thunderbolt')}** — {uploader.username}")
+            st.caption(video_path or "Sem caminho de vídeo registado")
+            title = st.text_input("Título Upload-Post", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"upload_post_title_{task['id']}")
+            description = st.text_area("Descrição Upload-Post", value=task.get("description", ""), key=f"upload_post_description_{task['id']}", height=90)
+            if st.button("Enviar vídeo pelo Upload-Post", type="primary", key=f"upload_post_send_{task['id']}", disabled=not selected_platforms):
+                result = uploader.upload_video(
+                    video_path,
+                    title=title,
+                    description=description,
+                    user=uploader.username,
+                    platforms=selected_platforms,
+                    async_upload=async_upload,
+                )
+                record = {
+                    "id": uuid.uuid4().hex,
+                    "task_id": task.get("id"),
+                    "destination": "Upload-Post",
+                    "target": {"username": uploader.username, "platforms": selected_platforms},
+                    "status": "published" if result.ok else "failed",
+                    "message": result.message,
+                    "data": result.data,
+                    "created_at": now(),
+                }
+                uploads = read_json("uploads.json", [])
+                uploads.append(record)
+                write_json("uploads.json", uploads)
+                reconcile_persisted_notifications()
+                (st.success if result.ok else st.error)(result.message)
+                if result.ok and result.data.get("request_id"):
+                    st.caption(f"Request ID Upload-Post: {result.data['request_id']}")
 
 
 UPLOAD_DESTINATION_TARGET_KEYS = {

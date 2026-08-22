@@ -115,6 +115,7 @@ DEFAULTS: dict[str, Any] = {
             "upload_instagram_success": True,
             "upload_facebook_pages_success": True,
             "upload_postiz_success": True,
+            "upload_upload_post_success": True,
             "mcp_operation_completed": True,
         },
         "kaggle_username": "",

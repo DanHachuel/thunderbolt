@@ -33,7 +33,7 @@ class PostizAdapter:
 
     def status(self) -> IntegrationResult:
         if not self.api_key:
-            return self._error("Postiz não configurado: adicione a API key em Configurações Técnicas.")
+            return self._error("Postiz não configurado: adicione a API key em Configuração API > API Keys > Serviços e modelos.")
         return IntegrationResult(True, f"Postiz configurado em {self.base_url}.", {"base_url": self.base_url, "mcp_url": self.mcp_url})
 
     def list_integrations(self) -> IntegrationResult:

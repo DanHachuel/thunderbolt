@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.76.
+Estado auditado para o release 0.2.77.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -18,8 +18,9 @@ Estado auditado para o release 0.2.76.
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
 | Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. |
-| Instagram e Facebook Pages no Upload | Concluído como UI | Destinos, chips rosa/azul e botões desactivados para publicação futura. |
+| Instagram e Facebook Pages no Upload | Concluído no Upload-Post e preparado no convencional | Os destinos continuam visíveis no Upload convencional; a publicação real para Instagram/Facebook pode ser feita pela subaba **Upload-Post** com plataformas ligadas ao perfil, enquanto os botões convencionais permanecem desactivados. |
 | Upload para Postiz por API key/MCP | Concluído como integração configurável | Aba **Postiz** em Upload, `PostizAdapter` com `GET /integrations`, `POST /upload` para MP4 e `POST /posts` para YouTube; campos de API key, Base URL, MCP URL e integração padrão em Configuração API. |
+| Upload-Post para múltiplas plataformas | Concluído como integração configurável | Quarta subaba **Upload-Post** em Upload; `UploadPostAdapter` usa `POST /upload` com `multipart/form-data`, `Authorization: Apikey`, username/perfil, plataformas repetidas em `platform[]`, suporte a `async_upload`, `request_id`, histórico local e notificação própria. |
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | API Keys por fonte de materiais com múltiplas chaves | Concluído | `Configuração API > API Keys > Fontes de materiais` permite seleccionar Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou local, adicionar várias chaves na mesma fonte, deduplicar e guardar listas independentes em `material_api_keys`; `build_moneyprinter_config()` exporta arrays legados para o `config.toml` e internaliza parâmetros técnicos da área de fontes. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |

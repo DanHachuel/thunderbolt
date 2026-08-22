@@ -12,7 +12,7 @@ def test_thumbnail_requires_a_dedicated_gemini_image_key():
     try:
         thumbnail_generation.generate_thumbnail_image({}, "A thumbnail prompt")
     except thumbnail_generation.ThumbnailGenerationError as exc:
-        assert "Configurações Técnicas > API Keys" in str(exc)
+        assert "Configuração API > API Keys > Serviços e modelos" in str(exc)
     else:
         raise AssertionError("A geração deveria exigir a API key Nano Banana")
 

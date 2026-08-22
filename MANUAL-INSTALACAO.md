@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.76 install
+npx --yes @danhachuel/thunderbolt@0.2.77 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -436,7 +436,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -478,15 +478,23 @@ A aba **Automação Youtube**, dentro do menu expansível **Automação**, lista
 
 A área **Teste de vozes**, dentro de **Configurações > Configuração API**, é isolada da pipeline. O preview pode ser reproduzido e descarregado de `storage/voice_previews/`. Caminhos vazios, directórios, ficheiros vazios e previews sem permissões de leitura são ignorados com uma mensagem clara, sem traceback. Se uma instalação antiga mostrar que `edge-tts` está em falta, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o detector reinstala apenas a dependência ausente.
 
-## Upload, Postiz e Upload directo
+## Upload, Postiz, Upload-Post e Upload directo
 
 A subaba **Postiz**, dentro de **Upload**, permite carregar as integrações Postiz, seleccionar o canal ligado e enviar vídeos MP4 através da Public API. Configure **Activar Postiz como fallback final**, **Postiz API key**, **Postiz Public API Base URL**, **Postiz MCP URL** e, opcionalmente, o ID da integração padrão em **Configuração API > API Keys > Serviços e modelos**. A API key é enviada como valor bruto do cabeçalho `Authorization`; o upload usa `POST /upload` e a publicação usa `POST /posts`.
 
-O botão de envio YouTube segue a ordem fixa **1. API Oficial, 2. Upload directo, 3. Postiz**. A API Oficial regista no storage local até cinco envios bem-sucedidos por dia por conta Gmail. Quando a quota é atingida ou o método falha, o Thunderbolt valida o `credentials.json` e tenta o Upload directo. Postiz só é tentado como último recurso e apenas quando está activo, com API key e integração válida.
+O botão de envio YouTube segue a ordem fixa **1. API Oficial, 2. Upload directo, 3. Postiz**. O **Upload-Post** é uma quarta subaba independente e não altera essa rota automática do YouTube. A API Oficial regista no storage local até cinco envios bem-sucedidos por dia por conta Gmail. Quando a quota é atingida ou o método falha, o Thunderbolt valida o `credentials.json` e tenta o Upload directo. Postiz só é tentado como último recurso e apenas quando está activo, com API key e integração válida.
 
 Em **Configurações > Contas Google**, cada conta aparece como um expander identificado por nome e e-mail. Dentro dele existe o uploader **Subir documento de cookies/credenciais** e o input **sessionInfo token desta conta Google**. O documento JSON único contém cookies, INNERTUBE_API_KEY, chunk_size e o mapa de IDs delegados por canal; o sessionInfo preenchido na conta é sincronizado no mesmo ficheiro, guardado em `storage/youtube_direct_accounts/<id-da-conta>/credentials.json`.
 
 Em **Canais Youtube > Canais cadastrados**, a secção **Upload directo — documento da conta deste canal** mostra apenas a conta Google associada e confirma se o documento contém o ID delegado desse canal. O `DELEGATED_SESSION_ID` permanece exclusivamente no mapa do documento; o upload bloqueia a operação se faltar qualquer elemento técnico.
+
+### Upload-Post
+
+A subaba **Upload-Post** usa a API oficial do [Upload-Post](https://docs.upload-post.com/) para publicar vídeos prontos em uma ou mais plataformas ligadas ao perfil configurado. Em **Configuração API > API Keys > Serviços e modelos > Publicação através do Upload-Post**, active a integração, guarde a API key, o username/perfil e as plataformas padrão. Depois abra **Upload > Upload-Post**, confirme ou altere as plataformas, escreva o título e a descrição e clique em **Enviar vídeo pelo Upload-Post**.
+
+A credencial não é duplicada na página de Upload. A integração envia o ficheiro local como `video` em `multipart/form-data`, usa `platform[]` repetido para cada destino e autentica com `Authorization: Apikey ...`. **Processar em segundo plano** envia `async_upload=true`; quando a API devolver `request_id`, este fica visível e é guardado em `uploads.json`. O histórico local também alimenta a notificação **Upload-Post concluído**. O Upload-Post é distinto do Postiz: não usa os endpoints nem a selecção de integrações do Postiz.
+
+### Upload directo
 
 A subaba **Upload directo** adapta o [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). Cada conta Google tem um único `credentials.json`, criado automaticamente ao adicionar a conta, com cookies, sessionInfo, INNERTUBE_API_KEY, chunk_size e `delegated_session_ids` por canal. O uploader aceita um documento JSON completo ou parcial; o merge actualiza somente os valores presentes e preserva os restantes. O documento é guardado fora de `storage/state/`, com permissões locais restritas.
 

@@ -154,7 +154,7 @@ def upload_with_default_route(
 
     postiz = PostizAdapter(settings)
     if not bool(settings.get("postiz_enabled", False)):
-        postiz_result = IntegrationResult(False, "Postiz está desactivado em Configurações Técnicas.", {})
+        postiz_result = IntegrationResult(False, "Postiz está desactivado em Configuração API > API Keys > Serviços e modelos.", {})
         attempts.append(_attempt_record("Postiz", postiz_result, skipped=True))
     else:
         postiz_publisher = postiz_publisher or postiz.publish_video
