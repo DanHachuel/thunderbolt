@@ -22,7 +22,7 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.automation_worker import load_worker_status
-from hermes_ui.storage import BLUEPRINTS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, write_json
+from hermes_ui.storage import BLUEPRINTS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -204,6 +204,41 @@ def card(label: str, value: str | int, note: str = ""):
     st.markdown(f'<div class="content-card"><div class="content-label">{label}</div><div class="content-value">{value}</div><div class="small-muted">{note}</div></div>', unsafe_allow_html=True)
 
 
+def _library_card_key(kind: str, path: Path) -> str:
+    return hashlib.sha1(f"{kind}:{path.resolve()}".encode("utf-8")).hexdigest()[:12]
+
+
+def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str:
+    """Render the inline name editor while keeping the physical filename unchanged."""
+    edit_key = f"rename_{kind}_{_library_card_key(kind, path)}"
+    if st.session_state.get(edit_key):
+        with st.form(f"{edit_key}_form", border=False):
+            edited_name = st.text_input("Nome de apresentação", value=current_name, max_chars=120, key=f"{edit_key}_input")
+            save_col, cancel_col = st.columns(2)
+            with save_col:
+                save_name = st.form_submit_button("Guardar nome", type="primary", use_container_width=True)
+            with cancel_col:
+                cancel_name = st.form_submit_button("Cancelar", use_container_width=True)
+        if save_name:
+            try:
+                set_display_name(kind, path, edited_name)
+                st.session_state.pop(edit_key, None)
+                st.success("Nome actualizado.")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+        if cancel_name:
+            st.session_state.pop(edit_key, None)
+            st.rerun()
+    return edit_key
+
+
+def _render_card_pencil(edit_key: str) -> None:
+    if st.button("✏️", help="Editar nome de apresentação", key=f"pencil_{edit_key}", type="tertiary", use_container_width=True):
+        st.session_state[edit_key] = True
+        st.rerun()
+
+
 def channel_options() -> list[dict]:
     return [c for c in read_json("channels.json", []) if c.get("active", True)]
 
@@ -214,7 +249,7 @@ def blueprint_catalog() -> list[tuple[str, str]]:
         try:
             data = load_blueprint_file(path)
             identifier = str(data.get("id") or path.stem)
-            label = str(data.get("name") or path.stem)
+            label = get_display_name("blueprints", path, str(data.get("name") or data.get("title") or path.stem))
             options.append((identifier, label))
         except (OSError, ValueError, json.JSONDecodeError):
             continue
@@ -231,11 +266,11 @@ def blueprint_for_channel(channel: dict) -> dict[str, Any]:
             data = load_blueprint_file(path)
         except (OSError, ValueError, json.JSONDecodeError):
             continue
-        identifiers = {str(data.get("id") or ""), path.stem, str(data.get("name") or "")}
+        identifiers = {str(data.get("id") or ""), path.stem, str(data.get("name") or ""), get_display_name("blueprints", path, str(data.get("name") or path.stem))}
         if blueprint_id in identifiers:
             resolved = dict(data)
             resolved.setdefault("id", blueprint_id)
-            resolved.setdefault("name", str(data.get("name") or path.stem))
+            resolved["name"] = get_display_name("blueprints", path, str(data.get("name") or path.stem))
             return resolved
     return {"id": blueprint_id, "name": blueprint_id}
 
@@ -665,14 +700,21 @@ def render_blueprints():
         if not files:
             st.info("Ainda não existem blueprints na pasta local.")
         for path in files:
-            if search and search.lower() not in path.name.lower():
-                continue
             try:
                 data = load_blueprint_file(path)
-                title = data.get("channel_name") or data.get("name") or data.get("title") or path.stem
-                with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}"):
-                    st.caption(f"Ficheiro: {path}")
-                    st.json(data)
+                fallback_title = str(data.get("channel_name") or data.get("name") or data.get("title") or path.stem)
+                title = get_display_name("blueprints", path, fallback_title)
+                if search and search.lower() not in f"{title}\n{path.name}".lower():
+                    continue
+                card_key = _library_card_key("blueprints", path)
+                header_cols = st.columns([0.93, 0.07], vertical_alignment="center")
+                with header_cols[0]:
+                    with st.expander(f"{title} — {path.relative_to(BLUEPRINTS)}"):
+                        st.caption(f"Ficheiro: {path}")
+                        st.json(data)
+                with header_cols[1]:
+                    _render_card_pencil(f"rename_blueprints_{card_key}")
+                _render_library_name_editor("blueprints", path, title)
             except Exception as exc:
                 with st.expander(f"Inválido — {path.name}"):
                     st.error(str(exc))
@@ -752,7 +794,8 @@ def render_tiktok_prompt_masters():
                 content = load_prompt_master_file(path)
             except (OSError, ValueError):
                 content = ""
-            if search and search.lower() not in f"{path.name}\n{content}".lower():
+            display_heading = get_display_name("prompt_masters", path, next((line.lstrip("#").strip() for line in content.splitlines() if line.startswith("#")), path.stem))
+            if search and search.lower() not in f"{display_heading}\n{path.name}\n{content}".lower():
                 continue
             visible_files.append(path)
         if not visible_files:
@@ -760,24 +803,31 @@ def render_tiktok_prompt_masters():
         for path in visible_files:
             try:
                 content = load_prompt_master_file(path)
-                heading = next((line.lstrip("#").strip() for line in content.splitlines() if line.startswith("#")), path.stem)
-                with st.expander(f"{heading} — {path.name}", expanded=False):
-                    st.caption(f"Ficheiro TikTok: `{path}`")
-                    edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
-                    prompt_cols = st.columns(3)
-                    with prompt_cols[0]:
-                        if st.button("Guardar alterações", type="primary", use_container_width=True, key=f"save_prompt_master_{path.stem}"):
-                            path.write_text(edited_content.rstrip() + "\n", encoding="utf-8")
-                            st.success("Prompt Master actualizado.")
-                            st.rerun()
-                    with prompt_cols[1]:
-                        st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"download_prompt_master_{path.stem}")
-                    with prompt_cols[2]:
-                        if st.button("Apagar", use_container_width=True, key=f"delete_prompt_master_{path.stem}"):
-                            path.unlink(missing_ok=True)
-                            st.success("Prompt Master removido da biblioteca TikTok.")
-                            st.rerun()
-                    st.markdown(content)
+                fallback_heading = next((line.lstrip("#").strip() for line in content.splitlines() if line.startswith("#")), path.stem)
+                heading = get_display_name("prompt_masters", path, fallback_heading)
+                card_key = _library_card_key("prompt_masters", path)
+                header_cols = st.columns([0.93, 0.07], vertical_alignment="center")
+                with header_cols[0]:
+                    with st.expander(f"{heading} — {path.name}", expanded=False):
+                        st.caption(f"Ficheiro TikTok: `{path}`")
+                        edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
+                        prompt_cols = st.columns(3)
+                        with prompt_cols[0]:
+                            if st.button("Guardar alterações", type="primary", use_container_width=True, key=f"save_prompt_master_{path.stem}"):
+                                path.write_text(edited_content.rstrip() + "\n", encoding="utf-8")
+                                st.success("Prompt Master actualizado.")
+                                st.rerun()
+                        with prompt_cols[1]:
+                            st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"download_prompt_master_{path.stem}")
+                        with prompt_cols[2]:
+                            if st.button("Apagar", use_container_width=True, key=f"delete_prompt_master_{path.stem}"):
+                                path.unlink(missing_ok=True)
+                                st.success("Prompt Master removido da biblioteca TikTok.")
+                                st.rerun()
+                        st.markdown(content)
+                with header_cols[1]:
+                    _render_card_pencil(f"rename_prompt_masters_{card_key}")
+                _render_library_name_editor("prompt_masters", path, heading)
             except (OSError, ValueError) as exc:
                 with st.expander(f"Ficheiro inválido — {path.name}"):
                     st.error(str(exc))

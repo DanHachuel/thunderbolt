@@ -20,6 +20,9 @@ def test_prompt_master_storage_is_not_blueprints_storage():
     assert 'def load_prompt_master_file(path: Path)' in STORAGE_SOURCE
     assert 'storage/tiktok/prompts_master/**/*.md' in PACKAGE_SOURCE
     assert 'BLUEPRINTS / "importados"' in STORAGE_SOURCE
+    assert '"display_names.json": {"blueprints": {}, "prompt_masters": {}}' in STORAGE_SOURCE
+    assert 'def get_display_name(kind: str, path: Path, fallback: str)' in STORAGE_SOURCE
+    assert 'def set_display_name(kind: str, path: Path, name: str)' in STORAGE_SOURCE
 
 
 def test_prompt_master_ui_has_upload_library_editor_and_actions():
@@ -35,3 +38,9 @@ def test_prompt_master_ui_has_upload_library_editor_and_actions():
         assert label in MAIN_SOURCE
     assert 'mime="text/markdown"' in MAIN_SOURCE
     assert 'st.markdown(content)' in MAIN_SOURCE
+    assert 'def _render_card_pencil(edit_key: str)' in MAIN_SOURCE
+    assert 'help="Editar nome de apresentação"' in MAIN_SOURCE
+    assert '_render_card_pencil(f"rename_blueprints_' in MAIN_SOURCE
+    assert '_render_card_pencil(f"rename_prompt_masters_' in MAIN_SOURCE
+    assert '_render_library_name_editor("blueprints", path, title)' in MAIN_SOURCE
+    assert '_render_library_name_editor("prompt_masters", path, heading)' in MAIN_SOURCE

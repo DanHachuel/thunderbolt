@@ -24,6 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "queues.json": {"niche": [], "blueprint": [], "brand": [], "script": [], "title": [], "thumbnail": [], "video": [], "edit": [], "upload": []},
     "batches.json": [],
     "uploads.json": [],
+    "display_names.json": {"blueprints": {}, "prompt_masters": {}},
     "niche_apify_runs.json": [],
     "metadata_edits.json": [],
         "python_editor_edits.json": [],
@@ -304,6 +305,53 @@ def append_json(name: str, item: dict[str, Any]) -> dict[str, Any]:
     entries.append(item)
     write_json(name, entries)
     return item
+
+
+def _display_name_key(kind: str, path: Path) -> str:
+    """Return a stable storage-relative key without renaming the physical file."""
+    resolved = path.resolve()
+    if kind == "blueprints":
+        root = BLUEPRINTS.resolve()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise ValueError("O ficheiro não pertence ao storage de Blueprints.") from exc
+    if kind == "prompt_masters":
+        root = TIKTOK_PROMPT_MASTERS.resolve()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise ValueError("O ficheiro não pertence ao storage de Prompt Masters.") from exc
+    raise ValueError(f"Tipo de biblioteca inválido: {kind}")
+
+
+def get_display_name(kind: str, path: Path, fallback: str) -> str:
+    names = read_json("display_names.json", {"blueprints": {}, "prompt_masters": {}})
+    if not isinstance(names, dict):
+        return fallback
+    entries = names.get(kind, {})
+    if not isinstance(entries, dict):
+        return fallback
+    value = str(entries.get(_display_name_key(kind, path)) or "").strip()
+    return value or fallback
+
+
+def set_display_name(kind: str, path: Path, name: str) -> str:
+    clean_name = " ".join(str(name).split()).strip()
+    if not clean_name:
+        raise ValueError("Informe um nome para a biblioteca.")
+    if len(clean_name) > 120:
+        raise ValueError("O nome deve ter no máximo 120 caracteres.")
+    names = read_json("display_names.json", {"blueprints": {}, "prompt_masters": {}})
+    if not isinstance(names, dict):
+        names = {"blueprints": {}, "prompt_masters": {}}
+    entries = names.get(kind)
+    if not isinstance(entries, dict):
+        entries = {}
+        names[kind] = entries
+    entries[_display_name_key(kind, path)] = clean_name
+    write_json("display_names.json", names)
+    return clean_name
 
 
 def list_blueprint_files() -> list[Path]:
