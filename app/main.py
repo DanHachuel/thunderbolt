@@ -218,6 +218,55 @@ def current_ui_language() -> str:
     return normalized
 
 
+_CONTENT_TRANSLATED_STREAMLIT_METHODS = {
+    "title", "header", "subheader", "caption", "write", "markdown", "info", "warning", "error", "success",
+    "button", "form_submit_button", "text_input", "text_area", "selectbox", "radio", "checkbox", "file_uploader",
+    "date_input", "number_input", "multiselect", "toggle", "select_slider", "expander", "tabs",
+}
+_OPTION_TRANSLATED_STREAMLIT_METHODS = {"selectbox", "radio", "multiselect", "select_slider", "tabs"}
+_STREAMLIT_I18N_INSTALLED = False
+
+
+def _translate_streamlit_arguments(method_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    if not args and "label" not in kwargs:
+        return args, kwargs
+    selected_language = current_ui_language()
+    translated_args = list(args)
+    if translated_args and isinstance(translated_args[0], str):
+        translated_args[0] = ui_text(translated_args[0], selected_language)
+    elif isinstance(kwargs.get("label"), str):
+        kwargs["label"] = ui_text(kwargs["label"], selected_language)
+    for keyword in ("placeholder", "help"):
+        if isinstance(kwargs.get(keyword), str):
+            kwargs[keyword] = ui_text(kwargs[keyword], selected_language)
+    if method_name in _OPTION_TRANSLATED_STREAMLIT_METHODS and len(translated_args) >= 2:
+        existing_format_func = kwargs.get("format_func")
+        if existing_format_func is None:
+            kwargs["format_func"] = lambda value: ui_text(value, selected_language) if isinstance(value, str) else value
+        else:
+            kwargs["format_func"] = lambda value, formatter=existing_format_func: ui_text(formatter(value), selected_language) if isinstance(formatter(value), str) else formatter(value)
+    return tuple(translated_args), kwargs
+
+
+def install_streamlit_content_translation() -> None:
+    """Translate visible widget labels at render time while preserving stored option values."""
+    global _STREAMLIT_I18N_INSTALLED
+    if _STREAMLIT_I18N_INSTALLED:
+        return
+    for method_name in _CONTENT_TRANSLATED_STREAMLIT_METHODS:
+        original = getattr(st, method_name)
+
+        def translated_method(*args: Any, __method_name: str = method_name, __original: Any = original, **kwargs: Any):
+            translated_args, translated_kwargs = _translate_streamlit_arguments(__method_name, args, kwargs)
+            return __original(*translated_args, **translated_kwargs)
+
+        setattr(st, method_name, translated_method)
+    _STREAMLIT_I18N_INSTALLED = True
+
+
+install_streamlit_content_translation()
+
+
 def localized_tab_labels(labels: list[str], language: str | None = None) -> list[str]:
     """Translate Streamlit tab labels while keeping widget keys and behaviour stable."""
     selected_language = language_code(language or current_ui_language())

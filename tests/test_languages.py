@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, LANGUAGE_FLAG_SVGS, TAB_TRANSLATIONS, _TAB_LABELS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label
+from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, LANGUAGE_FLAG_SVGS, TAB_TRANSLATIONS, _TAB_LABELS, language_code, language_label, translate_ui_content, ui_language_menu_label, ui_text, video_language_label
 from integrations.moneyprinter_config import build_moneyprinter_config
 
 
@@ -47,6 +47,34 @@ def test_ui_translation_and_header_picker_are_present():
     assert "Interface local para operação e automação de conteúdo faceless" in MAIN_SOURCE
     assert "ui_text(\"Filas locais e dependências da cascata\", ui_language)" in MAIN_SOURCE
     assert '"ui_language": "pt"' in STORAGE_SOURCE
+
+
+def test_internal_content_labels_translate_in_all_supported_languages():
+    examples = {
+        "en": {"Título": "Title", "Video Settings": "Video Settings", "Gerar com IA a partir do Blueprint": "Generate with AI from Blueprint"},
+        "zh": {"Título": "标题", "Descrição": "描述", "Upload": "上传"},
+        "de": {"Título": "Titel", "Canais": "Kanäle", "Guardar": "Speichern"},
+        "vi": {"Título": "Tiêu đề", "Upload": "Tải lên", "Pesquisar": "Tìm kiếm"},
+        "tr": {"Título": "Başlık", "Canais": "Kanallar", "Apagar": "Sil"},
+        "ru": {"Título": "Заголовок", "Descrição": "Описание", "Cancelar": "Отмена"},
+        "es": {"Título": "Título", "Canais": "Canales", "Pesquisar": "Buscar"},
+        "id": {"Título": "Judul", "Descrição": "Deskripsi", "Guardar": "Simpan"},
+        "it": {"Título": "Titolo", "Canais": "Canali", "Apagar": "Elimina"},
+    }
+    for code, expected in examples.items():
+        for source, translated in expected.items():
+            assert translate_ui_content(source, code) == translated
+    assert translate_ui_content("private", "en") == "private"
+    assert translate_ui_content("full_ia", "de") == "full_ia"
+    assert "API Configuration" in translate_ui_content("Configure em Configuração API", "en")
+    assert "Google account" in translate_ui_content("Conta Google para Upload directo", "en")
+
+
+def test_global_content_translation_hook_is_installed_before_page_renderers():
+    assert "install_streamlit_content_translation()" in MAIN_SOURCE
+    assert "_CONTENT_TRANSLATED_STREAMLIT_METHODS" in MAIN_SOURCE
+    assert "_OPTION_TRANSLATED_STREAMLIT_METHODS" in MAIN_SOURCE
+    assert "translate_ui_content" in MAIN_SOURCE or "ui_text" in MAIN_SOURCE
 
 
 def test_moneyprinter_config_persists_ui_and_video_language_codes():

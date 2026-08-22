@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.81
+> **Versão deste manual:** 0.2.86
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -194,9 +194,9 @@ npx --yes @danhachuel/thunderbolt install
 
 O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTurbo: **Inglês (en) 🇺🇸**, **Chinês Simplificado (zh) 🇨🇳**, **Alemão (de) 🇩🇪**, **Vietnamita (vi) 🇻🇳**, **Turco (tr) 🇹🇷**, **Português (pt) 🇧🇷**, **Russo (ru) 🇷🇺**, **Espanhol (es) 🇪🇸**, **Indonésio (id) 🇮🇩** e **Italiano (it) 🇮🇹**. A criação de vídeos mantém ainda os rótulos históricos para não invalidar Blueprints e tarefas antigas.
 
-No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra o rótulo **Language** acima do selector. Cada opção apresenta o nome e o código, acompanhados por uma imagem SVG local da bandeira; não depende de emojis nem de siglas da fonte do sistema. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O dashboard inicial e as abas da barra lateral usam o mesmo idioma seleccionado. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mantém o catálogo de vídeo independente, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
+No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra o rótulo **Language** acima do selector. Cada opção apresenta o nome e o código, acompanhados por uma imagem SVG local da bandeira; não depende de emojis nem de siglas da fonte do sistema. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O dashboard inicial, o interior das páginas e as abas da barra lateral usam o mesmo idioma seleccionado. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mantém o catálogo de vídeo independente, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
-Todas as subabas internas também são traduzidas nos dez idiomas: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais e Client MCP/Servidor MCP/Skill. A ordem e as chaves internas dos widgets permanecem estáveis.
+Todas as subabas internas e o conteúdo das páginas também são traduzidos nos dez idiomas. Isso inclui títulos, subtítulos, descrições, labels, placeholders, opções, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML. Valores técnicos, IDs, URLs, nomes de ficheiros e dados introduzidos pelo utilizador permanecem inalterados. As subabas internas traduzidas incluem: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais e Client MCP/Servidor MCP/Skill. A ordem e as chaves internas dos widgets permanecem estáveis.
 
 ## 4. Diagnóstico antes de iniciar
 
@@ -450,9 +450,9 @@ As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, 
 
 A alternativa Apify não usa o dataset, parâmetros, execução ou estado da alternativa Kaggle. Configure o **Apify API Token**, o **Apify Actor ID**, o intervalo de consulta e o limite da execução em **Configuração API > API Keys > Serviços e modelos**. Na aba, informe até três palavras-chave, período, máximo de resultados, Shorts, duração, idioma das legendas, ordenação e filtros de legendas. O botão **Pesquisar no Apify** inicia manualmente o actor `streamers~youtube-scraper`, consulta o estado do run, carrega o dataset, normaliza os vídeos, limpa SRT, calcula VSC Ratio, tenta resumir transcrições através do LLM configurado e disponibiliza resultados JSON/CSV. O histórico resumido é guardado em `storage/state/niche_apify_runs.json`; não há gravação automática no Airtable do workflow anexado.
 
-## AI Influencers: Personagens, Redes Sociais e Tutorial Meta
+## AI Influencers: Personagens, Redes Sociais, Tutorial Meta e Tutorial Supabase
 
-O menu **AI Influencers** foi adicionado abaixo de **Edição**. As abas **Personagens**, **Redes Sociais** e **Tutorial Meta** aparecem nessa ordem. **Personagens** e **Redes Sociais** mostram apenas uma mensagem de reserva para desenvolvimento futuro; **Tutorial Meta** apresenta o guia local de configuração de Instagram e credenciais Meta para automações com n8n.
+O menu **AI Influencers** foi adicionado abaixo de **Edição**. As abas **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase** aparecem nessa ordem. **Personagens** e **Redes Sociais** mostram apenas uma mensagem de reserva para desenvolvimento futuro; **Tutorial Meta** apresenta o guia local de configuração de Instagram e credenciais Meta para automações com n8n.
 
 ## Edição: Limpador de Metadados, Cortes, Editor Python e Download Mídia
 
