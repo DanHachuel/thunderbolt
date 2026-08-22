@@ -10,6 +10,7 @@ from typing import Any
 from . import storage
 from .creative_generation import generate_creative_package, generate_topic_for_channel
 from .domain import create_batch, create_tasks_for_batch
+from .notifications import record_notification
 
 WORKER_STATE_FILE = "automation_worker.json"
 LOCK_FILENAME = "automation_worker.lock"
@@ -257,6 +258,13 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
                 "batch_id": batch["id"],
                 "task_ids": [task["id"] for task in item["tasks"]],
             }
+            record_notification(
+                "automation_completed",
+                "Automação concluída",
+                f"O lote agendado do canal {item['channel_id']} foi criado com sucesso.",
+                metadata={"channel_id": item["channel_id"], "batch_id": batch["id"], "time": current_minute},
+                dedupe_key=f"automation:{batch['id']}",
+            )
         _write_status(status)
         return {
             "ok": True,
@@ -268,6 +276,13 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
     except Exception as exc:
         status["last_error"] = str(exc)
         _write_status(status)
+        record_notification(
+            "automation_failed",
+            "Automação falhou",
+            f"A execução automática das {current_minute} terminou com erro: {exc}",
+            metadata={"date": day, "time": current_minute},
+            dedupe_key=f"automation:failed:{day}:{current_minute}",
+        )
         return {"ok": False, "local_time": _local_iso(current), "error": str(exc), "created": created}
 
 

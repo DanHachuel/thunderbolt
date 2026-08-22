@@ -4,6 +4,7 @@ import re
 import uuid
 from typing import Any
 
+from .notifications import record_notification
 from .storage import append_json, now, read_json, write_json
 
 STAGES = ["niche", "blueprint", "brand", "script", "title", "thumbnail", "video", "edit", "upload"]
@@ -199,13 +200,49 @@ def update_channel_video(video_id: str, updates: dict[str, Any]) -> dict[str, An
     return None
 
 
+def _notify_task_completion(task: dict[str, Any], previous_state: str = "") -> None:
+    current_state = str(task.get("state") or "")
+    task_id = str(task.get("id") or "")
+    if not task_id or current_state == previous_state and current_state in {"done", "failed"}:
+        return
+    title = str(task.get("title") or task.get("topic") or "Actividade")
+    channel = str(task.get("channel_name") or "Canal")
+    if current_state == "failed":
+        record_notification(
+            "activity_failed",
+            f"Actividade falhou: {title}",
+            f"A actividade de {channel} terminou com erro.",
+            metadata={"task_id": task_id, "channel_name": channel, "error": task.get("error") or ""},
+            dedupe_key=f"task:{task_id}:failed",
+        )
+        return
+    if current_state != "done":
+        return
+    artifacts = task.get("artifacts") if isinstance(task.get("artifacts"), dict) else {}
+    if bool(task.get("music_mode")) or str(task.get("style_wide") or "") == "music":
+        event_type, label = "music_completed", "Música concluída"
+    elif str(task.get("stage") or "") == "script" and not artifacts.get("video"):
+        event_type, label = "script_stage_completed", "Roteiro concluído"
+    else:
+        event_type, label = "video_completed", "Vídeo concluído"
+    record_notification(
+        event_type,
+        f"{label}: {title}",
+        f"A actividade de {channel} terminou com sucesso.",
+        metadata={"task_id": task_id, "channel_name": channel, "stage": task.get("stage") or "", "creation_mode": task.get("creation_mode") or ""},
+        dedupe_key=f"task:{task_id}:{event_type}:done",
+    )
+
+
 def update_task(task_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     tasks = read_json("tasks.json", [])
     for task in tasks:
         if task.get("id") == task_id:
+            previous_state = str(task.get("state") or "")
             task.update(updates)
             task["updated_at"] = now()
             write_json("tasks.json", tasks)
+            _notify_task_completion(task, previous_state)
             return task
     return None
 
@@ -216,6 +253,7 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
     tasks = read_json("tasks.json", [])
     for task in tasks:
         if task.get("id") == task_id:
+            previous_state = str(task.get("state") or "")
             if state:
                 task["state"] = state
             if stage:
@@ -226,6 +264,7 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
                 task["error"] = error
             task["updated_at"] = now()
             write_json("tasks.json", tasks)
+            _notify_task_completion(task, previous_state)
             return task
     return None
 

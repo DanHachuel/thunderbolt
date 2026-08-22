@@ -38,13 +38,13 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.70
+## Navegação da UI 0.2.72
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes** e **Editor Python**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais** e **Tutorial Meta**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 Dentro de **Configurações > Contas Google**, a UI contém os cartões expansíveis de contas Google/YouTube, `sessionInfo`, documentos de Upload directo, `INNERTUBE_API_KEY`, o formulário **Adicionar outra conta Gmail** e a configuração global do YouTube (OAuth Client ID, OAuth Client Secret e YouTube Data API Key). A página **Configuração API** contém as restantes API Keys, providers, modelos, serviços, materiais, Nano Banana, TikTok, Postiz e o **Teste de vozes**.
 
-A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** é o centro local reservado para futuros eventos de processamento, publicação e integrações.
+A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** mantém um histórico persistente de conclusões e falhas, reconcilia estados escritos por componentes locais e disponibiliza um checkbox independente para cada operação mapeada.
 
 ## Canais Youtube — edição por cartão e vídeos recentes
 

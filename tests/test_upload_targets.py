@@ -17,7 +17,8 @@ def test_youtube_upload_uses_the_explicitly_selected_channel():
 
 
 def test_future_platform_target_lists_are_reserved_in_settings():
-    assert '"TikTok": "tiktok_profiles"' in SOURCE
+    assert '"TikTok": "tiktok_accounts"' in SOURCE
+    assert 'settings.get("tiktok_profiles", [])' in SOURCE
     assert '"Instagram": "instagram_profiles"' in SOURCE
     assert '"Facebook Pages": "facebook_pages"' in SOURCE
     assert 'A lista de {destination} será ligada numa etapa própria de credenciais/API.' in SOURCE

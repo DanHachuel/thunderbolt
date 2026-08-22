@@ -17,6 +17,7 @@ import requests
 
 from . import storage
 from .metadata_cleaner import VIDEO_EXTENSIONS, _resolve_ffmpeg
+from .notifications import record_notification
 
 
 class CutsError(RuntimeError):
@@ -380,6 +381,14 @@ def generate_clips(
         record["error"] = str(exc)
     _write_manifest(record, run_dir)
     storage.append_json("cuts_runs.json", record)
+    if record["status"] == "complete":
+        record_notification(
+            "cuts_completed",
+            "Cortes concluídos",
+            f"A geração de cortes para {record['source_name']} terminou com {len(record['clips'])} clip(s).",
+            metadata={"run_id": record["id"], "clip_count": len(record["clips"]), "output_format": record.get("output_format") or ""},
+            dedupe_key=f"cuts:{record['id']}",
+        )
     if record["status"] == "error":
         raise CutsError(record["error"])
     return record

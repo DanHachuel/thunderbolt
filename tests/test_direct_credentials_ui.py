@@ -11,7 +11,7 @@ def test_direct_credentials_keep_cookies_in_document_but_api_key_in_account_sect
     assert 'credentials.json' in MAIN_SOURCE
     assert '### INNERTUBE_API_KEY' in MAIN_SOURCE
     assert 'Guardar INNERTUBE_API_KEY' in MAIN_SOURCE
-    assert 'fora do documento de cookies/credenciais' in MAIN_SOURCE
+    assert 'fora do documento de cookies.' in MAIN_SOURCE
 
 
 def test_direct_credentials_are_read_per_account_and_channel_from_document():
@@ -49,8 +49,8 @@ def test_google_accounts_use_collapsed_name_email_cards_and_external_add_form():
     assert 'associação de canais não depende da completude deste documento' in MAIN_SOURCE
 
 
-def test_technical_settings_are_split_into_three_unnumbered_tabs():
-    expected = 'st.tabs(["Contas Google/YouTube — canais em lote", "API Keys", "Teste de vozes"])'
+def test_api_settings_keep_api_keys_and_voice_test_tabs():
+    expected = 'st.tabs(["API Keys", "Teste de vozes"])'
     assert expected in MAIN_SOURCE
     assert 'st.subheader("API Keys")' in MAIN_SOURCE
     assert 'st.subheader("Execução local")' not in MAIN_SOURCE

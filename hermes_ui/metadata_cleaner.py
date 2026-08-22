@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import storage
+from .notifications import record_notification
 
 
 def _metadata_root() -> Path:
@@ -175,6 +176,13 @@ def save_edit_record(source: Path, output: Path, metadata: dict[str, Any], run_i
         "created_at": run_info.get("created_at", _now()),
     }
     storage.append_json("metadata_edits.json", record)
+    record_notification(
+        "metadata_cleaning_completed",
+        f"Metadados limpos: {output.name}",
+        "A limpeza de metadados terminou com um ficheiro de saída guardado.",
+        metadata={"record_id": record["id"], "output_name": output.name},
+        dedupe_key=f"metadata_cleaning_completed:{record['id']}",
+    )
     return record
 
 

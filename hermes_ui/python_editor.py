@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from . import storage
+from .notifications import record_notification
 from .metadata_cleaner import VIDEO_EXTENSIONS as METADATA_VIDEO_EXTENSIONS
 from .metadata_cleaner import _resolve_ffmpeg
 
@@ -257,6 +258,13 @@ def save_edit_record(source: Path, output: Path, run_info: dict[str, Any]) -> di
         "created_at": run_info.get("created_at", _now()),
     }
     storage.append_json("python_editor_edits.json", record)
+    record_notification(
+        "python_edit_completed",
+        f"Edição Python concluída: {output.name}",
+        f"A operação {record.get('operation') or 'de edição'} terminou com um artefacto guardado.",
+        metadata={"record_id": record["id"], "output_name": output.name, "operation": record.get("operation") or ""},
+        dedupe_key=f"python_edit_completed:{record['id']}",
+    )
     return record
 
 

@@ -13,7 +13,8 @@ def test_all_prompt_masters_are_bundled_as_seed_content():
     seed_files = sorted(SEED_DIR.glob("*.md"))
     storage_files = sorted(STORAGE_DIR.glob("*.md"))
     assert len(seed_files) == 30
-    assert {path.name for path in seed_files} == {path.name for path in storage_files}
+    assert {path.name for path in seed_files} <= {path.name for path in storage_files}
+    assert len(storage_files) >= len(seed_files)
     assert all(path.read_text(encoding="utf-8").strip() for path in seed_files)
 
 

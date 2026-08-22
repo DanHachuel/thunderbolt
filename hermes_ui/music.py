@@ -8,6 +8,7 @@ from typing import Any
 import requests
 
 from . import storage
+from .notifications import record_notification
 
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 
@@ -35,6 +36,13 @@ def store_music_file(name: str, content: bytes) -> Path:
         raise ValueError("O ficheiro de música está vazio.")
     target = music_directory() / safe_music_name(name)
     target.write_bytes(content)
+    record_notification(
+        "music_completed",
+        f"Música concluída: {target.stem}",
+        f"O ficheiro de música {target.name} foi guardado no storage local.",
+        metadata={"filename": target.name, "source": "local_storage"},
+        dedupe_key=f"music:{target.name}:{target.stat().st_mtime_ns}",
+    )
     return target
 
 

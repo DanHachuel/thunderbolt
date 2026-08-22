@@ -34,6 +34,7 @@ from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips,
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
+from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -331,7 +332,16 @@ def generate_creative_for_ui(settings: dict[str, Any], channel: dict, topic: str
         blueprint_for_channel(channel),
         language=str(channel.get("language") or "Português"),
     )
-    return creative_payload_from_result(channel, topic, creative, topic_source=topic_source)
+    payload = creative_payload_from_result(channel, topic, creative, topic_source=topic_source)
+    creative_key = hashlib.sha1(json.dumps({"channel_id": channel.get("id") or "", "topic": topic, "titles": payload.get("title_candidates", [])}, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    record_notification(
+        "title_generation_completed",
+        f"Títulos gerados: {payload.get('title') or topic or 'Vídeo'}",
+        f"O pacote de títulos para {channel.get('name') or 'o canal seleccionado'} terminou de ser gerado.",
+        metadata={"channel_name": channel.get("name") or "", "topic": topic},
+        dedupe_key=f"titles:{creative_key}",
+    )
+    return payload
 
 
 def valid_hhmm(value: str) -> bool:
@@ -671,8 +681,10 @@ def render_blueprints():
                 try:
                     blueprint, branding = create_blueprint_from_link(source_url, niche, language, creation_type == "Blueprint + Branding completo", channel_name, blueprint_name)
                     blueprint_path, branding_path = save_generated_blueprint(blueprint, branding)
+                    record_notification("blueprint_completed", f"Blueprint criado: {blueprint_path.stem}", "O Blueprint foi criado e guardado no storage local.", metadata={"name": blueprint_path.stem}, dedupe_key=f"blueprint:{blueprint_path}:{blueprint_path.stat().st_mtime_ns}")
                     st.success(f"Blueprint criado: {blueprint_path.name}")
                     if branding_path:
+                        record_notification("branding_completed", f"Branding criado: {branding_path.stem}", "O Branding foi criado e guardado no storage local.", metadata={"name": branding_path.stem}, dedupe_key=f"branding:{branding_path}:{branding_path.stat().st_mtime_ns}")
                         st.success(f"Branding completo criado: {branding_path.name}")
                     st.rerun()
                 except ValueError as exc:
@@ -692,6 +704,7 @@ def render_blueprints():
                     st.warning("O ficheiro já existe. Confirme a substituição.")
                 else:
                     destination.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    record_notification("blueprint_completed", f"Blueprint guardado: {destination.stem}", "O Blueprint importado foi guardado no storage local.", metadata={"name": destination.stem}, dedupe_key=f"blueprint:{destination}:{destination.stat().st_mtime_ns}")
                     st.success(f"Blueprint guardado em {destination}")
                     st.rerun()
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
@@ -731,6 +744,7 @@ def render_blueprints():
                 target = BLUEPRINTS / "brandings" / (Path(branding_upload.name).stem.replace(" ", "-") + ".json")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                record_notification("branding_completed", f"Branding guardado: {target.stem}", "O Branding importado foi guardado no storage local.", metadata={"name": target.stem}, dedupe_key=f"branding:{target}:{target.stat().st_mtime_ns}")
                 st.success(f"Branding guardado em {target}")
                 st.rerun()
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
@@ -1534,6 +1548,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                                     payload["thumbnail_path"] = thumbnail_path
                                     payload["thumbnail_status"] = "generated"
                                     st.session_state["new_video_general_payloads"] = payloads
+                                    record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": channel.get("name") or "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
                                     st.success("Thumbnail gerada com Nano Banana.")
                                     st.rerun()
                                 except ThumbnailGenerationError as exc:
@@ -1588,6 +1603,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
                                 st.session_state["new_video_creative_payload"] = payload
+                                record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": selected_one.get("name") if selected_one else "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
                                 st.success("Thumbnail gerada com Nano Banana.")
                                 st.rerun()
                             except ThumbnailGenerationError as exc:
@@ -1761,6 +1777,16 @@ def render_scripts():
                         structure_notes=structure_notes,
                         generation_settings=script_settings,
                     )
+                generation_key = hashlib.sha1(f"{document_type}|{generated.get('title', '')}|{generated.get('content', '')}".encode("utf-8")).hexdigest()
+                generated["notification_dedupe_key"] = f"script-generation:{generation_key}"
+                script_event_type = "music_lyrics_generated" if document_type == "Letra de música" else "standalone_script_generated"
+                record_notification(
+                    script_event_type,
+                    f"{'Letra de música' if document_type == 'Letra de música' else 'Roteiro autónomo'} gerado: {generated.get('title') or title or 'Documento'}",
+                    "A geração do documento terminou com sucesso e o rascunho está disponível para revisão.",
+                    metadata={"document_type": "music_lyrics" if document_type == "Letra de música" else "video_script", "title": generated.get("title") or title or "Documento"},
+                    dedupe_key=generated["notification_dedupe_key"],
+                )
                 st.session_state["script_draft"] = generated
                 st.session_state["script_draft_title"] = generated["title"]
                 st.session_state["script_draft_summary"] = generated.get("summary", "")
@@ -1886,6 +1912,9 @@ def render_niche_finder():
                 )
             st.session_state["niche_results"] = results
             st.session_state["niche_last_parameters"] = current_parameters
+            niche_key = hashlib.sha1(json.dumps(current_parameters, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+            summary = results.get("summary", {}) if isinstance(results, dict) else {}
+            record_notification("niche_analysis_completed", "Análise de nicho concluída", "A análise Kaggle terminou com resultados prontos para consulta.", metadata={"source": "Kaggle", "rows_filtered": summary.get("rows_filtered", 0)}, dedupe_key=f"niche:kaggle:{niche_key}")
             st.success("Análise concluída.")
         except (NicheAnalysisError, DatasetError, OSError) as exc:
             st.error("Não foi possível concluir a análise solicitada com os parâmetros actuais.")
@@ -2029,6 +2058,7 @@ def render_niche_finder_apify():
                 history = []
             history.insert(0, st.session_state["niche_apify_last_run"])
             write_json("niche_apify_runs.json", history[:20])
+            record_notification("niche_analysis_completed", "Análise de nicho concluída", f"A pesquisa Apify terminou com {len(items)} vídeo(s) recebido(s).", metadata={"run_id": finished.run_id, "item_count": len(items)}, dedupe_key=f"niche:apify:{finished.run_id}")
             st.session_state.pop("niche_apify_active_run", None)
             progress.progress(100, text="Pesquisa Apify concluída.")
             st.success(f"Pesquisa concluída: {len(items)} vídeo(s) recebido(s).")
@@ -2570,6 +2600,7 @@ def render_upload_direct():
                     uploads = read_json("uploads.json", [])
                     uploads.append(record)
                     write_json("uploads.json", uploads)
+                    reconcile_persisted_notifications()
                     (st.success if result.ok else st.error)(result.message)
 
 
@@ -2657,6 +2688,7 @@ def render_upload_postiz():
                 uploads = read_json("uploads.json", [])
                 uploads.append(record)
                 write_json("uploads.json", uploads)
+                reconcile_persisted_notifications()
                 (st.success if result.ok else st.error)(result.message)
 
 
@@ -2833,6 +2865,7 @@ def render_upload_conventional():
                     uploads = read_json("uploads.json", [])
                     uploads.append(record)
                     write_json("uploads.json", uploads)
+                    reconcile_persisted_notifications()
                     (st.success if result.ok else st.error)(result.message)
                     if result.data.get("attempts"):
                         with st.expander("Detalhes dos mecanismos de upload"):
@@ -2852,6 +2885,7 @@ def render_upload_conventional():
                 uploads = read_json("uploads.json", [])
                 uploads.append(record)
                 write_json("uploads.json", uploads)
+                reconcile_persisted_notifications()
                 (st.success if result.ok else st.warning)(result.message)
             if "Instagram" in destination:
                 st.button("Preparar Instagram", key=f"upload_instagram_{task['id']}", disabled=True, help="UI preparada; publicação Instagram ainda não está activa.")
@@ -3358,13 +3392,91 @@ def render_settings():
 
 def render_notifications():
     st.title("Notificações")
-    st.caption("Centro de notificações locais do Thunderbolt.")
-    st.info("Ainda não existem notificações registadas. Os eventos de processamento, publicação e integração serão ligados aqui numa etapa posterior.")
+    st.caption("Centro de notificações internas persistentes do Thunderbolt. As conclusões são guardadas no storage local e aparecem quando a aplicação é actualizada.")
+    reconcile_persisted_notifications()
+    preferences = notification_preferences()
+    catalog = notification_event_catalog()
+    notifications = list_notifications(limit=500)
+    unread_count = unread_notification_count()
+    summary_cols = st.columns(3)
+    with summary_cols[0]:
+        st.metric("Não lidas", unread_count)
+    with summary_cols[1]:
+        st.metric("Total guardado", len(notifications))
+    with summary_cols[2]:
+        st.metric("Operações mapeadas", len(catalog))
+
+    action_cols = st.columns([1.4, 1.4, 2.2])
+    with action_cols[0]:
+        if st.button("Marcar todas como lidas", use_container_width=True, disabled=unread_count == 0):
+            mark_all_notifications_read()
+            st.rerun()
+    with action_cols[1]:
+        if st.button("Actualizar notificações", use_container_width=True):
+            reconcile_persisted_notifications()
+            st.rerun()
+    with action_cols[2]:
+        confirm_clear = st.checkbox("Confirmar limpeza do histórico", key="confirm_clear_notifications")
+        if st.button("Limpar histórico", use_container_width=True, disabled=not confirm_clear):
+            clear_notifications()
+            st.session_state.pop("confirm_clear_notifications", None)
+            st.rerun()
+
     st.divider()
-    st.subheader("Preferências de notificação")
-    st.caption("Os canais de e-mail, push e webhook ainda não estão activos nesta versão.")
-    st.checkbox("Notificações no painel", value=True, disabled=True, key="notifications_panel_preview")
-    st.checkbox("Notificações por e-mail", value=False, disabled=True, key="notifications_email_preview")
+    st.subheader("Operações notificadas")
+    st.caption("Ligue ou desligue cada tipo de notificação. As preferências ficam guardadas no storage local e aplicam-se às próximas conclusões.")
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for event in catalog:
+        grouped.setdefault(event["category"], []).append(event)
+    with st.form("notification_preferences_form"):
+        pending_preferences: dict[str, bool] = {}
+        for category, events in grouped.items():
+            st.markdown(f"**{category}**")
+            for event in events:
+                pending_preferences[event["code"]] = st.checkbox(
+                    event["label"],
+                    value=bool(preferences.get(event["code"], True)),
+                    help=event["description"],
+                    key=f"notification_preference_{event['code']}",
+                )
+        if st.form_submit_button("Guardar preferências", type="primary", use_container_width=True):
+            save_notification_preferences(pending_preferences)
+            st.success("Preferências de notificação guardadas.")
+            st.rerun()
+
+    st.divider()
+    st.subheader("Histórico de notificações")
+    filter_cols = st.columns([1, 1.4])
+    category_options = ["Todas"] + sorted({event["category"] for event in catalog})
+    with filter_cols[0]:
+        selected_category = st.selectbox("Categoria", category_options, key="notifications_category_filter")
+    with filter_cols[1]:
+        selected_state = st.selectbox("Estado", ["Todas", "Não lidas", "Lidas"], key="notifications_state_filter")
+    category_filter = "" if selected_category == "Todas" else selected_category
+    unread_filter = selected_state == "Não lidas"
+    filtered = list_notifications(limit=500, category=category_filter, unread_only=unread_filter)
+    if selected_state == "Lidas":
+        filtered = [item for item in filtered if item.get("read")]
+    if not filtered:
+        st.info("Ainda não existem notificações para os filtros seleccionados.")
+    for item in filtered:
+        with st.container(border=True):
+            notification_cols = st.columns([3.3, 1.4, 1])
+            with notification_cols[0]:
+                st.write(f"**{item.get('title') or item.get('label') or 'Notificação'}**")
+                st.caption(item.get("message") or "")
+                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                if metadata:
+                    public_details = " · ".join(f"{key}: {value}" for key, value in metadata.items() if value not in (None, ""))
+                    if public_details:
+                        st.caption(public_details)
+            with notification_cols[1]:
+                st.caption(f"{item.get('category', 'Sistema')} · {item.get('created_at', '—')}")
+                st.write("Lida" if item.get("read") else "Não lida")
+            with notification_cols[2]:
+                if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", use_container_width=True):
+                    mark_notification_read(str(item.get("id")))
+                    st.rerun()
 
 
 def render_models_ai_tutorial():
@@ -3782,6 +3894,10 @@ def main():
         "Configuração API": render_settings,
         "Notificações": render_notifications,
     }
+    try:
+        reconcile_persisted_notifications()
+    except Exception:
+        pass
     renderers.get(current_page, render_dashboard)()
 
 if __name__ == "__main__":
