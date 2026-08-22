@@ -7,19 +7,32 @@ PACKAGE_SOURCE = (ROOT / "package.json").read_text(encoding="utf-8")
 THEME_CONFIG = (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
 
 
-def test_streamlit_theme_config_defaults_to_light_with_moneyprinter_style_semantics():
+def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semantics():
     assert "[theme]" in THEME_CONFIG
-    assert 'base = "light"' in THEME_CONFIG
+    assert 'base = "dark"' in THEME_CONFIG
     assert 'primaryColor = "#35A7FF"' in THEME_CONFIG
-    assert 'backgroundColor = "#FFFFFF"' in THEME_CONFIG
-    assert 'secondaryBackgroundColor = "#F3F6FA"' in THEME_CONFIG
-    assert 'textColor = "#16202A"' in THEME_CONFIG
+    assert 'backgroundColor = "#0B1118"' in THEME_CONFIG
+    assert 'secondaryBackgroundColor = "#121B26"' in THEME_CONFIG
+    assert 'textColor = "#F4F8FB"' in THEME_CONFIG
     assert '[client]\ntoolbarMode = "auto"' in THEME_CONFIG
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.2.87"' in PACKAGE_SOURCE
+    assert '"version": "0.2.88"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
+
+
+def test_theme_selector_is_explicit_persistent_and_dark_by_default():
+    assert 'UI_THEME_VALUES = ("dark", "light")' in MAIN_SOURCE
+    assert 'stored = st.session_state.get("ui_theme")' in MAIN_SOURCE
+    assert 'normalized = normalize_ui_theme(stored) if stored is not None else "dark"' in MAIN_SOURCE
+    assert 'settings["ui_theme"] = normalized' in MAIN_SOURCE
+    assert 'key="top_ui_theme_selector"' in MAIN_SOURCE
+    assert 'render_ui_theme_picker(language)' in MAIN_SOURCE
+    assert 'ui_text("Theme", selected_language)' in MAIN_SOURCE
+    assert 'format_func=lambda value: ui_theme_label(value, selected_language)' in MAIN_SOURCE
+    assert 'color-scheme: {ui_theme};' in MAIN_SOURCE
+    assert 'list(UI_THEME_VALUES).index(current)' in MAIN_SOURCE
 
 
 def test_custom_css_inherits_active_streamlit_theme_instead_of_forcing_dark_palette():
@@ -40,6 +53,15 @@ def test_custom_css_inherits_active_streamlit_theme_instead_of_forcing_dark_pale
         "color:#9cafbf",
     ):
         assert forced_dark_rule not in css
+
+
+def test_theme_labels_are_available_for_all_supported_languages():
+    from hermes_ui.languages import LANGUAGE_CODES, UI_TRANSLATIONS
+
+    for code in LANGUAGE_CODES:
+        assert UI_TRANSLATIONS[code]["Theme"]
+        assert UI_TRANSLATIONS[code]["Dark"]
+        assert UI_TRANSLATIONS[code]["Light"]
 
 
 def test_theme_fix_keeps_native_streamlit_toolbar_and_platform_chip_identity_colors():

@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.87
+> **Versão deste manual:** 0.2.88
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -200,7 +200,7 @@ Todas as subabas internas e o conteúdo das páginas também são traduzidos nos
 
 ### Temas Light e Dark
 
-A aplicação usa o mecanismo nativo de temas do Streamlit e é distribuída com `.streamlit/config.toml`, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O ficheiro define uma base **Light** legível; o utilizador pode seleccionar **Dark** no menu nativo do Streamlit. Os componentes próprios da UI herdam as cores do tema activo através de `currentColor` e `color-mix`, sem forçar fundos, cartões ou textos da paleta escura. O toolbar nativo, o indicador de execução, **Deploy** e o menu principal continuam sem sobreposições CSS.
+A aplicação usa o mecanismo nativo de temas do Streamlit e é distribuída com `.streamlit/config.toml`, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O ficheiro define **Dark** como tema padrão e a UI mostra um selector explícito **Theme** com as opções **Dark** e **Light**. Se ainda não existir preferência, o Thunderbolt inicia sempre em Dark; quando o utilizador selecciona Light, essa escolha fica guardada em `storage/state/settings.json` como `ui_theme` e é restaurada nos arranques seguintes. Os componentes próprios da UI herdam as cores do tema activo através de variáveis semânticas, `currentColor` e `color-mix`. O toolbar nativo, o indicador de execução, **Deploy** e o menu principal continuam sem sobreposições CSS.
 
 ## 4. Diagnóstico antes de iniciar
 
