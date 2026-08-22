@@ -106,7 +106,8 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
 
 
 def test_language_picker_is_positioned_after_deploy_before_main_menu():
-    assert 'right:2.5rem' in MAIN_SOURCE
-    assert '[data-testid="stAppDeployButton"] { transform:translateX(-3rem)' in MAIN_SOURCE
-    assert '[data-testid="stMainMenu"] { transform:translateX(1rem)' in MAIN_SOURCE
+    assert 'right:1.5rem' in MAIN_SOURCE
+    assert '[data-testid="stAppDeployButton"] { width:3.3rem' in MAIN_SOURCE
+    assert '[data-testid="stMainMenu"] { width:1.5rem' in MAIN_SOURCE
+    assert 'transform:translateX(1rem) !important' in MAIN_SOURCE
     assert 'right:8rem' not in MAIN_SOURCE

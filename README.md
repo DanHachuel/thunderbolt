@@ -52,7 +52,7 @@ O Thunderbolt mantém os idiomas históricos da criação de vídeos e acrescent
 
 No canto superior direito da aplicação existe um botão compacto com a bandeira do idioma actual, colocado imediatamente **à direita do botão Deploy e antes do menu principal** do Streamlit. O espaço à esquerda de **Deploy** fica livre para o indicador de execução. Ao abrir o botão, seleccione outro idioma; a preferência é guardada em `storage/state/settings.json` como `ui_language`, e a navegação lateral actualiza-se sem alterar o idioma seleccionado para os vídeos. A primeira implementação traduz o chrome principal da navegação e mantém os rótulos específicos das páginas compatíveis com o fluxo existente.
 
-## Navegação da UI 0.2.79
+## Navegação da UI 0.2.80
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais** e **Tutorial Meta**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 

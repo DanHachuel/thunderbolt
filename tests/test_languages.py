@@ -29,7 +29,7 @@ def test_ui_translation_and_header_picker_are_present():
     assert ui_text("Configurações", "es") == "Configuración"
     assert "def render_ui_language_picker(language: str)" in MAIN_SOURCE
     assert "with st.popover(language_flag(current)" in MAIN_SOURCE
-    assert "right:2.5rem" in MAIN_SOURCE
+    assert "right:1.5rem" in MAIN_SOURCE
     assert "ui_language_picker" in MAIN_SOURCE
     assert "save_ui_language(selected)" in MAIN_SOURCE
     assert '"ui_language": "pt"' in STORAGE_SOURCE
