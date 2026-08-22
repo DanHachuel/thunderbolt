@@ -33,6 +33,7 @@ from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEd
 from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
+from hermes_ui.material_sources import material_api_keys, material_source_catalog, selected_material_source, update_material_api_keys
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
@@ -3238,6 +3239,51 @@ def render_google_accounts():
         st.success("Configuração global do YouTube guardada em Contas Google.")
         st.rerun()
 
+def render_material_source_api_keys(settings: dict[str, Any]) -> None:
+    st.subheader("Fontes de materiais")
+    st.caption("Seleccione a fonte que será usada na pipeline e guarde uma ou mais API keys. Qualidade, endpoints e parâmetros internos são definidos pelo Thunderbolt.")
+    source_catalog = material_source_catalog()
+    source_codes = [item["code"] for item in source_catalog] + ["local"]
+    source_labels = {item["code"]: item["label"] for item in source_catalog} | {"local": "Ficheiros locais"}
+    source_help = {item["code"]: item["description"] for item in source_catalog} | {"local": "Usar materiais já existentes no storage local; não requer API key."}
+    selected_source = st.selectbox(
+        "Fonte de materiais",
+        source_codes,
+        index=source_codes.index(selected_material_source(settings)) if selected_material_source(settings) in source_codes else 0,
+        format_func=lambda value: source_labels.get(value, value),
+        key="material_source_selector",
+    )
+    st.caption(source_help.get(selected_source, ""))
+    current_keys = material_api_keys(settings, selected_source)
+    row_key = f"material_source_key_rows_{selected_source}"
+    row_count = max(len(current_keys), int(st.session_state.get(row_key, len(current_keys) or 1)))
+    if selected_source == "local":
+        st.info("A fonte local não usa API key. Os materiais devem existir na pasta configurada do storage.")
+        if st.button("Guardar fonte local", type="primary", key="save_local_material_source"):
+            settings["video_source"] = selected_source
+            write_json("settings.json", settings)
+            st.success("Fonte de materiais guardada: ficheiros locais.")
+            st.rerun()
+        return
+    with st.form(f"material_api_keys_form_{selected_source}"):
+        key_values: list[str] = []
+        for index in range(row_count):
+            key_values.append(st.text_input(f"API Key {index + 1}", value=current_keys[index] if index < len(current_keys) else "", type="password", key=f"material_api_key_{selected_source}_{index}"))
+        save_keys = st.form_submit_button("Guardar fonte e chaves", type="primary", use_container_width=True)
+        add_key = st.form_submit_button("Adicionar outra chave", use_container_width=True)
+    if add_key:
+        st.session_state[row_key] = row_count + 1
+        st.rerun()
+    if save_keys:
+        update_material_api_keys(settings, selected_source, key_values)
+        settings["video_source"] = selected_source
+        write_json("settings.json", settings)
+        st.session_state[row_key] = max(1, len(material_api_keys(settings, selected_source)))
+        st.success(f"Fonte {source_labels.get(selected_source, selected_source)} guardada com {len(material_api_keys(settings, selected_source))} chave(s).")
+        st.rerun()
+    st.caption(f"{len(current_keys)} chave(s) actualmente guardada(s) para {source_labels.get(selected_source, selected_source)}. As chaves são mantidas no storage local e usadas com rotação interna.")
+
+
 def render_settings():
     st.title("Configuração API")
     st.caption("Configuração das APIs, providers, serviços e ferramentas técnicas usados pelo Thunderbolt. As credenciais ficam no storage local e não são enviadas para o GitHub.")
@@ -3255,221 +3301,191 @@ def render_settings():
     api_keys_tab, voice_test_tab = st.tabs(["API Keys", "Teste de vozes"])
 
     with api_keys_tab:
-        with st.form("settings_form"):
-            st.subheader("API Keys")
-            port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-            moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-            with st.expander("Niche Finder — execução remota no Kaggle", expanded=True):
-                st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
-                kaggle_cols = st.columns(3)
-                with kaggle_cols[0]:
-                    kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
-                with kaggle_cols[1]:
-                    kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
-                with kaggle_cols[2]:
-                    kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
+        api_service_tab, material_sources_tab = st.tabs(["Serviços e modelos", "Fontes de materiais"])
+        with api_service_tab:
+            with st.form("settings_form"):
+                st.subheader("API Keys")
+                port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
+                moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
+                with st.expander("Niche Finder — execução remota no Kaggle", expanded=True):
+                    st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
+                    kaggle_cols = st.columns(3)
+                    with kaggle_cols[0]:
+                        kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
+                    with kaggle_cols[1]:
+                        kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
+                    with kaggle_cols[2]:
+                        kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
 
-            with st.expander("Niche Finder — execução através da Apify", expanded=True):
-                st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
-                apify_cols = st.columns(4)
-                with apify_cols[0]:
-                    apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
-                with apify_cols[1]:
-                    apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
-                with apify_cols[2]:
-                    apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
-                with apify_cols[3]:
-                    apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
+                with st.expander("Niche Finder — execução através da Apify", expanded=True):
+                    st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
+                    apify_cols = st.columns(4)
+                    with apify_cols[0]:
+                        apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
+                    with apify_cols[1]:
+                        apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
+                    with apify_cols[2]:
+                        apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
+                    with apify_cols[3]:
+                        apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
 
-            with st.expander("Serviço, materiais e rede"):
-                cols = st.columns(2)
-                with cols[0]:
-                    log_level = st.selectbox("Log level", ["DEBUG", "INFO", "WARNING", "ERROR"], index=["DEBUG", "INFO", "WARNING", "ERROR"].index(settings.get("log_level", "DEBUG")) if settings.get("log_level", "DEBUG") in ["DEBUG", "INFO", "WARNING", "ERROR"] else 0)
-                    listen_host = text_setting("API listen host", "listen_host")
-                    listen_port = st.number_input("API listen port", 1, 65535, int(settings.get("listen_port", 8080)))
-                    video_source = st.selectbox("Fonte de materiais", ["pexels", "pixabay", "coverr", "loomloom", "local"], index=["pexels", "pixabay", "coverr", "loomloom", "local"].index(settings.get("video_source", "pexels")) if settings.get("video_source", "pexels") in ["pexels", "pixabay", "coverr", "loomloom", "local"] else 0)
-                with cols[1]:
-                    endpoint = text_setting("Endpoint público", "endpoint")
-                    proxy_http = text_setting("Proxy HTTP", "proxy_http")
-                    proxy_https = text_setting("Proxy HTTPS", "proxy_https")
-                    match_materials_to_script = st.checkbox("Alinhar materiais ao roteiro", bool(settings.get("match_materials_to_script", False)))
+                with st.expander("Nano Banana — geração de thumbnails", expanded=True):
+                    st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
+                    nano_cols = st.columns(2)
+                    with nano_cols[0]:
+                        gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
+                        gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
+                    with nano_cols[1]:
+                        gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
+                        gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
 
-            with st.expander("Nano Banana — geração de thumbnails", expanded=True):
-                st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
-                nano_cols = st.columns(2)
-                with nano_cols[0]:
-                    gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
-                    gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
-                with nano_cols[1]:
-                    gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
-                    gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
-
-            with st.expander("LLM — providers e modelos", expanded=True):
-                provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
-                llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
-                st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
-                st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
-                openai_cols = st.columns(3)
-                with openai_cols[0]:
-                    openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
-                with openai_cols[1]:
-                    openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
-                with openai_cols[2]:
-                    cached_catalog = st.session_state.get("openai_model_catalog", {})
-                    catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
-                    cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
-                    current_model_name = str(settings.get("openai_model_name", "") or "")
-                    manual_option = "__manual_model__"
-                    if cached_models:
-                        model_options = [manual_option, *cached_models]
-                        model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
-                        selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
-                        if selected_model == manual_option:
-                            openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
+                with st.expander("LLM — providers e modelos", expanded=True):
+                    provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
+                    llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
+                    st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
+                    st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
+                    openai_cols = st.columns(3)
+                    with openai_cols[0]:
+                        openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
+                    with openai_cols[1]:
+                        openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
+                    with openai_cols[2]:
+                        cached_catalog = st.session_state.get("openai_model_catalog", {})
+                        catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
+                        cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
+                        current_model_name = str(settings.get("openai_model_name", "") or "")
+                        manual_option = "__manual_model__"
+                        if cached_models:
+                            model_options = [manual_option, *cached_models]
+                            model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
+                            selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
+                            if selected_model == manual_option:
+                                openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
+                            else:
+                                openai_model_name = selected_model
                         else:
-                            openai_model_name = selected_model
+                            openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
+                    refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
+                    if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
+                        st.warning(str(cached_catalog["error"]))
+                    elif cached_models:
+                        st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
                     else:
-                        openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
-                refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
-                if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
-                    st.warning(str(cached_catalog["error"]))
-                elif cached_models:
-                    st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
-                else:
-                    st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
-                llm_fields = [
-                    ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
-                    ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
-                    ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
-                    ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
-                    ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
-                    ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
-                    ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
-                ]
-                for label, prefix, has_key in llm_fields:
-                    st.markdown(f"**{label}**")
-                    cols = st.columns(3)
+                        st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
+                    llm_fields = [
+                        ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
+                        ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
+                        ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
+                        ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
+                        ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
+                        ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
+                        ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
+                    ]
+                    for label, prefix, has_key in llm_fields:
+                        st.markdown(f"**{label}**")
+                        cols = st.columns(3)
+                        with cols[0]:
+                            if has_key:
+                                settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
+                            else:
+                                settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
+                        with cols[1]:
+                            settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
+                        with cols[2]:
+                            settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
+
+                with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
+                    cols = st.columns(2)
                     with cols[0]:
-                        if has_key:
-                            settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
-                        else:
-                            settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
+                        azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
+                        azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
+                        siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                        minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                        minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
+                        minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
+                        minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
                     with cols[1]:
-                        settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
-                    with cols[2]:
-                        settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
+                        elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                        elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
+                        chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
+                        chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                        chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
+                        sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                        sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+                        st.markdown("**Suno — agente musical opcional**")
+                        suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                        suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
+                        suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
-            with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
-                cols = st.columns(2)
-                with cols[0]:
-                    azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
-                    azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
-                    siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
-                    minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
-                    minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
-                    minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
-                    minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
-                with cols[1]:
-                    elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
-                    elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
-                    chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
-                    chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
-                    chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
-                    sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
-                    sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
-                    st.markdown("**Suno — agente musical opcional**")
-                    suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
-                    suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
-                    suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
+                with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
+                    st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
+                    tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
+                    tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
 
-            with st.expander("Vídeo, materiais, Whisper e FFmpeg"):
-                cols = st.columns(2)
-                with cols[0]:
-                    pexels_api_keys = text_setting("Pexels API keys", "pexels_api_keys", secret=True, help_text="Separe várias chaves por vírgula para rotação.")
-                    pixabay_api_keys = text_setting("Pixabay API keys", "pixabay_api_keys", secret=True)
-                    coverr_api_keys = text_setting("Coverr API keys", "coverr_api_keys", secret=True)
-                    twelvelabs_api_keys = text_setting("TwelveLabs API keys", "twelvelabs_api_keys", secret=True)
-                    material_directory = text_setting("Pasta de materiais", "material_directory")
-                with cols[1]:
-                    subtitle_provider = st.selectbox("Subtitle provider", ["edge", "whisper", ""], index=["edge", "whisper", ""].index(settings.get("subtitle_provider", "edge")) if settings.get("subtitle_provider", "edge") in ["edge", "whisper", ""] else 0)
-                    ffmpeg_path = text_setting("Caminho FFmpeg", "ffmpeg_path")
-                    video_codec = text_setting("Codec de vídeo", "video_codec")
-                    whisper_model_size = text_setting("Whisper model", "whisper_model_size")
-                    whisper_device = st.selectbox("Whisper device", ["cpu", "cuda"], index=0 if settings.get("whisper_device", "cpu") == "cpu" else 1)
-                    whisper_compute_type = text_setting("Whisper compute type", "whisper_compute_type")
+                with st.expander("Publicação através do Upload-Post"):
+                    upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
+                    upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
+                    upload_post_username = text_setting("Upload-Post username", "upload_post_username")
+                    upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
+                    upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
 
-            with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
-                st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
-                tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
-                tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
+                with st.expander("Postiz — API key, integração e MCP", expanded=True):
+                    st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
+                    postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
+                    postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
+                    postiz_cols = st.columns(2)
+                    with postiz_cols[0]:
+                        postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
+                        postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
+                        postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
+                    with postiz_cols[1]:
+                        postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
+                        postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
+                    st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
 
-            with st.expander("Publicação através do Upload-Post"):
-                upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
-                upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
-                upload_post_username = text_setting("Upload-Post username", "upload_post_username")
-                upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
-                upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+                if refresh_openai_models:
+                    try:
+                        discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
+                        st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
+                        st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
+                        st.rerun()
+                    except ModelDiscoveryError as exc:
+                        st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
+                        st.rerun()
 
-            with st.expander("Postiz — API key, integração e MCP", expanded=True):
-                st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
-                postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
-                postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
-                postiz_cols = st.columns(2)
-                with postiz_cols[0]:
-                    postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
-                    postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
-                    postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
-                with postiz_cols[1]:
-                    postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
-                    postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
-                st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
-
-            if refresh_openai_models:
-                try:
-                    discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
-                    st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
-                    st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
-                    st.rerun()
-                except ModelDiscoveryError as exc:
-                    st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
-                    st.rerun()
-
-            save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
-            if save_all_settings:
-                settings.update({
-                    "port": port, "moneyprinter_path": moneyprinter_path,
-                    "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
-                    "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                    "log_level": log_level, "listen_host": listen_host, "listen_port": listen_port, "video_source": video_source,
-                    "endpoint": endpoint, "proxy_http": proxy_http, "proxy_https": proxy_https, "match_materials_to_script": match_materials_to_script,
-                    "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
-                    "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
-                    "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
-                    "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
-                    "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
-                    "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
-                    "pexels_api_keys": pexels_api_keys, "pixabay_api_keys": pixabay_api_keys, "coverr_api_keys": coverr_api_keys, "twelvelabs_api_keys": twelvelabs_api_keys,
-                    "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
-                    "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint, "subtitle_provider": subtitle_provider,
-                    "ffmpeg_path": ffmpeg_path, "video_codec": video_codec, "material_directory": material_directory,
-                    "whisper_model_size": whisper_model_size, "whisper_device": whisper_device, "whisper_compute_type": whisper_compute_type,
-                    "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
-                    "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
-                    "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
-                    "upload_post_auto_upload": upload_post_auto_upload,
-                    "postiz_enabled": postiz_enabled, "postiz_api_key": postiz_api_key, "postiz_base_url": postiz_base_url.strip() or "https://api.postiz.com/public/v1",
-                    "postiz_mcp_url": postiz_mcp_url.strip() or "https://api.postiz.com/mcp", "postiz_mode": postiz_mode,
-                    "postiz_integration_id": postiz_integration_id.strip(), "postiz_auto_publish": bool(postiz_auto_publish),
-                })
-                write_json("settings.json", settings)
-                try:
-                    synced = sync_moneyprinter_config(settings, moneyprinter_path)
-                    if synced:
-                        st.success(f"Configurações guardadas e sincronizadas com {synced}")
-                    else:
-                        st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
-                except Exception as exc:
-                    st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+                save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
+                if save_all_settings:
+                    settings.update({
+                        "port": port, "moneyprinter_path": moneyprinter_path,
+                        "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
+                        "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
+                        "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
+                        "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
+                        "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
+                        "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
+                        "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
+                        "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
+                        "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
+                        "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint,
+                        "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
+                        "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
+                        "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
+                        "upload_post_auto_upload": upload_post_auto_upload,
+                        "postiz_enabled": postiz_enabled, "postiz_api_key": postiz_api_key, "postiz_base_url": postiz_base_url.strip() or "https://api.postiz.com/public/v1",
+                        "postiz_mcp_url": postiz_mcp_url.strip() or "https://api.postiz.com/mcp", "postiz_mode": postiz_mode,
+                        "postiz_integration_id": postiz_integration_id.strip(), "postiz_auto_publish": bool(postiz_auto_publish),
+                    })
+                    write_json("settings.json", settings)
+                    try:
+                        synced = sync_moneyprinter_config(settings, moneyprinter_path)
+                        if synced:
+                            st.success(f"Configurações guardadas e sincronizadas com {synced}")
+                        else:
+                            st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
+                    except Exception as exc:
+                        st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+        with material_sources_tab:
+            render_material_source_api_keys(settings)
 
     with voice_test_tab:
         st.subheader("Teste de vozes")

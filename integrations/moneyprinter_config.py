@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from hermes_ui.material_sources import all_material_api_keys, selected_material_source
+
 try:
     import toml
 except ImportError:  # pragma: no cover - installation fallback
@@ -112,9 +114,13 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
     for settings_key, config_key in app_map.items():
         if settings_key in settings:
             app[config_key] = settings[settings_key]
-    for key in ("pexels_api_keys", "pixabay_api_keys", "coverr_api_keys", "twelvelabs_api_keys"):
-        if key in settings:
-            app[key] = _list_value(settings[key])
+    # A UI can store the canonical mapping while older installations still
+    # expose one legacy field per source.  Export every supported source as a
+    # TOML array so MoneyPrinterTurbo can rotate keys without CSV parsing.
+    canonical_material_keys = all_material_api_keys(settings)
+    for source, keys in canonical_material_keys.items():
+        app[f"{source}_api_keys"] = _list_value(keys)
+    app["video_source"] = selected_material_source(settings)
     config["app"] = app
 
     whisper["model_size"] = settings.get("whisper_model_size", whisper.get("model_size", "large-v3"))

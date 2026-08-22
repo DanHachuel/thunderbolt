@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.56 install
+npx --yes @danhachuel/thunderbolt@0.2.76 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -388,14 +388,14 @@ Após iniciar a aplicação, valide o seguinte percurso:
 3. **Brandings:** abra a subaba **Brandings** e confirme a listagem dos ficheiros JSON.
 4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** com um URL `/channel/UC...`, um handle ou uma subpágina `/videos`; o parser resolve o ID, consulta a página pública e tenta o RSS quando necessário. Confirme que o resultado abre o formulário de revisão sem Data API Key. Se o canal não existir ou não fornecer metadados, confirme a mensagem clara e que o formulário de uma pesquisa anterior desaparece. A Data API é opcional e fica separada; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
 5. **Niche Finder Kaggle:** abra o menu expansível **Niche Finder**, seleccione **Niche Finder Kaggle**, defina os parâmetros dentro do conteúdo principal e confirme que não há preparação automática. Antes do clique, não deve existir download de dataset nem análise. Clique em **Analisar Nichos** para iniciar a preparação dos dados e a análise; depois altere país, engagement, datas e tags e clique novamente para aplicar os novos parâmetros. Em seguida, abra a alternativa independente **Niche Finder Apify**, configure as palavras-chave e filtros na própria aba e confirme que nada é executado antes de clicar em **Pesquisar no Apify**.
-6. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote. O campo **Tópico ou briefing** pode ser escrito manualmente ou preenchido pelo botão **Gerar tópico/briefing com IA**; a geração só ocorre após o clique e usa o provider configurado em **Configuração API > API Keys**.
+6. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote. O campo **Tópico ou briefing** pode ser escrito manualmente ou preenchido pelo botão **Gerar tópico/briefing com IA**; a geração só ocorre após o clique e usa o provider configurado em **Configuração API > API Keys > Serviços e modelos**.
 7. **Criação de Vídeos:** depois de seleccionar o canal, confirme que o painel entre **Canal** e **Estilo wide** mostra o Blueprint e a voz, ou **SEM BLUEPRINT CONFIGURADO**. Clique em **Gerar títulos e thumbnails com IA**, confirme pelo menos 20 candidatos de título e 3–5 variantes de thumbnail, escolha uma variante e verifique o prompt guardado. Na subaba **Vídeos**, verifique o estado `to_do`, o título escolhido, o estado da thumbnail e os botões **Iniciar** e **Parar**. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
 8. **Lote geral:** confirme que não existe **Canais incluídos** nem selector parcial. A UI deve listar todos os canais cadastrados e criar exactamente uma tarefa por canal, com briefing, título, thumbnail e Blueprint próprios. Use **Gerar tópicos individuais para todos os canais** e **Gerar títulos e thumbnails para todos os canais** antes de criar o batch.
 9. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
 10. **Edição > Limpador de Metadados:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos das páginas de criação não são aceites nesta área.
-11. **Configurações > Configuração API:** confirme que os caminhos e credenciais estão locais e não aparecem no Git. Na secção **Contas Google/YouTube — canais em lote**, adicione cada conta com o seu e-mail/Gmail, OAuth Client ID, OAuth Client Secret e `sessionInfo` próprios; use **Repetir campos para nova conta** para preparar contas adicionais e o ícone **Apagar conta** para eliminar individualmente a conta, tokens, documento JSON e associações de canais.
-12. **OpenAI/ NVIDIA NIM:** em **LLM — providers e modelos**, seleccione `openai`, confirme a Base URL, introduza a API key e clique em **Consultar/actualizar modelos NIM**. Escolha um modelo da lista ou utilize o fallback manual e guarde as configurações. Confirme que a consulta só ocorre após o clique e que um erro de endpoint não interrompe a UI.
-13. **Criação de Vídeos:** confirme que `Pexels/Pixabay` substitui o label antigo, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
+11. **Configurações > Configuração API:** confirme que as credenciais ficam locais e não aparecem no Git. Em **API Keys > Fontes de materiais**, seleccione Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou Ficheiros locais. Para uma fonte com API, preencha a primeira chave e use **Adicionar outra chave** para criar quantas linhas forem necessárias; clique em **Guardar fonte e chaves**. Cada fonte mantém a sua própria lista, com deduplicação e rotação interna. Não são pedidos endpoint, proxy, qualidade, codec, FFmpeg, Whisper, directório ou filtros nesta subaba. Na secção **Contas Google/YouTube — canais em lote**, adicione cada conta com o seu e-mail/Gmail, OAuth Client ID, OAuth Client Secret e `sessionInfo` próprios; use **Repetir campos para nova conta** para preparar contas adicionais e o ícone **Apagar conta** para eliminar individualmente a conta, tokens, documento JSON e associações de canais.
+12. **OpenAI/ NVIDIA NIM:** em **API Keys > Serviços e modelos > LLM — providers e modelos**, seleccione `openai`, confirme a Base URL, introduza a API key e clique em **Consultar/actualizar modelos NIM**. Escolha um modelo da lista ou utilize o fallback manual e guarde as configurações. Confirme que a consulta só ocorre após o clique e que um erro de endpoint não interrompe a UI.
+13. **Criação de Vídeos:** confirme que a fonte seleccionada em **API Keys > Fontes de materiais** é usada pela pipeline, que `Estilo IA` aparece apenas em `full_ia` e que `Apenas Música` exige áudio e guarda `background_mode=none`.
 14. **Canais Youtube:** abra **Configurações > Canais Youtube**, clique em **Editar** num cartão, altere o nicho, Blueprint/Prompts do Canal, Narrador/Voz padrão e horário, guarde e confirme que o cartão é actualizado sem duplicar o canal. Clique em **Actualizar últimos 10 vídeos**, valide a vista Lista, mude para Kanban e abra **Editar vídeo** para testar título, estado, data, URL e notas.
 15. **Automação Youtube:** no cartão de cada canal, escolha o **Blueprint padrão** e a **Voz padrão**, clique em `Guardar` e confirme que o resumo do cartão se actualiza. Configure também **Automação ON** e um horário `HH:MM`; confirme a lista de vídeos cadastrados. Os mesmos defaults aparecem em **Canais Youtube** e são usados em novas tarefas. Inicie o Thunderbolt pelo launcher, confirme o aviso verde **Worker activo** e verifique que o relógio apresentado corresponde ao computador. O worker cria no máximo um lote por canal por dia quando o horário local coincide.
 16. **Configurações > Configuração API > Teste de vozes:** teste Edge/Azure ou provider configurado e confirme reprodução/download sem criação de tarefa.
@@ -403,6 +403,14 @@ Após iniciar a aplicação, valide o seguinte percurso:
 18. **Configurações > MCP > Client MCP:** confirme que Short Video Maker, AutoVio, OpenMontage e OpenCut aparecem com as portas padrão editáveis. O estado **Activo** é uma preferência local; a detecção deve indicar **Não detectado** quando os serviços externos não estiverem instalados ou iniciados.
 19. **Configurações > MCP > Servidor MCP:** abra a subaba, mantenha o host `127.0.0.1`, active **Servidor MCP ON** e clique em **Guardar e iniciar Servidor MCP**. Confirme o endpoint `/mcp` e o health endpoint `/health`. Mantenha **Permitir ferramentas de escrita** desactivado até precisar que um agente crie lotes.
 20. **Configurações > MCP > Skill:** clique em **Guardar skill localmente** e confirme o ficheiro em `storage/skills/moneyprinterturbo-video.md`; opcionalmente use **Descarregar skill .md** para obter a cópia através do navegador.
+
+## Configuração API — fontes de materiais
+
+A área **Configurações > Configuração API > API Keys** separa as credenciais de serviços da configuração de fontes. Abra a subaba **Fontes de materiais** e escolha a fonte que a pipeline deverá usar. Para **Pexels**, **Pixabay**, **Coverr**, **WaveSpeed AI**, **LoomLoom** ou **TwelveLabs**, cada linha **API Key** é mascarada. Clique em **Adicionar outra chave** para guardar várias credenciais da mesma fonte; por exemplo, duas chaves Pixabay e duas Pexels ficam em listas independentes.
+
+Clique em **Guardar fonte e chaves** para persistir a fonte activa e as respectivas chaves no storage local. O Thunderbolt remove linhas vazias e duplicadas, mantém compatibilidade com instalações antigas que usavam campos separados e escreve arrays no `config.toml` do MoneyPrinterTurbo para permitir rotação interna. Ao seleccionar **Ficheiros locais**, nenhuma API key é necessária e os materiais são obtidos do storage local.
+
+A subaba de fontes não é um painel de tuning: endpoints, proxy, qualidade, correspondência ao roteiro, directório, FFmpeg, codec, Whisper e outros parâmetros técnicos não são expostos ali. A subaba **Serviços e modelos** continua disponível para credenciais de LLM, TTS, Nano Banana, TikTok, Postiz e integrações que não são fontes de materiais. `INNERTUBE_API_KEY` não pertence a esta página; permanece no documento de cada conta em **Configurações > Contas Google**.
 
 ## Gestão de Canais, edição e vídeos recentes
 
@@ -428,11 +436,11 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
-A alternativa Apify não usa o dataset, parâmetros, execução ou estado da alternativa Kaggle. Configure o **Apify API Token**, o **Apify Actor ID**, o intervalo de consulta e o limite da execução em **Configuração API**. Na aba, informe até três palavras-chave, período, máximo de resultados, Shorts, duração, idioma das legendas, ordenação e filtros de legendas. O botão **Pesquisar no Apify** inicia manualmente o actor `streamers~youtube-scraper`, consulta o estado do run, carrega o dataset, normaliza os vídeos, limpa SRT, calcula VSC Ratio, tenta resumir transcrições através do LLM configurado e disponibiliza resultados JSON/CSV. O histórico resumido é guardado em `storage/state/niche_apify_runs.json`; não há gravação automática no Airtable do workflow anexado.
+A alternativa Apify não usa o dataset, parâmetros, execução ou estado da alternativa Kaggle. Configure o **Apify API Token**, o **Apify Actor ID**, o intervalo de consulta e o limite da execução em **Configuração API > API Keys > Serviços e modelos**. Na aba, informe até três palavras-chave, período, máximo de resultados, Shorts, duração, idioma das legendas, ordenação e filtros de legendas. O botão **Pesquisar no Apify** inicia manualmente o actor `streamers~youtube-scraper`, consulta o estado do run, carrega o dataset, normaliza os vídeos, limpa SRT, calcula VSC Ratio, tenta resumir transcrições através do LLM configurado e disponibiliza resultados JSON/CSV. O histórico resumido é guardado em `storage/state/niche_apify_runs.json`; não há gravação automática no Airtable do workflow anexado.
 
 ## AI Influencers: Personagens, Redes Sociais e Tutorial Meta
 
@@ -454,7 +462,7 @@ No modo automático de **Cortes**, a aplicação não inventa uma selecção vir
 
 ## Criação de Vídeos — IA editorial e pacotes criativos
 
-O formulário permite escrever manualmente o **Tópico ou briefing** ou clicar em **Gerar tópico/briefing com IA**. O botão usa o provider LLM, Base URL, API key e modelo guardados em **Configuração API > API Keys**, incorpora a descrição, o nicho e o Blueprint do canal e coloca o resultado no campo para revisão. Abrir a página não inicia chamadas externas.
+O formulário permite escrever manualmente o **Tópico ou briefing** ou clicar em **Gerar tópico/briefing com IA**. O botão usa o provider LLM, Base URL, API key e modelo guardados em **Configuração API > API Keys > Serviços e modelos**, incorpora a descrição, o nicho e o Blueprint do canal e coloca o resultado no campo para revisão. Abrir a página não inicia chamadas externas.
 
 Depois do tópico, clique em **Gerar títulos e thumbnails com IA**. O Thunderbolt solicita pelo menos 20 títulos candidatos e 3–5 variantes de thumbnail, aplica as regras das referências empacotadas em `seed/references/` e guarda a variante escolhida na task. O título aparece pré-preenchido no Upload. A thumbnail guarda conceito, texto de até quatro palavras, composição, paleta, prompt e sinergia com o título; se não existir um provider de imagem configurado, fica com estado **Prompt de thumbnail pronto — imagem pendente de provider de imagem**, sem criar um ficheiro artificial.
 
@@ -472,7 +480,7 @@ A área **Teste de vozes**, dentro de **Configurações > Configuração API**, 
 
 ## Upload, Postiz e Upload directo
 
-A subaba **Postiz**, dentro de **Upload**, permite carregar as integrações Postiz, seleccionar o canal ligado e enviar vídeos MP4 através da Public API. Configure **Activar Postiz como fallback final**, **Postiz API key**, **Postiz Public API Base URL**, **Postiz MCP URL** e, opcionalmente, o ID da integração padrão em **Configuração API > API Keys**. A API key é enviada como valor bruto do cabeçalho `Authorization`; o upload usa `POST /upload` e a publicação usa `POST /posts`.
+A subaba **Postiz**, dentro de **Upload**, permite carregar as integrações Postiz, seleccionar o canal ligado e enviar vídeos MP4 através da Public API. Configure **Activar Postiz como fallback final**, **Postiz API key**, **Postiz Public API Base URL**, **Postiz MCP URL** e, opcionalmente, o ID da integração padrão em **Configuração API > API Keys > Serviços e modelos**. A API key é enviada como valor bruto do cabeçalho `Authorization`; o upload usa `POST /upload` e a publicação usa `POST /posts`.
 
 O botão de envio YouTube segue a ordem fixa **1. API Oficial, 2. Upload directo, 3. Postiz**. A API Oficial regista no storage local até cinco envios bem-sucedidos por dia por conta Gmail. Quando a quota é atingida ou o método falha, o Thunderbolt valida o `credentials.json` e tenta o Upload directo. Postiz só é tentado como último recurso e apenas quando está activo, com API key e integração válida.
 
@@ -498,7 +506,7 @@ A aba **Limpador de Metadados** recebe somente vídeos externos já prontos. O f
 
 A descrição combina **Preview**, **Links** e **Timestamps**, seguindo a estrutura do workflow `YTBMetadataGenerator.json`. O preview recomendado tem entre 100 e 200 caracteres; os capítulos devem começar por `00:00`. O manifesto JSON descarregado contém os campos para um fluxo posterior de upload. Esta adaptação local não faz scraping automático via RSS/Apify nem publica directamente no YouTube.
 
-Se a limpeza falhar, confirme a disponibilidade do FFmpeg em **Configurações > Configuração API > Caminho FFmpeg** ou execute `doctor`. O processo usa `-map_metadata -1` para remover os metadados existentes e `-c copy` para evitar uma re-encodificação desnecessária sempre que o contentor permitir.
+Se a limpeza falhar, execute `doctor` para confirmar a disponibilidade do FFmpeg e valide a instalação de `imageio-ffmpeg`; o caminho técnico é detectado internamente e não é configurado na subaba de fontes. O processo usa `-map_metadata -1` para remover os metadados existentes e `-c copy` para evitar uma re-encodificação desnecessária sempre que o contentor permitir.
 
 ## 11. Problemas frequentes
 

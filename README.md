@@ -22,12 +22,12 @@ A primeira versão implementa a camada UI independente com:
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados, Clip Generator local em Cortes e Editor Python inspirado no PYEdit para vídeos e scripts locais |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, fallback ordenado API Oficial → Upload directo → Postiz, upload de MP4 para Postiz via API key/MCP configurável, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Configurações Técnicas | Provedores LLM, OpenAI/NVIDIA NIM com API key, Base URL e selector de modelos, TTS/voz, preview de vozes, Suno, materiais, Whisper, FFmpeg, OAuth YouTube, contas Google/YouTube para canais em lote com e-mail, Client ID, Client Secret e sessionInfo por conta, cartões expansíveis por nome/e-mail, documento credentials.json criado automaticamente e eliminação individual, cookies SID/SSID/HSID/APISID/SAPISID no documento JSON, Data API Key opcional, Kaggle Username/API Key, Apify API Token/Actor ID/limites, Upload directo, Postiz API key/Base URL/MCP URL/integração padrão, TikTok Client ID/Secret e Upload-Post |
+| Configurações | **Contas Google**, **Configuração API** e **Notificações**; API Keys divididas entre **Serviços e modelos** e **Fontes de materiais**, com várias chaves independentes por fonte, além de contas Google/YouTube por cartão, `INNERTUBE_API_KEY` no documento da conta, providers, TTS, Nano Banana, Postiz, TikTok e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 ## Upload directo — credenciais por conta e por canal
 
-O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa um único documento JSON por conta Google. Em **Configurações Técnicas > Contas Google/YouTube — canais em lote**, cada conta aparece como um cartão expansível identificado por **nome — e-mail**. Dentro do cartão existe o uploader **Subir documento de cookies/credenciais** e o único campo técnico permitido na UI, **sessionInfo token desta conta Google**. Cookies, `INNERTUBE_API_KEY`, `chunk_size` e `delegated_session_ids` continuam exclusivamente no documento.
+O Upload directo baseado no [YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api) usa um único documento JSON por conta Google. Em **Configurações > Contas Google > Contas Google/YouTube — canais em lote**, cada conta aparece como um cartão expansível identificado por **nome — e-mail**. Dentro do cartão existe o uploader **Subir documento de cookies/credenciais** e o único campo técnico permitido na UI, **sessionInfo token desta conta Google**. Cookies, `INNERTUBE_API_KEY`, `chunk_size` e `delegated_session_ids` continuam exclusivamente no documento.
 
 O botão **Adicionar outra conta Gmail** fica abaixo de uma divisória, fora dos cartões existentes. Ao criar uma conta, o Thunderbolt cria imediatamente `credentials.json` com placeholders vazios. Um upload completo ou parcial é incorporado por merge: os cookies enviados actualizam apenas os cookies fornecidos e valores como `sessionInfo`, `INNERTUBE_API_KEY`, `chunk_size` e `delegated_session_ids` existentes não são apagados. O alerta **Documento incompleto: SID, SSID, HSID, APISID, SAPISID, sessionInfo, INNERTUBE_API_KEY** permanece visível por conta quando necessário.
 
@@ -38,11 +38,15 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.75
+## Navegação da UI 0.2.76
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais** e **Tutorial Meta**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
-Dentro de **Configurações > Contas Google**, a UI contém os cartões expansíveis de contas Google/YouTube, `sessionInfo`, documentos de Upload directo, `INNERTUBE_API_KEY`, o formulário **Adicionar outra conta Gmail** e a configuração global do YouTube (OAuth Client ID, OAuth Client Secret e YouTube Data API Key). A página **Configuração API** contém as restantes API Keys, providers, modelos, serviços, materiais, Nano Banana, TikTok, Postiz e o **Teste de vozes**.
+Dentro de **Configurações > Contas Google**, a UI contém os cartões expansíveis de contas Google/YouTube, `sessionInfo`, documentos de Upload directo, `INNERTUBE_API_KEY`, o formulário **Adicionar outra conta Gmail** e a configuração global do YouTube (OAuth Client ID, OAuth Client Secret e YouTube Data API Key). A página **Configuração API** contém as restantes credenciais, providers, modelos, serviços, Nano Banana, TikTok e Postiz.
+
+Em **Configuração API > API Keys**, a subaba **Fontes de materiais** segue o padrão do MoneyPrinterTurbo: seleccione uma fonte — **Pexels**, **Pixabay**, **Coverr**, **WaveSpeed AI**, **LoomLoom**, **TwelveLabs** ou **Ficheiros locais** — e introduza as API keys dessa fonte. **Adicionar outra chave** cria outra linha para a mesma fonte; as listas são guardadas separadamente por fonte, deduplicadas e exportadas para o `config.toml` do motor como arrays para rotação. A subaba não expõe endpoint, proxy, qualidade, codec, FFmpeg, Whisper, directório ou filtros técnicos: esses valores permanecem internalizados e a fonte local não requer credencial.
+
+A subaba **Serviços e modelos** mantém as credenciais de providers e serviços que não são fontes de materiais. A chave `gemini_image_api_key` da Nano Banana continua separada de `gemini_api_key` do LLM textual. `INNERTUBE_API_KEY` permanece exclusivamente em **Configurações > Contas Google**, dentro da configuração da conta, e não é duplicada em API Keys.
 
 A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** mantém um histórico persistente de conclusões e falhas, reconcilia estados escritos por componentes locais e disponibiliza um checkbox independente para cada operação mapeada.
 
@@ -58,7 +62,7 @@ Abaixo do cartão, a secção **Últimos 10 vídeos publicados** usa o feed púb
 
 ## Criação de Vídeos — geração editorial por canal
 
-A aba **Criação de Vídeos** permite escrever manualmente o **Tópico ou briefing** ou usar **Gerar tópico/briefing com IA**. A geração usa o provider LLM configurado localmente em **Configurações Técnicas > API Keys**, incorpora o Blueprint, a descrição, o idioma e a voz do canal e só ocorre depois do clique do utilizador. Se não houver credenciais ou modelo, a UI mostra uma mensagem accionável e não inventa conteúdo.
+A aba **Criação de Vídeos** permite escrever manualmente o **Tópico ou briefing** ou usar **Gerar tópico/briefing com IA**. A geração usa o provider LLM configurado localmente em **Configuração API > API Keys > Serviços e modelos**, incorpora o Blueprint, a descrição, o idioma e a voz do canal e só ocorre depois do clique do utilizador. Se não houver credenciais ou modelo, a UI mostra uma mensagem accionável e não inventa conteúdo.
 
 Entre **Canal** e **Estilo wide**, a UI mostra o Blueprint padrão resolvido do canal e a voz associada. Quando não existe configuração, apresenta **SEM BLUEPRINT CONFIGURADO**. Depois do briefing, **Gerar títulos e thumbnails com IA** cria pelo menos 20 candidatos de título e 3–5 variantes de thumbnail. Os títulos seguem as fórmulas e regras de curiosidade, especificidade, emoção, keyword inicial e humanização fornecidas nas referências empacotadas; as thumbnails guardam conceito, overlay de até quatro palavras, composição, cores, prompt e sinergia com o título.
 
@@ -68,7 +72,7 @@ No modo **Lote geral**, o Thunderbolt remove a selecção parcial e processa aut
 
 ## OpenAI/ NVIDIA NIM — descoberta de modelos
 
-Em **Configurações Técnicas > LLM — providers e modelos**, a área anteriormente chamada **OpenAI — API key, Base URL e modelo** passa a chamar-se **OpenAI/ NVIDIA NIM — API key, Base URL e modelo**. O campo de modelo manual usa o parâmetro `help` suportado pelas versões do Streamlit instaladas pelo Thunderbolt, evitando o erro de argumento `help_text`. O provider interno continua a ser `openai`, para preservar a compatibilidade com o MoneyPrinterTurbo e com os restantes endpoints OpenAI-compatible.
+Em **Configuração API > API Keys > Serviços e modelos > LLM — providers e modelos**, a área anteriormente chamada **OpenAI — API key, Base URL e modelo** passa a chamar-se **OpenAI/ NVIDIA NIM — API key, Base URL e modelo**. O campo de modelo manual usa o parâmetro `help` suportado pelas versões do Streamlit instaladas pelo Thunderbolt, evitando o erro de argumento `help_text`. O provider interno continua a ser `openai`, para preservar a compatibilidade com o MoneyPrinterTurbo e com os restantes endpoints OpenAI-compatible.
 
 A Base URL predefinida para NVIDIA NIM é `https://integrate.api.nvidia.com/v1`. Depois de inserir a API key, clique em **Consultar/actualizar modelos NIM**. O Thunderbolt consulta a Base URL acrescentando `/models`, lê os identificadores do formato OpenAI (`data[].id`) e apresenta-os num selector. O modelo escolhido é guardado em `openai_model_name` e é sincronizado para o `config.toml` do motor.
 
@@ -165,9 +169,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.56 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.56
+npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install
+npx.cmd --yes @danhachuel/thunderbolt@0.2.76 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.2.76
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -191,13 +195,13 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em Configurações Técnicas. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.56 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em **Configuração API > API Keys > Serviços e modelos**. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.76 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 
 O **Editor Python** combina o recorte seguro do [PYEdit](https://github.com/Congren/PYEdit) com o armazenamento local do Thunderbolt. Na subaba **Vídeos**, pode escolher um vídeo já gerado e registado nos artefactos da pipeline, indicar qualquer pasta local de vídeos ou fazer upload manual. A página não inicia nenhuma edição ao ser aberta.
 
-As operações disponíveis são cortar trecho, remover áudio, extrair áudio, substituir áudio, alterar velocidade e redimensionar vídeo. Cada operação cria uma cópia em `storage/python_editor/outputs/`, preserva o original, regista um histórico separado em `storage/state/python_editor_edits.json` e permite descarregar o resultado e um manifesto JSON. As operações usam FFmpeg local, aproveitando o caminho configurado em **Configurações Técnicas** ou o fallback `imageio-ffmpeg`.
+As operações disponíveis são cortar trecho, remover áudio, extrair áudio, substituir áudio, alterar velocidade e redimensionar vídeo. Cada operação cria uma cópia em `storage/python_editor/outputs/`, preserva o original, regista um histórico separado em `storage/state/python_editor_edits.json` e permite descarregar o resultado e um manifesto JSON. As operações usam FFmpeg local, aproveitando a detecção interna e o fallback `imageio-ffmpeg`; a subaba de fontes não expõe caminhos técnicos.
 
 Na subaba **Código Python**, pode criar e guardar scripts em `storage/python_editor/scripts/` ou carregar scripts existentes. Por segurança, a UI não executa código Python, não possui botão de execução e não executa scripts automaticamente.
 
@@ -284,7 +288,7 @@ O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áu
 
 ## Teste de vozes
 
-A área **Configurações > Configurações Técnicas > Teste de vozes** é isolada da pipeline.
+A área **Configurações > Configuração API > Teste de vozes** é isolada da pipeline.
  Permite escolher Edge/Azure Speech ou um provider HTTP configurado, seleccionar voz/ID, alterar a velocidade, sintetizar uma amostra, reproduzi-la e descarregá-la. O áudio é guardado em `storage/voice_previews/` e nunca altera vídeos ou tarefas. Se uma instalação antiga não tiver `edge-tts`, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o instalador detecta a dependência em falta sem reinstalar componentes válidos.
 
 ## MCP e integrações externas opcionais
@@ -302,7 +306,7 @@ As portas iniciais são `3123` para Short Video Maker, `3001` para a API backend
 
 A subaba **Vídeos**, dentro de **Criação de Vídeos** ou **Criação de Músicas**, mostra o backlog e permite iniciar/parar tarefas; deixou de existir como botão principal na barra lateral.
 
-A página **Configurações Técnicas** contém apenas o TikTok Client ID e o TikTok Client Secret para TikTok.
+As credenciais do TikTok ficam em **Configuração API > API Keys > Serviços e modelos**, no expander próprio de TikTok.
  Para YouTube, o bloco principal pede o OAuth Client ID e Client Secret; a Data API Key, se usada, fica numa área opcional separada. Client ID + Client Secret não formam uma Data API Key nem um token OAuth.
  Redirect URI, scopes, autorização OAuth e tokens são geridos no TikTok for Developers Playground. O adaptador rejeita o upload quando faltam credenciais ou OAuth, em vez de indicar sucesso falso.
 

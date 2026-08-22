@@ -28,3 +28,30 @@ def test_tiktok_settings_are_not_added_to_mpt_config():
     text = str(payload)
     assert "redirect_uri" not in text
     assert "tiktok_client_key" not in text
+
+
+def test_moneyprinter_config_exports_canonical_multi_key_sources_as_arrays():
+    settings = {
+        "video_source": "pixabay",
+        "material_api_keys": {
+            "pexels": ["pexels-1", "pexels-1", "pexels-2"],
+            "pixabay": ["pixabay-1", "pixabay-2"],
+            "wavespeed": ["wave-1"],
+            "loomloom": ["loom-1", "loom-2"],
+            "twelvelabs": ["labs-1"],
+        },
+    }
+    payload = build_moneyprinter_config(settings)
+    app = payload["app"]
+    assert app["video_source"] == "pixabay"
+    assert app["pexels_api_keys"] == ["pexels-1", "pexels-2"]
+    assert app["pixabay_api_keys"] == ["pixabay-1", "pixabay-2"]
+    assert app["wavespeed_api_keys"] == ["wave-1"]
+    assert app["loomloom_api_keys"] == ["loom-1", "loom-2"]
+    assert app["twelvelabs_api_keys"] == ["labs-1"]
+
+
+def test_moneyprinter_config_accepts_local_source_and_legacy_fallback():
+    payload = build_moneyprinter_config({"video_source": "local", "pixabay_api_keys": "legacy-a, legacy-b"})
+    assert payload["app"]["video_source"] == "local"
+    assert payload["app"]["pixabay_api_keys"] == ["legacy-a", "legacy-b"]
