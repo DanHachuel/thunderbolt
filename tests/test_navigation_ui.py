@@ -105,9 +105,10 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     assert 'Alinhar materiais ao roteiro' not in settings_page
 
 
-def test_language_picker_is_positioned_after_deploy_before_main_menu():
-    assert 'right:1.5rem' in MAIN_SOURCE
-    assert '[data-testid="stAppDeployButton"] { width:3.3rem' in MAIN_SOURCE
-    assert '[data-testid="stMainMenu"] { width:1.5rem' in MAIN_SOURCE
-    assert 'transform:translateX(1rem) !important' in MAIN_SOURCE
-    assert 'right:8rem' not in MAIN_SOURCE
+def test_language_picker_uses_native_layout_without_touching_streamlit_toolbar():
+    assert '"Language / 语言"' in MAIN_SOURCE
+    assert 'top_language_code_selector' in MAIN_SOURCE
+    assert 'st.popover' not in MAIN_SOURCE
+    assert 'stAppDeployButton' not in MAIN_SOURCE
+    assert 'stMainMenu' not in MAIN_SOURCE
+    assert 'right:1.5rem' not in MAIN_SOURCE

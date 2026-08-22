@@ -91,7 +91,7 @@ def language_label(value: Any, *, include_code: bool = True) -> str:
     code = language_code(value)
     item = LANGUAGE_BY_CODE[code]
     suffix = f" ({item['code']})" if include_code else ""
-    return f"{item['flag']} {item['name']}{suffix}"
+    return f"{item['name']}{suffix} {item['flag']}"
 
 
 def language_option_labels(*, include_code: bool = True) -> list[str]:

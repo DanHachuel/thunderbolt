@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.80
+> **Versão deste manual:** 0.2.81
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -192,9 +192,9 @@ npx --yes @danhachuel/thunderbolt install
 
 ## Idiomas e selector de bandeira
 
-O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTurbo: **🇺🇸 Inglês (en)**, **🇨🇳 Chinês Simplificado (zh)**, **🇩🇪 Alemão (de)**, **🇻🇳 Vietnamita (vi)**, **🇹🇷 Turco (tr)**, **🇧🇷 Português (pt)**, **🇷🇺 Russo (ru)**, **🇪🇸 Espanhol (es)**, **🇮🇩 Indonésio (id)** e **🇮🇹 Italiano (it)**. A criação de vídeos mantém ainda os rótulos históricos para não invalidar Blueprints e tarefas antigas.
+O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTurbo: **Inglês (en) 🇺🇸**, **Chinês Simplificado (zh) 🇨🇳**, **Alemão (de) 🇩🇪**, **Vietnamita (vi) 🇻🇳**, **Turco (tr) 🇹🇷**, **Português (pt) 🇧🇷**, **Russo (ru) 🇷🇺**, **Espanhol (es) 🇪🇸**, **Indonésio (id) 🇮🇩** e **Italiano (it) 🇮🇹**. A criação de vídeos mantém ainda os rótulos históricos para não invalidar Blueprints e tarefas antigas.
 
-No canto superior direito, imediatamente **à direita de Deploy e antes do menu principal**, o botão com a bandeira actual abre o selector do **Idioma da interface**. O espaço à esquerda de **Deploy** fica livre para o indicador de execução do Streamlit. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mostra bandeira, nome e código, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
+No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra cada opção como **nome do idioma + bandeira**. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mostra bandeira, nome e código, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
 ## 4. Diagnóstico antes de iniciar
 

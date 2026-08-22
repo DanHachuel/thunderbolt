@@ -37,7 +37,7 @@ from hermes_ui.material_sources import material_api_keys, material_source_catalo
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
-from hermes_ui.languages import LANGUAGE_CODES, language_code, language_flag, language_label, ui_text, video_language_label, video_language_options
+from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label, ui_text, video_language_label, video_language_options
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -188,24 +188,7 @@ st.markdown("""
 [data-testid="stRadio"] label { border:1px solid #2a4052; border-radius:12px; padding:.65rem .8rem; background:#101b25; min-height:4.3rem; }
 [data-testid="stRadio"] label:has(input:checked) { border-color:#c59b55; background:linear-gradient(145deg, rgba(96,71,33,.42), rgba(17,27,37,.95)); }
 [data-testid="stStatusWidget"] { border-color:#2a4052 !important; background:#101b25 !important; }
-/* Selector compacto de idioma, visualmente colocado à direita do Deploy e antes do menu. */
-[data-testid="stPopover"] { position:fixed !important; top:0.20rem !important; right:1.5rem !important; width:1.5rem !important; min-width:1.5rem !important; max-width:1.5rem !important; z-index:100000 !important; pointer-events:auto !important; }
-/* Reservar uma faixa própria entre Deploy e o menu sem deslocar o indicador de execução. */
-[data-testid="stAppDeployButton"] { width:3.3rem !important; min-width:3.3rem !important; max-width:3.3rem !important; }
-[data-testid="stAppDeployButton"] button { width:3.3rem !important; min-width:3.3rem !important; max-width:3.3rem !important; padding:0 !important; justify-content:center !important; }
-[data-testid="stMainMenu"] { width:1.5rem !important; min-width:1.5rem !important; max-width:1.5rem !important; transform:translateX(1rem) !important; }
-[data-testid="stPopover"] > div,
-[data-testid="stPopover"] [data-testid="stPopoverButton"] { width:1.5rem !important; min-width:1.5rem !important; max-width:1.5rem !important; }
-[data-testid="stPopover"] [data-testid="stPopoverButton"] { height:2.25rem !important; padding:0 !important; border:1px solid #2a4052 !important; border-radius:8px !important; background:#101b25 !important; }
-[data-testid="stPopover"] [data-testid="stPopoverButton"] p { font-size:1rem !important; line-height:1 !important; margin:0 !important; }
-[data-testid="stPopover"] [data-testid="stPopoverButton"] [data-testid="stIconMaterial"] { display:none !important; }
-[data-testid="stPopover"] [data-testid="stPopoverBody"] { min-width:18rem; }
-@media (max-width: 700px) {
-  [data-testid="stPopover"] { right:1.5rem !important; }
-  [data-testid="stAppDeployButton"] { width:3.3rem !important; min-width:3.3rem !important; max-width:3.3rem !important; }
-  [data-testid="stAppDeployButton"] button { width:3.3rem !important; min-width:3.3rem !important; max-width:3.3rem !important; }
-  [data-testid="stMainMenu"] { width:1.5rem !important; min-width:1.5rem !important; max-width:1.5rem !important; transform:translateX(1rem) !important; }
-}
+/* O menu de idiomas usa layout nativo da aplicação; o toolbar do Streamlit não é alterado. */
 
 /* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */
 [data-testid="stMultiSelectTagsContainer"] span[data-tag] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
@@ -263,20 +246,21 @@ def save_video_language(value: str) -> str:
 
 
 def render_ui_language_picker(language: str) -> None:
-    """Render the flag-only popover over the Streamlit toolbar area."""
+    """Render the MoneyPrinterTurbo-style native language menu in app layout."""
     current = language_code(language)
-    with st.popover(language_flag(current), help="Trocar idioma da interface"):
-        st.markdown(f"**{ui_text('Idioma da interface', current)}**")
+    _spacer, language_col = st.columns([5.2, 1.5])
+    with language_col:
         selected = st.selectbox(
-            ui_text("Idioma da interface", current),
+            "Language / 语言",
             list(LANGUAGE_CODES),
             index=list(LANGUAGE_CODES).index(current),
             format_func=language_label,
-            key="ui_language_picker",
+            key="top_language_code_selector",
+            label_visibility="collapsed",
         )
-        if selected != current:
-            save_ui_language(selected)
-            st.rerun()
+    if selected != current:
+        save_ui_language(selected)
+        st.rerun()
 
 
 def card(label: str, value: str | int, note: str = ""):
