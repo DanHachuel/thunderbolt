@@ -208,6 +208,7 @@ DEFAULTS: dict[str, Any] = {
         "postiz_auto_publish": False,
         "tiktok_client_key": "",
         "tiktok_client_secret": "",
+        "tiktok_accounts": [],
         "tiktok_redirect_uri": "http://localhost:3030/oauth/tiktok/callback",
         "tiktok_scopes": "user.info.basic,video.publish,video.upload",
         "tiktok_access_token": "",

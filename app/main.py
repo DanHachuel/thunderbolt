@@ -40,6 +40,7 @@ from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesiz
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
+from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
@@ -752,6 +753,159 @@ def render_blueprints():
             except Exception as exc:
                 with st.expander(f"Inválido — {path.name}"):
                     st.error(str(exc))
+
+
+def _tiktok_accounts_from_settings(settings: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_accounts = settings.get("tiktok_accounts")
+    if not isinstance(raw_accounts, list) or not raw_accounts:
+        raw_accounts = settings.get("tiktok_profiles", [])
+    if not isinstance(raw_accounts, list):
+        return []
+    accounts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in raw_accounts:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            reference = normalize_tiktok_reference(str(raw.get("url") or raw.get("handle") or raw.get("username") or raw.get("id") or ""))
+        except ValueError:
+            continue
+        account = {**raw, **reference}
+        account["name"] = str(raw.get("name") or raw.get("label") or reference["username"]).strip()
+        account["bio"] = str(raw.get("bio") or raw.get("description") or "").strip()
+        account["source"] = str(raw.get("source") or raw.get("origin") or "manual").strip()
+        key = account["id"]
+        if key in seen:
+            continue
+        seen.add(key)
+        accounts.append(account)
+    return accounts
+
+
+def _save_tiktok_accounts(accounts: list[dict[str, Any]]) -> None:
+    settings = read_json("settings.json", {})
+    settings["tiktok_accounts"] = accounts
+    write_json("settings.json", settings)
+
+
+def _upsert_tiktok_account(account: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    settings = read_json("settings.json", {})
+    accounts = _tiktok_accounts_from_settings(settings)
+    normalized = normalize_tiktok_reference(str(account.get("url") or account.get("handle") or account.get("username") or ""))
+    merged = {**account, **normalized}
+    merged["name"] = str(account.get("name") or normalized["username"]).strip() or normalized["username"]
+    existing_index = next((index for index, item in enumerate(accounts) if item.get("id") == normalized["id"] or item.get("username") == normalized["username"]), None)
+    created = existing_index is None
+    if existing_index is None:
+        accounts.append(merged)
+    else:
+        accounts[existing_index] = {**accounts[existing_index], **merged}
+    _save_tiktok_accounts(accounts)
+    return accounts, created
+
+
+def _tiktok_account_metric(account: dict[str, Any], key: str, label: str) -> str:
+    value = account.get(key)
+    return f"{label}: {value:,}" if isinstance(value, int) else f"{label}: —"
+
+
+def render_tiktok_accounts():
+    st.title("Contas TikTok")
+    st.caption("Pesquisa pública e cadastro manual de contas TikTok para alimentar o selector de destino no Upload. Esta área não usa OAuth, API de publicação nem lote.")
+    settings = read_json("settings.json", {})
+    accounts = _tiktok_accounts_from_settings(settings)
+
+    search_tab, manual_tab, library_tab = st.tabs(["Pesquisa pública", "Cadastro manual", "Contas cadastradas"])
+    with search_tab:
+        st.subheader("Pesquisar perfil público")
+        st.info("A pesquisa consulta apenas a página pública do perfil e pode devolver dados incompletos. Se o TikTok bloquear a consulta, utilize o cadastro manual.")
+        with st.form("tiktok_public_lookup_form"):
+            lookup_source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta ou @conta", key="tiktok_public_lookup_source")
+            lookup_submitted = st.form_submit_button("Pesquisar perfil público", type="primary", use_container_width=True)
+        if lookup_submitted:
+            result = fetch_public_tiktok_profile(lookup_source)
+            st.session_state["tiktok_public_lookup"] = {"ok": result.ok, "message": result.message, "data": result.data}
+            (st.success if result.ok else st.warning)(result.message)
+        lookup = st.session_state.get("tiktok_public_lookup", {})
+        lookup_data = lookup.get("data") if isinstance(lookup, dict) else None
+        if isinstance(lookup_data, dict) and lookup_data.get("url"):
+            with st.container(border=True):
+                st.subheader(str(lookup_data.get("name") or lookup_data.get("handle") or "Perfil TikTok"))
+                st.caption(f"{lookup_data.get('handle', '')} · {lookup_data.get('public_url') or lookup_data.get('url')}")
+                if lookup_data.get("bio"):
+                    st.write(lookup_data["bio"])
+                metric_cols = st.columns(4)
+                with metric_cols[0]: st.metric("Seguidores", lookup_data.get("subscriber_count") if lookup_data.get("subscriber_count") is not None else "—")
+                with metric_cols[1]: st.metric("Seguindo", lookup_data.get("following_count") if lookup_data.get("following_count") is not None else "—")
+                with metric_cols[2]: st.metric("Gostos", lookup_data.get("likes_count") if lookup_data.get("likes_count") is not None else "—")
+                with metric_cols[3]: st.metric("Vídeos", lookup_data.get("video_count") if lookup_data.get("video_count") is not None else "—")
+                display_name = st.text_input("Nome da conta", value=str(lookup_data.get("name") or lookup_data.get("username") or ""), key="tiktok_lookup_display_name")
+                notes = st.text_area("Observações internas", value=str(lookup_data.get("notes") or ""), key="tiktok_lookup_notes", height=80)
+                if st.button("Cadastrar conta TikTok", type="primary", use_container_width=True, key="tiktok_register_public_account"):
+                    try:
+                        stored = {**lookup_data, "name": display_name.strip() or lookup_data.get("username", ""), "notes": notes.strip(), "source": "public_lookup"}
+                        _upsert_tiktok_account(stored)
+                        st.session_state.pop("tiktok_public_lookup", None)
+                        st.success("Conta TikTok cadastrada e disponível no selector de Upload.")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+
+    with manual_tab:
+        st.subheader("Cadastrar conta manualmente")
+        with st.form("tiktok_manual_account_form"):
+            manual_source = st.text_input("@handle ou URL pública", placeholder="@minhaconta", key="tiktok_manual_source")
+            manual_name = st.text_input("Nome da conta", placeholder="Nome de apresentação", key="tiktok_manual_name")
+            manual_notes = st.text_area("Observações internas", height=90, key="tiktok_manual_notes")
+            manual_submitted = st.form_submit_button("Guardar cadastro manual", type="primary", use_container_width=True)
+        if manual_submitted:
+            try:
+                reference = normalize_tiktok_reference(manual_source)
+                _upsert_tiktok_account({**reference, "name": manual_name.strip() or reference["username"], "notes": manual_notes.strip(), "source": "manual"})
+                st.success("Conta TikTok cadastrada manualmente.")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+
+    with library_tab:
+        st.subheader(f"Contas TikTok cadastradas ({len(accounts)})")
+        if not accounts:
+            st.info("Ainda não existem contas TikTok. Use Pesquisa pública ou Cadastro manual para adicionar a primeira conta.")
+        for account in accounts:
+            account_id = str(account.get("id") or account.get("username"))
+            with st.container(border=True):
+                card_cols = st.columns([0.18, 2.7, 1.1, 1.1, 0.8])
+                with card_cols[0]:
+                    if account.get("avatar_url"):
+                        st.image(account["avatar_url"], width=52)
+                    else:
+                        st.markdown("### TT")
+                with card_cols[1]:
+                    st.write(f"**{account.get('name') or account.get('username')}**")
+                    st.caption(f"{account.get('handle') or '@' + str(account.get('username', ''))} · {account.get('public_url') or account.get('url')}")
+                    st.caption(str(account.get("source") or "manual").replace("_", " ").title())
+                with card_cols[2]: st.caption(_tiktok_account_metric(account, "subscriber_count", "Seguidores"))
+                with card_cols[3]: st.caption(_tiktok_account_metric(account, "video_count", "Vídeos"))
+                with card_cols[4]:
+                    if st.button("Apagar", key=f"delete_tiktok_account_{account_id}"):
+                        _save_tiktok_accounts([item for item in accounts if str(item.get("id")) != account_id])
+                        st.success("Conta TikTok removida.")
+                        st.rerun()
+                with st.expander("Editar conta", expanded=False):
+                    with st.form(f"edit_tiktok_account_{account_id}"):
+                        edited_name = st.text_input("Nome da conta", value=str(account.get("name") or account.get("username") or ""), key=f"edit_tiktok_name_{account_id}")
+                        edited_source = st.text_input("@handle ou URL pública", value=str(account.get("public_url") or account.get("url") or account.get("handle") or ""), key=f"edit_tiktok_source_{account_id}")
+                        edited_notes = st.text_area("Observações internas", value=str(account.get("notes") or ""), key=f"edit_tiktok_notes_{account_id}", height=80)
+                        edit_submitted = st.form_submit_button("Guardar conta", type="primary", use_container_width=True)
+                    if edit_submitted:
+                        try:
+                            reference = normalize_tiktok_reference(edited_source)
+                            updated = {**account, **reference, "name": edited_name.strip() or reference["username"], "notes": edited_notes.strip(), "source": account.get("source") or "manual"}
+                            _upsert_tiktok_account(updated)
+                            st.success("Conta TikTok actualizada.")
+                            st.rerun()
+                        except ValueError as exc:
+                            st.error(str(exc))
 
 
 def render_tiktok_prompt_masters():
@@ -2509,7 +2663,7 @@ def render_upload_postiz():
 
 
 UPLOAD_DESTINATION_TARGET_KEYS = {
-    "TikTok": "tiktok_profiles",
+    "TikTok": "tiktok_accounts",
     "Instagram": "instagram_profiles",
     "Facebook Pages": "facebook_pages",
 }
@@ -2539,6 +2693,8 @@ def upload_targets_for_destination(destination: str, channels: list[dict[str, An
     if not setting_key:
         return []
     configured_targets = settings.get(setting_key, [])
+    if destination == "TikTok" and (not isinstance(configured_targets, list) or not configured_targets):
+        configured_targets = settings.get("tiktok_profiles", [])
     if not isinstance(configured_targets, list):
         return []
     targets: list[Any] = []
@@ -2553,12 +2709,14 @@ def upload_targets_for_destination(destination: str, channels: list[dict[str, An
 def render_upload_destination_target(destination: str, channels: list[dict[str, Any]], settings: dict[str, Any]) -> Any | None:
     options = upload_targets_for_destination(destination, channels, settings)
     destination_key = re.sub(r"[^a-z0-9]+", "_", destination.lower()).strip("_")
-    select_label = "Canal" if destination == "YouTube" else "Perfil / página"
-    empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else f"Nenhum {destination} configurado"
+    select_label = "Canal" if destination == "YouTube" else ("Conta TikTok" if destination == "TikTok" else "Perfil / página")
+    empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else ("Nenhuma conta TikTok cadastrada" if destination == "TikTok" else f"Nenhum {destination} configurado")
     if not options:
         st.selectbox(select_label, [empty_label], disabled=True, key=f"upload_target_{destination_key}")
         if destination == "YouTube":
             st.caption("Cadastre ou liste pelo menos um canal YouTube antes de escolher o destino de envio.")
+        elif destination == "TikTok":
+            st.caption("Cadastre uma conta em Pipeline TikTok > Contas TikTok antes de escolher o destino de envio.")
         else:
             st.caption(f"A lista de {destination} será ligada numa etapa própria de credenciais/API.")
         return None
@@ -3447,6 +3605,7 @@ def main():
     ]
     pipeline_tiktok_items = [
         ("Prompts Master", ":material/auto_awesome:", "Prompts Master"),
+        ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
     ]
     edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
@@ -3545,6 +3704,7 @@ def main():
         "Criação de Músicas": render_music_creation,
         "Roteiros": render_scripts,
         "Prompts Master": render_tiktok_prompt_masters,
+        "Contas TikTok": render_tiktok_accounts,
         "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Niche Finder Apify": render_niche_finder_apify,
