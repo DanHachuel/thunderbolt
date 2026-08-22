@@ -37,7 +37,7 @@ from hermes_ui.material_sources import material_api_keys, material_source_catalo
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
-from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label, ui_text, video_language_label, video_language_options
+from hermes_ui.languages import LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -246,17 +246,31 @@ def save_video_language(value: str) -> str:
 
 
 def render_ui_language_picker(language: str) -> None:
-    """Render the MoneyPrinterTurbo-style native language menu in app layout."""
+    """Render the native MoneyPrinterTurbo-style picker with local SVG flags."""
     current = language_code(language)
+    current_flag_uri = LANGUAGE_FLAG_DATA_URIS[current]
+    option_flag_css = "\n".join(
+        f'''[role="listbox"][aria-label="Language"] [role="option"][aria-posinset="{position}"] [data-item-hl]::before {{ content: ""; display: inline-block; width: 1.5rem; height: 1rem; margin-right: .55rem; flex: 0 0 auto; vertical-align: middle; background: url("{LANGUAGE_FLAG_DATA_URIS[code]}") center / cover no-repeat; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }}'''
+        for position, code in enumerate(LANGUAGE_CODES, start=1)
+    )
+    st.markdown(
+        f'''<style>
+        [data-testid="stSelectbox"]:has(input[aria-label="Language"]) label {{ display: block !important; visibility: visible !important; }}
+        [data-testid="stSelectbox"]:has(input[aria-label="Language"]) input {{ background-image: url("{current_flag_uri}") !important; background-repeat: no-repeat !important; background-position: .65rem center !important; background-size: 1.5rem 1rem !important; padding-left: 2.55rem !important; }}
+        [role="listbox"][aria-label="Language"] [data-item-hl] {{ display: flex; align-items: center; }}
+        {option_flag_css}
+        </style>''',
+        unsafe_allow_html=True,
+    )
     _spacer, language_col = st.columns([5.2, 1.5])
     with language_col:
         selected = st.selectbox(
-            "Language / 语言",
+            "Language",
             list(LANGUAGE_CODES),
             index=list(LANGUAGE_CODES).index(current),
-            format_func=language_label,
+            format_func=ui_language_menu_label,
             key="top_language_code_selector",
-            label_visibility="collapsed",
+            label_visibility="visible",
         )
     if selected != current:
         save_ui_language(selected)
@@ -700,16 +714,26 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
 
 
 def render_dashboard():
+    ui_language = current_ui_language()
     st.title("Thunderbolt")
-    st.caption("Interface local para operação e automação de conteúdo faceless")
+    st.caption(ui_text("Interface local para operação e automação de conteúdo faceless", ui_language))
     summary = pipeline_summary()
+    active_note = f'{summary["active_channels"]} {ui_text("activos", ui_language)}'
+    cards = [
+        ("Canais", summary["channels"], active_note),
+        ("Tarefas", summary["total_tasks"], ui_text("total registado", ui_language)),
+        ("A fazer", summary["pending"], ui_text("na pipeline", ui_language)),
+        ("Em execução", summary["doing"], ui_text("a decorrer", ui_language)),
+        ("Concluídos", summary["done"], ui_text("artefactos prontos", ui_language)),
+        ("Falhas", summary["failed"], ui_text("requerem atenção", ui_language)),
+    ]
     cols = st.columns(6)
-    for col, (label, value, note) in zip(cols, [("Canais", summary["channels"], f'{summary["active_channels"]} activos'), ("Tarefas", summary["total_tasks"], "total registado"), ("A fazer", summary["pending"], "na pipeline"), ("Em execução", summary["doing"], "a decorrer"), ("Concluídos", summary["done"], "artefactos prontos"), ("Falhas", summary["failed"], "requerem atenção")]):
+    for col, (label, value, note) in zip(cols, cards):
         with col:
-            card(label, value, note)
+            card(ui_text(label, ui_language), value, note)
     st.divider()
-    st.subheader("Pipeline")
-    st.caption("Filas locais e dependências da cascata")
+    st.subheader(ui_text("Pipeline", ui_language))
+    st.caption(ui_text("Filas locais e dependências da cascata", ui_language))
     queues = read_json("queues.json", {})
     blueprint_count = len(list_blueprint_files())
     for row_start in range(0, len(STAGES), 3):
@@ -717,9 +741,10 @@ def render_dashboard():
         for col, stage in zip(queue_cols, STAGES[row_start:row_start + 3]):
             with col:
                 if stage == "blueprint":
-                    card("Blueprints", blueprint_count, f"na biblioteca · {len(queues.get(stage, []))} tarefa(s) na fila")
+                    queue_note = f'{ui_text("na biblioteca", ui_language)} · {len(queues.get(stage, []))} {ui_text("tarefa(s) na fila", ui_language)}'
+                    card(ui_text("Blueprints", ui_language), blueprint_count, queue_note)
                 else:
-                    card(stage.title(), len(queues.get(stage, [])), "fila")
+                    card(ui_text(stage.title(), ui_language), len(queues.get(stage, [])), ui_text("fila", ui_language))
 
 
 def render_blueprints():

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 
@@ -22,53 +23,38 @@ LANGUAGE_CATALOG: tuple[dict[str, str], ...] = (
 LANGUAGE_BY_CODE = {item["code"]: item for item in LANGUAGE_CATALOG}
 LANGUAGE_CODES = tuple(item["code"] for item in LANGUAGE_CATALOG)
 
-# Legacy labels used by existing channels, scripts and tests.  They remain
+# SVGs are embedded locally so flags render as images instead of relying on the
+# host operating system's emoji font (which may show regional-letter siglas).
+LANGUAGE_FLAG_SVGS: dict[str, str] = {
+    "en": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><path fill="#b22234" d="M0 0h30v2H0zm0 4h30v2H0zm0 4h30v2H0zm0 4h30v2H0zm0 4h30v2H0zm0 4h30v2H0z"/><rect width="13" height="10.8" fill="#3c3b6e"/><g fill="#fff"><circle cx="2" cy="2" r=".55"/><circle cx="5" cy="2" r=".55"/><circle cx="8" cy="2" r=".55"/><circle cx="11" cy="2" r=".55"/><circle cx="3.5" cy="4.2" r=".55"/><circle cx="6.5" cy="4.2" r=".55"/><circle cx="9.5" cy="4.2" r=".55"/><circle cx="2" cy="6.4" r=".55"/><circle cx="5" cy="6.4" r=".55"/><circle cx="8" cy="6.4" r=".55"/><circle cx="11" cy="6.4" r=".55"/><circle cx="3.5" cy="8.6" r=".55"/><circle cx="6.5" cy="8.6" r=".55"/><circle cx="9.5" cy="8.6" r=".55"/></g></svg>',
+    "zh": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#de2910"/><path fill="#ffde00" d="m6 2 1 2.1 2.3.2-1.8 1.5.6 2.2L6 6.8 3.9 8l.6-2.2-1.8-1.5L5 4.1z"/></svg>',
+    "de": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#000" d="M0 0h30v6.67H0z"/><path fill="#d00" d="M0 6.67h30v6.66H0z"/><path fill="#ffce00" d="M0 13.33h30V20H0z"/></svg>',
+    "vi": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#da251d"/><path fill="#ff0" d="m15 3 1.9 5.7h6l-4.9 3.5 1.9 5.8-4.9-3.6 1.9-5.8-4.9-3.5h6z"/></svg>',
+    "tr": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#e30a17"/><circle cx="13" cy="10" r="5.2" fill="#fff"/><circle cx="15" cy="10" r="4.2" fill="#e30a17"/><path fill="#fff" d="m19 6.1 1.2 3.1 3.3.1-2.6 2 1 3.2-2.9-1.9-2.8 1.9 1-3.2-2.6-2 3.3-.1z"/></svg>',
+    "pt": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#ffdf00"/><path fill="#009c3b" d="m15 1.2 12.2 8.8L15 18.8 2.8 10z"/><circle cx="15" cy="10" r="4.1" fill="#002776"/><path fill="#fff" d="M11.4 9.4c2.2-1.1 4.7-.9 7.1.6l-.3 1.1c-2.2-1.4-4.4-1.6-6.5-.6z"/></svg>',
+    "ru": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#fff" d="M0 0h30v6.67H0z"/><path fill="#22408c" d="M0 6.67h30v6.66H0z"/><path fill="#d52b1e" d="M0 13.33h30V20H0z"/></svg>',
+    "es": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#aa151b" d="M0 0h30v4H0zM0 16h30v4H0z"/><rect y="4" width="30" height="12" fill="#f1bf00"/><path fill="#ad1519" d="M7 7h2v6H7z"/></svg>',
+    "id": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#ce1126" d="M0 0h30v10H0z"/><path fill="#fff" d="M0 10h30v10H0z"/></svg>',
+    "it": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#009246" d="M0 0h10v20H0z"/><path fill="#f1f2f1" d="M10 0h10v20H10z"/><path fill="#ce2b37" d="M20 0h10v20H20z"/></svg>',
+}
+LANGUAGE_FLAG_DATA_URIS = {
+    code: "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    for code, svg in LANGUAGE_FLAG_SVGS.items()
+}
+
+# Legacy labels used by existing channels, scripts and tests. They remain
 # readable while new UI selections persist only the canonical short code.
 LEGACY_LANGUAGE_CODES = {
-    "01 – inglês": "en",
-    "01 - inglês": "en",
-    "06 – alemão": "de",
-    "06 - alemão": "de",
-    "15 – italiano": "it",
-    "15 - italiano": "it",
-    "29 – turco": "tr",
-    "29 - turco": "tr",
-    "31 – russo": "ru",
-    "31 - russo": "ru",
-    "36 – português (brasil)": "pt",
-    "36 - português (brasil)": "pt",
-    "39 – mandarim": "zh",
-    "39 - mandarim": "zh",
-    "13 – espanhol (espanha)": "es",
-    "41 - espanhol (latam)": "es",
-    "42 – vietnamita": "vi",
-    "42 - vietnamita": "vi",
-    "44 – indonésio": "id",
-    "44 - indonésio": "id",
-    "13 – espanhol (espanha)": "es",
-    "13 - espanhol (espanha)": "es",
-    "37 – cantonês": "zh",
-    "37 - cantonês": "zh",
-    "english": "en",
-    "inglês": "en",
-    "inglés": "en",
-    "zh": "zh",
-    "chinês": "zh",
-    "chinês simplificado": "zh",
-    "deutsch": "de",
-    "alemão": "de",
-    "vietnamita": "vi",
-    "turco": "tr",
-    "português": "pt",
-    "português (brasil)": "pt",
-    "portuguese": "pt",
-    "ru": "ru",
-    "russo": "ru",
-    "español": "es",
-    "espanhol": "es",
-    "indonésio": "id",
-    "bahasa indonesia": "id",
-    "italiano": "it",
+    "01 – inglês": "en", "01 - inglês": "en", "06 – alemão": "de", "06 - alemão": "de",
+    "15 – italiano": "it", "15 - italiano": "it", "29 – turco": "tr", "29 - turco": "tr",
+    "31 – russo": "ru", "31 - russo": "ru", "36 – português (brasil)": "pt", "36 - português (brasil)": "pt",
+    "39 – mandarim": "zh", "39 - mandarim": "zh", "13 – espanhol (espanha)": "es", "13 - espanhol (espanha)": "es",
+    "41 - espanhol (latam)": "es", "42 – vietnamita": "vi", "42 - vietnamita": "vi",
+    "44 – indonésio": "id", "44 - indonésio": "id", "37 – cantonês": "zh", "37 - cantonês": "zh",
+    "english": "en", "inglês": "en", "inglés": "en", "zh": "zh", "chinês": "zh", "chinês simplificado": "zh",
+    "deutsch": "de", "alemão": "de", "vietnamita": "vi", "turco": "tr", "português": "pt",
+    "português (brasil)": "pt", "portuguese": "pt", "ru": "ru", "russo": "ru", "español": "es",
+    "espanhol": "es", "indonésio": "id", "bahasa indonesia": "id", "italiano": "it",
 }
 
 
@@ -87,11 +73,19 @@ def language_code(value: Any, default: str = "pt") -> str:
 
 
 def language_label(value: Any, *, include_code: bool = True) -> str:
-    """Return the visual label with the requested flag and optional code."""
+    """Return a text label with the legacy emoji flag presentation."""
     code = language_code(value)
     item = LANGUAGE_BY_CODE[code]
     suffix = f" ({item['code']})" if include_code else ""
     return f"{item['name']}{suffix} {item['flag']}"
+
+
+def ui_language_menu_label(value: Any, *, include_code: bool = True) -> str:
+    """Return text-only UI label; the picker renders the flag as a real SVG icon."""
+    code = language_code(value)
+    item = LANGUAGE_BY_CODE[code]
+    suffix = f" ({item['code']})" if include_code else ""
+    return f"{item['name']}{suffix}"
 
 
 def language_option_labels(*, include_code: bool = True) -> list[str]:
@@ -102,51 +96,47 @@ def language_option_codes() -> list[str]:
     return list(LANGUAGE_CODES)
 
 
+_CORE_UI_TEXT_KEYS = (
+    "Início", "Niche Finder", "Pipeline", "Pipeline TikTok", "Automação", "Edição", "AI Influencers", "Configurações",
+    "Criação de Vídeos", "Criação de Músicas", "Roteiros", "Upload", "Prompts Master", "Contas TikTok", "Automação Youtube",
+    "Niche Finder Kaggle", "Niche Finder Apify", "Limpador de Metadados", "Cortes", "Editor Python", "Download Mídia",
+    "Personagens", "Redes Sociais", "Tutorial Meta", "Canais Youtube", "Blueprints Youtube", "MCP", "Contas Google",
+    "Configuração API", "Notificações", "Interface local para operação e automação de conteúdo faceless", "Canais", "activos",
+    "Tarefas", "total registado", "A fazer", "na pipeline", "Em execução", "a decorrer", "Concluídos", "artefactos prontos",
+    "Falhas", "requerem atenção", "Filas locais e dependências da cascata", "Niche", "Blueprints", "Brand", "Script", "Title",
+    "Thumbnail", "Video", "Edit", "fila", "na biblioteca", "tarefa(s) na fila", "Language",
+)
+
+
 UI_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {key: key for key in _CORE_UI_TEXT_KEYS},
     "en": {
-        "Início": "Home", "Niche Finder": "Niche Finder", "Pipeline": "Pipeline", "Pipeline TikTok": "TikTok Pipeline",
-        "Automação": "Automation", "Edição": "Editing", "AI Influencers": "AI Influencers", "Configurações": "Settings",
-        "Criação de Vídeos": "Video Creation", "Criação de Músicas": "Music Creation", "Roteiros": "Scripts", "Upload": "Upload",
-        "Prompts Master": "Prompt Masters", "Contas TikTok": "TikTok Accounts", "Automação Youtube": "YouTube Automation",
-        "Canais Youtube": "YouTube Channels", "Blueprints Youtube": "YouTube Blueprints", "Contas Google": "Google Accounts",
-        "Configuração API": "API Configuration", "Notificações": "Notifications", "Niche Finder Kaggle": "Niche Finder Kaggle",
-        "Niche Finder Apify": "Niche Finder Apify", "Limpador de Metadados": "Metadata Cleaner", "Cortes": "Cuts",
-        "Editor Python": "Python Editor", "Download Mídia": "Media Download", "Personagens": "Characters", "Redes Sociais": "Social Networks",
-        "Tutorial Meta": "Meta Tutorial", "Idioma da interface": "Interface language",
+        "Início": "Home", "Niche Finder": "Niche Finder", "Pipeline": "Pipeline", "Pipeline TikTok": "TikTok Pipeline", "Automação": "Automation", "Edição": "Editing", "AI Influencers": "AI Influencers", "Configurações": "Settings", "Criação de Vídeos": "Video Creation", "Criação de Músicas": "Music Creation", "Roteiros": "Scripts", "Upload": "Upload", "Prompts Master": "Prompt Masters", "Contas TikTok": "TikTok Accounts", "Automação Youtube": "YouTube Automation", "Niche Finder Kaggle": "Niche Finder Kaggle", "Niche Finder Apify": "Niche Finder Apify", "Limpador de Metadados": "Metadata Cleaner", "Cortes": "Cuts", "Editor Python": "Python Editor", "Download Mídia": "Media Download", "Personagens": "Characters", "Redes Sociais": "Social Networks", "Tutorial Meta": "Meta Tutorial", "Canais Youtube": "YouTube Channels", "Blueprints Youtube": "YouTube Blueprints", "MCP": "MCP", "Contas Google": "Google Accounts", "Configuração API": "API Configuration", "Notificações": "Notifications", "Interface local para operação e automação de conteúdo faceless": "Local interface for faceless content operation and automation", "Canais": "Channels", "activos": "active", "Tarefas": "Tasks", "total registado": "total registered", "A fazer": "To do", "na pipeline": "in pipeline", "Em execução": "Running", "a decorrer": "in progress", "Concluídos": "Completed", "artefactos prontos": "ready artifacts", "Falhas": "Failures", "requerem atenção": "need attention", "Filas locais e dependências da cascata": "Local queues and cascade dependencies", "Niche": "Niche", "Blueprints": "Blueprints", "Brand": "Brand", "Script": "Script", "Title": "Title", "Thumbnail": "Thumbnail", "Video": "Video", "Edit": "Edit", "fila": "queue", "na biblioteca": "in library", "tarefa(s) na fila": "task(s) in queue", "Language": "Language",
     },
     "zh": {
-        "Início": "首页", "Pipeline": "视频流程", "Pipeline TikTok": "TikTok 流程", "Automação": "自动化", "Edição": "编辑", "Configurações": "设置",
-        "Criação de Vídeos": "视频创作", "Criação de Músicas": "音乐创作", "Roteiros": "脚本", "Upload": "上传", "Contas Google": "Google 账户", "Notificações": "通知", "Idioma da interface": "界面语言",
+        "Início": "首页", "Niche Finder": "利基搜索", "Pipeline": "视频流程", "Pipeline TikTok": "TikTok 流程", "Automação": "自动化", "Edição": "编辑", "AI Influencers": "AI 影响者", "Configurações": "设置", "Criação de Vídeos": "视频创作", "Criação de Músicas": "音乐创作", "Roteiros": "脚本", "Upload": "上传", "Prompts Master": "主提示词", "Contas TikTok": "TikTok 账户", "Automação Youtube": "YouTube 自动化", "Niche Finder Kaggle": "Kaggle 利基搜索", "Niche Finder Apify": "Apify 利基搜索", "Limpador de Metadados": "元数据清理器", "Cortes": "剪辑", "Editor Python": "Python 编辑器", "Download Mídia": "媒体下载", "Personagens": "角色", "Redes Sociais": "社交网络", "Tutorial Meta": "Meta 教程", "Canais Youtube": "YouTube 频道", "Blueprints Youtube": "YouTube 蓝图", "MCP": "MCP", "Contas Google": "Google 账户", "Configuração API": "API 配置", "Notificações": "通知", "Interface local para operação e automação de conteúdo faceless": "无脸内容运营与自动化本地界面", "Canais": "频道", "activos": "活跃", "Tarefas": "任务", "total registado": "已登记总数", "A fazer": "待处理", "na pipeline": "在流程中", "Em execução": "执行中", "a decorrer": "正在进行", "Concluídos": "已完成", "artefactos prontos": "成品已就绪", "Falhas": "失败", "requerem atenção": "需要关注", "Filas locais e dependências da cascata": "本地队列和级联依赖", "Niche": "利基", "Blueprints": "蓝图", "Brand": "品牌", "Script": "脚本", "Title": "标题", "Thumbnail": "缩略图", "Video": "视频", "Edit": "编辑", "fila": "队列", "na biblioteca": "在库中", "tarefa(s) na fila": "队列中的任务", "Language": "语言",
     },
     "de": {
-        "Início": "Startseite", "Pipeline": "Pipeline", "Pipeline TikTok": "TikTok-Pipeline", "Automação": "Automatisierung", "Edição": "Bearbeitung", "Configurações": "Einstellungen",
-        "Criação de Vídeos": "Videoerstellung", "Criação de Músicas": "Musikerstellung", "Roteiros": "Skripte", "Upload": "Upload", "Contas Google": "Google-Konten", "Notificações": "Benachrichtigungen", "Idioma da interface": "Oberflächensprache",
+        "Início": "Startseite", "Niche Finder": "Nischenfinder", "Pipeline": "Pipeline", "Pipeline TikTok": "TikTok-Pipeline", "Automação": "Automatisierung", "Edição": "Bearbeitung", "AI Influencers": "KI-Influencer", "Configurações": "Einstellungen", "Criação de Vídeos": "Videoerstellung", "Criação de Músicas": "Musikerstellung", "Roteiros": "Skripte", "Upload": "Upload", "Prompts Master": "Prompt Masters", "Contas TikTok": "TikTok-Konten", "Automação Youtube": "YouTube-Automatisierung", "Niche Finder Kaggle": "Kaggle-Nischenfinder", "Niche Finder Apify": "Apify-Nischenfinder", "Limpador de Metadados": "Metadatenbereinigung", "Cortes": "Schnitte", "Editor Python": "Python-Editor", "Download Mídia": "Mediendownload", "Personagens": "Figuren", "Redes Sociais": "Soziale Netzwerke", "Tutorial Meta": "Meta-Tutorial", "Canais Youtube": "YouTube-Kanäle", "Blueprints Youtube": "YouTube-Blueprints", "MCP": "MCP", "Contas Google": "Google-Konten", "Configuração API": "API-Konfiguration", "Notificações": "Benachrichtigungen", "Interface local para operação e automação de conteúdo faceless": "Lokale Oberfläche für den Betrieb und die Automatisierung von Faceless-Inhalten", "Canais": "Kanäle", "activos": "aktiv", "Tarefas": "Aufgaben", "total registado": "insgesamt registriert", "A fazer": "Offen", "na pipeline": "in der Pipeline", "Em execução": "In Ausführung", "a decorrer": "in Bearbeitung", "Concluídos": "Abgeschlossen", "artefactos prontos": "fertige Artefakte", "Falhas": "Fehler", "requerem atenção": "benötigen Aufmerksamkeit", "Filas locais e dependências da cascata": "Lokale Warteschlangen und Abhängigkeiten", "Niche": "Nische", "Blueprints": "Blueprints", "Brand": "Marke", "Script": "Skript", "Title": "Titel", "Thumbnail": "Thumbnail", "Video": "Video", "Edit": "Bearbeitung", "fila": "Warteschlange", "na biblioteca": "in der Bibliothek", "tarefa(s) na fila": "Aufgabe(n) in der Warteschlange", "Language": "Sprache",
     },
     "vi": {
-        "Início": "Trang chủ", "Pipeline": "Quy trình", "Pipeline TikTok": "Quy trình TikTok", "Automação": "Tự động hóa", "Edição": "Chỉnh sửa", "Configurações": "Cài đặt",
-        "Criação de Vídeos": "Tạo video", "Criação de Músicas": "Tạo nhạc", "Roteiros": "Kịch bản", "Upload": "Tải lên", "Contas Google": "Tài khoản Google", "Notificações": "Thông báo", "Idioma da interface": "Ngôn ngữ giao diện",
+        "Início": "Trang chủ", "Niche Finder": "Tìm ngách", "Pipeline": "Quy trình", "Pipeline TikTok": "Quy trình TikTok", "Automação": "Tự động hóa", "Edição": "Chỉnh sửa", "AI Influencers": "Người ảnh hưởng AI", "Configurações": "Cài đặt", "Criação de Vídeos": "Tạo video", "Criação de Músicas": "Tạo nhạc", "Roteiros": "Kịch bản", "Upload": "Tải lên", "Prompts Master": "Prompt Master", "Contas TikTok": "Tài khoản TikTok", "Automação Youtube": "Tự động hóa YouTube", "Niche Finder Kaggle": "Tìm ngách Kaggle", "Niche Finder Apify": "Tìm ngách Apify", "Limpador de Metadados": "Trình dọn siêu dữ liệu", "Cortes": "Cắt", "Editor Python": "Trình soạn thảo Python", "Download Mídia": "Tải phương tiện", "Personagens": "Nhân vật", "Redes Sociais": "Mạng xã hội", "Tutorial Meta": "Hướng dẫn Meta", "Canais Youtube": "Kênh YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Tài khoản Google", "Configuração API": "Cấu hình API", "Notificações": "Thông báo", "Interface local para operação e automação de conteúdo faceless": "Giao diện cục bộ để vận hành và tự động hóa nội dung faceless", "Canais": "Kênh", "activos": "đang hoạt động", "Tarefas": "Tác vụ", "total registado": "tổng số đã đăng ký", "A fazer": "Cần làm", "na pipeline": "trong quy trình", "Em execução": "Đang chạy", "a decorrer": "đang diễn ra", "Concluídos": "Đã hoàn tất", "artefactos prontos": "sản phẩm đã sẵn sàng", "Falhas": "Lỗi", "requerem atenção": "cần chú ý", "Filas locais e dependências da cascata": "Hàng đợi cục bộ và các phụ thuộc", "Niche": "Ngách", "Blueprints": "Blueprint", "Brand": "Thương hiệu", "Script": "Kịch bản", "Title": "Tiêu đề", "Thumbnail": "Ảnh thu nhỏ", "Video": "Video", "Edit": "Chỉnh sửa", "fila": "hàng đợi", "na biblioteca": "trong thư viện", "tarefa(s) na fila": "tác vụ trong hàng đợi", "Language": "Ngôn ngữ",
     },
     "tr": {
-        "Início": "Ana sayfa", "Pipeline": "Akış", "Pipeline TikTok": "TikTok akışı", "Automação": "Otomasyon", "Edição": "Düzenleme", "Configurações": "Ayarlar",
-        "Criação de Vídeos": "Video oluşturma", "Criação de Músicas": "Müzik oluşturma", "Roteiros": "Senaryolar", "Upload": "Yükleme", "Contas Google": "Google hesapları", "Notificações": "Bildirimler", "Idioma da interface": "Arayüz dili",
+        "Início": "Ana sayfa", "Niche Finder": "Niş Bulucu", "Pipeline": "Akış", "Pipeline TikTok": "TikTok Akışı", "Automação": "Otomasyon", "Edição": "Düzenleme", "AI Influencers": "Yapay Zekâ Etkileyicileri", "Configurações": "Ayarlar", "Criação de Vídeos": "Video Oluşturma", "Criação de Músicas": "Müzik Oluşturma", "Roteiros": "Senaryolar", "Upload": "Yükleme", "Prompts Master": "Prompt Master", "Contas TikTok": "TikTok Hesapları", "Automação Youtube": "YouTube Otomasyonu", "Niche Finder Kaggle": "Kaggle Niş Bulucu", "Niche Finder Apify": "Apify Niş Bulucu", "Limpador de Metadados": "Meta Veri Temizleyici", "Cortes": "Kesitler", "Editor Python": "Python Editörü", "Download Mídia": "Medya İndirme", "Personagens": "Karakterler", "Redes Sociais": "Sosyal Ağlar", "Tutorial Meta": "Meta Eğitimi", "Canais Youtube": "YouTube Kanalları", "Blueprints Youtube": "YouTube Blueprint'leri", "MCP": "MCP", "Contas Google": "Google Hesapları", "Configuração API": "API Yapılandırması", "Notificações": "Bildirimler", "Interface local para operação e automação de conteúdo faceless": "Faceless içerik operasyonu ve otomasyonu için yerel arayüz", "Canais": "Kanallar", "activos": "aktif", "Tarefas": "Görevler", "total registado": "kayıtlı toplam", "A fazer": "Yapılacak", "na pipeline": "akışta", "Em execução": "Çalışıyor", "a decorrer": "devam ediyor", "Concluídos": "Tamamlandı", "artefactos prontos": "hazır çıktılar", "Falhas": "Hatalar", "requerem atenção": "dikkat gerekiyor", "Filas locais e dependências da cascata": "Yerel kuyruklar ve bağımlılıklar", "Niche": "Niş", "Blueprints": "Blueprint", "Brand": "Marka", "Script": "Senaryo", "Title": "Başlık", "Thumbnail": "Küçük resim", "Video": "Video", "Edit": "Düzenle", "fila": "kuyruk", "na biblioteca": "kütüphanede", "tarefa(s) na fila": "kuyruktaki görev(ler)", "Language": "Dil",
     },
     "ru": {
-        "Início": "Главная", "Pipeline": "Конвейер", "Pipeline TikTok": "Конвейер TikTok", "Automação": "Автоматизация", "Edição": "Редактирование", "Configurações": "Настройки",
-        "Criação de Vídeos": "Создание видео", "Criação de Músicas": "Создание музыки", "Roteiros": "Сценарии", "Upload": "Загрузка", "Contas Google": "Аккаунты Google", "Notificações": "Уведомления", "Idioma da interface": "Язык интерфейса",
+        "Início": "Главная", "Niche Finder": "Поиск ниши", "Pipeline": "Конвейер", "Pipeline TikTok": "Конвейер TikTok", "Automação": "Автоматизация", "Edição": "Редактирование", "AI Influencers": "ИИ-инфлюенсеры", "Configurações": "Настройки", "Criação de Vídeos": "Создание видео", "Criação de Músicas": "Создание музыки", "Roteiros": "Сценарии", "Upload": "Загрузка", "Prompts Master": "Мастер-промпты", "Contas TikTok": "Аккаунты TikTok", "Automação Youtube": "Автоматизация YouTube", "Niche Finder Kaggle": "Поиск ниши Kaggle", "Niche Finder Apify": "Поиск ниши Apify", "Limpador de Metadados": "Очистка метаданных", "Cortes": "Нарезка", "Editor Python": "Редактор Python", "Download Mídia": "Загрузка медиа", "Personagens": "Персонажи", "Redes Sociais": "Социальные сети", "Tutorial Meta": "Руководство Meta", "Canais Youtube": "Каналы YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Аккаунты Google", "Configuração API": "Настройка API", "Notificações": "Уведомления", "Interface local para operação e automação de conteúdo faceless": "Локальный интерфейс для работы и автоматизации faceless-контента", "Canais": "Каналы", "activos": "активны", "Tarefas": "Задачи", "total registado": "всего зарегистрировано", "A fazer": "К выполнению", "na pipeline": "в конвейере", "Em execução": "Выполняются", "a decorrer": "в процессе", "Concluídos": "Завершены", "artefactos prontos": "готовые материалы", "Falhas": "Ошибки", "requerem atenção": "требуют внимания", "Filas locais e dependências da cascata": "Локальные очереди и зависимости конвейера", "Niche": "Ниша", "Blueprints": "Blueprints", "Brand": "Бренд", "Script": "Сценарий", "Title": "Заголовок", "Thumbnail": "Миниатюра", "Video": "Видео", "Edit": "Монтаж", "fila": "очередь", "na biblioteca": "в библиотеке", "tarefa(s) na fila": "задач в очереди", "Language": "Язык",
     },
     "es": {
-        "Início": "Inicio", "Pipeline": "Flujo", "Pipeline TikTok": "Flujo de TikTok", "Automação": "Automatización", "Edição": "Edición", "Configurações": "Configuración",
-        "Criação de Vídeos": "Creación de vídeos", "Criação de Músicas": "Creación de música", "Roteiros": "Guiones", "Upload": "Carga", "Contas Google": "Cuentas de Google", "Notificações": "Notificaciones", "Idioma da interface": "Idioma de la interfaz",
+        "Início": "Inicio", "Niche Finder": "Buscador de nichos", "Pipeline": "Flujo", "Pipeline TikTok": "Flujo de TikTok", "Automação": "Automatización", "Edição": "Edición", "AI Influencers": "Influencers de IA", "Configurações": "Configuración", "Criação de Vídeos": "Creación de vídeos", "Criação de Músicas": "Creación de música", "Roteiros": "Guiones", "Upload": "Subir", "Prompts Master": "Prompts maestros", "Contas TikTok": "Cuentas de TikTok", "Automação Youtube": "Automatización de YouTube", "Niche Finder Kaggle": "Buscador de nichos Kaggle", "Niche Finder Apify": "Buscador de nichos Apify", "Limpador de Metadados": "Limpiador de metadatos", "Cortes": "Cortes", "Editor Python": "Editor de Python", "Download Mídia": "Descargar medios", "Personagens": "Personajes", "Redes Sociais": "Redes sociales", "Tutorial Meta": "Tutorial de Meta", "Canais Youtube": "Canales de YouTube", "Blueprints Youtube": "Blueprints de YouTube", "MCP": "MCP", "Contas Google": "Cuentas de Google", "Configuração API": "Configuración de API", "Notificações": "Notificaciones", "Interface local para operação e automação de conteúdo faceless": "Interfaz local para operar y automatizar contenido faceless", "Canais": "Canales", "activos": "activos", "Tarefas": "Tareas", "total registado": "total registrado", "A fazer": "Pendiente", "na pipeline": "en el flujo", "Em execução": "En ejecución", "a decorrer": "en curso", "Concluídos": "Completados", "artefactos prontos": "artefactos listos", "Falhas": "Fallos", "requerem atenção": "requieren atención", "Filas locais e dependências da cascata": "Colas locales y dependencias del flujo", "Niche": "Nicho", "Blueprints": "Blueprints", "Brand": "Marca", "Script": "Guion", "Title": "Título", "Thumbnail": "Miniatura", "Video": "Vídeo", "Edit": "Edición", "fila": "cola", "na biblioteca": "en la biblioteca", "tarefa(s) na fila": "tarea(s) en la cola", "Language": "Idioma",
     },
     "id": {
-        "Início": "Beranda", "Pipeline": "Alur", "Pipeline TikTok": "Alur TikTok", "Automação": "Otomatisasi", "Edição": "Penyuntingan", "Configurações": "Pengaturan",
-        "Criação de Vídeos": "Pembuatan video", "Criação de Músicas": "Pembuatan musik", "Roteiros": "Skrip", "Upload": "Unggah", "Contas Google": "Akun Google", "Notificações": "Notifikasi", "Idioma da interface": "Bahasa antarmuka",
+        "Início": "Beranda", "Niche Finder": "Pencari Niche", "Pipeline": "Alur", "Pipeline TikTok": "Alur TikTok", "Automação": "Otomatisasi", "Edição": "Penyuntingan", "AI Influencers": "Influencer AI", "Configurações": "Pengaturan", "Criação de Vídeos": "Pembuatan video", "Criação de Músicas": "Pembuatan musik", "Roteiros": "Skrip", "Upload": "Unggah", "Prompts Master": "Prompt Master", "Contas TikTok": "Akun TikTok", "Automação Youtube": "Otomatisasi YouTube", "Niche Finder Kaggle": "Pencari Niche Kaggle", "Niche Finder Apify": "Pencari Niche Apify", "Limpador de Metadados": "Pembersih metadata", "Cortes": "Potongan", "Editor Python": "Editor Python", "Download Mídia": "Unduh media", "Personagens": "Karakter", "Redes Sociais": "Jejaring sosial", "Tutorial Meta": "Tutorial Meta", "Canais Youtube": "Kanal YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Akun Google", "Configuração API": "Konfigurasi API", "Notificações": "Notifikasi", "Interface local para operação e automação de conteúdo faceless": "Antarmuka lokal untuk operasi dan otomatisasi konten faceless", "Canais": "Kanal", "activos": "aktif", "Tarefas": "Tugas", "total registado": "total terdaftar", "A fazer": "Perlu dilakukan", "na pipeline": "dalam alur", "Em execução": "Berjalan", "a decorrer": "sedang berlangsung", "Concluídos": "Selesai", "artefactos prontos": "artefak siap", "Falhas": "Kegagalan", "requerem atenção": "perlu perhatian", "Filas locais e dependências da cascata": "Antrean lokal dan dependensi alur", "Niche": "Niche", "Blueprints": "Blueprint", "Brand": "Merek", "Script": "Skrip", "Title": "Judul", "Thumbnail": "Thumbnail", "Video": "Video", "Edit": "Edit", "fila": "antrean", "na biblioteca": "di pustaka", "tarefa(s) na fila": "tugas dalam antrean", "Language": "Bahasa",
     },
     "it": {
-        "Início": "Home", "Pipeline": "Pipeline", "Pipeline TikTok": "Pipeline TikTok", "Automação": "Automazione", "Edição": "Modifica", "Configurações": "Impostazioni",
-        "Criação de Vídeos": "Creazione video", "Criação de Músicas": "Creazione musicale", "Roteiros": "Script", "Upload": "Caricamento", "Contas Google": "Account Google", "Notificações": "Notifiche", "Idioma da interface": "Lingua dell'interfaccia",
+        "Início": "Home", "Niche Finder": "Trova nicchia", "Pipeline": "Pipeline", "Pipeline TikTok": "Pipeline TikTok", "Automação": "Automazione", "Edição": "Modifica", "AI Influencers": "Influencer AI", "Configurações": "Impostazioni", "Criação de Vídeos": "Creazione video", "Criação de Músicas": "Creazione musicale", "Roteiros": "Script", "Upload": "Caricamento", "Prompts Master": "Prompt Master", "Contas TikTok": "Account TikTok", "Automação Youtube": "Automazione YouTube", "Niche Finder Kaggle": "Trova nicchia Kaggle", "Niche Finder Apify": "Trova nicchia Apify", "Limpador de Metadados": "Pulizia metadati", "Cortes": "Tagli", "Editor Python": "Editor Python", "Download Mídia": "Download media", "Personagens": "Personaggi", "Redes Sociais": "Social network", "Tutorial Meta": "Tutorial Meta", "Canais Youtube": "Canali YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Account Google", "Configuração API": "Configurazione API", "Notificações": "Notifiche", "Interface local para operação e automação de conteúdo faceless": "Interfaccia locale per la gestione e l'automazione di contenuti faceless", "Canais": "Canali", "activos": "attivi", "Tarefas": "Attività", "total registado": "totale registrato", "A fazer": "Da fare", "na pipeline": "nella pipeline", "Em execução": "In esecuzione", "a decorrer": "in corso", "Concluídos": "Completati", "artefactos prontos": "artefatti pronti", "Falhas": "Errori", "requerem atenção": "richiedono attenzione", "Filas locais e dependências da cascata": "Code locali e dipendenze della pipeline", "Niche": "Nicchia", "Blueprints": "Blueprint", "Brand": "Brand", "Script": "Script", "Title": "Titolo", "Thumbnail": "Miniatura", "Video": "Video", "Edit": "Modifica", "fila": "coda", "na biblioteca": "nella libreria", "tarefa(s) na fila": "attività in coda", "Language": "Lingua",
     },
-    "pt": {},
 }
 
 
@@ -166,11 +156,7 @@ def language_locale(value: Any) -> str:
 def video_language_label(value: Any) -> str:
     """Format a video-language value while preserving all historical options."""
     raw = str(value or "").strip()
-    if raw.casefold() in {
-        "music",
-        "00 – apenas música de fundo (sem falas)",
-        "00 - apenas música de fundo (sem falas)",
-    }:
+    if raw.casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"}:
         return "🎵 Apenas Música de Fundo (Sem Falas)"
     normalized = language_code(raw, default="")
     if normalized in LANGUAGE_BY_CODE and (raw.casefold() in LEGACY_LANGUAGE_CODES or raw in LANGUAGE_BY_CODE):
@@ -183,15 +169,7 @@ def video_language_options() -> list[str]:
 
 
 __all__ = [
-    "LANGUAGE_CATALOG",
-    "LANGUAGE_BY_CODE",
-    "LANGUAGE_CODES",
-    "language_code",
-    "language_flag",
-    "language_label",
-    "language_locale",
-    "language_option_codes",
-    "language_option_labels",
-    "video_language_label",
-    "video_language_options",
+    "LANGUAGE_CATALOG", "LANGUAGE_BY_CODE", "LANGUAGE_CODES", "LANGUAGE_FLAG_DATA_URIS", "language_code", "language_flag",
+    "language_label", "ui_language_menu_label", "language_locale", "language_option_codes", "language_option_labels",
+    "ui_text", "video_language_label", "video_language_options",
 ]

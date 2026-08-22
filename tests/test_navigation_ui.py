@@ -106,7 +106,9 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
 
 
 def test_language_picker_uses_native_layout_without_touching_streamlit_toolbar():
-    assert '"Language / 语言"' in MAIN_SOURCE
+    assert '"Language"' in MAIN_SOURCE
+    assert "ui_language_menu_label" in MAIN_SOURCE
+    assert "LANGUAGE_FLAG_DATA_URIS" in MAIN_SOURCE
     assert 'top_language_code_selector' in MAIN_SOURCE
     assert 'st.popover' not in MAIN_SOURCE
     assert 'stAppDeployButton' not in MAIN_SOURCE
