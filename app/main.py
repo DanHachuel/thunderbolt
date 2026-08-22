@@ -22,7 +22,7 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.automation_worker import load_worker_status
-from hermes_ui.storage import BLUEPRINTS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
+from hermes_ui.storage import BLUEPRINTS, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -34,6 +34,7 @@ from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips,
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
+from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
@@ -2110,6 +2111,120 @@ def render_edit_placeholder(page_title: str, description: str):
     st.info("Esta aba está reservada para desenvolvimento futuro e ainda não executa nenhuma operação.")
 
 
+def render_media_download():
+    st.title("Download Mídia")
+    st.caption("Baixe vídeos e áudio de URLs públicas através da API oficial do yt-dlp. Use esta ferramenta apenas com conteúdo que tem autorização para descarregar e utilizar.")
+    st.markdown("Baseado em [yt-dlp](https://github.com/yt-dlp/yt-dlp), um downloader open source para vídeo e áudio.")
+    dependency = dependency_status()
+    if not dependency["yt_dlp"]:
+        st.warning("yt-dlp não está instalado neste ambiente. Execute a instalação das dependências do Thunderbolt antes de iniciar um download.")
+    st.info("A combinação de streams, conversão de áudio e incorporação de metadados pode exigir FFmpeg. Downloads longos permanecem nesta página até terminarem.")
+
+    with st.form("media_download_form"):
+        urls_text = st.text_area("URLs para descarregar", placeholder="Uma URL http(s) por linha", height=120, key="media_download_urls")
+        mode_label = st.radio("Tipo de mídia", ["Vídeo", "Áudio"], horizontal=True, key="media_download_mode")
+        option_cols = st.columns(3)
+        with option_cols[0]:
+            if mode_label == "Vídeo":
+                quality_label = st.selectbox("Qualidade", list(VIDEO_QUALITY_OPTIONS), key="media_download_quality")
+                video_container = st.selectbox("Contentor", list(VIDEO_CONTAINERS), key="media_download_container")
+                audio_format = "mp3"
+            else:
+                quality_label = "Melhor qualidade"
+                video_container = "mp4"
+                audio_format = st.selectbox("Formato de áudio", list(AUDIO_FORMATS), key="media_download_audio_format")
+        with option_cols[1]:
+            allow_playlist = st.checkbox("Permitir playlist", value=False, key="media_download_allow_playlist")
+            download_subtitles = st.checkbox("Descarregar legendas", value=False, key="media_download_subtitles")
+        with option_cols[2]:
+            embed_metadata = st.checkbox("Incorporar metadados", value=False, key="media_download_embed_metadata")
+            st.caption("Playlist desactivada por padrão para evitar downloads acidentais em massa.")
+        start_download = st.form_submit_button("Iniciar download", type="primary", use_container_width=True)
+
+    if start_download:
+        progress = st.progress(0, text="A preparar o download…")
+        progress_status = st.empty()
+
+        def on_progress(payload: dict[str, Any]) -> None:
+            value = float(payload.get("progress") or 0)
+            progress.progress(int(max(0, min(100, value))), text=f"{payload.get('status', 'processing').capitalize()} · {payload.get('current_file') or payload.get('display_url') or 'a processar'}")
+            progress_status.caption(str(payload.get("hook_status") or payload.get("status") or "processing"))
+
+        try:
+            results = download_media(
+                urls_text,
+                mode="video" if mode_label == "Vídeo" else "audio",
+                quality=quality_label,
+                container=video_container,
+                audio_format=audio_format,
+                allow_playlist=allow_playlist,
+                download_subtitles=download_subtitles,
+                embed_metadata=embed_metadata,
+                progress_callback=on_progress,
+            )
+            st.session_state["media_download_last_results"] = results
+            completed = sum(1 for item in results if item.get("status") == "completed")
+            failed = len(results) - completed
+            if completed:
+                st.success(f"{completed} download(s) concluído(s) e guardado(s) em `{MEDIA_DOWNLOADS}`.")
+            if failed:
+                st.warning(f"{failed} download(s) terminou/terminaram com erro. Consulte o histórico abaixo.")
+        except (MediaDownloadError, ValueError, OSError) as exc:
+            progress.empty()
+            st.error(str(exc))
+
+    latest_results = st.session_state.get("media_download_last_results", [])
+    if latest_results:
+        st.subheader("Resultado da última execução")
+        for record in latest_results:
+            with st.container(border=True):
+                status_label = "Concluído" if record.get("status") == "completed" else "Falhou"
+                st.write(f"**{record.get('title') or record.get('display_url') or 'Download'}** — {status_label}")
+                st.caption(f"{record.get('display_url', 'URL não disponível')} · {record.get('mode', 'video')} · {record.get('completed_at') or record.get('created_at', '—')}")
+                if record.get("error"):
+                    st.error(record["error"])
+                for filename in record.get("files", []):
+                    output = media_download_file(record, str(filename))
+                    if output:
+                        st.download_button("Descarregar ficheiro", data=output.read_bytes(), file_name=output.name, mime="audio/*" if record.get("mode") == "audio" else "video/*", key=f"media_result_{record.get('operation_id')}_{filename}")
+
+    st.divider()
+    st.subheader("Histórico de downloads")
+    history = list_media_downloads()
+    action_cols = st.columns([1, 1, 3])
+    with action_cols[0]:
+        if st.button("Actualizar histórico", key="media_download_refresh"):
+            st.rerun()
+    with action_cols[1]:
+        clear_requested = st.button("Limpar histórico", key="media_download_clear")
+    if clear_requested:
+        st.session_state["media_download_confirm_clear"] = True
+    if st.session_state.get("media_download_confirm_clear"):
+        st.warning("Isto remove apenas o histórico, não os ficheiros guardados em storage/downloads.")
+        confirm_cols = st.columns(2)
+        with confirm_cols[0]:
+            if st.button("Confirmar limpeza", type="primary", key="media_download_confirm_clear_button"):
+                clear_media_download_history()
+                st.session_state.pop("media_download_confirm_clear", None)
+                st.rerun()
+        with confirm_cols[1]:
+            if st.button("Cancelar", key="media_download_cancel_clear_button"):
+                st.session_state.pop("media_download_confirm_clear", None)
+                st.rerun()
+    if not history:
+        st.caption("Ainda não existem downloads registados.")
+    for record in history:
+        status_label = {"completed": "Concluído", "failed": "Falhou", "processing": "Em processamento"}.get(str(record.get("status")), str(record.get("status") or "—"))
+        with st.expander(f"{record.get('title') or record.get('display_url') or 'Download'} — {status_label}", expanded=False):
+            st.caption(f"{record.get('display_url', 'URL não disponível')} · {record.get('mode', 'video')} · {record.get('created_at', '—')}")
+            if record.get("error"):
+                st.error(record["error"])
+            for filename in record.get("files", []):
+                output = media_download_file(record, str(filename))
+                if output:
+                    st.download_button("Descarregar", data=output.read_bytes(), file_name=output.name, mime="audio/*" if record.get("mode") == "audio" else "video/*", key=f"media_history_{record.get('operation_id')}_{filename}")
+
+
 def render_cuts():
     st.title("Cortes")
     st.caption("Crie clips verticais, quadrados ou horizontais a partir de vídeos longos, com um fluxo local inspirado no Clip Generator do OpenShorts.")
@@ -3776,6 +3891,7 @@ def main():
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
         ("Cortes", ":material/content_cut:", "Cortes"),
         ("Editor Python", ":material/code:", "Editor Python"),
+        ("Download Mídia", ":material/download:", "Download Mídia"),
     ]
     models_ai_items = [
         ("Personagens", ":material/person:", "Personagens"),
@@ -3882,6 +3998,7 @@ def main():
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": render_cuts,
         "Editor Python": render_python_editor,
+        "Download Mídia": render_media_download,
         "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),

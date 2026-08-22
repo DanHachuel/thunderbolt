@@ -13,6 +13,7 @@ STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
 TIKTOK_PROMPT_MASTERS = STORAGE / "tiktok" / "prompts_master"
+MEDIA_DOWNLOADS = STORAGE / "downloads"
 NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 SEED_TIKTOK_PROMPT_MASTERS = ROOT / "seed" / "prompt_masters"
@@ -25,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "batches.json": [],
     "uploads.json": [],
     "notifications.json": [],
+    "media_downloads.json": [],
     "display_names.json": {"blueprints": {}, "prompt_masters": {}},
     "niche_apify_runs.json": [],
     "metadata_edits.json": [],
@@ -283,7 +285,7 @@ def seed_prompt_masters() -> None:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, MEDIA_DOWNLOADS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     seed_prompt_masters()

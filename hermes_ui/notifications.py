@@ -26,6 +26,8 @@ EVENT_CATALOG: tuple[dict[str, str], ...] = (
     {"code": "cuts_completed", "category": "Edição", "label": "Cortes concluídos", "description": "Quando a geração de cortes terminar com um manifesto completo."},
     {"code": "metadata_cleaning_completed", "category": "Edição", "label": "Metadados limpos", "description": "Quando uma cópia com metadados limpos for criada."},
     {"code": "python_edit_completed", "category": "Edição", "label": "Edição Python concluída", "description": "Quando uma operação do Editor Python guardar o artefacto."},
+    {"code": "media_download_completed", "category": "Edição", "label": "Download Mídia concluído", "description": "Quando um vídeo ou áudio terminar de ser descarregado com sucesso."},
+    {"code": "media_download_failed", "category": "Edição", "label": "Download Mídia falhou", "description": "Quando um download de vídeo ou áudio terminar com erro."},
     {"code": "automation_completed", "category": "Automação", "label": "Automação concluída", "description": "Quando o worker concluir o lote agendado de um canal."},
     {"code": "automation_failed", "category": "Automação", "label": "Automação falhou", "description": "Quando uma execução automática terminar com erro."},
     {"code": "activity_failed", "category": "Sistema", "label": "Actividade falhou", "description": "Quando uma tarefa ou operação persistida terminar em erro."},

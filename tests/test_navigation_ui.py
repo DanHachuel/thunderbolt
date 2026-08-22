@@ -76,3 +76,12 @@ def test_models_ai_is_renamed_in_visible_navigation_with_legacy_alias():
     assert 'with st.expander("AI Influencers"' in MAIN_SOURCE
     assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in MAIN_SOURCE
     assert '("Models AI", ":material/smart_toy:", "Models AI")' not in MAIN_SOURCE
+
+
+def test_edition_contains_media_download_page_and_controls():
+    assert '("Download Mídia", ":material/download:", "Download Mídia")' in MAIN_SOURCE
+    assert '"Download Mídia": render_media_download' in MAIN_SOURCE
+    assert 'def render_media_download()' in MAIN_SOURCE
+    for label in ("URLs para descarregar", "Tipo de mídia", "Qualidade", "Contentor", "Formato de áudio", "Permitir playlist", "Descarregar legendas", "Incorporar metadados", "Iniciar download", "Histórico de downloads"):
+        assert label in MAIN_SOURCE
+    assert 'from hermes_ui.media_downloader import' in MAIN_SOURCE

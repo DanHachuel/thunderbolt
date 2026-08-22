@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.56
+> **Versão deste manual:** 0.2.75
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -438,9 +438,11 @@ A alternativa Apify não usa o dataset, parâmetros, execução ou estado da alt
 
 O menu **AI Influencers** foi adicionado abaixo de **Edição**. As abas **Personagens**, **Redes Sociais** e **Tutorial Meta** aparecem nessa ordem. **Personagens** e **Redes Sociais** mostram apenas uma mensagem de reserva para desenvolvimento futuro; **Tutorial Meta** apresenta o guia local de configuração de Instagram e credenciais Meta para automações com n8n.
 
-## Edição: Limpador de Metadados, Cortes e Editor Python
+## Edição: Limpador de Metadados, Cortes, Editor Python e Download Mídia
 
 A aba **Limpador de Metadados** continua funcional e foi movida para **Edição**. A aba **Cortes** é um Clip Generator local inspirado no [OpenShorts](https://github.com/mutonby/openshorts): permite upload de vídeo, URL directa, vídeos gerados ou pasta local, formatos 9:16/1:1/16:9, opções avançadas, modo manual ou automático por segmentos locais e confirmação de direitos antes da geração. Os clips são processados com FFmpeg, guardados em `storage/cuts/runs/<id>/`, apresentados com preview e downloads individual/ZIP, acompanhados de manifesto JSON e histórico. A aba **Editor Python** é funcional e permite escolher vídeos gerados, indicar uma pasta local ou fazer upload manual; as operações são manuais e criam cópias sem alterar os originais.
+
+A aba **Download Mídia** usa a API Python do [yt-dlp](https://github.com/yt-dlp/yt-dlp) para descarregar vídeos ou áudio a partir de URLs públicas. Aceita uma URL por linha, permite escolher qualidade/contentor, formato de áudio, legendas, metadados e processamento de playlists, que fica desactivado por padrão. Os resultados são guardados em `storage/downloads/`, o histórico em `storage/state/media_downloads.json` e o progresso é apresentado durante a operação. A combinação de streams e a conversão de áudio podem exigir FFmpeg. A ferramenta não aceita cookies, tokens ou opções de linha de comandos introduzidas pelo utilizador.
 
 ## Editor Python baseado no PYEdit
 
