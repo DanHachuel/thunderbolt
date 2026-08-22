@@ -189,7 +189,7 @@ def test_edition_navigation_has_cleaner_cuts_and_python_editor():
     assert '"Editor Python": render_python_editor' in source
 
 
-def test_models_ai_navigation_has_characters_and_social_pages():
+def test_ai_influencers_navigation_has_characters_and_social_pages():
     source_path = Path(__file__).parents[1] / "app" / "main.py"
     source = source_path.read_text(encoding="utf-8")
 
@@ -197,7 +197,9 @@ def test_models_ai_navigation_has_characters_and_social_pages():
     assert '("Personagens", ":material/person:", "Personagens")' in source
     assert '("Redes Sociais", ":material/share:", "Redes Sociais")' in source
     assert source.index('("Personagens", ":material/person:') < source.index('("Redes Sociais", ":material/share:')
-    assert '"Models AI": lambda: render_edit_placeholder("Models AI"' in source
+    assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in source
+    assert '"Models AI": "AI Influencers"' in source
+    assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in source
     assert '"Personagens": lambda: render_edit_placeholder("Personagens"' in source
     assert '"Redes Sociais": lambda: render_edit_placeholder("Redes Sociais"' in source
 

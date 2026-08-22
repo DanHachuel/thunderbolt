@@ -3694,7 +3694,7 @@ def main():
         ("Pipeline TikTok", ":material/video_library:", "Pipeline TikTok"),
         ("Automação", ":material/schedule:", "Automação"),
         ("Edição", ":material/edit:", "Edição"),
-        ("Models AI", ":material/smart_toy:", "Models AI"),
+        ("AI Influencers", ":material/smart_toy:", "AI Influencers"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
     aliases = {
@@ -3707,6 +3707,7 @@ def main():
         "Canais": "Canais Youtube",
         "Blueprints": "Blueprints Youtube",
         "Configurações Técnicas": "Configuração API",
+        "Models AI": "AI Influencers",
         "Contas Google/YouTube — canais em lote": "Contas Google",
     }
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
@@ -3742,8 +3743,8 @@ def main():
                 with st.expander("Edição", expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
                     for child_target, child_icon, child_label in edition_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Models AI":
-                with st.expander("Models AI", expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
+            elif target == "AI Influencers":
+                with st.expander("AI Influencers", expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
                     for child_target, child_icon, child_label in models_ai_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Niche Finder":
@@ -3771,7 +3772,7 @@ def main():
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": render_cuts,
         "Editor Python": render_python_editor,
-        "Models AI": lambda: render_edit_placeholder("Models AI", "Seleccione uma das abas Models AI no menu expansível."),
+        "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),

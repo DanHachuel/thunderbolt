@@ -68,3 +68,11 @@ def test_tutorial_reference_is_packaged_and_contains_meta_setup_sections():
     assert "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md" in tutorial
     assert "Join our Skool community" not in tutorial
     assert "Be part of a growing community" not in tutorial
+
+
+def test_models_ai_is_renamed_in_visible_navigation_with_legacy_alias():
+    assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in MAIN_SOURCE
+    assert 'elif target == "AI Influencers":' in MAIN_SOURCE
+    assert 'with st.expander("AI Influencers"' in MAIN_SOURCE
+    assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in MAIN_SOURCE
+    assert '("Models AI", ":material/smart_toy:", "Models AI")' not in MAIN_SOURCE
