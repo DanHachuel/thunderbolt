@@ -103,3 +103,10 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     assert 'Caminho FFmpeg' not in settings_page
     assert 'Proxy HTTP' not in settings_page
     assert 'Alinhar materiais ao roteiro' not in settings_page
+
+
+def test_language_picker_is_positioned_after_deploy_before_main_menu():
+    assert 'right:2.5rem' in MAIN_SOURCE
+    assert '[data-testid="stAppDeployButton"] { transform:translateX(-3rem)' in MAIN_SOURCE
+    assert '[data-testid="stMainMenu"] { transform:translateX(1rem)' in MAIN_SOURCE
+    assert 'right:8rem' not in MAIN_SOURCE

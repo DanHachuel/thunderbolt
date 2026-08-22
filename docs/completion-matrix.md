@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.78.
+Estado auditado para o release 0.2.79.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -14,7 +14,7 @@ Estado auditado para o release 0.2.78.
 | Vídeos como subaba de Novo vídeo | Concluído | `render_new_video()` cria as subabas e mostra o caminho real de `storage/videos`. |
 | YouTube upload via lógica adaptada do youtube-automation-agent com OAuth fallback | Concluído | `integrations/youtube_upload.py`; o fluxo recomendado usa API Oficial, depois Upload directo e, no fim, Postiz. O contador local limita a API Oficial a cinco envios bem-sucedidos por dia por conta Gmail. |
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |
-| Idiomas MoneyPrinterTurbo e selector de UI | Concluído | `hermes_ui/languages.py` fornece os códigos `en`, `zh`, `de`, `vi`, `tr`, `pt`, `ru`, `es`, `id` e `it`, com bandeiras, normalização legada e traduções do chrome; o botão de bandeira fica fixo à esquerda do Deploy, persiste `ui_language` e não altera `video_language`. |
+| Idiomas MoneyPrinterTurbo e selector de UI | Concluído | `hermes_ui/languages.py` fornece os códigos `en`, `zh`, `de`, `vi`, `tr`, `pt`, `ru`, `es`, `id` e `it`, com bandeiras, normalização legada e traduções do chrome; o botão de bandeira fica fixo à direita do Deploy e antes do menu principal, deixando o indicador de execução livre à esquerda, persiste `ui_language` e não altera `video_language`. |
 | Lista histórica ampliada de idiomas de vídeo | Concluído | `VIDEO_LANGUAGE_OPTIONS` continua preservada para tarefas e Blueprints antigos; `VIDEO_LANGUAGE_SELECTION_OPTIONS` acrescenta os códigos MoneyPrinterTurbo, mostra bandeiras e sincroniza `ui.video_language`. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |

@@ -188,12 +188,20 @@ st.markdown("""
 [data-testid="stRadio"] label { border:1px solid #2a4052; border-radius:12px; padding:.65rem .8rem; background:#101b25; min-height:4.3rem; }
 [data-testid="stRadio"] label:has(input:checked) { border-color:#c59b55; background:linear-gradient(145deg, rgba(96,71,33,.42), rgba(17,27,37,.95)); }
 [data-testid="stStatusWidget"] { border-color:#2a4052 !important; background:#101b25 !important; }
-/* Selector compacto de idioma, visualmente colocado à esquerda do Deploy do Streamlit. */
-[data-testid="stPopover"] { position:fixed !important; top:0.34rem !important; right:4.75rem !important; z-index:100000 !important; }
-[data-testid="stPopover"] > button { min-width:2.25rem !important; width:2.25rem !important; height:2.25rem !important; padding:0 !important; border:1px solid #2a4052 !important; border-radius:8px !important; background:#101b25 !important; }
-[data-testid="stPopover"] > button p { font-size:1.12rem !important; line-height:1 !important; margin:0 !important; }
+/* Selector compacto de idioma, visualmente colocado à direita do Deploy e antes do menu. */
+[data-testid="stPopover"] { position:fixed !important; top:0.20rem !important; right:2.5rem !important; width:2.55rem !important; min-width:2.55rem !important; max-width:2.55rem !important; z-index:100000 !important; pointer-events:auto !important; }
+[data-testid="stAppDeployButton"] { transform:translateX(-3rem) !important; }
+[data-testid="stMainMenu"] { transform:translateX(1rem) !important; }
+[data-testid="stPopover"] > div,
+[data-testid="stPopover"] [data-testid="stPopoverButton"] { width:2.55rem !important; min-width:2.55rem !important; max-width:2.55rem !important; }
+[data-testid="stPopover"] [data-testid="stPopoverButton"] { height:2.25rem !important; padding:0 !important; border:1px solid #2a4052 !important; border-radius:8px !important; background:#101b25 !important; }
+[data-testid="stPopover"] [data-testid="stPopoverButton"] p { font-size:1.12rem !important; line-height:1 !important; margin:0 !important; }
 [data-testid="stPopover"] [data-testid="stPopoverBody"] { min-width:18rem; }
-@media (max-width: 700px) { [data-testid="stPopover"] { right:3.2rem !important; } }
+@media (max-width: 700px) {
+  [data-testid="stPopover"] { right:2.5rem !important; }
+  [data-testid="stAppDeployButton"] { transform:translateX(-3rem) !important; }
+  [data-testid="stMainMenu"] { transform:translateX(1rem) !important; }
+}
 
 /* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */
 [data-testid="stMultiSelectTagsContainer"] span[data-tag] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
