@@ -8,7 +8,7 @@ def test_automation_is_an_expander_with_youtube_child_page():
     assert 'automation_items = [' in MAIN_SOURCE
     assert '("Automação Youtube", ":material/schedule:", "Automação Youtube")' in MAIN_SOURCE
     assert 'elif target == "Automação":' in MAIN_SOURCE
-    assert 'with st.expander("Automação", expanded=current_page in {item[0] for item in automation_items}' in MAIN_SOURCE
+    assert 'with st.expander(ui_text("Automação", ui_language), expanded=current_page in {item[0] for item in automation_items}' in MAIN_SOURCE
     assert '"Automação Youtube": render_automation' in MAIN_SOURCE
     assert 'st.title("Automação Youtube")' in MAIN_SOURCE
 
@@ -73,7 +73,7 @@ def test_tutorial_reference_is_packaged_and_contains_meta_setup_sections():
 def test_models_ai_is_renamed_in_visible_navigation_with_legacy_alias():
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in MAIN_SOURCE
     assert 'elif target == "AI Influencers":' in MAIN_SOURCE
-    assert 'with st.expander("AI Influencers"' in MAIN_SOURCE
+    assert 'with st.expander(ui_text("AI Influencers", ui_language)' in MAIN_SOURCE
     assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in MAIN_SOURCE
     assert '("Models AI", ":material/smart_toy:", "Models AI")' not in MAIN_SOURCE
 

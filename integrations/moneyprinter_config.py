@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from hermes_ui.languages import language_code
 from hermes_ui.material_sources import all_material_api_keys, selected_material_source
 
 try:
@@ -32,6 +33,7 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
     elevenlabs = dict(config.get("elevenlabs") or {})
     chatterbox = dict(config.get("chatterbox") or {})
     proxy = dict(config.get("proxy") or {})
+    ui = dict(config.get("ui") or {})
 
     app_map = {
         "llm_provider": "llm_provider",
@@ -122,6 +124,11 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
         app[f"{source}_api_keys"] = _list_value(keys)
     app["video_source"] = selected_material_source(settings)
     config["app"] = app
+
+    ui["language"] = language_code(settings.get("ui_language", ui.get("language", "pt")))
+    requested_video_language = str(settings.get("video_language") or ui.get("video_language") or "").strip()
+    ui["video_language"] = "" if requested_video_language.casefold() == "music" else language_code(requested_video_language)
+    config["ui"] = ui
 
     whisper["model_size"] = settings.get("whisper_model_size", whisper.get("model_size", "large-v3"))
     whisper["device"] = settings.get("whisper_device", whisper.get("device", "cpu"))

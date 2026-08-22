@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.75
+> **Versão deste manual:** 0.2.78
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -23,7 +23,7 @@ A instalação assistida cria um ambiente local separado para evitar misturar as
 | FFmpeg | Disponibilizado pelo pacote Python `imageio-ffmpeg` |
 | Porta da aplicação | `3030`, configurável com `THUNDERBOLT_PORT` |
 
-A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local.
+A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local. O idioma da interface e o idioma dos vídeos são preferências independentes.
 
 O MoneyPrinterTurbo declara Python 3.11 ou superior como requisito e documenta a instalação com `uv` ou com `venv + pip`. A aplicação segue o mesmo princípio e adiciona um instalador assistido próprio.[1]
 
@@ -189,6 +189,12 @@ $env:MONEYPRINTER_PATH="C:\MoneyPrinterTurbo"
 $env:THUNDERBOLT_VENV="C:\ContentHermes\.venv"
 npx --yes @danhachuel/thunderbolt install
 ```
+
+## Idiomas e selector de bandeira
+
+O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTurbo: **🇺🇸 Inglês (en)**, **🇨🇳 Chinês Simplificado (zh)**, **🇩🇪 Alemão (de)**, **🇻🇳 Vietnamita (vi)**, **🇹🇷 Turco (tr)**, **🇧🇷 Português (pt)**, **🇷🇺 Russo (ru)**, **🇪🇸 Espanhol (es)**, **🇮🇩 Indonésio (id)** e **🇮🇹 Italiano (it)**. A criação de vídeos mantém ainda os rótulos históricos para não invalidar Blueprints e tarefas antigas.
+
+No canto superior direito, imediatamente à esquerda de **Deploy**, o botão com a bandeira actual abre o selector do **Idioma da interface**. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mostra bandeira, nome e código, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
 ## 4. Diagnóstico antes de iniciar
 

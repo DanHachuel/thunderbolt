@@ -37,6 +37,7 @@ from hermes_ui.material_sources import material_api_keys, material_source_catalo
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
+from hermes_ui.languages import LANGUAGE_CODES, language_code, language_flag, language_label, ui_text, video_language_label, video_language_options
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -126,8 +127,10 @@ VIDEO_LANGUAGE_OPTIONS = [
     "50 – Hausa",
 ]
 
-# Mantemos estes valores separados para que Criação de Vídeos e Roteiros partilhem
-# exactamente os mesmos selectores sem alterar a lista histórica de idiomas.
+# Mantemos esta lista histórica para preservar Blueprints, testes e tarefas antigas.
+# A UI acrescenta os dez códigos canónicos do MoneyPrinterTurbo com bandeiras.
+VIDEO_LANGUAGE_SELECTION_OPTIONS = ["music", *LANGUAGE_CODES, *[item for item in VIDEO_LANGUAGE_OPTIONS if item not in {"01 – Inglês", "06 – Alemão", "15 – Italiano", "29 – Turco", "31 – Russo", "36 – Português (Brasil)", "39 – Mandarim", "41 – Espanhol (LatAm)", "42 – Vietnamita", "44 – Indonésio"}]]
+
 VIDEO_FORMAT_OPTIONS = ["wide", "shorts", "music"]
 VIDEO_CONCATENATION_OPTIONS = ["Random Concatenation (Recommended)", "Sequential Concatenation"]
 VIDEO_TRANSITION_OPTIONS = ["None", "Fade", "Dissolve"]
@@ -185,6 +188,12 @@ st.markdown("""
 [data-testid="stRadio"] label { border:1px solid #2a4052; border-radius:12px; padding:.65rem .8rem; background:#101b25; min-height:4.3rem; }
 [data-testid="stRadio"] label:has(input:checked) { border-color:#c59b55; background:linear-gradient(145deg, rgba(96,71,33,.42), rgba(17,27,37,.95)); }
 [data-testid="stStatusWidget"] { border-color:#2a4052 !important; background:#101b25 !important; }
+/* Selector compacto de idioma, visualmente colocado à esquerda do Deploy do Streamlit. */
+[data-testid="stPopover"] { position:fixed !important; top:0.34rem !important; right:4.75rem !important; z-index:100000 !important; }
+[data-testid="stPopover"] > button { min-width:2.25rem !important; width:2.25rem !important; height:2.25rem !important; padding:0 !important; border:1px solid #2a4052 !important; border-radius:8px !important; background:#101b25 !important; }
+[data-testid="stPopover"] > button p { font-size:1.12rem !important; line-height:1 !important; margin:0 !important; }
+[data-testid="stPopover"] [data-testid="stPopoverBody"] { min-width:18rem; }
+@media (max-width: 700px) { [data-testid="stPopover"] { right:3.2rem !important; } }
 
 /* Cores dos chips por identidade da plataforma, sem depender da ordem de selecção. */
 [data-testid="stMultiSelectTagsContainer"] span[data-tag] { color:#ffffff !important; border:0 !important; font-weight:700 !important; }
@@ -204,6 +213,58 @@ st.markdown("""
 [data-testid="stMultiSelect"] [data-baseweb="tag"] svg { color:#ffffff !important; fill:#ffffff !important; }
 </style>
 """, unsafe_allow_html=True)
+
+
+def current_ui_language() -> str:
+    settings = read_json("settings.json", {})
+    stored = st.session_state.get("ui_language") or settings.get("ui_language") or "pt"
+    normalized = language_code(stored)
+    st.session_state["ui_language"] = normalized
+    return normalized
+
+
+def save_ui_language(value: str) -> str:
+    normalized = language_code(value)
+    settings = read_json("settings.json", {})
+    settings["ui_language"] = normalized
+    write_json("settings.json", settings)
+    try:
+        sync_moneyprinter_config(settings, str(settings.get("moneyprinter_path") or ""))
+    except Exception:
+        # The selector remains usable even when no MoneyPrinterTurbo path exists.
+        pass
+    st.session_state["ui_language"] = normalized
+    return normalized
+
+
+def save_video_language(value: str) -> str:
+    normalized = "music" if str(value or "").strip().casefold() == "music" else language_code(value)
+    settings = read_json("settings.json", {})
+    settings["video_language"] = normalized
+    write_json("settings.json", settings)
+    try:
+        sync_moneyprinter_config(settings, str(settings.get("moneyprinter_path") or ""))
+    except Exception:
+        pass
+    st.session_state["video_language"] = normalized
+    return normalized
+
+
+def render_ui_language_picker(language: str) -> None:
+    """Render the flag-only popover over the Streamlit toolbar area."""
+    current = language_code(language)
+    with st.popover(language_flag(current), help="Trocar idioma da interface"):
+        st.markdown(f"**{ui_text('Idioma da interface', current)}**")
+        selected = st.selectbox(
+            ui_text("Idioma da interface", current),
+            list(LANGUAGE_CODES),
+            index=list(LANGUAGE_CODES).index(current),
+            format_func=language_label,
+            key="ui_language_picker",
+        )
+        if selected != current:
+            save_ui_language(selected)
+            st.rerun()
 
 
 def card(label: str, value: str | int, note: str = ""):
@@ -377,10 +438,12 @@ def render_video_generation_settings(prefix: str, *, current_language: str = "")
             key=f"{prefix}_video_subject",
             placeholder="Ex.: How AI is changing everyday life",
         )
+        normalized_current_language = "music" if str(current_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"} else language_code(current_language)
         settings["script_language"] = st.selectbox(
             "Script Language",
-            VIDEO_LANGUAGE_OPTIONS,
-            index=VIDEO_LANGUAGE_OPTIONS.index(current_language) if current_language in VIDEO_LANGUAGE_OPTIONS else 0,
+            VIDEO_LANGUAGE_SELECTION_OPTIONS,
+            index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalized_current_language) if normalized_current_language in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0,
+            format_func=video_language_label,
             key=f"{prefix}_script_language",
         )
     with subject_cols[1]:
@@ -603,7 +666,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             edited_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
             edited_url = st.text_input("URL", value=str(channel.get("url") or ""))
             edited_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
-            edited_language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=["Português", "English", "Español", "Français", "Deutsch"].index(channel.get("language")) if channel.get("language") in {"Português", "English", "Español", "Français", "Deutsch"} else 0)
+            edited_language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index(language_code(channel.get("language") or "pt")), format_func=language_label)
             style_options = ["Pexels/Pixabay", "full_ia", "Apenas Música"]
             style_value = {"pexels": "Pexels/Pixabay", "music": "Apenas Música"}.get(str(channel.get("style_wide") or "pexels"), str(channel.get("style_wide") or "Pexels/Pixabay"))
             edited_style = st.selectbox("Estilo wide", style_options, index=style_options.index(style_value) if style_value in style_options else 0)
@@ -1052,7 +1115,7 @@ def render_channels():
                 name = st.text_input("Nome do canal", value=imported.get("name", ""), key="yt_import_name")
                 url = st.text_input("URL", value=imported.get("url", source if source.startswith("http") else ""), key="yt_import_url")
                 handle = st.text_input("Handle", value=imported.get("handle", ""), key="yt_import_handle")
-                language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="yt_import_language")
+                language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index(language_code(imported.get("language") or "pt")), format_func=language_label, key="yt_import_language")
                 style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="yt_import_style")
                 blueprint = st.selectbox("Blueprint padrão do canal", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
                 voice_options = voice_catalog(imported.get("default_voice") or imported.get("voice", ""))
@@ -1155,7 +1218,7 @@ def render_channels():
                     with defaults_cols[1]:
                         batch_voice = st.selectbox("Voz padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="batch_channel_voice")
                     with defaults_cols[2]:
-                        batch_language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], key="batch_channel_language")
+                        batch_language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="batch_channel_language")
                     with defaults_cols[3]:
                         batch_style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], key="batch_channel_style")
                     import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", use_container_width=True)
@@ -1201,7 +1264,7 @@ def render_channels():
             handle = st.text_input("Handle", placeholder="@seucanal", key="manual_channel_handle")
             description = st.text_area("Descrição", key="manual_channel_description")
             niche = st.text_input("Canais de Referência / Nicho", placeholder="Ex.: História militar, mistérios, ciência", key="manual_channel_niche")
-            language = st.selectbox("Idioma", ["Português", "English", "Español", "Français", "Deutsch"], index=0, key="manual_channel_language")
+            language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="manual_channel_language")
             style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="manual_channel_style")
             manual_blueprint_items = blueprint_catalog()
             manual_blueprint_ids = [item[0] for item in manual_blueprint_items]
@@ -1361,10 +1424,11 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
             )
             mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
             selected_one: dict[str, Any] | None = None
-            legacy_language = st.session_state.get("video_language")
-            legacy_language_map = {"Português": "36 – Português (Brasil)", "English": "01 – Inglês", "Español": "41 – Espanhol (LatAm)"}
-            if legacy_language not in VIDEO_LANGUAGE_OPTIONS:
-                st.session_state["video_language"] = legacy_language_map.get(legacy_language, VIDEO_LANGUAGE_OPTIONS[0])
+            legacy_language = st.session_state.get("video_language") or read_json("settings.json", {}).get("video_language")
+            if str(legacy_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"}:
+                st.session_state["video_language"] = "music"
+            else:
+                st.session_state["video_language"] = language_code(legacy_language or "pt")
             generation_settings: dict[str, Any] = {}
             if mode == "general":
                 selected = [str(channel["id"]) for channel in all_channels if channel.get("id")]
@@ -1625,6 +1689,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                 fmt = generation_settings["video_format"]
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
             if submitted:
+                save_video_language(language)
                 style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
                 if style == "music" and not music_path:
                     st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
@@ -1753,7 +1818,7 @@ def render_scripts():
         legacy_script_language = str(st.session_state.get("script_language") or "")
         script_settings = render_video_generation_settings(
             "pipeline_scripts",
-            current_language=legacy_script_language if legacy_script_language in VIDEO_LANGUAGE_OPTIONS else "",
+            current_language=legacy_script_language or str(read_json("settings.json", {}).get("video_language") or "pt"),
         )
         language = script_settings["script_language"]
         structure_notes = script_settings["script_structure_notes"]
@@ -4031,13 +4096,16 @@ def main():
     if current_page not in {item[0] for item in top_pages + pipeline_items + pipeline_tiktok_items + automation_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
         current_page = "Início"
     st.session_state["page"] = current_page
+    ui_language = current_ui_language()
+    render_ui_language_picker(ui_language)
 
     def navigate(target: str):
         st.session_state["page"] = target
         st.rerun()
 
     def render_nav_button(target: str, icon: str, label: str, *, child: bool = False):
-        if st.button(label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+        display_label = ui_text(label, ui_language)
+        if st.button(display_label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
             navigate(target)
 
     with st.sidebar:
@@ -4045,31 +4113,31 @@ def main():
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
         for target, icon, label in top_pages:
             if target == "Pipeline":
-                with st.expander("Pipeline", expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
+                with st.expander(ui_text("Pipeline", ui_language), expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
                     for child_target, child_icon, child_label in pipeline_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Pipeline TikTok":
-                with st.expander("Pipeline TikTok", expanded=current_page in {item[0] for item in pipeline_tiktok_items}, icon=":material/video_library:"):
+                with st.expander(ui_text("Pipeline TikTok", ui_language), expanded=current_page in {item[0] for item in pipeline_tiktok_items}, icon=":material/video_library:"):
                     for child_target, child_icon, child_label in pipeline_tiktok_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Automação":
-                with st.expander("Automação", expanded=current_page in {item[0] for item in automation_items}, icon=":material/schedule:"):
+                with st.expander(ui_text("Automação", ui_language), expanded=current_page in {item[0] for item in automation_items}, icon=":material/schedule:"):
                     for child_target, child_icon, child_label in automation_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Edição":
-                with st.expander("Edição", expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
+                with st.expander(ui_text("Edição", ui_language), expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
                     for child_target, child_icon, child_label in edition_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "AI Influencers":
-                with st.expander("AI Influencers", expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
+                with st.expander(ui_text("AI Influencers", ui_language), expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
                     for child_target, child_icon, child_label in models_ai_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Niche Finder":
-                with st.expander("Niche Finder", expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
+                with st.expander(ui_text("Niche Finder", ui_language), expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
                     for child_target, child_icon, child_label in niche_finder_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             elif target == "Configurações":
-                with st.expander("Configurações", expanded=current_page in {item[0] for item in settings_items}, icon=":material/settings:"):
+                with st.expander(ui_text("Configurações", ui_language), expanded=current_page in {item[0] for item in settings_items}, icon=":material/settings:"):
                     for child_target, child_icon, child_label in settings_items:
                         render_nav_button(child_target, child_icon, child_label, child=True)
             else:

@@ -15,7 +15,7 @@ A primeira versão implementa a camada UI independente com:
 | Blueprints Youtube | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais Youtube | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
-| Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; lotes; 51 rótulos de idioma; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
+| Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; idiomas históricos preservados e dez códigos MoneyPrinterTurbo com bandeiras; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
 | Automação | Menu expansível com a subaba **Automação Youtube**, onde ficam os vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | AI Influencers | Menu expansível com Personagens, Redes Sociais e Tutorial Meta |
 | Niche Finder | Menu expansível com duas alternativas independentes: Niche Finder Kaggle e Niche Finder Apify, com parâmetros, execução e resultados separados |
@@ -46,7 +46,13 @@ Os dados são segredos de sessão. Os valores não aparecem em tabelas ou logs, 
 
 Os adaptadores do MoneyPrinterTurbo e de publicação nas plataformas são ligados pelas configurações locais e pelos pontos de integração em `integrations/`. A UI não inventa dados quando um serviço externo ou credencial não está disponível.
 
-## Navegação da UI 0.2.77
+## Idiomas e selector rápido da UI
+
+O Thunderbolt mantém os idiomas históricos da criação de vídeos e acrescenta as dez opções canónicas do MoneyPrinterTurbo: **🇺🇸 Inglês (en)**, **🇨🇳 Chinês Simplificado (zh)**, **🇩🇪 Alemão (de)**, **🇻🇳 Vietnamita (vi)**, **🇹🇷 Turco (tr)**, **🇧🇷 Português (pt)**, **🇷🇺 Russo (ru)**, **🇪🇸 Espanhol (es)**, **🇮🇩 Indonésio (id)** e **🇮🇹 Italiano (it)**. Os códigos curtos são os valores persistidos e sincronizados com `ui.video_language` no `config.toml`; a bandeira e o nome são apenas a apresentação visual.
+
+No canto superior direito da aplicação existe um botão compacto com a bandeira do idioma actual, colocado imediatamente à esquerda do botão **Deploy** do Streamlit. Ao abrir o botão, seleccione outro idioma; a preferência é guardada em `storage/state/settings.json` como `ui_language`, e a navegação lateral actualiza-se sem alterar o idioma seleccionado para os vídeos. A primeira implementação traduz o chrome principal da navegação e mantém os rótulos específicos das páginas compatíveis com o fluxo existente.
+
+## Navegação da UI 0.2.78
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais** e **Tutorial Meta**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 

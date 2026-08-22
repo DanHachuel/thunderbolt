@@ -193,6 +193,8 @@ DEFAULTS: dict[str, Any] = {
         "log_level": "DEBUG",
         "listen_host": "127.0.0.1",
         "listen_port": 8080,
+        "ui_language": "pt",
+        "video_language": "pt",
         "video_source": "pexels",
         "match_materials_to_script": False,
         "endpoint": "",
