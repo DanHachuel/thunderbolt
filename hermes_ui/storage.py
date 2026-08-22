@@ -15,6 +15,7 @@ BLUEPRINTS = STORAGE / "blueprints"
 TIKTOK_PROMPT_MASTERS = STORAGE / "tiktok" / "prompts_master"
 NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
+SEED_TIKTOK_PROMPT_MASTERS = ROOT / "seed" / "prompt_masters"
 
 DEFAULTS: dict[str, Any] = {
         "channels.json": [],
@@ -239,10 +240,22 @@ def seed_blueprints() -> None:
             shutil.copy2(source, target)
 
 
+def seed_prompt_masters() -> None:
+    """Copy packaged TikTok Prompt Masters without overwriting user files."""
+    if not SEED_TIKTOK_PROMPT_MASTERS.exists():
+        return
+    TIKTOK_PROMPT_MASTERS.mkdir(parents=True, exist_ok=True)
+    for source in sorted(SEED_TIKTOK_PROMPT_MASTERS.glob("*.md")):
+        target = TIKTOK_PROMPT_MASTERS / source.name
+        if not target.exists():
+            shutil.copy2(source, target)
+
+
 def ensure_storage() -> None:
     for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
+    seed_prompt_masters()
     for filename, default in DEFAULTS.items():
         target = STATE / filename
         if not target.exists():
