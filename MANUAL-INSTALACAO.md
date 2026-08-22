@@ -196,6 +196,8 @@ O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTur
 
 No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra o rótulo **Language** acima do selector. Cada opção apresenta o nome e o código, acompanhados por uma imagem SVG local da bandeira; não depende de emojis nem de siglas da fonte do sistema. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O dashboard inicial e as abas da barra lateral usam o mesmo idioma seleccionado. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mantém o catálogo de vídeo independente, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
+Todas as subabas internas também são traduzidas nos dez idiomas: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais e Client MCP/Servidor MCP/Skill. A ordem e as chaves internas dos widgets permanecem estáveis.
+
 ## 4. Diagnóstico antes de iniciar
 
 Depois da instalação, execute:

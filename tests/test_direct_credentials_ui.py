@@ -50,7 +50,7 @@ def test_google_accounts_use_collapsed_name_email_cards_and_external_add_form():
 
 
 def test_api_settings_keep_api_keys_and_voice_test_tabs():
-    expected = 'st.tabs(["API Keys", "Teste de vozes"])'
+    expected = 'render_localized_tabs(["API Keys", "Teste de vozes"])'
     assert expected in MAIN_SOURCE
     assert 'st.subheader("API Keys")' in MAIN_SOURCE
     assert 'st.subheader("Execução local")' not in MAIN_SOURCE

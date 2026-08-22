@@ -8,7 +8,7 @@ def test_cuts_page_uses_functional_clip_generator_renderer():
     assert "def render_cuts():" in MAIN_SOURCE
     assert '"Cortes": render_cuts' in MAIN_SOURCE
     assert "Create Viral Shorts" in MAIN_SOURCE
-    assert 'st.tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])' in MAIN_SOURCE
+    assert 'render_localized_tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])' in MAIN_SOURCE
     assert 'with st.expander("advanced options", expanded=False):' in MAIN_SOURCE
     assert 'st.button(\n            "Gerar Clips"' in MAIN_SOURCE
 

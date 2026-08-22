@@ -91,8 +91,8 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     settings_start = MAIN_SOURCE.index("def render_settings():")
     settings_page = MAIN_SOURCE[settings_start:]
     material_sources_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_material_source_api_keys("):]
-    assert 'api_keys_tab, voice_test_tab = st.tabs(["API Keys", "Teste de vozes"])' in settings_page
-    assert 'api_service_tab, material_sources_tab = st.tabs(["Serviços e modelos", "Fontes de materiais"])' in settings_page
+    assert 'api_keys_tab, voice_test_tab = render_localized_tabs(["API Keys", "Teste de vozes"])' in settings_page
+    assert 'api_service_tab, material_sources_tab = render_localized_tabs(["Serviços e modelos", "Fontes de materiais"])' in settings_page
     assert 'with material_sources_tab:' in settings_page
     assert 'render_material_source_api_keys(settings)' in settings_page
     for label in ("Fonte de materiais", "Adicionar outra chave", "Guardar fonte e chaves"):

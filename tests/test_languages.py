@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, LANGUAGE_FLAG_SVGS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label
+from hermes_ui.languages import LANGUAGE_CATALOG, LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, LANGUAGE_FLAG_SVGS, TAB_TRANSLATIONS, _TAB_LABELS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label
 from integrations.moneyprinter_config import build_moneyprinter_config
 
 
@@ -79,3 +79,15 @@ def test_brazil_flag_svg_uses_official_color_order():
     assert '<path fill="#ffdf00"' in brazil
     assert '<circle cx="15" cy="10" r="4.2" fill="#002776"/>' in brazil
     assert '<rect width="30" height="20" fill="#ffdf00"/>' not in brazil
+
+
+def test_all_tab_and_subtab_labels_are_translated_for_every_supported_language():
+    assert len(_TAB_LABELS) == 31
+    assert "render_localized_tabs" in MAIN_SOURCE
+    for code in LANGUAGE_CODES:
+        assert set(_TAB_LABELS).issubset(TAB_TRANSLATIONS[code])
+    assert ui_text("Pesquisa pública", "en") == "Public search"
+    assert ui_text("Cadastro manual", "zh") == "手动注册"
+    assert ui_text("Importar do YouTube", "de") == "Von YouTube importieren"
+    assert ui_text("Teste de vozes", "es") == "Prueba de voces"
+    assert ui_text("Serviços e modelos", "it") == "Servizi e modelli"

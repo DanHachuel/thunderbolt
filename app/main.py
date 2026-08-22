@@ -218,6 +218,17 @@ def current_ui_language() -> str:
     return normalized
 
 
+def localized_tab_labels(labels: list[str], language: str | None = None) -> list[str]:
+    """Translate Streamlit tab labels while keeping widget keys and behaviour stable."""
+    selected_language = language_code(language or current_ui_language())
+    return [ui_text(label, selected_language) for label in labels]
+
+
+def render_localized_tabs(labels: list[str], language: str | None = None):
+    """Render a tab group with labels translated for the selected UI language."""
+    return st.tabs(localized_tab_labels(labels, language))
+
+
 def save_ui_language(value: str) -> str:
     normalized = language_code(value)
     settings = read_json("settings.json", {})
@@ -750,7 +761,7 @@ def render_dashboard():
 def render_blueprints():
     st.title("Blueprints Youtube")
     st.caption(f"Biblioteca local lida directamente de `{BLUEPRINTS}`")
-    blueprint_tab, branding_tab = st.tabs(["Blueprints", "Brandings"])
+    blueprint_tab, branding_tab = render_localized_tabs(["Blueprints", "Brandings"])
     with blueprint_tab:
         st.subheader("Criar blueprint a partir de link")
         with st.form("create_blueprint_from_link"):
@@ -915,7 +926,7 @@ def render_tiktok_accounts():
     settings = read_json("settings.json", {})
     accounts = _tiktok_accounts_from_settings(settings)
 
-    search_tab, manual_tab, library_tab = st.tabs(["Pesquisa pública", "Cadastro manual", "Contas cadastradas"])
+    search_tab, manual_tab, library_tab = render_localized_tabs(["Pesquisa pública", "Cadastro manual", "Contas cadastradas"])
     with search_tab:
         st.subheader("Pesquisar perfil público")
         st.info("A pesquisa consulta apenas a página pública do perfil e pode devolver dados incompletos. Se o TikTok bloquear a consulta, utilize o cadastro manual.")
@@ -1012,7 +1023,7 @@ def render_tiktok_prompt_masters():
     st.title("Prompts Master")
     st.caption(f"Biblioteca exclusiva para vídeos TikTok. Os ficheiros ficam em `{TIKTOK_PROMPT_MASTERS}` e nunca entram na pasta de Blueprints YouTube.")
 
-    upload_tab, library_tab = st.tabs(["Upload", "Biblioteca"])
+    upload_tab, library_tab = render_localized_tabs(["Upload", "Biblioteca"])
     with upload_tab:
         st.subheader("Adicionar Prompt Master")
         st.info("Use ficheiros Markdown `.md`. Cada Prompt Master é guardado como um ficheiro independente no storage TikTok.")
@@ -1097,7 +1108,7 @@ def render_channels():
     youtube_account_labels = {"": "Sem conta Google associada"}
     youtube_account_labels.update({str(account["id"]): f"{account.get('label', 'Canais YouTube')} — {account.get('email', 'sem e-mail')}" for account in youtube_accounts})
     youtube_accounts_by_id = {str(account["id"]): account for account in youtube_accounts}
-    import_tab, batch_tab, manual_tab = st.tabs(["Importar do YouTube", "Canais em lote gmail", "Cadastro manual"])
+    import_tab, batch_tab, manual_tab = render_localized_tabs(["Importar do YouTube", "Canais em lote gmail", "Cadastro manual"])
 
     with import_tab:
         st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
@@ -1430,7 +1441,7 @@ def render_channels():
 
 def render_new_video(page_title: str = "Criação de Vídeos"):
     st.title(page_title)
-    create_tab, videos_tab = st.tabs(["Criar vídeo", "Vídeos"])
+    create_tab, videos_tab = render_localized_tabs(["Criar vídeo", "Vídeos"])
     with create_tab:
         all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict)]
         active_channels = [c for c in all_channels if c.get("active", True)]
@@ -1790,7 +1801,7 @@ def render_scripts():
     script_dir = script_storage_path()
     st.info(f"**Ficheiros guardados em:** `{script_dir}` · o conteúdo fica no storage local do Thunderbolt e não é enviado automaticamente para plataformas.")
 
-    create_tab, history_tab = st.tabs(["Novo roteiro/letra", "Histórico guardado"])
+    create_tab, history_tab = render_localized_tabs(["Novo roteiro/letra", "Histórico guardado"])
     with create_tab:
         all_channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict)]
         active_channels = [channel for channel in all_channels if channel.get("active", True)]
@@ -2030,7 +2041,7 @@ def render_niche_finder():
     keyword = st.text_input("Filtrar palavras-chave nos clusters", key="niche_cluster_keyword", placeholder="Ex.: música, gaming, receitas")
     if keyword.strip():
         cluster_table = cluster_table[cluster_table["palavras"].str.contains(keyword.strip(), case=False, na=False)]
-    tab_clusters, tab_rules, tab_data = st.tabs(["Clusters encontrados", "Regras de associação", "Dados analisados"])
+    tab_clusters, tab_rules, tab_data = render_localized_tabs(["Clusters encontrados", "Regras de associação", "Dados analisados"])
     with tab_clusters:
         st.dataframe(cluster_table, use_container_width=True, hide_index=True)
         if not points.empty:
@@ -2323,7 +2334,7 @@ def render_cuts():
     )
 
     source_path = None
-    source_tab, url_tab, generated_tab, folder_tab = st.tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])
+    source_tab, url_tab, generated_tab, folder_tab = render_localized_tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])
     with source_tab:
         uploaded_video = st.file_uploader(
             "Clique para carregar ou arraste um vídeo",
@@ -2501,7 +2512,7 @@ def render_python_editor():
     st.caption("Editor local inspirado no PYEdit para scripts Python e edição manual de vídeos do Thunderbolt.")
     st.info("Escolha um vídeo gerado, indique uma pasta local ou faça upload de um vídeo. Nenhum código Python é executado nesta aba; as operações de vídeo só começam depois de clicar no botão da operação.")
 
-    video_tab, code_tab = st.tabs(["Vídeos", "Código Python"])
+    video_tab, code_tab = render_localized_tabs(["Vídeos", "Código Python"])
     with video_tab:
         st.subheader("Escolher vídeo")
         source_mode = st.radio("Origem", ["Vídeos gerados", "Pasta local", "Upload manual"], horizontal=True, key="python_editor_source_mode")
@@ -2809,7 +2820,7 @@ def render_upload_direct():
 
 def render_upload():
     st.title("Upload")
-    upload_tab, direct_tab, postiz_tab, upload_post_tab = st.tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])
+    upload_tab, direct_tab, postiz_tab, upload_post_tab = render_localized_tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])
     with direct_tab:
         render_upload_direct()
     with postiz_tab:
@@ -3459,10 +3470,10 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, voice_test_tab = st.tabs(["API Keys", "Teste de vozes"])
+    api_keys_tab, voice_test_tab = render_localized_tabs(["API Keys", "Teste de vozes"])
 
     with api_keys_tab:
-        api_service_tab, material_sources_tab = st.tabs(["Serviços e modelos", "Fontes de materiais"])
+        api_service_tab, material_sources_tab = render_localized_tabs(["Serviços e modelos", "Fontes de materiais"])
         with api_service_tab:
             with st.form("settings_form"):
                 st.subheader("API Keys")
@@ -3790,7 +3801,7 @@ def render_mcp():
     st.title("MCP")
     st.caption("Clientes externos, servidor MCP do Thunderbolt e a skill local ficam separados para evitar confundir funções diferentes.")
 
-    client_tab, server_tab, skill_tab = st.tabs(["Client MCP", "Servidor MCP", "Skill"])
+    client_tab, server_tab, skill_tab = render_localized_tabs(["Client MCP", "Servidor MCP", "Skill"])
 
     with client_tab:
         st.subheader("Client MCP")

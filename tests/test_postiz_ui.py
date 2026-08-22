@@ -7,7 +7,7 @@ STORAGE_SOURCE = (ROOT / "hermes_ui" / "storage.py").read_text(encoding="utf-8")
 
 
 def test_upload_has_postiz_and_upload_post_tabs_and_adapters():
-    assert 'st.tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])' in MAIN_SOURCE
+    assert 'render_localized_tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])' in MAIN_SOURCE
     assert "def render_upload_postiz():" in MAIN_SOURCE
     assert "def render_upload_post():" in MAIN_SOURCE
     assert "Enviar vídeo pelo Upload-Post" in MAIN_SOURCE
