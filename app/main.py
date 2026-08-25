@@ -216,9 +216,20 @@ st.markdown("""
 
 
 def current_ui_language() -> str:
-    settings = read_json("settings.json", {})
-    stored = st.session_state.get("ui_language") or settings.get("ui_language") or "pt"
-    normalized = language_code(stored)
+    """Return the session language without hitting disk on every widget render."""
+    cached = st.session_state.get("ui_language")
+    if cached:
+        return language_code(cached)
+    requested = ""
+    try:
+        requested = str(st.query_params.get("lang") or "").strip()
+    except Exception:
+        requested = ""
+    if requested:
+        normalized = language_code(requested)
+    else:
+        settings = read_json("settings.json", {})
+        normalized = language_code(settings.get("ui_language") or "pt")
     st.session_state["ui_language"] = normalized
     return normalized
 
@@ -235,7 +246,7 @@ _STREAMLIT_I18N_INSTALLED = False
 def _translate_streamlit_arguments(method_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if not args and "label" not in kwargs:
         return args, kwargs
-    selected_language = current_ui_language()
+    selected_language = str(st.session_state.get("ui_language") or current_ui_language())
     translated_args = list(args)
     if translated_args and isinstance(translated_args[0], str):
         translated_args[0] = ui_text(translated_args[0], selected_language)
@@ -339,6 +350,10 @@ def render_ui_language_picker(language: str) -> None:
         )
     if selected != current:
         save_ui_language(selected)
+        try:
+            st.query_params["lang"] = selected
+        except Exception:
+            pass
         st.rerun()
 
 
