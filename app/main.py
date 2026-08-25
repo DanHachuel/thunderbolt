@@ -4240,9 +4240,7 @@ def main():
     ]
     niche_finder_items = [
         ("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle"),
-        ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
         ("Niche Finder Apify", ":material/api:", "Niche Finder Apify"),
-        ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
     ]
     automation_items = [
         ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
@@ -4308,9 +4306,9 @@ def main():
         st.session_state["page"] = target
         st.rerun()
 
-    def render_nav_button(target: str, icon: str, label: str):
+    def render_nav_button(target: str, icon: str, label: str, scope: str):
         display_label = ui_text(label, ui_language)
-        if st.button(display_label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
             navigate(target)
 
     with st.sidebar:
@@ -4319,12 +4317,12 @@ def main():
         for target, icon, label in top_pages:
             children = groups.get(target)
             if children is None:
-                render_nav_button(target, icon, label)
+                render_nav_button(target, icon, label, "top")
                 continue
             child_targets = {item[0] for item in children}
             with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):
                 for child_target, child_icon, child_label in children:
-                    render_nav_button(child_target, child_icon, child_label)
+                    render_nav_button(child_target, child_icon, child_label, target)
 
     renderers = {
         "Início": render_dashboard,
