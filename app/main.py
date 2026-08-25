@@ -3791,17 +3791,25 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                     model = st.text_input("Modelo manual", value=current_model if selected == manual_model and current_model not in model_catalog else "", key=f"llm_card_{card_id}_model_manual") if selected == manual_model else selected
                 else:
                     model = st.text_input("Modelo", value=current_model, help="ID do modelo usado pelo endpoint Chat Completions.", key=f"llm_card_{card_id}_model")
-            if definition.show_base_url:
-                base_url = st.text_input(
-                    "Base URL",
-                    value=str(card.get("base_url") or definition.default_base_url),
-                    help="Endpoint OpenAI-compatible deste provider; só aparece quando é configurável.",
-                    key=f"llm_card_{card_id}_base_url",
-                )
-            else:
-                base_url = str(card.get("base_url") or definition.default_base_url)
-                if base_url:
+            base_url = str(card.get("base_url") or definition.default_base_url)
+            endpoint_col, action_col = st.columns([1.65, 1.05])
+            with endpoint_col:
+                if definition.show_base_url:
+                    base_url = st.text_input(
+                        "Base URL",
+                        value=base_url,
+                        help="Endpoint OpenAI-compatible deste provider; só aparece quando é configurável.",
+                        key=f"llm_card_{card_id}_base_url",
+                    )
+                elif base_url:
                     st.caption(f"Endpoint gerido pelo provider: {base_url}")
+            with action_col:
+                action_buttons = st.columns(2)
+                with action_buttons[0]:
+                    refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
+                with action_buttons[1]:
+                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+
             extra_values: dict[str, str] = {}
             if definition.extra_fields:
                 extra_cols = st.columns(len(definition.extra_fields))
@@ -3812,26 +3820,26 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                             value=str(card.get(field_name) or ""),
                             key=f"llm_card_{card_id}_{field_name}",
                         )
-            enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"llm_card_{card_id}_enabled")
-            primary_llm = st.checkbox(
-                "LLM principal",
-                value=str(settings.get(LLM_ACTIVE_CARD_KEY) or "") == card_id,
-                help="Usar este cartão como provider principal para geração de temas, roteiros, títulos e keywords.",
-                key=f"llm_card_{card_id}_primary",
-            )
-            telegram_llm = st.checkbox(
-                "LLM Telegram",
-                value=bool(card.get("telegram_llm", False)),
-                help="Usar este cartão exclusivamente para o roteamento de notificações Telegram. Apenas um cartão pode ficar seleccionado.",
-                key=f"llm_card_{card_id}_telegram",
-            )
-            action_cols = st.columns([1.35, 1.35, 1.1])
-            with action_cols[0]:
-                test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
-            with action_cols[1]:
-                refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
-            with action_cols[2]:
-                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True)
+
+            status_cols = st.columns(3)
+            with status_cols[0]:
+                enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"llm_card_{card_id}_enabled")
+            with status_cols[1]:
+                primary_llm = st.checkbox(
+                    "LLM principal",
+                    value=str(settings.get(LLM_ACTIVE_CARD_KEY) or "") == card_id,
+                    help="Usar este cartão como provider principal para geração de temas, roteiros, títulos e keywords.",
+                    key=f"llm_card_{card_id}_primary",
+                )
+            with status_cols[2]:
+                telegram_llm = st.checkbox(
+                    "LLM Telegram",
+                    value=bool(card.get("telegram_llm", False)),
+                    help="Usar este cartão exclusivamente para o roteamento de notificações Telegram. Apenas um cartão pode ficar seleccionado.",
+                    key=f"llm_card_{card_id}_telegram",
+                )
+
+            save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True)
             remove_clicked = False
             if definition.code != "openai":
                 remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True)
@@ -3921,11 +3929,12 @@ def render_settings():
     with api_keys_tab:
         api_service_tab, material_sources_tab = render_localized_tabs(["Serviços e modelos", "Fontes de materiais"])
         with api_service_tab:
+            st.subheader("API Keys")
+            port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
+            moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
+            render_llm_provider_cards(settings)
             with st.form("settings_form"):
-                st.subheader("API Keys")
-                port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-                moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-                with st.expander("Niche Finder — execução remota no Kaggle", expanded=False):
+                with st.expander("Niche Finder — Kaggle", expanded=False):
                     st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
                     kaggle_cols = st.columns(3)
                     with kaggle_cols[0]:
@@ -3936,7 +3945,7 @@ def render_settings():
                         kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
                     _render_credential_status(kaggle_api_key)
 
-                with st.expander("Niche Finder — execução através da Apify", expanded=False):
+                with st.expander("Niche Finder — Apify", expanded=False):
                     st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
                     apify_cols = st.columns(4)
                     with apify_cols[0]:
@@ -4050,7 +4059,6 @@ def render_settings():
                             st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
                     except Exception as exc:
                         st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
-        render_llm_provider_cards(settings)
         with material_sources_tab:
             render_material_source_api_keys(settings)
 
