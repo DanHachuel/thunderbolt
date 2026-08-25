@@ -473,9 +473,95 @@ for _language_code, _pipeline_feature_translation in _PIPELINE_FEATURE_TRANSLATI
     UI_TRANSLATIONS[_language_code].update(_pipeline_feature_translation)
 
 
+_DRAFT_VIDEO_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "Gerar de Rascunho": "Gerar de Rascunho", "Roteiros guardados": "Roteiros guardados", "Seleccione um roteiro": "Seleccione um roteiro",
+        "Configurações a completar": "Configurações a completar", "Configurações de vídeo": "Configurações de vídeo", "Configurações de áudio": "Configurações de áudio", "Configurações de legendas": "Configurações de legendas",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Roteiro completo: todas as configurações estão disponíveis.", "Seleccione as configurações que pretende completar.": "Seleccione as configurações que pretende completar.",
+        "Continuar criação": "Continuar criação", "Gerar apenas o vídeo": "Gerar apenas o vídeo", "Seleccione um canal para continuar.": "Seleccione um canal para continuar.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.",
+        "Ainda não existem roteiros guardados.": "Ainda não existem roteiros guardados.", "Histórico guardado": "Histórico guardado", "Rascunho local": "Rascunho local", "Origem": "Origem",
+    },
+    "en": {
+        "Gerar de Rascunho": "Generate from Draft", "Roteiros guardados": "Saved scripts", "Seleccione um roteiro": "Select a script",
+        "Configurações a completar": "Settings to complete", "Configurações de vídeo": "Video settings", "Configurações de áudio": "Audio settings", "Configurações de legendas": "Subtitle settings",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Complete script: all settings are available.", "Seleccione as configurações que pretende completar.": "Select the settings you want to complete.",
+        "Continuar criação": "Continue creation", "Gerar apenas o vídeo": "Generate video only", "Seleccione um canal para continuar.": "Select a channel to continue.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "This script does not contain enough content. Return to Scripts and save the topic, script and keywords.",
+        "Ainda não existem roteiros guardados.": "There are no saved scripts yet.", "Histórico guardado": "Saved history", "Rascunho local": "Local draft", "Origem": "Source",
+    },
+    "zh": {
+        "Gerar de Rascunho": "从草稿生成", "Roteiros guardados": "已保存脚本", "Seleccione um roteiro": "选择脚本",
+        "Configurações a completar": "需要完成的设置", "Configurações de vídeo": "视频设置", "Configurações de áudio": "音频设置", "Configurações de legendas": "字幕设置",
+        "Roteiro completo: todas as configurações estão disponíveis.": "完整脚本：所有设置均可用。", "Seleccione as configurações que pretende completar.": "选择要完成的设置。",
+        "Continuar criação": "继续创建", "Gerar apenas o vídeo": "仅生成视频", "Seleccione um canal para continuar.": "选择一个频道以继续。",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "此脚本内容不足。请返回脚本页面并保存主题、脚本和关键词。",
+        "Ainda não existem roteiros guardados.": "还没有保存的脚本。", "Histórico guardado": "已保存历史", "Rascunho local": "本地草稿", "Origem": "来源",
+    },
+    "de": {
+        "Gerar de Rascunho": "Aus Entwurf erstellen", "Roteiros guardados": "Gespeicherte Skripte", "Seleccione um roteiro": "Skript auswählen",
+        "Configurações a completar": "Zu vervollständigende Einstellungen", "Configurações de vídeo": "Videoeinstellungen", "Configurações de áudio": "Audioeinstellungen", "Configurações de legendas": "Untertiteleinstellungen",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Vollständiges Skript: Alle Einstellungen sind verfügbar.", "Seleccione as configurações que pretende completar.": "Wählen Sie die zu vervollständigenden Einstellungen.",
+        "Continuar criação": "Erstellung fortsetzen", "Gerar apenas o vídeo": "Nur Video erstellen", "Seleccione um canal para continuar.": "Wählen Sie einen Kanal, um fortzufahren.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Dieses Skript enthält nicht genügend Inhalt. Kehren Sie zu Skripten zurück und speichern Sie Thema, Skript und Schlüsselwörter.",
+        "Ainda não existem roteiros guardados.": "Es gibt noch keine gespeicherten Skripte.", "Histórico guardado": "Gespeicherter Verlauf", "Rascunho local": "Lokaler Entwurf", "Origem": "Quelle",
+    },
+    "vi": {
+        "Gerar de Rascunho": "Tạo từ bản nháp", "Roteiros guardados": "Kịch bản đã lưu", "Seleccione um roteiro": "Chọn kịch bản",
+        "Configurações a completar": "Cài đặt cần hoàn tất", "Configurações de vídeo": "Cài đặt video", "Configurações de áudio": "Cài đặt âm thanh", "Configurações de legendas": "Cài đặt phụ đề",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Kịch bản hoàn chỉnh: tất cả cài đặt đều khả dụng.", "Seleccione as configurações que pretende completar.": "Chọn các cài đặt bạn muốn hoàn tất.",
+        "Continuar criação": "Tiếp tục tạo", "Gerar apenas o vídeo": "Chỉ tạo video", "Seleccione um canal para continuar.": "Chọn kênh để tiếp tục.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Kịch bản này chưa đủ nội dung. Hãy quay lại Kịch bản và lưu chủ đề, kịch bản cùng từ khóa.",
+        "Ainda não existem roteiros guardados.": "Chưa có kịch bản nào được lưu.", "Histórico guardado": "Lịch sử đã lưu", "Rascunho local": "Bản nháp cục bộ", "Origem": "Nguồn",
+    },
+    "tr": {
+        "Gerar de Rascunho": "Taslakta oluştur", "Roteiros guardados": "Kayıtlı senaryolar", "Seleccione um roteiro": "Bir senaryo seçin",
+        "Configurações a completar": "Tamamlanacak ayarlar", "Configurações de vídeo": "Video ayarları", "Configurações de áudio": "Ses ayarları", "Configurações de legendas": "Altyazı ayarları",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Tam senaryo: tüm ayarlar kullanılabilir.", "Seleccione as configurações que pretende completar.": "Tamamlamak istediğiniz ayarları seçin.",
+        "Continuar criação": "Oluşturmaya devam et", "Gerar apenas o vídeo": "Yalnızca video oluştur", "Seleccione um canal para continuar.": "Devam etmek için bir kanal seçin.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Bu senaryo yeterli içeriğe sahip değil. Senaryolara dönüp konu, senaryo ve anahtar kelimeleri kaydedin.",
+        "Ainda não existem roteiros guardados.": "Henüz kayıtlı senaryo yok.", "Histórico guardado": "Kayıtlı geçmiş", "Rascunho local": "Yerel taslak", "Origem": "Kaynak",
+    },
+    "ru": {
+        "Gerar de Rascunho": "Создать из черновика", "Roteiros guardados": "Сохранённые сценарии", "Seleccione um roteiro": "Выберите сценарий",
+        "Configurações a completar": "Настройки для заполнения", "Configurações de vídeo": "Настройки видео", "Configurações de áudio": "Настройки аудио", "Configurações de legendas": "Настройки субтитров",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Полный сценарий: все настройки доступны.", "Seleccione as configurações que pretende completar.": "Выберите настройки, которые хотите заполнить.",
+        "Continuar criação": "Продолжить создание", "Gerar apenas o vídeo": "Создать только видео", "Seleccione um canal para continuar.": "Выберите канал для продолжения.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "В этом сценарии недостаточно содержимого. Вернитесь в раздел сценариев и сохраните тему, сценарий и ключевые слова.",
+        "Ainda não existem roteiros guardados.": "Сохранённых сценариев пока нет.", "Histórico guardado": "Сохранённая история", "Rascunho local": "Локальный черновик", "Origem": "Источник",
+    },
+    "es": {
+        "Gerar de Rascunho": "Generar desde borrador", "Roteiros guardados": "Guiones guardados", "Seleccione um roteiro": "Selecciona un guion",
+        "Configurações a completar": "Configuraciones que completar", "Configurações de vídeo": "Configuración de vídeo", "Configurações de áudio": "Configuración de audio", "Configurações de legendas": "Configuración de subtítulos",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Guion completo: todas las configuraciones están disponibles.", "Seleccione as configurações que pretende completar.": "Selecciona las configuraciones que quieras completar.",
+        "Continuar criação": "Continuar creación", "Gerar apenas o vídeo": "Generar solo el vídeo", "Seleccione um canal para continuar.": "Selecciona un canal para continuar.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Este guion no tiene contenido suficiente. Vuelve a Guiones y guarda el tema, el guion y las palabras clave.",
+        "Ainda não existem roteiros guardados.": "Todavía no hay guiones guardados.", "Histórico guardado": "Historial guardado", "Rascunho local": "Borrador local", "Origem": "Origen",
+    },
+    "id": {
+        "Gerar de Rascunho": "Buat dari Draf", "Roteiros guardados": "Skrip tersimpan", "Seleccione um roteiro": "Pilih skrip",
+        "Configurações a completar": "Pengaturan yang harus dilengkapi", "Configurações de vídeo": "Pengaturan video", "Configurações de áudio": "Pengaturan audio", "Configurações de legendas": "Pengaturan subtitle",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Skrip lengkap: semua pengaturan tersedia.", "Seleccione as configurações que pretende completar.": "Pilih pengaturan yang ingin dilengkapi.",
+        "Continuar criação": "Lanjutkan pembuatan", "Gerar apenas o vídeo": "Buat video saja", "Seleccione um canal para continuar.": "Pilih kanal untuk melanjutkan.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Skrip ini belum memiliki konten yang cukup. Kembali ke Skrip dan simpan topik, skrip, serta kata kunci.",
+        "Ainda não existem roteiros guardados.": "Belum ada skrip tersimpan.", "Histórico guardado": "Riwayat tersimpan", "Rascunho local": "Draf lokal", "Origem": "Sumber",
+    },
+    "it": {
+        "Gerar de Rascunho": "Genera da bozza", "Roteiros guardados": "Copioni salvati", "Seleccione um roteiro": "Seleziona un copione",
+        "Configurações a completar": "Impostazioni da completare", "Configurações de vídeo": "Impostazioni video", "Configurações de áudio": "Impostazioni audio", "Configurações de legendas": "Impostazioni sottotitoli",
+        "Roteiro completo: todas as configurações estão disponíveis.": "Copione completo: tutte le impostazioni sono disponibili.", "Seleccione as configurações que pretende completar.": "Seleziona le impostazioni da completare.",
+        "Continuar criação": "Continua creazione", "Gerar apenas o vídeo": "Genera solo il video", "Seleccione um canal para continuar.": "Seleziona un canale per continuare.",
+        "Este roteiro não tem conteúdo suficiente. Volte a Roteiros e guarde tópico, roteiro e palavras-chave.": "Questo copione non contiene abbastanza contenuti. Torna a Copioni e salva argomento, copione e parole chiave.",
+        "Ainda não existem roteiros guardados.": "Non ci sono ancora copioni salvati.", "Histórico guardado": "Cronologia salvata", "Rascunho local": "Bozza locale", "Origem": "Origine",
+    },
+}
+for _language_code, _draft_video_translation in _DRAFT_VIDEO_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_draft_video_translation)
+
+
 _TAB_LABELS = (
     "Blueprints", "Brandings", "Pesquisa pública", "Cadastro manual", "Contas cadastradas", "Biblioteca",
-    "Importar do YouTube", "Canais em lote gmail", "Criar vídeo", "Vídeos", "Novo roteiro/letra", "Histórico guardado",
+    "Importar do YouTube", "Canais em lote gmail", "Criar vídeo", "Gerar de Rascunho", "Vídeos", "Novo roteiro/letra", "Histórico guardado",
     "Clusters encontrados", "Regras de associação", "Dados analisados", "Upload ficheiro", "URL de vídeo", "Vídeos gerados",
     "Pasta local", "Código Python", "Upload convencional", "Upload directo", "Postiz", "Upload-Post", "API Keys",
     "Teste de Voz", "Serviços e modelos", "Fontes de Materiais", "Client MCP", "Servidor MCP", "Skill",
@@ -484,7 +570,7 @@ _TAB_LABELS = (
 TAB_TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt": {label: label for label in _TAB_LABELS},
     "en": {
-        "Blueprints": "Blueprints", "Brandings": "Brandings", "Pesquisa pública": "Public search", "Cadastro manual": "Manual registration", "Contas cadastradas": "Registered accounts", "Biblioteca": "Library", "Importar do YouTube": "Import from YouTube", "Canais em lote gmail": "Bulk Gmail channels", "Criar vídeo": "Create video", "Vídeos": "Videos", "Novo roteiro/letra": "New script/lyrics", "Histórico guardado": "Saved history", "Clusters encontrados": "Found clusters", "Regras de associação": "Association rules", "Dados analisados": "Analyzed data", "Upload ficheiro": "Upload file", "URL de vídeo": "Video URL", "Vídeos gerados": "Generated videos", "Pasta local": "Local folder", "Código Python": "Python code", "Upload convencional": "Conventional upload", "Upload directo": "Direct upload", "Postiz": "Postiz", "Upload-Post": "Upload-Post", "API Keys": "API Keys", "Teste de Voz": "Voice testing", "Serviços e modelos": "Services and models", "Fontes de Materiais": "Media sources", "Client MCP": "MCP client", "Servidor MCP": "MCP server", "Skill": "Skill",
+        "Blueprints": "Blueprints", "Brandings": "Brandings", "Pesquisa pública": "Public search", "Cadastro manual": "Manual registration", "Contas cadastradas": "Registered accounts", "Biblioteca": "Library", "Importar do YouTube": "Import from YouTube", "Canais em lote gmail": "Bulk Gmail channels", "Criar vídeo": "Create video", "Gerar de Rascunho": "Generate from Draft", "Vídeos": "Videos", "Novo roteiro/letra": "New script/lyrics", "Histórico guardado": "Saved history", "Clusters encontrados": "Found clusters", "Regras de associação": "Association rules", "Dados analisados": "Analyzed data", "Upload ficheiro": "Upload file", "URL de vídeo": "Video URL", "Vídeos gerados": "Generated videos", "Pasta local": "Local folder", "Código Python": "Python code", "Upload convencional": "Conventional upload", "Upload directo": "Direct upload", "Postiz": "Postiz", "Upload-Post": "Upload-Post", "API Keys": "API Keys", "Teste de Voz": "Voice testing", "Serviços e modelos": "Services and models", "Fontes de Materiais": "Media sources", "Client MCP": "MCP client", "Servidor MCP": "MCP server", "Skill": "Skill",
     },
     "zh": {
         "Blueprints": "蓝图", "Brandings": "品牌", "Pesquisa pública": "公开搜索", "Cadastro manual": "手动注册", "Contas cadastradas": "已注册账户", "Biblioteca": "库", "Importar do YouTube": "从 YouTube 导入", "Canais em lote gmail": "Gmail 批量频道", "Criar vídeo": "创建视频", "Vídeos": "视频", "Novo roteiro/letra": "新建脚本/歌词", "Histórico guardado": "已保存历史", "Clusters encontrados": "找到的聚类", "Regras de associação": "关联规则", "Dados analisados": "分析数据", "Upload ficheiro": "上传文件", "URL de vídeo": "视频 URL", "Vídeos gerados": "已生成视频", "Pasta local": "本地文件夹", "Código Python": "Python 代码", "Upload convencional": "常规上传", "Upload directo": "直接上传", "Postiz": "Postiz", "Upload-Post": "Upload-Post", "API Keys": "API 密钥", "Teste de Voz": "语音测试", "Serviços e modelos": "服务与模型", "Fontes de Materiais": "媒体来源", "Client MCP": "MCP 客户端", "Servidor MCP": "MCP 服务器", "Skill": "技能",
