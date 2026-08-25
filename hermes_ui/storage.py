@@ -127,7 +127,7 @@ DEFAULTS: dict[str, Any] = {
         "apify_actor_id": "streamers~youtube-scraper",
         "apify_poll_interval_seconds": 10,
         "apify_run_timeout_seconds": 900,
-        "llm_provider": DEFAULT_LLM_PROVIDER
+        "llm_provider": DEFAULT_LLM_PROVIDER,
         "moonshot_api_key": "",
         "moonshot_base_url": "",
         "moonshot_model_name": "",
