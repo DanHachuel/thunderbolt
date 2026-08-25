@@ -2166,20 +2166,9 @@ def render_scripts():
             st.warning("Sem Blueprint seleccionado: o documento pode ser criado, mas não terá contexto editorial de Blueprint.")
 
         document_type = st.radio("Tipo de documento", ["Roteiro de vídeo", "Letra de música"], horizontal=True, key="script_document_type")
-        title = st.text_input("Título", key="script_title", placeholder="Ex.: A verdade esquecida sobre…")
-        brief = st.text_area(
-            "Tema ou briefing",
-            key="script_brief",
-            height=120,
-            placeholder="Descreva o tema, a mensagem, o conflito ou a ideia musical que o Blueprint deve orientar.",
-        )
-        legacy_script_language = str(st.session_state.get("script_language") or "")
-        script_subject_key = "pipeline_scripts_video_subject"
-        if script_subject_key not in st.session_state:
-            st.session_state[script_subject_key] = str(brief or title or "")
         script_settings = render_video_generation_settings(
             "pipeline_scripts",
-            current_language=legacy_script_language or str(read_json("settings.json", {}).get("video_language") or "pt"),
+            current_language=str(st.session_state.get("script_language") or read_json("settings.json", {}).get("video_language") or "pt"),
             channel=selected_channel,
             generate_content_callback=lambda: _generate_video_content_callback(
                 "pipeline_scripts",
@@ -2200,6 +2189,8 @@ def render_scripts():
         )
         language = script_settings["script_language"]
         structure_notes = script_settings["script_structure_notes"]
+        title = str(script_settings.get("video_subject") or "").strip()
+        brief = str(script_settings.get("video_script") or "").strip() or title
         generate_col, clear_col = st.columns([1.4, 1])
         with generate_col:
             generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", use_container_width=True, key="generate_script_document")
@@ -2279,7 +2270,7 @@ def render_scripts():
                 except (OSError, ValueError) as exc:
                     st.error(f"Não foi possível guardar o documento: {exc}")
         else:
-            st.caption("Gere um rascunho com IA para o editar aqui, ou seleccione um Blueprint e preencha o briefing para começar.")
+            st.caption("Gere um rascunho com IA para o editar aqui, ou seleccione um Blueprint e preencha as configurações do tema para começar.")
 
     with history_tab:
         st.caption(f"Histórico persistente: `{script_dir}` · índice em `{STORAGE / 'state' / 'scripts.json'}`")
