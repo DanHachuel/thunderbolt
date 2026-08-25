@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from .llm_providers import active_llm_card, provider_definition
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCES_DIR = ROOT / "seed" / "references"
@@ -28,14 +30,12 @@ class CreativeGenerationError(RuntimeError):
 
 
 def _provider_config(settings: dict[str, Any]) -> tuple[str, str, str, str]:
-    provider = str(settings.get("llm_provider") or "openai").strip().lower()
-    key = str(settings.get(f"{provider}_api_key") or "").strip()
-    base_url = str(settings.get(f"{provider}_base_url") or "").strip()
-    model = str(settings.get(f"{provider}_model_name") or "").strip()
-    if provider == "openai":
-        base_url = base_url or "https://api.openai.com/v1"
-    elif provider == "ollama":
-        base_url = base_url or "http://127.0.0.1:11434/v1"
+    card = active_llm_card(settings)
+    provider = str(card.get("provider") or "openai").strip().lower()
+    definition = provider_definition(provider)
+    key = str(card.get("api_key") or "").strip()
+    base_url = str(card.get("base_url") or "").strip() or definition.default_base_url
+    model = str(card.get("model") or "").strip()
     if not base_url:
         raise CreativeGenerationError(
             f"O provider LLM '{provider}' não tem Base URL configurada em Configuração API > API Keys > Serviços e modelos."
@@ -44,7 +44,7 @@ def _provider_config(settings: dict[str, Any]) -> tuple[str, str, str, str]:
         raise CreativeGenerationError(
             f"O provider LLM '{provider}' não tem modelo configurado em Configuração API > API Keys > Serviços e modelos."
         )
-    if provider not in {"ollama", "litellm"} and not key:
+    if definition.requires_api_key and not key:
         raise CreativeGenerationError(
             f"Configure a API key do provider LLM '{provider}' em Configuração API > API Keys > Serviços e modelos."
         )

@@ -128,6 +128,17 @@ DEFAULTS: dict[str, Any] = {
         "apify_poll_interval_seconds": 10,
         "apify_run_timeout_seconds": 900,
         "llm_provider": DEFAULT_LLM_PROVIDER,
+        "llm_provider_cards": [{
+            "id": "llm-openai-default",
+            "provider": "openai",
+            "api_key": "",
+            "model": "",
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "enabled": True,
+            "telegram_llm": False,
+        }],
+        "llm_active_card_id": "llm-openai-default",
+        "llm_telegram_card_id": "",
         "moonshot_api_key": "",
         "moonshot_base_url": "",
         "moonshot_model_name": "",
@@ -293,15 +304,27 @@ def seed_prompt_masters() -> None:
 
 
 def _migrate_settings(settings: Any) -> tuple[dict[str, Any], bool]:
-    """Keep the shipped OpenAI/NVIDIA NIM default across package upgrades."""
+    """Keep the OpenAI/NVIDIA NIM default and materialise the LLM card schema."""
     if not isinstance(settings, dict):
         return {"llm_provider": DEFAULT_LLM_PROVIDER}, True
 
-    provider = str(settings.get("llm_provider") or "").strip().lower()
-    if provider not in LEGACY_DEFAULT_LLM_PROVIDERS:
-        return settings, False
+    migrated = dict(settings)
+    provider = str(migrated.get("llm_provider") or "").strip().lower()
+    changed = False
+    if provider in LEGACY_DEFAULT_LLM_PROVIDERS:
+        migrated["llm_provider"] = DEFAULT_LLM_PROVIDER
+        changed = True
 
-    return {**settings, "llm_provider": DEFAULT_LLM_PROVIDER}, True
+    # Import localmente para evitar que o módulo de catálogo dependa do storage.
+    # Settings antigos com um provider explícito continuam a ser devolvidos sem
+    # alteração textual; os consumidores/UI fazem a materialização preguiçosa dos
+    # cartões, evitando alterar dados durante uma simples leitura de compatibilidade.
+    if "llm_provider_cards" not in migrated and provider not in LEGACY_DEFAULT_LLM_PROVIDERS:
+        return settings, changed
+    from hermes_ui.llm_providers import ensure_llm_provider_cards
+
+    migrated, cards_changed = ensure_llm_provider_cards(migrated)
+    return migrated, changed or cards_changed
 
 
 def ensure_storage() -> None:
