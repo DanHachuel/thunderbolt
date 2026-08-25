@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from functools import lru_cache
 from typing import Any
 
 
@@ -589,6 +590,22 @@ for _row in _CONTENT_TOKEN_TRANSLATION_ROWS:
         UI_TOKEN_TRANSLATIONS[_code][_source] = _translated
 
 
+@lru_cache(maxsize=16)
+def _combined_translations(language: str) -> dict[str, str]:
+    """Build the immutable-language translation index once per process."""
+    return {
+        **UI_TRANSLATIONS.get(language, {}),
+        **UI_CONTENT_TRANSLATIONS.get(language, {}),
+        **UI_TOKEN_TRANSLATIONS.get(language, {}),
+    }
+
+
+@lru_cache(maxsize=16)
+def _sorted_translations(language: str) -> tuple[tuple[str, str], ...]:
+    """Cache longest-first token replacement order for each language."""
+    return tuple(sorted(_combined_translations(language).items(), key=lambda item: len(item[0]), reverse=True))
+
+
 def translate_ui_content(value: Any, language: Any = "pt") -> Any:
     """Translate visible Streamlit content while preserving non-text values and user data markup."""
     if not isinstance(value, str):
@@ -601,12 +618,7 @@ def translate_ui_content(value: Any, language: Any = "pt") -> Any:
     if exact is not None:
         return exact
     translated = value
-    combined_translations = {
-        **UI_TRANSLATIONS.get(code, {}),
-        **UI_CONTENT_TRANSLATIONS.get(code, {}),
-        **UI_TOKEN_TRANSLATIONS.get(code, {}),
-    }
-    for source, target in sorted(combined_translations.items(), key=lambda item: len(item[0]), reverse=True):
+    for source, target in _sorted_translations(code):
         if source != target and source in translated:
             translated = translated.replace(source, target)
     return translated
