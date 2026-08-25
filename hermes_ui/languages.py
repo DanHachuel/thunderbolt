@@ -1222,3 +1222,91 @@ _MATERIAL_SOURCE_TRANSLATIONS: dict[str, dict[str, str]] = {
 }
 for _language_code, _material_source_translation in _MATERIAL_SOURCE_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_material_source_translation)
+
+
+# API credential diagnostics. Keep these keys stable because the settings
+# renderer calls ui_text() for every visible result in all supported languages.
+_API_TEST_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "A testar chamada API…": "A testar chamada API…",
+        "Último teste: API Key OK": "Último teste: API Key OK",
+        "Último teste: falta configuração": "Último teste: falta configuração",
+        "Último teste: requer autorização ou endpoint seguro": "Último teste: requer autorização ou endpoint seguro",
+        "Último teste: chamada falhou": "Último teste: chamada falhou",
+        "Testar credenciais TTS e música": "Testar credenciais TTS e música",
+    },
+    "en": {
+        "A testar chamada API…": "Testing API call…",
+        "Último teste: API Key OK": "Last test: API key OK",
+        "Último teste: falta configuração": "Last test: configuration missing",
+        "Último teste: requer autorização ou endpoint seguro": "Last test: additional authorization or a safe endpoint is required",
+        "Último teste: chamada falhou": "Last test: call failed",
+        "Testar credenciais TTS e música": "Test TTS and music credentials",
+    },
+    "zh": {
+        "A testar chamada API…": "正在测试 API 调用…",
+        "Último teste: API Key OK": "上次测试：API 密钥正常",
+        "Último teste: falta configuração": "上次测试：缺少配置",
+        "Último teste: requer autorização ou endpoint seguro": "上次测试：需要额外授权或安全端点",
+        "Último teste: chamada falhou": "上次测试：调用失败",
+        "Testar credenciais TTS e música": "测试 TTS 和音乐凭证",
+    },
+    "de": {
+        "A testar chamada API…": "API-Aufruf wird getestet…",
+        "Último teste: API Key OK": "Letzter Test: API-Schlüssel OK",
+        "Último teste: falta configuração": "Letzter Test: Konfiguration fehlt",
+        "Último teste: requer autorização ou endpoint seguro": "Letzter Test: zusätzliche Autorisierung oder ein sicherer Endpunkt erforderlich",
+        "Último teste: chamada falhou": "Letzter Test: Aufruf fehlgeschlagen",
+        "Testar credenciais TTS e música": "TTS- und Musik-Anmeldedaten testen",
+    },
+    "vi": {
+        "A testar chamada API…": "Đang kiểm tra lệnh gọi API…",
+        "Último teste: API Key OK": "Lần kiểm tra cuối: Khóa API hợp lệ",
+        "Último teste: falta configuração": "Lần kiểm tra cuối: Thiếu cấu hình",
+        "Último teste: requer autorização ou endpoint seguro": "Lần kiểm tra cuối: Cần ủy quyền bổ sung hoặc endpoint an toàn",
+        "Último teste: chamada falhou": "Lần kiểm tra cuối: Lệnh gọi thất bại",
+        "Testar credenciais TTS e música": "Kiểm tra thông tin xác thực TTS và âm nhạc",
+    },
+    "tr": {
+        "A testar chamada API…": "API çağrısı test ediliyor…",
+        "Último teste: API Key OK": "Son test: API anahtarı OK",
+        "Último teste: falta configuração": "Son test: yapılandırma eksik",
+        "Último teste: requer autorização ou endpoint seguro": "Son test: ek yetkilendirme veya güvenli uç nokta gerekli",
+        "Último teste: chamada falhou": "Son test: çağrı başarısız",
+        "Testar credenciais TTS e música": "TTS ve müzik kimlik bilgilerini test et",
+    },
+    "ru": {
+        "A testar chamada API…": "Проверка вызова API…",
+        "Último teste: API Key OK": "Последняя проверка: API-ключ действителен",
+        "Último teste: falta configuração": "Последняя проверка: не хватает конфигурации",
+        "Último teste: requer autorização ou endpoint seguro": "Последняя проверка: требуется дополнительная авторизация или безопасный эндпоинт",
+        "Último teste: chamada falhou": "Последняя проверка: вызов не выполнен",
+        "Testar credenciais TTS e música": "Проверить учётные данные TTS и музыки",
+    },
+    "es": {
+        "A testar chamada API…": "Probando la llamada API…",
+        "Último teste: API Key OK": "Última prueba: clave API correcta",
+        "Último teste: falta configuração": "Última prueba: falta configuración",
+        "Último teste: requer autorização ou endpoint seguro": "Última prueba: se requiere autorización adicional o un endpoint seguro",
+        "Último teste: chamada falhou": "Última prueba: la llamada falló",
+        "Testar credenciais TTS e música": "Probar credenciales de TTS y música",
+    },
+    "id": {
+        "A testar chamada API…": "Menguji panggilan API…",
+        "Último teste: API Key OK": "Tes terakhir: Kunci API OK",
+        "Último teste: falta configuração": "Tes terakhir: konfigurasi tidak lengkap",
+        "Último teste: requer autorização ou endpoint seguro": "Tes terakhir: diperlukan otorisasi tambahan atau endpoint aman",
+        "Último teste: chamada falhou": "Tes terakhir: panggilan gagal",
+        "Testar credenciais TTS e música": "Uji kredensial TTS dan musik",
+    },
+    "it": {
+        "A testar chamada API…": "Test della chiamata API in corso…",
+        "Último teste: API Key OK": "Ultimo test: chiave API OK",
+        "Último teste: falta configuração": "Ultimo test: configurazione mancante",
+        "Último teste: requer autorização ou endpoint seguro": "Ultimo test: è necessaria un'autorizzazione aggiuntiva o un endpoint sicuro",
+        "Último teste: chamada falhou": "Ultimo test: chiamata non riuscita",
+        "Testar credenciais TTS e música": "Testa le credenziali TTS e musica",
+    },
+}
+for _language_code, _api_test_values in _API_TEST_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_api_test_values)
