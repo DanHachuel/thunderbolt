@@ -9,20 +9,27 @@ from typing import Any
 
 # The persisted value is always the short MoneyPrinterTurbo-compatible code.
 LANGUAGE_CATALOG: tuple[dict[str, str], ...] = (
-    {"code": "en", "name": "Inglês", "flag": "🇺🇸", "locale": "en-US"},
-    {"code": "zh", "name": "Chinês Simplificado", "flag": "🇨🇳", "locale": "zh-CN"},
-    {"code": "de", "name": "Alemão", "flag": "🇩🇪", "locale": "de-DE"},
-    {"code": "vi", "name": "Vietnamita", "flag": "🇻🇳", "locale": "vi-VN"},
-    {"code": "tr", "name": "Turco", "flag": "🇹🇷", "locale": "tr-TR"},
-    {"code": "pt", "name": "Português", "flag": "🇧🇷", "locale": "pt-BR"},
-    {"code": "ru", "name": "Russo", "flag": "🇷🇺", "locale": "ru-RU"},
-    {"code": "es", "name": "Espanhol", "flag": "🇪🇸", "locale": "es-ES"},
-    {"code": "id", "name": "Indonésio", "flag": "🇮🇩", "locale": "id-ID"},
-    {"code": "it", "name": "Italiano", "flag": "🇮🇹", "locale": "it-IT"},
+    {"code": "en", "name": "Inglês", "ui_name": "English", "flag": "🇺🇸", "locale": "en-US"},
+    {"code": "zh", "name": "Chinês Simplificado", "ui_name": "Simplified Chinese", "flag": "🇨🇳", "locale": "zh-CN"},
+    {"code": "de", "name": "Alemão", "ui_name": "German", "flag": "🇩🇪", "locale": "de-DE"},
+    {"code": "vi", "name": "Vietnamita", "ui_name": "Vietnamese", "flag": "🇻🇳", "locale": "vi-VN"},
+    {"code": "tr", "name": "Turco", "ui_name": "Turkish", "flag": "🇹🇷", "locale": "tr-TR"},
+    {"code": "pt", "name": "Português", "ui_name": "Portuguese", "flag": "🇧🇷", "locale": "pt-BR"},
+    {"code": "ru", "name": "Russo", "ui_name": "Russian", "flag": "🇷🇺", "locale": "ru-RU"},
+    {"code": "es", "name": "Espanhol", "ui_name": "Spanish", "flag": "🇪🇸", "locale": "es-ES"},
+    {"code": "id", "name": "Indonésio", "ui_name": "Indonesian", "flag": "🇮🇩", "locale": "id-ID"},
+    {"code": "it", "name": "Italiano", "ui_name": "Italian", "flag": "🇮🇹", "locale": "it-IT"},
+    {"code": "pl", "name": "Polaco", "ui_name": "Polish", "flag": "🇵🇱", "locale": "pl-PL"},
+    {"code": "ga", "name": "Irlandês", "ui_name": "Irish", "flag": "🇮🇪", "locale": "ga-IE"},
+    {"code": "ar", "name": "Árabe", "ui_name": "Arabic", "flag": "🇸🇦", "locale": "ar-SA"},
+    {"code": "he", "name": "Hebraico", "ui_name": "Hebrew", "flag": "🇮🇱", "locale": "he-IL"},
 )
 
 LANGUAGE_BY_CODE = {item["code"]: item for item in LANGUAGE_CATALOG}
 LANGUAGE_CODES = tuple(item["code"] for item in LANGUAGE_CATALOG)
+# Video creation keeps the original ten MoneyPrinterTurbo-compatible languages;
+# the UI selector may contain additional interface languages independently.
+VIDEO_LANGUAGE_CODES = ("en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it")
 
 # SVGs are embedded locally so flags render as images instead of relying on the
 # host operating system's emoji font (which may show regional-letter siglas).
@@ -37,6 +44,10 @@ LANGUAGE_FLAG_SVGS: dict[str, str] = {
     "es": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#aa151b" d="M0 0h30v4H0zM0 16h30v4H0z"/><rect y="4" width="30" height="12" fill="#f1bf00"/><path fill="#ad1519" d="M7 7h2v6H7z"/></svg>',
     "id": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#ce1126" d="M0 0h30v10H0z"/><path fill="#fff" d="M0 10h30v10H0z"/></svg>',
     "it": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#009246" d="M0 0h10v20H0z"/><path fill="#f1f2f1" d="M10 0h10v20H10z"/><path fill="#ce2b37" d="M20 0h10v20H20z"/></svg>',
+    "pl": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#fff" d="M0 0h30v10H0z"/><path fill="#dc143c" d="M0 10h30v10H0z"/></svg>',
+    "ga": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#169b62" d="M0 0h10v20H0z"/><path fill="#fff" d="M10 0h10v20H10z"/><path fill="#ff883e" d="M20 0h10v20H20z"/></svg>',
+    "ar": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#006c35"/><path fill="#fff" d="M6 8.5h16v1H6zM9 11.5h12v1H9z"/><path fill="none" stroke="#fff" stroke-width=".7" d="M7 13.8h16"/></svg>',
+    "he": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#fff"/><path fill="#0038b8" d="M0 2h30v3H0zM0 15h30v3H0z"/><path fill="none" stroke="#0038b8" stroke-width="1" d="m15 6 3.5 6h-7zM15 14 11.5 8h7z"/></svg>',
 }
 LANGUAGE_FLAG_DATA_URIS = {
     code: "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
@@ -56,6 +67,8 @@ LEGACY_LANGUAGE_CODES = {
     "deutsch": "de", "alemão": "de", "vietnamita": "vi", "turco": "tr", "português": "pt",
     "português (brasil)": "pt", "portuguese": "pt", "ru": "ru", "russo": "ru", "español": "es",
     "espanhol": "es", "indonésio": "id", "bahasa indonesia": "id", "italiano": "it",
+    "polish": "pl", "polaco": "pl", "polonês": "pl", "polones": "pl", "irish": "ga", "irlandês": "ga", "irlandes": "ga",
+    "arabic": "ar", "árabe": "ar", "arabe": "ar", "hebrew": "he", "hebraico": "he", "hebreu": "he",
 }
 
 
@@ -68,7 +81,7 @@ def language_code(value: Any, default: str = "pt") -> str:
     if lowered in LEGACY_LANGUAGE_CODES:
         return LEGACY_LANGUAGE_CODES[lowered]
     for item in LANGUAGE_CATALOG:
-        if lowered in {item["name"].casefold(), item["locale"].casefold()}:
+        if lowered in {item["name"].casefold(), item.get("ui_name", "").casefold(), item["locale"].casefold()}:
             return item["code"]
     return default if default in LANGUAGE_BY_CODE else "pt"
 
@@ -81,12 +94,12 @@ def language_label(value: Any, *, include_code: bool = True) -> str:
     return f"{item['name']}{suffix} {item['flag']}"
 
 
-def ui_language_menu_label(value: Any, *, include_code: bool = True) -> str:
-    """Return text-only UI label; the picker renders the flag as a real SVG icon."""
+def ui_language_menu_label(value: Any, *, include_code: bool = False) -> str:
+    """Return the English UI label; the picker renders the flag as a real SVG icon."""
     code = language_code(value)
     item = LANGUAGE_BY_CODE[code]
     suffix = f" ({item['code']})" if include_code else ""
-    return f"{item['name']}{suffix}"
+    return f"{item.get('ui_name', item['name'])}{suffix}"
 
 
 def language_option_labels(*, include_code: bool = True) -> list[str]:
@@ -139,7 +152,6 @@ UI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "Início": "Home", "Niche Finder": "Trova nicchia", "Pipeline": "Pipeline", "Pipeline TikTok": "Pipeline TikTok", "Automação": "Automazione", "Edição": "Modifica", "AI Influencers": "Influencer AI", "Configurações": "Impostazioni", "Criação de Vídeos": "Creazione video", "Criação de Músicas": "Creazione musicale", "Roteiros": "Script", "Upload": "Caricamento", "Prompts Master": "Prompt Master", "Contas TikTok": "Account TikTok", "Automação Youtube": "Automazione YouTube", "Niche Finder Kaggle": "Trova nicchia Kaggle", "Niche Finder Apify": "Trova nicchia Apify", "Limpador de Metadados": "Pulizia metadati", "Cortes": "Tagli", "Editor Python": "Editor Python", "Download Mídia": "Download media", "Personagens": "Personaggi", "Redes Sociais": "Social network", "Tutorial Meta": "Tutorial Meta", "Canais Youtube": "Canali YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Account Google", "Configuração API": "Configurazione API", "Notificações": "Notifiche", "Interface local para operação e automação de conteúdo faceless": "Interfaccia locale per la gestione e l'automazione di contenuti faceless", "Canais": "Canali", "activos": "attivi", "Tarefas": "Attività", "total registado": "totale registrato", "A fazer": "Da fare", "na pipeline": "nella pipeline", "Em execução": "In esecuzione", "a decorrer": "in corso", "Concluídos": "Completati", "artefactos prontos": "artefatti pronti", "Falhas": "Errori", "requerem atenção": "richiedono attenzione", "Filas locais e dependências da cascata": "Code locali e dipendenze della pipeline", "Niche": "Nicchia", "Blueprints": "Blueprint", "Brand": "Brand", "Script": "Script", "Title": "Titolo", "Thumbnail": "Miniatura", "Video": "Video", "Edit": "Modifica", "fila": "coda", "na biblioteca": "nella libreria", "tarefa(s) na fila": "attività in coda", "Language": "Lingua", "Theme": "Tema", "Dark": "Scuro", "Light": "Chiaro",
     },
 }
-
 
 # Labels for the independent LLM provider cards.
 _LLM_TRANSLATIONS: dict[str, dict[str, str]] = {
@@ -1108,11 +1120,11 @@ def video_language_label(value: Any) -> str:
 
 
 def video_language_options() -> list[str]:
-    return ["music", *LANGUAGE_CODES]
+    return ["music", *VIDEO_LANGUAGE_CODES]
 
 
 __all__ = [
-    "LANGUAGE_CATALOG", "LANGUAGE_BY_CODE", "LANGUAGE_CODES", "LANGUAGE_FLAG_DATA_URIS", "language_code", "language_flag",
+    "LANGUAGE_CATALOG", "LANGUAGE_BY_CODE", "LANGUAGE_CODES", "VIDEO_LANGUAGE_CODES", "LANGUAGE_FLAG_DATA_URIS", "language_code", "language_flag",
     "language_label", "ui_language_menu_label", "language_locale", "language_option_codes", "language_option_labels",
     "ui_text", "video_language_label", "video_language_options",
 ]
@@ -1310,3 +1322,10 @@ _API_TEST_TRANSLATIONS: dict[str, dict[str, str]] = {
 }
 for _language_code, _api_test_values in _API_TEST_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_api_test_values)
+
+
+# The four additional UI languages use the complete English UI catalogue as a
+# safe fallback until dedicated translations are added. Their selector labels,
+# flags and persisted language codes remain independent of video languages.
+for _ui_language_code in ("pl", "ga", "ar", "he"):
+    UI_TRANSLATIONS[_ui_language_code] = dict(UI_TRANSLATIONS["en"])
