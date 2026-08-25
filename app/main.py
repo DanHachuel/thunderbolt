@@ -41,7 +41,7 @@ from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROV
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
-from hermes_ui.languages import LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
+from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
@@ -147,8 +147,9 @@ VIDEO_LANGUAGE_OPTIONS = [
 ]
 
 # Mantemos esta lista histórica para preservar Blueprints, testes e tarefas antigas.
-# A UI acrescenta os dez códigos canónicos do MoneyPrinterTurbo com bandeiras.
-VIDEO_LANGUAGE_SELECTION_OPTIONS = ["music", *LANGUAGE_CODES, *[item for item in VIDEO_LANGUAGE_OPTIONS if item not in {"01 – Inglês", "06 – Alemão", "15 – Italiano", "29 – Turco", "31 – Russo", "36 – Português (Brasil)", "39 – Mandarim", "41 – Espanhol (LatAm)", "42 – Vietnamita", "44 – Indonésio"}]]
+# A criação de vídeos usa exclusivamente os dez códigos canónicos do MoneyPrinterTurbo;
+# os quatro idiomas adicionais pertencem apenas ao selector da UI.
+VIDEO_LANGUAGE_SELECTION_OPTIONS = ["music", *VIDEO_LANGUAGE_CODES, *[item for item in VIDEO_LANGUAGE_OPTIONS if item not in {"01 – Inglês", "06 – Alemão", "15 – Italiano", "29 – Turco", "31 – Russo", "36 – Português (Brasil)", "39 – Mandarim", "41 – Espanhol (LatAm)", "42 – Vietnamita", "44 – Indonésio"}]]
 
 VIDEO_FORMAT_OPTIONS = ["wide", "shorts", "music"]
 VIDEO_CONCATENATION_OPTIONS = ["Random Concatenation (Recommended)", "Sequential Concatenation"]
