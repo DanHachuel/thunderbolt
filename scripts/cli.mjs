@@ -188,8 +188,8 @@ proxy.on("upgrade", (request, clientSocket, head) => {
   const upstreamSocket = net.connect(backendPort, "127.0.0.1", () => {
     const headers = Object.entries(request.headers)
       .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(", ") : value}`)
-      .join("\\r\\n");
-    upstreamSocket.write(`GET ${request.url} HTTP/1.1\\r\\n${headers}\\r\\n\\r\\n`);
+      .join("\r\n");
+    upstreamSocket.write(`GET ${request.url} HTTP/1.1\r\n${headers}\r\n\r\n`);
     if (head.length) upstreamSocket.write(head);
     clientSocket.pipe(upstreamSocket).pipe(clientSocket);
   });
