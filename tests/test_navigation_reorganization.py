@@ -29,6 +29,11 @@ class NavigationReorganizationTests(unittest.TestCase):
         positions = [top_block.index(item) for item in expected_order]
         self.assertEqual(positions, sorted(positions))
 
+    def test_navigation_icons_are_valid_and_settings_remains_visible(self):
+        self.assertNotIn(":material/facebook:", MAIN_SOURCE)
+        self.assertIn('(\"Facebook Pages\", \":material/public:\", \"Facebook Pages\")', MAIN_SOURCE)
+        self.assertIn('(\"Configurações\", \":material/settings:\", \"Configurações\")', MAIN_SOURCE)
+
     def test_requested_groups_and_children_are_present(self):
         required = (
             "Arquivos Base", "Blueprints Youtube", "Prompt Masters",
