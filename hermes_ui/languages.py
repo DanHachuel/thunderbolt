@@ -179,6 +179,17 @@ UI_NAV_TRANSLATIONS: dict[str, dict[str, str]] = {
 for _language_code, _navigation_values in UI_NAV_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_navigation_values)
 
+# The source-level page identifier intentionally uses the exact English spelling
+# requested by the product flow. The displayed label remains localized per UI
+# language, while the legacy accented navigation label stays backward-compatible.
+_BACKLOG_CANONICAL_LABELS = {
+    "pt": "Backlog Vídeos", "en": "Video Backlog", "zh": "视频待办", "de": "Video-Backlog",
+    "vi": "Danh sách video", "tr": "Video Bekleme Listesi", "ru": "Очередь видео", "es": "Cola de vídeos",
+    "id": "Antrean Video", "it": "Coda video",
+}
+for _language_code, _backlog_label in _BACKLOG_CANONICAL_LABELS.items():
+    UI_TRANSLATIONS[_language_code]["Backlog Videos"] = _backlog_label
+
 
 VIDEO_GENERATION_TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt": {
