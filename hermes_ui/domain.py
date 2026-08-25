@@ -7,7 +7,7 @@ from typing import Any
 from .notifications import record_notification
 from .storage import append_json, now, read_json, write_json
 
-STAGES = ["niche", "blueprint", "brand", "script", "title", "thumbnail", "video", "edit", "upload"]
+STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "thumbnail_prompt", "thumbnail", "video", "edit", "upload"]
 VALID_STATES = {"to_do", "doing", "blocked", "done", "failed", "cancelled"}
 
 

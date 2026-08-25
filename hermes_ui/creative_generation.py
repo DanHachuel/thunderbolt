@@ -178,6 +178,17 @@ def _short_overlay(value: Any) -> str:
     return " ".join(words[:4])
 
 
+def _keywords_from_text(*values: str) -> list[str]:
+    """Build a small deterministic keyword fallback when the LLM omits keywords."""
+    blocked = {"para", "como", "sobre", "mais", "esse", "esta", "that", "this", "with", "from", "video"}
+    result: list[str] = []
+    for value in values:
+        for word in re.findall(r"[\wÀ-ÿ]{4,}", str(value or "").casefold(), flags=re.UNICODE):
+            if word not in blocked and word not in result:
+                result.append(word)
+    return result[:15]
+
+
 def generate_creative_package(
     settings: dict[str, Any],
     channel: dict[str, Any],
@@ -194,7 +205,7 @@ def generate_creative_package(
         "O título deve carregar keywords no início, ter curiosidade, especificidade e emoção, sem clickbait falso. "
         "A thumbnail deve ter no máximo três elementos, alto contraste, uma composição clara, texto opcional de até 4 palavras, "
         "safe zones e leitura em 120px. O texto da thumbnail não pode repetir o título integralmente. Remove AI tells. "
-        "Responde apenas com JSON válido nas chaves selected_title, title_candidates e thumbnail_variants."
+        "Responde apenas com JSON válido nas chaves selected_title, title_candidates, keywords e thumbnail_variants."
     )
     user = json.dumps(
         {
@@ -202,6 +213,7 @@ def generate_creative_package(
             "language": language or context["language"],
             "topic": topic.strip(),
             "reference_rules": reference_bundle(),
+            "keywords_schema": ["lista de 8 a 15 keywords SEO curtas, sem hashtags"],
             "title_candidates_schema": {
                 "title": "string",
                 "formula": "string",
@@ -241,6 +253,14 @@ def generate_creative_package(
         )
     if len(titles) < 20:
         raise CreativeGenerationError("Os títulos devolvidos pelo provider não têm conteúdo suficiente.")
+    raw_keywords = result.get("keywords")
+    keywords = [str(item).strip() for item in raw_keywords if str(item).strip()] if isinstance(raw_keywords, list) else []
+    selected_title = str(result.get("selected_title") or titles[0]["title"]).strip()
+    if selected_title not in {item["title"] for item in titles}:
+        selected_title = titles[0]["title"]
+    if not keywords:
+        keywords = _keywords_from_text(topic, selected_title)
+
     variants_raw = result.get("thumbnail_variants")
     if not isinstance(variants_raw, list) or len(variants_raw) < 3:
         raise CreativeGenerationError("O provider deve devolver pelo menos 3 variantes de thumbnail.")
@@ -264,12 +284,10 @@ def generate_creative_package(
         )
     if len(variants) < 3:
         raise CreativeGenerationError("As variantes de thumbnail devolvidas pelo provider estão incompletas.")
-    selected_title = str(result.get("selected_title") or titles[0]["title"]).strip()
-    if selected_title not in {item["title"] for item in titles}:
-        selected_title = titles[0]["title"]
     return {
         "title": selected_title,
         "title_candidates": titles,
+        "keywords": keywords[:15],
         "thumbnail_variant": variants[0],
         "thumbnail_variants": variants,
         "thumbnail_status": "prompt_ready",
