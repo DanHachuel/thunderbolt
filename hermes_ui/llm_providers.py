@@ -9,12 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
-from urllib.parse import urlsplit, urlunsplit
-
 from integrations.openai_model_discovery import (
     DEFAULT_NVIDIA_NIM_BASE_URL,
-    ModelDiscoveryError,
+    OpenAICompatibleAPIError,
     fetch_openai_compatible_models,
+    validate_openai_compatible_api_key,
 )
 
 
@@ -357,14 +356,6 @@ def apply_llm_cards_to_settings(
     return result
 
 
-def _safe_url(value: str) -> str:
-    try:
-        parsed = urlsplit(str(value or ""))
-        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
-    except ValueError:
-        return "endpoint configurado"
-
-
 def _redact(text: Any, secrets: tuple[str, ...]) -> str:
     message = str(text or "")
     for secret in secrets:
@@ -386,11 +377,12 @@ def test_llm_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
         return {"ok": False, "status": "error", "message": "Missing configuration — introduza a Base URL antes do teste."}
     if not base_url:
         return {"ok": False, "status": "error", "message": "Missing configuration — este provider não tem endpoint configurado."}
-    if not definition.supports_model_discovery:
-        return {"ok": False, "status": "error", "message": "Teste automático não suportado para este protocolo; verifique os campos do provider."}
+    model = str(normalized.get("model") or "").strip()
+    if not model:
+        return {"ok": False, "status": "error", "message": "Missing configuration — introduza o modelo antes do teste."}
     try:
-        models = fetch_openai_compatible_models(api_key, base_url)
-    except ModelDiscoveryError as exc:
+        validate_openai_compatible_api_key(api_key, base_url, model)
+    except OpenAICompatibleAPIError as exc:
         return {
             "ok": False,
             "status": "error",
@@ -401,7 +393,7 @@ def test_llm_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "ok": True,
         "status": "success",
-        "message": f"API OK — {_safe_url(base_url)} respondeu com {len(models)} modelo(s).",
+        "message": "API Key OK",
     }
 
 
