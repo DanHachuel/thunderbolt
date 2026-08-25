@@ -34,6 +34,7 @@ from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips,
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import material_api_keys, material_source_catalog, selected_material_source, update_material_api_keys
+from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
@@ -54,7 +55,7 @@ from integrations.youtube_direct_credentials import delete_credentials_document,
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
-from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL, ModelDiscoveryError, fetch_openai_compatible_models
+from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL
 
 DEFAULT_UI_LANGUAGE = "en"
 
@@ -206,6 +207,15 @@ st.markdown("""
 [data-testid="stRadio"] label { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:color-mix(in srgb, currentColor 4%, transparent); }
 [data-testid="stRadio"] label:has(input:checked) { border-color:var(--tb-gold); background:rgba(197,155,85,.24); }
 [data-testid="stRadio"] label:has(input:checked) { background:linear-gradient(145deg, color-mix(in srgb, var(--tb-gold) 24%, transparent), color-mix(in srgb, currentColor 6%, transparent)); }
+.tb-api-status { display:inline-flex; align-items:center; gap:.38rem; margin:.08rem 0 .55rem; padding:.18rem .55rem; border-radius:999px; font-size:.78rem; font-weight:700; line-height:1.2; border:1px solid rgba(128,128,128,.24); }
+.tb-api-status__dot { display:inline-flex; align-items:center; justify-content:center; width:1rem; height:1rem; border-radius:50%; font-size:.68rem; font-weight:800; }
+.tb-api-status--missing { color:#9a6700; background:rgba(245,158,11,.16); border-color:rgba(245,158,11,.45); }
+.tb-api-status--missing .tb-api-status__dot { color:#fff; background:#d99000; }
+.tb-api-status--local { color:#2563eb; background:rgba(59,130,246,.10); border-color:rgba(59,130,246,.35); }
+.tb-api-status--ready { color:#15803d; background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.36); }
+.tb-api-status--ready .tb-api-status__dot { color:#fff; background:#16a34a; }
+.tb-api-status--error { color:#b91c1c; background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.34); }
+.tb-api-status--error .tb-api-status__dot { color:#fff; background:#dc2626; }
 [data-testid="stStatusWidget"] { border-color:rgba(128,128,128,.28) !important; background:rgba(128,128,128,.06) !important; }
 [data-testid="stStatusWidget"] { border-color:color-mix(in srgb, currentColor 18%, transparent) !important; background:color-mix(in srgb, currentColor 4%, transparent) !important; }
 /* O menu de idiomas usa layout nativo da aplicação; o toolbar do Streamlit não é alterado. */
@@ -3671,6 +3681,7 @@ def render_material_source_api_keys(settings: dict[str, Any]) -> None:
     row_key = f"material_source_key_rows_{selected_source}"
     row_count = max(len(current_keys), int(st.session_state.get(row_key, len(current_keys) or 1)))
     if selected_source == "local":
+        _render_credential_status("", local=True, required=False)
         st.info("A fonte local não usa API key. Os materiais devem existir na pasta configurada do storage.")
         if st.button("Guardar fonte local", type="primary", key="save_local_material_source"):
             settings["video_source"] = selected_source
@@ -3678,6 +3689,7 @@ def render_material_source_api_keys(settings: dict[str, Any]) -> None:
             st.success("Fonte de materiais guardada: ficheiros locais.")
             st.rerun()
         return
+    _render_credential_status(any(str(item or "").strip() for item in current_keys))
     with st.form(f"material_api_keys_form_{selected_source}"):
         key_values: list[str] = []
         for index in range(row_count):
@@ -3695,6 +3707,199 @@ def render_material_source_api_keys(settings: dict[str, Any]) -> None:
         st.success(f"Fonte {source_labels.get(selected_source, selected_source)} guardada com {len(material_api_keys(settings, selected_source))} chave(s).")
         st.rerun()
     st.caption(f"{len(current_keys)} chave(s) actualmente guardada(s) para {source_labels.get(selected_source, selected_source)}. As chaves são mantidas no storage local e usadas com rotação interna.")
+
+
+def _api_status_badge(label: str, kind: str = "missing") -> None:
+    """Render a compact status chip that remains legible in both native themes."""
+    safe_kind = kind if kind in {"missing", "local", "ready", "error"} else "missing"
+    marker = "!" if safe_kind == "missing" else "✓" if safe_kind == "ready" else "×" if safe_kind == "error" else "•"
+    visible_label = ui_text(label, current_ui_language())
+    st.markdown(
+        f'<span class="tb-api-status tb-api-status--{safe_kind}"><span class="tb-api-status__dot">{marker}</span>{visible_label}</span>',
+        unsafe_allow_html=True,
+    )
+
+
+def _credential_status(value: Any, *, local: bool = False, required: bool = True) -> tuple[str, str]:
+    if local:
+        return "local", "Local / sem API key"
+    if required and not str(value or "").strip():
+        return "missing", "Missing key"
+    return "ready", "Configured"
+
+
+def _render_credential_status(value: Any, *, local: bool = False, required: bool = True) -> None:
+    kind, label = _credential_status(value, local=local, required=required)
+    _api_status_badge(label, kind)
+
+
+def _llm_card_config_status(card: dict[str, Any]) -> tuple[str, str]:
+    definition = provider_definition(card.get("provider"))
+    if definition.local:
+        return "local", "Local / sem API key"
+    if definition.requires_api_key and not str(card.get("api_key") or "").strip():
+        return "missing", "Missing key"
+    if definition.show_base_url and not str(card.get("base_url") or "").strip():
+        return "missing", "Missing configuration"
+    if not str(card.get("model") or "").strip():
+        return "missing", "Missing configuration"
+    return "ready", "Configured"
+
+
+def _persist_llm_cards(settings: dict[str, Any], cards: list[dict[str, Any]], active_id: str = "") -> dict[str, Any]:
+    updated = apply_llm_cards_to_settings(settings, cards, active_id)
+    write_json("settings.json", updated)
+    return updated
+
+
+def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int) -> None:
+    card = normalize_llm_card(cards[index], index)
+    cards[index] = card
+    card_id = str(card["id"])
+    definition = provider_definition(card.get("provider"))
+    with st.container(border=True):
+        header_cols = st.columns([3.2, 1.2])
+        with header_cols[0]:
+            st.subheader(definition.label)
+            if definition.description:
+                st.caption(definition.description)
+        with header_cols[1]:
+            status_kind, status_label = _llm_card_config_status(card)
+            _api_status_badge(status_label, status_kind)
+        with st.form(f"llm_card_form_{card_id}"):
+            key_col, model_col = st.columns(2)
+            with key_col:
+                api_key = card.get("api_key", "")
+                if definition.requires_api_key:
+                    api_key = st.text_input("API key", value=str(api_key or ""), type="password", key=f"llm_card_{card_id}_api_key")
+                else:
+                    st.caption("Este provider não exige API key.")
+                    api_key = ""
+            with model_col:
+                model_catalog = st.session_state.get(f"llm_model_catalog_{card_id}", [])
+                current_model = str(card.get("model") or "")
+                if model_catalog:
+                    manual_model = "__manual_model__"
+                    options = [manual_model, *[str(item) for item in model_catalog]]
+                    selected = st.selectbox(
+                        "Modelo",
+                        options,
+                        index=options.index(current_model) if current_model in options else 0,
+                        format_func=lambda value: "Escrever modelo manualmente" if value == manual_model else value,
+                        key=f"llm_card_{card_id}_model_select",
+                    )
+                    model = st.text_input("Modelo manual", value=current_model if selected == manual_model and current_model not in model_catalog else "", key=f"llm_card_{card_id}_model_manual") if selected == manual_model else selected
+                else:
+                    model = st.text_input("Modelo", value=current_model, help="ID do modelo usado pelo endpoint Chat Completions.", key=f"llm_card_{card_id}_model")
+            if definition.show_base_url:
+                base_url = st.text_input(
+                    "Base URL",
+                    value=str(card.get("base_url") or definition.default_base_url),
+                    help="Endpoint OpenAI-compatible deste provider; só aparece quando é configurável.",
+                    key=f"llm_card_{card_id}_base_url",
+                )
+            else:
+                base_url = str(card.get("base_url") or definition.default_base_url)
+                if base_url:
+                    st.caption(f"Endpoint gerido pelo provider: {base_url}")
+            extra_values: dict[str, str] = {}
+            if definition.extra_fields:
+                extra_cols = st.columns(len(definition.extra_fields))
+                for extra_col, field_name in zip(extra_cols, definition.extra_fields):
+                    with extra_col:
+                        extra_values[field_name] = st.text_input(
+                            field_name.replace("_", " ").title(),
+                            value=str(card.get(field_name) or ""),
+                            key=f"llm_card_{card_id}_{field_name}",
+                        )
+            enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"llm_card_{card_id}_enabled")
+            primary_llm = st.checkbox(
+                "LLM principal",
+                value=str(settings.get(LLM_ACTIVE_CARD_KEY) or "") == card_id,
+                help="Usar este cartão como provider principal para geração de temas, roteiros, títulos e keywords.",
+                key=f"llm_card_{card_id}_primary",
+            )
+            telegram_llm = st.checkbox(
+                "LLM Telegram",
+                value=bool(card.get("telegram_llm", False)),
+                help="Usar este cartão exclusivamente para o roteamento de notificações Telegram. Apenas um cartão pode ficar seleccionado.",
+                key=f"llm_card_{card_id}_telegram",
+            )
+            action_cols = st.columns([1.35, 1.35, 1.1])
+            with action_cols[0]:
+                test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+            with action_cols[1]:
+                refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
+            with action_cols[2]:
+                save_clicked = st.form_submit_button("Guardar cartão", type="primary", use_container_width=True)
+            remove_clicked = False
+            if definition.code != "openai":
+                remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True)
+
+        edited = dict(card)
+        edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "telegram_llm": bool(telegram_llm), **extra_values})
+        cards[index] = edited
+        if test_clicked:
+            test_result = test_llm_provider_card(edited)
+            edited["test_result"] = stamp_test_result(test_result)
+            _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or card_id))
+            if test_result.get("ok"):
+                st.success(f"Teste API: {test_result['message']}")
+            else:
+                st.error(f"Teste API: {test_result['message']}")
+        elif refresh_clicked:
+            try:
+                from integrations.openai_model_discovery import fetch_openai_compatible_models
+                discovered = fetch_openai_compatible_models(edited.get("api_key", ""), edited.get("base_url", ""))
+                st.session_state[f"llm_model_catalog_{card_id}"] = discovered
+                _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or card_id))
+                st.success(f"{len(discovered)} modelo(s) disponíveis neste endpoint.")
+            except Exception:
+                st.error("Não foi possível consultar os modelos deste endpoint.")
+        elif save_clicked:
+            active_id = card_id if primary_llm and enabled else str(settings.get(LLM_ACTIVE_CARD_KEY) or "")
+            _persist_llm_cards(settings, cards, active_id)
+            st.success("Cartão LLM guardado.")
+            st.rerun()
+        elif remove_clicked:
+            remaining = [item for item in cards if str(item.get("id")) != card_id]
+            _persist_llm_cards(settings, remaining, str(settings.get(LLM_ACTIVE_CARD_KEY) or ""))
+            st.success("Cartão LLM removido.")
+            st.rerun()
+
+        saved_test = edited.get("test_result") or card.get("test_result")
+        if isinstance(saved_test, dict) and saved_test.get("message"):
+            if saved_test.get("status") == "success":
+                st.success(f"Último teste: {saved_test['message']}")
+            else:
+                st.error(f"Último teste: {saved_test['message']}")
+
+
+def render_llm_provider_cards(settings: dict[str, Any]) -> None:
+    """Renderizar cartões LLM fora da form global para permitir acções por cartão."""
+    migrated, changed = ensure_llm_provider_cards(settings)
+    cards = [dict(item) for item in migrated.get(LLM_CARDS_KEY, [])]
+    if changed:
+        settings.update(migrated)
+        write_json("settings.json", settings)
+    with st.expander("LLM — providers e modelos", expanded=False):
+        st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; o cartão activo é usado pela geração de conteúdo.")
+        for index in range(len(cards)):
+            _render_llm_card(settings, cards, index)
+        st.divider()
+        st.markdown("**Adicionar provider LLM**")
+        provider_codes = [item.code for item in LLM_PROVIDER_CATALOG]
+        provider_to_add = st.selectbox(
+            "Provider LLM",
+            provider_codes,
+            format_func=lambda value: ui_text(provider_definition(value).label, current_ui_language()),
+            key="llm_new_provider_choice",
+        )
+        if st.button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card"):
+            new_card = new_llm_card(provider_to_add, card_id=f"llm-{provider_to_add}-{uuid.uuid4().hex[:8]}")
+            cards.append(new_card)
+            _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or DEFAULT_LLM_CARD_ID))
+            st.rerun()
 
 
 def render_settings():
@@ -3729,6 +3934,7 @@ def render_settings():
                         kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
                     with kaggle_cols[2]:
                         kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
+                    _render_credential_status(kaggle_api_key)
 
                 with st.expander("Niche Finder — execução através da Apify", expanded=False):
                     st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
@@ -3741,6 +3947,7 @@ def render_settings():
                         apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
                     with apify_cols[3]:
                         apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
+                    _render_credential_status(apify_api_token)
 
                 with st.expander("Nano Banana — geração de thumbnails", expanded=False):
                     st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
@@ -3751,94 +3958,49 @@ def render_settings():
                     with nano_cols[1]:
                         gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
                         gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
+                    _render_credential_status(gemini_image_api_key)
 
-                with st.expander("LLM — providers e modelos", expanded=False):
-                    provider_options = ["openai", "moonshot", "shengsuanyun", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
-                    current_llm_provider = str(settings.get("llm_provider") or DEFAULT_LLM_PROVIDER).strip().lower()
-                    llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(current_llm_provider) if current_llm_provider in provider_options else 0)
-                    st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
-                    st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
-                    openai_cols = st.columns(3)
-                    with openai_cols[0]:
-                        openai_api_key = text_setting("OpenAI/ NVIDIA NIM API key", "openai_api_key", secret=True, help_text="API key do OpenAI ou do NVIDIA Build/NIM. A credencial fica apenas no storage local.")
-                    with openai_cols[1]:
-                        openai_base_url = st.text_input("OpenAI/ NVIDIA NIM Base URL", value=str(settings.get("openai_base_url", "") or DEFAULT_NVIDIA_NIM_BASE_URL), help="Ex.: https://integrate.api.nvidia.com/v1. O Thunderbolt acrescenta /models para descobrir os modelos.", key="settings_openai_base_url")
-                    with openai_cols[2]:
-                        cached_catalog = st.session_state.get("openai_model_catalog", {})
-                        catalog_key = f"{openai_base_url.strip()}::{hashlib.sha256(openai_api_key.encode('utf-8')).hexdigest()}"
-                        cached_models = list(cached_catalog.get("models", [])) if cached_catalog.get("key") == catalog_key else []
-                        current_model_name = str(settings.get("openai_model_name", "") or "")
-                        manual_option = "__manual_model__"
-                        if cached_models:
-                            model_options = [manual_option, *cached_models]
-                            model_index = model_options.index(current_model_name) if current_model_name in model_options else 0
-                            selected_model = st.selectbox("Modelo OpenAI/ NVIDIA NIM", model_options, index=model_index, format_func=lambda value: "Escrever modelo manualmente" if value == manual_option else value, key="settings_openai_model_select")
-                            if selected_model == manual_option:
-                                openai_model_name = st.text_input("Modelo manual", value=current_model_name if current_model_name not in cached_models else "", help="Ex.: nvidia_nim/minimaxai/minimax-m3", key="settings_openai_model_manual")
-                            else:
-                                openai_model_name = selected_model
-                        else:
-                            openai_model_name = st.text_input("Modelo OpenAI/ NVIDIA NIM", value=current_model_name, help="Pode escrever um ID manualmente se o endpoint não disponibilizar /models.", key="settings_openai_model_name")
-                    refresh_openai_models = st.form_submit_button("Consultar/actualizar modelos NIM", use_container_width=True)
-                    if cached_catalog.get("key") == catalog_key and cached_catalog.get("error"):
-                        st.warning(str(cached_catalog["error"]))
-                    elif cached_models:
-                        st.caption(f"{len(cached_models)} modelo(s) carregado(s) a partir de {openai_base_url.rstrip('/')}/models.")
-                    else:
-                        st.info("Preencha a API key e clique em Consultar/actualizar modelos NIM para carregar os IDs disponíveis.")
-                    llm_fields = [
-                        ("Moonshot / Kimi", "moonshot", True), ("Shengsuan Cloud", "shengsuanyun", True),
-                        ("Google Gemini", "gemini", True), ("DeepSeek", "deepseek", True), ("Alibaba Qwen", "qwen", True),
-                        ("Azure OpenAI", "azure", True), ("VolcEngine Ark", "volcengine", True), ("xAI Grok", "grok", True),
-                        ("MiniMax", "minimax", True), ("Xiaomi MiMo", "mimo", True), ("Cloudflare AI Gateway", "cloudflare", True),
-                        ("ModelScope", "modelscope", True), ("AIHubMix", "aihubmix", True), ("AIML API", "aimlapi", True),
-                        ("EvoLink", "evolink", True), ("Ollama", "ollama", False), ("OneAPI", "oneapi", True),
-                        ("LiteLLM", "litellm", False), ("Groq", "groq", True), ("Pollinations AI", "pollinations", True),
-                    ]
-                    for label, prefix, has_key in llm_fields:
-                        st.markdown(f"**{label}**")
-                        cols = st.columns(3)
-                        with cols[0]:
-                            if has_key:
-                                settings[f"{prefix}_api_key"] = text_setting("API key", f"{prefix}_api_key", secret=True)
-                            else:
-                                settings[f"{prefix}_api_key"] = settings.get(f"{prefix}_api_key", "")
-                        with cols[1]:
-                            settings[f"{prefix}_base_url"] = text_setting("Base URL", f"{prefix}_base_url")
-                        with cols[2]:
-                            settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
 
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
                     cols = st.columns(2)
                     with cols[0]:
                         azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
+                        _render_credential_status(azure_speech_key)
                         azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
                         siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                        _render_credential_status(siliconflow_tts_api_key)
                         minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                        _render_credential_status(minimax_tts_api_key)
                         minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
                         minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
                         minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
                     with cols[1]:
                         elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                        _render_credential_status(elevenlabs_api_key)
                         elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
                         chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
                         chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                        _render_credential_status(chatterbox_api_key, local=True, required=False)
                         chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
                         sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                        _render_credential_status(sonilo_api_key)
                         sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
                         st.markdown("**Suno — agente musical opcional**")
                         suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                        _render_credential_status(suno_api_key)
                         suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
                         suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
                 with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
                     st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
                     tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
+                    _render_credential_status(tiktok_client_key)
                     tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
 
                 with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
+                    _render_credential_status(upload_post_api_key)
                     upload_post_username = text_setting("Upload-Post username", "upload_post_username")
                     upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
                     upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
@@ -3850,6 +4012,7 @@ def render_settings():
                     postiz_cols = st.columns(2)
                     with postiz_cols[0]:
                         postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
+                        _render_credential_status(postiz_api_key)
                         postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
                         postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
                     with postiz_cols[1]:
@@ -3857,23 +4020,12 @@ def render_settings():
                         postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
                     st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
 
-                if refresh_openai_models:
-                    try:
-                        discovered_models = fetch_openai_compatible_models(openai_api_key, openai_base_url)
-                        st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": discovered_models, "error": ""}
-                        st.success(f"{len(discovered_models)} modelo(s) carregado(s) do endpoint OpenAI-compatible.")
-                        st.rerun()
-                    except ModelDiscoveryError as exc:
-                        st.session_state["openai_model_catalog"] = {"key": catalog_key, "models": [], "error": str(exc)}
-                        st.rerun()
-
                 save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
                 if save_all_settings:
                     settings.update({
                         "port": port, "moneyprinter_path": moneyprinter_path,
                         "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
                         "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                        "llm_provider": llm_provider, "openai_api_key": openai_api_key, "openai_base_url": openai_base_url, "openai_model_name": openai_model_name,
                         "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
                         "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
                         "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
@@ -3898,6 +4050,7 @@ def render_settings():
                             st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
                     except Exception as exc:
                         st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+        render_llm_provider_cards(settings)
         with material_sources_tab:
             render_material_source_api_keys(settings)
 
