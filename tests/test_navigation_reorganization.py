@@ -47,6 +47,10 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertNotIn("with videos_tab:", MAIN_SOURCE)
         self.assertIn('"Backlog Vídeos": render_videos', MAIN_SOURCE)
 
+    def test_batch_success_message_points_to_video_backlog(self):
+        self.assertIn("Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.", MAIN_SOURCE)
+        self.assertNotIn("Abra a subaba Vídeos para acompanhar.", MAIN_SOURCE)
+
     def test_settings_order_keeps_notifications_before_api(self):
         settings_block = MAIN_SOURCE.split("    settings_items = [", 1)[1].split("    ]", 1)[0]
         self.assertLess(settings_block.index('"Notificações"'), settings_block.index('"Configuração API"'))
