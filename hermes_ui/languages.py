@@ -208,6 +208,22 @@ for _language_code, _llm_control_values in _LLM_CONTROL_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_llm_control_values)
 
 
+_API_KEY_EXPANDER_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {"Niche Finder — Kaggle": "Niche Finder — Kaggle", "Niche Finder — Apify": "Niche Finder — Apify"},
+    "en": {"Niche Finder — Kaggle": "Niche Finder — Kaggle", "Niche Finder — Apify": "Niche Finder — Apify"},
+    "zh": {"Niche Finder — Kaggle": "利基搜索 — Kaggle", "Niche Finder — Apify": "利基搜索 — Apify"},
+    "de": {"Niche Finder — Kaggle": "Kaggle-Nischenfinder", "Niche Finder — Apify": "Apify-Nischenfinder"},
+    "vi": {"Niche Finder — Kaggle": "Tìm ngách — Kaggle", "Niche Finder — Apify": "Tìm ngách — Apify"},
+    "tr": {"Niche Finder — Kaggle": "Kaggle Niş Bulucu", "Niche Finder — Apify": "Apify Niş Bulucu"},
+    "ru": {"Niche Finder — Kaggle": "Поиск ниши — Kaggle", "Niche Finder — Apify": "Поиск ниши — Apify"},
+    "es": {"Niche Finder — Kaggle": "Buscador de nichos — Kaggle", "Niche Finder — Apify": "Buscador de nichos — Apify"},
+    "id": {"Niche Finder — Kaggle": "Pencari Niche — Kaggle", "Niche Finder — Apify": "Pencari Niche — Apify"},
+    "it": {"Niche Finder — Kaggle": "Trova nicchia — Kaggle", "Niche Finder — Apify": "Trova nicchia — Apify"},
+}
+for _language_code, _api_key_values in _API_KEY_EXPANDER_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_api_key_values)
+
+
 # Labels introduced by the reorganised sidebar. They are merged into the
 # existing UI translation index so every navigation control uses the same
 # translation path as the legacy pages.
