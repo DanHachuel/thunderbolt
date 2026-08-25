@@ -145,8 +145,18 @@ if (args[0] === "worker" || args.includes("--worker")) {
   run(python, ["-m", "hermes_ui.automation_worker", ...args.filter((arg) => arg !== "worker" && arg !== "--worker")], "worker de automação");
 }
 
+if (args[0] === "pipeline-worker" || args.includes("--pipeline-worker")) {
+  run(python, ["-m", "hermes_ui.pipeline_worker", ...args.filter((arg) => arg !== "pipeline-worker" && arg !== "--pipeline-worker")], "worker do pipeline de vídeos");
+}
+
 const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
 const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
+  cwd: root,
+  stdio: "inherit",
+  env: runtimeEnv,
+  windowsHide: false,
+});
+const pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
   cwd: root,
   stdio: "inherit",
   env: runtimeEnv,
@@ -161,6 +171,7 @@ const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", po
 
 const stopWorker = () => {
   if (!worker.killed) worker.kill();
+  if (!pipelineWorker.killed) pipelineWorker.kill();
 };
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
@@ -169,3 +180,4 @@ child.on("exit", (code, signal) => {
   process.exit(code ?? (signal ? 1 : 0));
 });
 worker.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
+pipelineWorker.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
