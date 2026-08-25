@@ -153,7 +153,15 @@ if (args[0] === "pipeline-worker" || args.includes("--pipeline-worker")) {
 
 const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
 const publicPort = Number.parseInt(String(port), 10);
-const backendPort = Number.isFinite(publicPort) ? publicPort + 1 : 3031;
+const backendPort = await new Promise((resolve, reject) => {
+  const reservation = net.createServer();
+  reservation.once("error", reject);
+  reservation.listen(0, "127.0.0.1", () => {
+    const address = reservation.address();
+    const selectedPort = address && typeof address === "object" ? address.port : 0;
+    reservation.close((error) => error ? reject(error) : resolve(selectedPort));
+  });
+});
 const supportedLanguages = new Set(["en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it"]);
 
 const proxy = http.createServer((request, response) => {
@@ -196,7 +204,9 @@ proxy.on("upgrade", (request, clientSocket, head) => {
   upstreamSocket.on("error", () => clientSocket.destroy());
 });
 
-proxy.listen(publicPort, "127.0.0.1");
+proxy.listen(publicPort, "127.0.0.1", () => {
+  console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
+});
 const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
   cwd: root,
   stdio: "inherit",
@@ -211,7 +221,7 @@ const pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
 });
 const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
   cwd: root,
-  stdio: "inherit",
+  stdio: "ignore",
   env: runtimeEnv,
   windowsHide: false,
 });
