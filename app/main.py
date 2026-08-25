@@ -38,6 +38,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.languages import LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
+
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -54,6 +55,8 @@ from integrations.youtube_batch import account_key as youtube_batch_account_key,
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL, ModelDiscoveryError, fetch_openai_compatible_models
+
+DEFAULT_UI_LANGUAGE = "en"
 
 AI_STYLE_OPTIONS = [
     "Natural Realista",
@@ -229,8 +232,9 @@ def current_ui_language() -> str:
     if requested:
         normalized = language_code(requested)
     else:
-        settings = read_json("settings.json", {})
-        normalized = language_code(settings.get("ui_language") or "pt")
+        # A raiz do launcher é o idioma padrão do sistema. A mudança explícita
+        # de idioma continua a chegar por ?lang=..., incluindo a rota /en.
+        normalized = DEFAULT_UI_LANGUAGE
     st.session_state["ui_language"] = normalized
     return normalized
 
