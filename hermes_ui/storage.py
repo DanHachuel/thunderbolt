@@ -10,6 +10,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
+DEFAULT_LLM_PROVIDER = "openai"
+LEGACY_DEFAULT_LLM_PROVIDERS = {"", "moonshot"}
 STATE = STORAGE / "state"
 BLUEPRINTS = STORAGE / "blueprints"
 TIKTOK_PROMPT_MASTERS = STORAGE / "tiktok" / "prompts_master"
@@ -125,7 +127,7 @@ DEFAULTS: dict[str, Any] = {
         "apify_actor_id": "streamers~youtube-scraper",
         "apify_poll_interval_seconds": 10,
         "apify_run_timeout_seconds": 900,
-        "llm_provider": "moonshot",
+        "llm_provider": DEFAULT_LLM_PROVIDER
         "moonshot_api_key": "",
         "moonshot_base_url": "",
         "moonshot_model_name": "",
@@ -290,6 +292,18 @@ def seed_prompt_masters() -> None:
             shutil.copy2(source, target)
 
 
+def _migrate_settings(settings: Any) -> tuple[dict[str, Any], bool]:
+    """Keep the shipped OpenAI/NVIDIA NIM default across package upgrades."""
+    if not isinstance(settings, dict):
+        return {"llm_provider": DEFAULT_LLM_PROVIDER}, True
+
+    provider = str(settings.get("llm_provider") or "").strip().lower()
+    if provider not in LEGACY_DEFAULT_LLM_PROVIDERS:
+        return settings, False
+
+    return {**settings, "llm_provider": DEFAULT_LLM_PROVIDER}, True
+
+
 def ensure_storage() -> None:
     for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, MEDIA_DOWNLOADS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
@@ -321,7 +335,13 @@ def read_json(name: str, default: Any | None = None) -> Any:
     path = STATE / name
     try:
         with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+            data = json.load(handle)
+        if name != "settings.json":
+            return data
+        migrated, changed = _migrate_settings(data)
+        if changed:
+            atomic_write(path, migrated)
+        return migrated
     except (json.JSONDecodeError, OSError):
         backup = path.with_suffix(path.suffix + f".corrupt-{datetime.now().strftime('%Y%m%d%H%M%S')}")
         if path.exists():
