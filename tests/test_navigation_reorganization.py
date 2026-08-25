@@ -93,6 +93,11 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertIn('for row_start in range(0, len(channels), 3):', MAIN_SOURCE)
         self.assertNotIn('channel_videos_view_', MAIN_SOURCE)
 
+    def test_kanban_cards_match_dashboard_card_outline_style(self):
+        self.assertIn('border:1px solid color-mix(in srgb, currentColor 18%, transparent);', MAIN_SOURCE)
+        self.assertIn('box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent);', MAIN_SOURCE)
+        self.assertIn('.content-card { border:1px solid color-mix(in srgb, currentColor 18%, transparent);', MAIN_SOURCE)
+
     def test_list_mode_keeps_registered_channel_cards_and_video_details(self):
         kanban_branch = MAIN_SOURCE.split('if st.session_state.get("youtube_channels_view_mode", "Lista") == "Kanban":', 1)[1]
         list_branch = kanban_branch.split('    for channel in channels:', 1)[1]
