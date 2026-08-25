@@ -3831,7 +3831,7 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             with action_cols[1]:
                 refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
             with action_cols[2]:
-                save_clicked = st.form_submit_button("Guardar cartão", type="primary", use_container_width=True)
+                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True)
             remove_clicked = False
             if definition.code != "openai":
                 remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True)
