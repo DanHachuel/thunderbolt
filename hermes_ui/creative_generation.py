@@ -266,7 +266,7 @@ def generate_thumbnail_prompt(
         "És um director de arte de thumbnails para YouTube. Refaz um prompt de imagem forte e específico "
         "para o tópico fornecido, mantendo a intenção visual quando já existir um prompt. "
         "Separa rigorosamente a imagem sem texto do lettering: image_prompt nunca deve pedir texto renderizado, "
-        "enquanto overlay_text deve ser curto, legível e ter no máximo quatro palavras. "
+        "enquanto overlay_text é obrigatório, deve ser curto, legível e ter entre três e quatro palavras. "
         "Responde apenas com JSON válido nas chaves concept, overlay_text, composition, color_palette, subject, "
         "image_prompt, title_synergy e lettering_prompt."
     )
@@ -279,8 +279,8 @@ def generate_thumbnail_prompt(
             "reference_rules": reference_bundle(),
             "requirements": {
                 "image_prompt": "cinematic visual direction, no words, letters, logos or watermarks rendered in the image",
-                "overlay_text": "maximum 4 words, emotionally strong, not the full title",
-                "lettering_prompt": "instructions for changing only the lettering after the base image exists",
+                "overlay_text": "required, 3 to 4 words, emotionally strong, not the full title",
+                "lettering_prompt": "required instructions for rendering the exact overlay_text after the base image exists",
             },
         },
         ensure_ascii=False,
@@ -289,7 +289,11 @@ def generate_thumbnail_prompt(
     image_prompt = str(result.get("image_prompt") or "").strip()
     if not image_prompt:
         raise CreativeGenerationError("O provider não devolveu um prompt de imagem válido.")
-    overlay_text = _short_overlay(result.get("overlay_text"))
+    overlay_text = _short_overlay(result.get("overlay_text")) or _short_overlay(topic) or "WATCH NOW"
+    lettering_prompt = str(result.get("lettering_prompt") or "").strip() or (
+        "Render the exact overlay_text as bold, readable, high-contrast sans-serif lettering with an outline or shadow, "
+        "inside a safe zone and away from the main face or subject."
+    )
     return {
         "concept": str(result.get("concept") or "Thumbnail renovada").strip(),
         "overlay_text": overlay_text,
@@ -298,7 +302,7 @@ def generate_thumbnail_prompt(
         "subject": str(result.get("subject") or topic).strip(),
         "image_prompt": image_prompt,
         "title_synergy": str(result.get("title_synergy") or "").strip(),
-        "lettering_prompt": str(result.get("lettering_prompt") or "").strip(),
+        "lettering_prompt": lettering_prompt,
         "status": "prompt_ready",
     }
 
@@ -317,7 +321,7 @@ def generate_creative_package(
         "És director editorial e de thumbnails para YouTube. Cria um pacote coerente de título e thumbnail "
         "para o tópico fornecido. Gera exactamente pelo menos 20 títulos candidatos e entre 3 e 5 variantes de thumbnail. "
         "O título deve carregar keywords no início, ter curiosidade, especificidade e emoção, sem clickbait falso. "
-        "A thumbnail deve ter no máximo três elementos, alto contraste, uma composição clara, texto opcional de até 4 palavras, "
+        "A thumbnail deve ter no máximo três elementos, alto contraste, uma composição clara e lettering obrigatório de 3 a 4 palavras, "
         "safe zones e leitura em 120px. O texto da thumbnail não pode repetir o título integralmente. Remove AI tells. "
         "Responde apenas com JSON válido nas chaves selected_title, title_candidates, keywords e thumbnail_variants."
     )
@@ -337,12 +341,13 @@ def generate_creative_package(
             },
             "thumbnail_variant_schema": {
                 "concept": "string",
-                "overlay_text": "string, maximum 4 words",
+                "overlay_text": "required string, 3 to 4 words",
                 "composition": "string",
                 "color_palette": "string",
                 "subject": "string",
-                "image_prompt": "string, no text rendered in the image",
+                "image_prompt": "string describing the clean image base, without rendered text; lettering is specified separately",
                 "title_synergy": "string",
+                "lettering_prompt": "string describing how to render the exact overlay_text",
             },
         },
         ensure_ascii=False,
@@ -384,15 +389,21 @@ def generate_creative_package(
             continue
         if not str(item.get("concept") or "").strip() or not str(item.get("image_prompt") or "").strip():
             continue
+        overlay_text = _short_overlay(item.get("overlay_text")) or _short_overlay(topic) or "WATCH NOW"
+        lettering_prompt = str(item.get("lettering_prompt") or "").strip() or (
+            "Render the exact overlay_text as bold, readable, high-contrast sans-serif lettering with an outline or shadow, "
+            "inside a safe zone and away from the main face or subject."
+        )
         variants.append(
             {
                 "concept": str(item.get("concept") or "").strip(),
-                "overlay_text": _short_overlay(item.get("overlay_text")),
+                "overlay_text": overlay_text,
                 "composition": str(item.get("composition") or "").strip(),
                 "color_palette": str(item.get("color_palette") or "").strip(),
                 "subject": str(item.get("subject") or "").strip(),
                 "image_prompt": str(item.get("image_prompt") or "").strip(),
                 "title_synergy": str(item.get("title_synergy") or "").strip(),
+                "lettering_prompt": lettering_prompt,
                 "status": "prompt_ready",
             }
         )

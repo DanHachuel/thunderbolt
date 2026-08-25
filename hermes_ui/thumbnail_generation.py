@@ -4,6 +4,7 @@ import hashlib
 import mimetypes
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,51 @@ class ThumbnailGenerationError(RuntimeError):
 def _clean_detail(value: Any, api_key: str) -> str:
     detail = str(value or "").strip()[:600]
     return detail.replace(api_key, "[REDACTED]") if api_key else detail
+
+
+def _fallback_lettering(topic: str) -> str:
+    """Return a short headline when an older task has no overlay_text."""
+    words = re.findall(r"[\wÀ-ÿ$%'-]+", str(topic or ""), flags=re.UNICODE)
+    headline = " ".join(words[:4]).strip()
+    return headline.upper() if headline else "WATCH NOW"
+
+
+def _normalise_lettering_text(value: Any, topic: str) -> str:
+    """Keep the required thumbnail headline concise and never empty."""
+    words = re.findall(r"[\wÀ-ÿ$%'-]+", str(value or ""), flags=re.UNICODE)
+    if not words:
+        return _fallback_lettering(topic)
+    return " ".join(words[:4]).strip()
+
+
+def _compose_thumbnail_prompt(
+    base_prompt: str,
+    *,
+    topic: str = "",
+    lettering_text: str = "",
+    lettering_prompt: str = "",
+) -> tuple[str, str]:
+    """Combine the visual base and a mandatory, model-readable lettering layer."""
+    headline = _normalise_lettering_text(lettering_text, topic)
+    lettering_guidance = str(lettering_prompt or "").strip() or (
+        "Use a bold sans-serif headline with high contrast, a thick outline or shadow, "
+        "safe margins and placement that does not cover the face or main subject."
+    )
+    effective_prompt = (
+        "IMAGE BASE LAYER — create the requested cinematic YouTube thumbnail composition, subject, "
+        "lighting, colour palette and visual hierarchy. Keep the base image clean and uncluttered.\n"
+        f"{str(base_prompt or '').strip()}\n\n"
+        "MANDATORY LETTERING LAYER — the final image MUST visibly contain readable lettering. "
+        "If the image-base description says no text, no words or no lettering, that restriction is overridden "
+        "by this layer. Render the exact headline between the delimiters below; do not omit it, paraphrase it, "
+        "translate it, replace it with placeholder text or hide it.\n"
+        f"EXACT HEADLINE TO RENDER: <<<{headline}>>>\n"
+        f"LETTERING DESIGN: {lettering_guidance}\n"
+        "Use no more than three or four words, bold sans-serif typography, strong contrast, outline/shadow, "
+        "a safe-zone margin and a position that does not cover the face or main object. Do not add unrelated text, "
+        "logos or watermarks. The thumbnail must not be delivered without the exact headline visible."
+    )
+    return effective_prompt, headline
 
 
 def _decode_image_data(value: Any) -> bytes | None:
@@ -105,6 +151,8 @@ def generate_thumbnail_image(
     topic: str = "",
     variant_index: int = 0,
     reference_image: str | Path | None = None,
+    lettering_text: str = "",
+    lettering_prompt: str = "",
 ) -> Path:
     api_key = str(settings.get("gemini_image_api_key") or "").strip()
     if not api_key:
@@ -112,14 +160,20 @@ def generate_thumbnail_image(
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
         raise ThumbnailGenerationError("A thumbnail não tem um prompt de imagem para gerar.")
+    effective_prompt, headline = _compose_thumbnail_prompt(
+        clean_prompt,
+        topic=topic,
+        lettering_text=lettering_text,
+        lettering_prompt=lettering_prompt,
+    )
 
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
     aspect_ratio = str(settings.get("gemini_image_aspect_ratio") or DEFAULT_ASPECT_RATIO).strip()
     image_size = str(settings.get("gemini_image_size") or DEFAULT_IMAGE_SIZE).strip()
-    request_input: str | list[dict[str, str]] = clean_prompt
+    request_input: str | list[dict[str, str]] = effective_prompt
     if reference_image:
         request_input = [
-            {"type": "text", "text": clean_prompt},
+            {"type": "text", "text": effective_prompt},
             _image_input(Path(reference_image)),
         ]
     body = {
@@ -161,7 +215,12 @@ def generate_thumbnail_image(
     ensure_storage()
     output_dir = STORAGE / "thumbnails"
     output_dir.mkdir(parents=True, exist_ok=True)
-    destination = output_dir / _thumbnail_filename(clean_prompt, topic, variant_index, model)
+    destination = output_dir / _thumbnail_filename(
+        f"{effective_prompt}\nEXACT HEADLINE TO RENDER: {headline}",
+        topic,
+        variant_index,
+        model,
+    )
     fd, temp_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=output_dir)
     try:
         with os.fdopen(fd, "wb") as handle:
