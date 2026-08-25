@@ -3437,103 +3437,116 @@ def render_google_accounts():
         missing_document_parts = list(direct_status.get("missing_cookies", []))
         if not direct_status.get("has_session_info"):
             missing_document_parts.append("sessionInfo")
+        account_ready = bool(
+            account_email_snapshot != "sem e-mail"
+            and str(batch_account.get("client_id") or "").strip()
+            and str(batch_account.get("client_secret") or "").strip()
+            and bool(direct_status.get("document_exists"))
+            and not missing_document_parts
+        )
         if missing_document_parts:
             youtube_accounts_missing_document.append(account_email_snapshot)
 
-        with st.expander(f"{account_label_snapshot} — {account_email_snapshot}", expanded=False):
-            with st.form(f"batch_account_form_{account_id}"):
-                account_cols = st.columns(2)
-                with account_cols[0]:
-                    account_label = st.text_input("Nome da conta", value=account_label_snapshot, key=f"batch_label_{account_id}")
-                    account_email = st.text_input("E-mail/Gmail da conta", value=account_email_snapshot if account_email_snapshot != "sem e-mail" else "", key=f"batch_email_{account_id}")
-                    account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
-                with account_cols[1]:
-                    account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
-                    account_session_info = st.text_input(
-                        "sessionInfo token desta conta Google",
-                        value=str(batch_account.get("sessionInfo") or batch_account.get("session_info") or batch_account.get("direct_session_info", "")),
-                        type="password",
-                        key=f"batch_session_info_{account_id}",
-                        help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
-                    )
-                save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
-
-            st.markdown("**Documento de cookies/credenciais desta conta Google**")
-            st.caption("O documento padrão é criado automaticamente. Suba um JSON completo ou apenas o documento de cookies; os valores preenchidos são incorporados e mantidos em credentials.json.")
-            document_upload = st.file_uploader(
-                "Subir documento de cookies/credenciais",
-                type=["json"],
-                key=f"direct_credentials_document_{account_id}",
-                help="Aceita o JSON do YouTube-Video-Upload-Frontend-Api. Um documento parcial de cookies também é incorporado sem apagar os restantes campos.",
-            )
-            if missing_document_parts:
-                st.warning(f"Documento incompleto: {', '.join(missing_document_parts)}")
-            else:
-                st.success("Documento completo para a conta Google")
-            st.caption(f"Documento guardado em: {direct_status['document_file']}")
-            document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", use_container_width=True)
-
-            account_status = youtube_batch_account_status(batch_account, STORAGE)
-            status_cols = st.columns(3)
-            with status_cols[0]:
-                (st.success if account_status.ok else st.warning)(account_status.message)
-            with status_cols[1]:
-                if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
-                    result = authorize_youtube_batch_account(batch_account, STORAGE)
-                    (st.success if result.ok else st.error)(result.message)
-                    if result.ok:
-                        st.rerun()
-            with status_cols[2]:
-                if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
-                    delete_youtube_batch_token(batch_account, STORAGE)
-                    delete_credentials_document(STORAGE, batch_account)
-                    remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
-                    settings["youtube_batch_accounts"] = remaining_accounts
-                    if settings.get("youtube_batch_selected_account_id") == account_id:
-                        settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
-                    for channel in channel_state:
-                        if str(channel.get("google_account_id") or "") == account_id:
-                            channel.update({"google_account_id": "", "google_account_email": ""})
-                    write_json("channels.json", channel_state)
-                    write_json("settings.json", settings)
-                    st.rerun()
-
-            if save_account:
-                if "@" not in account_email.strip():
-                    st.error("Informe um e-mail Google válido.")
-                elif not account_client_id.strip() or not account_client_secret.strip():
-                    st.error("Informe o Client ID e o Client Secret desta conta.")
-                else:
-                    for existing in batch_accounts:
-                        if str(existing.get("id")) == account_id:
-                            credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
-                            if credentials_changed:
-                                delete_youtube_batch_token(existing, STORAGE)
-                            existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
-                            update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
-                            ensure_credentials_document(STORAGE, existing, settings, channel_state)
-                    settings["youtube_batch_accounts"] = batch_accounts
-                    write_json("settings.json", settings)
-                    st.success("Conta Google/YouTube guardada.")
-                    st.rerun()
-
-            if document_save:
-                if document_upload is None:
-                    st.error("Seleccione um documento JSON de cookies/credenciais antes de guardar.")
-                else:
-                    try:
-                        merge_credentials_document(
-                            STORAGE,
-                            batch_account,
-                            document_upload.getvalue(),
-                            document_upload.name,
-                            session_info_override=str(batch_account.get("sessionInfo") or ""),
-                            channels=channel_state,
+        with st.container(border=True):
+            account_header_cols = st.columns([3.2, 1.2])
+            with account_header_cols[0]:
+                st.subheader(f"{account_label_snapshot} — {account_email_snapshot}")
+            with account_header_cols[1]:
+                _api_status_badge("Configured" if account_ready else "Missing configuration", "ready" if account_ready else "missing")
+            with st.expander("Detalhes da conta Google", expanded=False):
+                with st.form(f"batch_account_form_{account_id}"):
+                    account_cols = st.columns(2)
+                    with account_cols[0]:
+                        account_label = st.text_input("Nome da conta", value=account_label_snapshot, key=f"batch_label_{account_id}")
+                        account_email = st.text_input("E-mail/Gmail da conta", value=account_email_snapshot if account_email_snapshot != "sem e-mail" else "", key=f"batch_email_{account_id}")
+                        account_client_id = st.text_input("OAuth Client ID", value=str(batch_account.get("client_id", "")), key=f"batch_client_id_{account_id}")
+                    with account_cols[1]:
+                        account_client_secret = st.text_input("OAuth Client Secret", value=str(batch_account.get("client_secret", "")), type="password", key=f"batch_client_secret_{account_id}")
+                        account_session_info = st.text_input(
+                            "sessionInfo token desta conta Google",
+                            value=str(batch_account.get("sessionInfo") or batch_account.get("session_info") or batch_account.get("direct_session_info", "")),
+                            type="password",
+                            key=f"batch_session_info_{account_id}",
+                            help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
                         )
-                        st.success("Documento incorporado e guardado nesta conta Google.")
+                    save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
+
+                st.markdown("**Documento de cookies/credenciais desta conta Google**")
+                st.caption("O documento padrão é criado automaticamente. Suba um JSON completo ou apenas o documento de cookies; os valores preenchidos são incorporados e mantidos em credentials.json.")
+                document_upload = st.file_uploader(
+                    "Subir documento de cookies/credenciais",
+                    type=["json"],
+                    key=f"direct_credentials_document_{account_id}",
+                    help="Aceita o JSON do YouTube-Video-Upload-Frontend-Api. Um documento parcial de cookies também é incorporado sem apagar os restantes campos.",
+                )
+                if missing_document_parts:
+                    st.warning(f"Documento incompleto: {', '.join(missing_document_parts)}")
+                else:
+                    st.success("Documento completo para a conta Google")
+                st.caption(f"Documento guardado em: {direct_status['document_file']}")
+                document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", use_container_width=True)
+
+                account_status = youtube_batch_account_status(batch_account, STORAGE)
+                status_cols = st.columns(3)
+                with status_cols[0]:
+                    (st.success if account_status.ok else st.warning)(account_status.message)
+                with status_cols[1]:
+                    if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
+                        result = authorize_youtube_batch_account(batch_account, STORAGE)
+                        (st.success if result.ok else st.error)(result.message)
+                        if result.ok:
+                            st.rerun()
+                with status_cols[2]:
+                    if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                        delete_youtube_batch_token(batch_account, STORAGE)
+                        delete_credentials_document(STORAGE, batch_account)
+                        remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
+                        settings["youtube_batch_accounts"] = remaining_accounts
+                        if settings.get("youtube_batch_selected_account_id") == account_id:
+                            settings["youtube_batch_selected_account_id"] = str(remaining_accounts[0].get("id")) if remaining_accounts else ""
+                        for channel in channel_state:
+                            if str(channel.get("google_account_id") or "") == account_id:
+                                channel.update({"google_account_id": "", "google_account_email": ""})
+                        write_json("channels.json", channel_state)
+                        write_json("settings.json", settings)
                         st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
+
+                if save_account:
+                    if "@" not in account_email.strip():
+                        st.error("Informe um e-mail Google válido.")
+                    elif not account_client_id.strip() or not account_client_secret.strip():
+                        st.error("Informe o Client ID e o Client Secret desta conta.")
+                    else:
+                        for existing in batch_accounts:
+                            if str(existing.get("id")) == account_id:
+                                credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
+                                if credentials_changed:
+                                    delete_youtube_batch_token(existing, STORAGE)
+                                existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
+                                update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
+                                ensure_credentials_document(STORAGE, existing, settings, channel_state)
+                        settings["youtube_batch_accounts"] = batch_accounts
+                        write_json("settings.json", settings)
+                        st.success("Conta Google/YouTube guardada.")
+                        st.rerun()
+
+                if document_save:
+                    if document_upload is None:
+                        st.error("Seleccione um documento JSON de cookies/credenciais antes de guardar.")
+                    else:
+                        try:
+                            merge_credentials_document(
+                                STORAGE,
+                                batch_account,
+                                document_upload.getvalue(),
+                                document_upload.name,
+                                session_info_override=str(batch_account.get("sessionInfo") or ""),
+                                channels=channel_state,
+                            )
+                            st.success("Documento incorporado e guardado nesta conta Google.")
+                            st.rerun()
+                        except ValueError as exc:
+                            st.error(str(exc))
 
     if youtube_accounts_missing_document:
         st.info("Contas que ainda precisam de dados no documento: " + ", ".join(youtube_accounts_missing_document))
@@ -3559,6 +3572,11 @@ def render_google_accounts():
                 legacy_account.pop("INNERTUBE_API_KEY", None)
             settings["youtube_batch_accounts"] = batch_accounts
             write_json("settings.json", settings)
+    innertube_status_cols = st.columns([3.2, 1.2])
+    with innertube_status_cols[0]:
+        st.caption("Estado da chave global")
+    with innertube_status_cols[1]:
+        _render_credential_status(current_innertube_api_key)
     with st.form("innertube_api_key_form"):
         innertube_api_key_value = st.text_input(
             "INNERTUBE_API_KEY",
