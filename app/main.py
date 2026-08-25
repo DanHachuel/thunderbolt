@@ -22,7 +22,7 @@ except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
-from hermes_ui.drafts import save_draft
+from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
@@ -47,6 +47,7 @@ from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.thumbnails import list_thumbnail_tasks, regenerate_thumbnail
+from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -648,6 +649,7 @@ def _save_pipeline_draft_callback(
             "video_subject": subject,
             "video_script": script,
             "video_keywords": keywords,
+            "generation_settings": dict(st.session_state.get(f"{prefix}_generation_settings") or {}),
             "summary": str((st.session_state.get("script_draft_summary") if is_script_draft else "") or "").strip(),
             "document_type": document_type,
             "language": str(st.session_state.get(f"{prefix}_script_language") or "").strip(),
@@ -712,134 +714,141 @@ def render_video_generation_settings(
     channel: dict[str, Any] | None = None,
     generate_content_callback: Any | None = None,
     save_draft_callback: Any | None = None,
+    sections: set[str] | None = None,
+    include_content: bool = True,
 ) -> dict[str, Any]:
-    """Render the shared MoneyPrinter-style settings and return a serializable payload."""
+    """Render shared settings, optionally limiting the visible video sections."""
     settings: dict[str, Any] = {}
-    st.markdown("### Video Subject Settings")
-    subject_cols = st.columns(2)
-    with subject_cols[0]:
-        settings["video_subject"] = st.text_input(
-            "Video Subject",
-            value=str(st.session_state.get(f"{prefix}_video_subject", "")),
-            key=f"{prefix}_video_subject",
-            placeholder="Ex.: How AI is changing everyday life",
-        )
-        normalized_current_language = "music" if str(current_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"} else language_code(current_language)
-        settings["script_language"] = st.selectbox(
-            "Script Language",
-            VIDEO_LANGUAGE_SELECTION_OPTIONS,
-            index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalized_current_language) if normalized_current_language in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0,
-            format_func=video_language_label,
-            key=f"{prefix}_script_language",
-        )
-    with subject_cols[1]:
-        with st.expander("Advanced Script Settings", expanded=False):
-            settings["script_structure_notes"] = st.text_area(
-                "Estrutura e notas opcionais",
-                value=str(st.session_state.get(f"{prefix}_script_structure_notes", "")),
-                key=f"{prefix}_script_structure_notes",
-                height=100,
-                placeholder="Ex.: gancho forte, 6 cenas, narração documental…",
+    visible_sections = sections if sections is not None else {"Configurações de vídeo", "Configurações de áudio", "Configurações de legendas"}
+
+    if include_content:
+        st.markdown("### Video Subject Settings")
+        subject_cols = st.columns(2)
+        with subject_cols[0]:
+            settings["video_subject"] = st.text_input(
+                "Video Subject",
+                value=str(st.session_state.get(f"{prefix}_video_subject", "")),
+                key=f"{prefix}_video_subject",
+                placeholder="Ex.: How AI is changing everyday life",
             )
-        settings["generate_script_with_ai"] = st.checkbox("Generate Script & Keywords with AI", value=True, key=f"{prefix}_generate_script_with_ai")
-    settings["video_script"] = st.text_area(
-        "Video Script (Optional)",
-        value=str(st.session_state.get(f"{prefix}_video_script", "")),
-        key=f"{prefix}_video_script",
-        height=130,
-    )
-    settings["video_keywords"] = st.text_area(
-        "Video Keywords (English, Optional)",
-        value=str(st.session_state.get(f"{prefix}_video_keywords", "")),
-        key=f"{prefix}_video_keywords",
-        height=90,
-    )
-    if generate_content_callback is not None:
-        st.button(
-            "Gerar tópico, roteiro e palavras-chave com IA",
-            key=f"{prefix}_generate_video_content",
-            use_container_width=True,
-            type="secondary",
-            icon=":material/auto_awesome:",
-            on_click=generate_content_callback,
+            normalized_current_language = "music" if str(current_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"} else language_code(current_language)
+            settings["script_language"] = st.selectbox(
+                "Script Language",
+                VIDEO_LANGUAGE_SELECTION_OPTIONS,
+                index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalized_current_language) if normalized_current_language in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0,
+                format_func=video_language_label,
+                key=f"{prefix}_script_language",
+            )
+        with subject_cols[1]:
+            with st.expander("Advanced Script Settings", expanded=False):
+                settings["script_structure_notes"] = st.text_area(
+                    "Estrutura e notas opcionais",
+                    value=str(st.session_state.get(f"{prefix}_script_structure_notes", "")),
+                    key=f"{prefix}_script_structure_notes",
+                    height=100,
+                    placeholder="Ex.: gancho forte, 6 cenas, narração documental…",
+                )
+            settings["generate_script_with_ai"] = st.checkbox("Generate Script & Keywords with AI", value=True, key=f"{prefix}_generate_script_with_ai")
+        settings["video_script"] = st.text_area(
+            "Video Script (Optional)",
+            value=str(st.session_state.get(f"{prefix}_video_script", "")),
+            key=f"{prefix}_video_script",
+            height=130,
         )
-        if st.session_state.get(f"{prefix}_generate_content_notice"):
-            st.success(st.session_state[f"{prefix}_generate_content_notice"])
-        if st.session_state.get(f"{prefix}_generate_content_error"):
-            st.error(st.session_state[f"{prefix}_generate_content_error"])
-
-    if save_draft_callback is not None:
-        st.button(
-            "Salvar rascunho",
-            key=f"{prefix}_save_draft",
-            use_container_width=True,
-            type="secondary",
-            icon=":material/save:",
-            on_click=save_draft_callback,
+        settings["video_keywords"] = st.text_area(
+            "Video Keywords (English, Optional)",
+            value=str(st.session_state.get(f"{prefix}_video_keywords", "")),
+            key=f"{prefix}_video_keywords",
+            height=90,
         )
-        if st.session_state.get(f"{prefix}_save_draft_notice"):
-            st.success(st.session_state[f"{prefix}_save_draft_notice"])
-        if st.session_state.get(f"{prefix}_save_draft_error"):
-            st.error(st.session_state[f"{prefix}_save_draft_error"])
+        if generate_content_callback is not None:
+            st.button(
+                "Gerar tópico, roteiro e palavras-chave com IA",
+                key=f"{prefix}_generate_video_content",
+                use_container_width=True,
+                type="secondary",
+                icon=":material/auto_awesome:",
+                on_click=generate_content_callback,
+            )
+            if st.session_state.get(f"{prefix}_generate_content_notice"):
+                st.success(st.session_state[f"{prefix}_generate_content_notice"])
+            if st.session_state.get(f"{prefix}_generate_content_error"):
+                st.error(st.session_state[f"{prefix}_generate_content_error"])
+        if save_draft_callback is not None:
+            st.button(
+                "Salvar rascunho",
+                key=f"{prefix}_save_draft",
+                use_container_width=True,
+                type="secondary",
+                icon=":material/save:",
+                on_click=save_draft_callback,
+            )
+            if st.session_state.get(f"{prefix}_save_draft_notice"):
+                st.success(st.session_state[f"{prefix}_save_draft_notice"])
+            if st.session_state.get(f"{prefix}_save_draft_error"):
+                st.error(st.session_state[f"{prefix}_save_draft_error"])
 
-    st.markdown("### Video Settings")
-    video_cols = st.columns(2)
-    with video_cols[0]:
-        settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
-        if settings["video_source"] == "full_ia":
-            settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
-        else:
-            settings["style_ia"] = ""
-        settings["video_format"] = st.selectbox("Formato", VIDEO_FORMAT_OPTIONS, key=f"{prefix}_video_format")
-        settings["video_concatenation_mode"] = st.selectbox("Video Concatenation Mode", VIDEO_CONCATENATION_OPTIONS, key=f"{prefix}_video_concatenation")
-        settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
-        settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
-    with video_cols[1]:
-        settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
-        settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
-        settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
-        settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
+    if "Configurações de vídeo" in visible_sections:
+        st.markdown("### Video Settings")
+        video_cols = st.columns(2)
+        with video_cols[0]:
+            settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
+            if settings["video_source"] == "full_ia":
+                settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
+            else:
+                settings["style_ia"] = ""
+            settings["video_format"] = st.selectbox("Formato", VIDEO_FORMAT_OPTIONS, key=f"{prefix}_video_format")
+            settings["video_concatenation_mode"] = st.selectbox("Video Concatenation Mode", VIDEO_CONCATENATION_OPTIONS, key=f"{prefix}_video_concatenation")
+            settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
+            settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
+        with video_cols[1]:
+            settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
+            settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
+            settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
+            settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
 
-    st.markdown("### Audio Settings")
-    audio_cols = st.columns(2)
-    with audio_cols[0]:
-        settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
-        settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
-        if channel is not None:
-            channel_id = str(channel.get("id") or channel.get("name") or "")
-            channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()
-            channel_state_key = f"{prefix}_voice_channel_id"
-            if st.session_state.get(channel_state_key) != channel_id:
-                st.session_state[f"{prefix}_voice"] = channel_voice
-                st.session_state[channel_state_key] = channel_id
-        current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
-        voice_options = voice_catalog(current_voice)
-        settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
-        volume_speed_cols = st.columns(2)
-        with volume_speed_cols[0]:
-            settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
-        with volume_speed_cols[1]:
-            settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
-        st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
-    with audio_cols[1]:
-        settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
-        settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
+    if "Configurações de áudio" in visible_sections:
+        st.markdown("### Audio Settings")
+        audio_cols = st.columns(2)
+        with audio_cols[0]:
+            settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
+            settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
+            if channel is not None:
+                channel_id = str(channel.get("id") or channel.get("name") or "")
+                channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()
+                channel_state_key = f"{prefix}_voice_channel_id"
+                if st.session_state.get(channel_state_key) != channel_id:
+                    st.session_state[f"{prefix}_voice"] = channel_voice
+                    st.session_state[channel_state_key] = channel_id
+            current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
+            voice_options = voice_catalog(current_voice)
+            settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
+            volume_speed_cols = st.columns(2)
+            with volume_speed_cols[0]:
+                settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
+            with volume_speed_cols[1]:
+                settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
+            st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
+        with audio_cols[1]:
+            settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
+            settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
 
-    st.markdown("### Subtitle Settings")
-    subtitle_cols = st.columns(2)
-    with subtitle_cols[0]:
-        settings["enable_subtitles"] = st.checkbox("Enable Subtitles", value=True, key=f"{prefix}_enable_subtitles")
-        settings["subtitle_font"] = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, key=f"{prefix}_subtitle_font")
-        settings["subtitle_position"] = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, key=f"{prefix}_subtitle_position")
-        settings["subtitle_color"] = st.color_picker("Color", "#FFFFFF", key=f"{prefix}_subtitle_color")
-        settings["subtitle_background"] = st.checkbox("Background", value=True, key=f"{prefix}_subtitle_background")
-        settings["subtitle_background_color"] = st.color_picker("Background Color", "#000000", key=f"{prefix}_subtitle_background_color")
-        settings["subtitle_rounded_background"] = st.checkbox("Rounded Background", value=False, key=f"{prefix}_subtitle_rounded_background")
-    with subtitle_cols[1]:
-        settings["subtitle_font_size"] = st.slider("Font Size", min_value=12, max_value=96, value=60, key=f"{prefix}_subtitle_font_size")
-        settings["subtitle_outline"] = st.color_picker("Outline", "#000000", key=f"{prefix}_subtitle_outline")
-        settings["subtitle_outline_width"] = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=1.5, step=0.25, key=f"{prefix}_subtitle_outline_width")
-        st.button("Restore Subtitle Defaults", key=f"{prefix}_restore_subtitle_defaults", disabled=True, help="Os valores predefinidos já estão activos nesta configuração.")
+    if "Configurações de legendas" in visible_sections:
+        st.markdown("### Subtitle Settings")
+        subtitle_cols = st.columns(2)
+        with subtitle_cols[0]:
+            settings["enable_subtitles"] = st.checkbox("Enable Subtitles", value=True, key=f"{prefix}_enable_subtitles")
+            settings["subtitle_font"] = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, key=f"{prefix}_subtitle_font")
+            settings["subtitle_position"] = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, key=f"{prefix}_subtitle_position")
+            settings["subtitle_color"] = st.color_picker("Color", "#FFFFFF", key=f"{prefix}_subtitle_color")
+            settings["subtitle_background"] = st.checkbox("Background", value=True, key=f"{prefix}_subtitle_background")
+            settings["subtitle_background_color"] = st.color_picker("Background Color", "#000000", key=f"{prefix}_subtitle_background_color")
+            settings["subtitle_rounded_background"] = st.checkbox("Rounded Background", value=False, key=f"{prefix}_subtitle_rounded_background")
+        with subtitle_cols[1]:
+            settings["subtitle_font_size"] = st.slider("Font Size", min_value=12, max_value=96, value=60, key=f"{prefix}_subtitle_font_size")
+            settings["subtitle_outline"] = st.color_picker("Outline", "#000000", key=f"{prefix}_subtitle_outline")
+            settings["subtitle_outline_width"] = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=1.5, step=0.25, key=f"{prefix}_subtitle_outline_width")
+            st.button("Restore Subtitle Defaults", key=f"{prefix}_restore_subtitle_defaults", disabled=True, help="Os valores predefinidos já estão activos nesta configuração.")
     return settings
 
 
@@ -1748,9 +1757,191 @@ def render_channels():
             render_channel_videos(channel)
 
 
+def _saved_video_draft_records() -> list[dict[str, Any]]:
+    """Return saved video scripts and local pipeline drafts in one selectable list."""
+    records: list[dict[str, Any]] = []
+    for source, source_records in (("history", list_script_documents()), ("draft", list_drafts())):
+        for raw_record in source_records:
+            if not isinstance(raw_record, dict):
+                continue
+            document_type = str(raw_record.get("document_type") or "video_script").strip()
+            draft_kind = str(raw_record.get("draft_kind") or "").strip()
+            if document_type not in {"", "video_script"}:
+                continue
+            if source == "draft" and draft_kind not in {"", "video", "script"}:
+                continue
+            if source == "draft" and not draft_kind and str(raw_record.get("page") or "") == "Criação de Músicas":
+                continue
+            if source == "history":
+                try:
+                    content = read_script_document(raw_record)
+                except (OSError, UnicodeError):
+                    content = ""
+            else:
+                content = str(raw_record.get("content") or "")
+            record = normalise_saved_script({**raw_record, "source": source, "source_label": "Histórico guardado" if source == "history" else "Rascunho local"}, content)
+            record["resume_id"] = f"{source}:{raw_record.get('id') or raw_record.get('filename') or len(records)}"
+            records.append(record)
+    return records
+
+
+def _seed_resume_video_settings(record: dict[str, Any]) -> None:
+    """Load one persisted record into the namespaced resume widgets."""
+    resume_id = str(record.get("resume_id") or "")
+    if st.session_state.get("new_video_resume_loaded_id") == resume_id:
+        return
+    generation_settings = record.get("generation_settings") if isinstance(record.get("generation_settings"), dict) else {}
+    st.session_state["new_video_resume_sections"] = missing_setting_sections(generation_settings)
+    for suffix in setting_widget_suffixes():
+        if suffix in generation_settings:
+            st.session_state[f"new_video_resume_{suffix}"] = generation_settings[suffix]
+    st.session_state["new_video_resume_loaded_id"] = resume_id
+
+
+def _create_video_task_from_saved_script(record: dict[str, Any], channel: dict[str, Any], settings: dict[str, Any]) -> list[dict[str, Any]]:
+    """Create a normal pipeline task while preserving the saved script as an override."""
+    subject = str(record.get("video_subject") or "").strip()
+    script = str(record.get("video_script") or "").strip()
+    keywords = str(record.get("video_keywords") or "").strip()
+    settings = {
+        **(record.get("generation_settings") if isinstance(record.get("generation_settings"), dict) else {}),
+        **settings,
+        "video_subject": subject,
+        "video_script": script,
+        "video_keywords": keywords,
+        "script_language": str(settings.get("script_language") or record.get("language") or channel.get("language") or "pt"),
+        "generate_script_with_ai": False,
+    }
+    style_label = str(settings.get("video_source") or "Pexels/Pixabay")
+    style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style_label, style_label)
+    blueprint_id = str(record.get("blueprint_id") or channel.get("default_blueprint_id") or channel.get("blueprint_id") or "")
+    blueprint_name = str(record.get("blueprint_name") or blueprint_id or "SEM BLUEPRINT CONFIGURADO")
+    payload = {
+        "topic": subject,
+        "title": str(record.get("title") or subject).strip(),
+        "topic_source": "saved_script",
+        "language": settings["script_language"],
+        "format": settings.get("video_format", "wide"),
+        "style_wide": style,
+        "style_ia": settings.get("style_ia", ""),
+        "music_mode": style == "music",
+        "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"),
+        "voice": str(settings.get("voice") or channel.get("default_voice") or channel.get("voice") or ""),
+        "blueprint_id": blueprint_id,
+        "blueprint_name": blueprint_name,
+        "generation_settings": settings,
+    }
+    batch = create_batch(
+        "single",
+        [str(channel.get("id") or "")],
+        subject,
+        1,
+        {
+            **payload,
+            "topic_source": "saved_script",
+            "channel_payloads": {str(channel.get("id") or ""): payload},
+        },
+    )
+    return create_tasks_for_batch(batch)
+
+
+def render_video_from_draft() -> None:
+    """Render the continuation flow for saved scripts and local pipeline drafts."""
+    st.subheader("Roteiros guardados")
+    st.caption("Seleccione um roteiro guardado para continuar a criação do vídeo sem perder o conteúdo já preparado.")
+    records = _saved_video_draft_records()
+    if not records:
+        st.info("Ainda não existem roteiros guardados.")
+        return
+
+    record_by_id = {str(record["resume_id"]): record for record in records}
+    selected_id = st.selectbox(
+        "Seleccione um roteiro",
+        list(record_by_id),
+        format_func=lambda identifier: f"{record_by_id[identifier].get('title') or 'Roteiro sem título'} · {record_by_id[identifier].get('source_label') or 'Rascunho'}",
+        key="new_video_resume_selected",
+    )
+    record = record_by_id[selected_id]
+    _seed_resume_video_settings(record)
+    with st.container(border=True):
+        st.markdown(f"**Video Subject:** {record.get('video_subject') or '—'}")
+        st.caption(f"{record.get('source_label') or 'Rascunho'} · {record.get('channel_name') or 'Documento independente'} · Blueprint: {record.get('blueprint_name') or '—'}")
+        if record.get("video_script"):
+            st.text_area("Video Script (Optional)", value=str(record["video_script"]), height=150, disabled=True, key=f"resume_preview_script_{selected_id}")
+        if record.get("video_keywords"):
+            st.caption(f"**Video Keywords:** {record['video_keywords']}")
+
+    content_missing = missing_content_fields(record)
+    if content_missing:
+        st.warning(f"Conteúdo em falta: {', '.join(content_missing)}. Volte a Roteiros e guarde tópico, roteiro e palavras-chave antes de continuar.")
+        return
+
+    persisted_settings = record.get("generation_settings") if isinstance(record.get("generation_settings"), dict) else {}
+    missing_sections = missing_setting_sections(persisted_settings)
+    if missing_sections:
+        selected_sections = set(
+            st.multiselect(
+                "Configurações a completar",
+                list(DRAFT_SETTING_SECTIONS),
+                default=missing_sections,
+                key="new_video_resume_sections",
+                help="Seleccione uma ou mais áreas para completar antes de criar a tarefa.",
+            )
+        )
+        st.caption("Seleccione as configurações que pretende completar.")
+    else:
+        selected_sections = set()
+        st.success("Roteiro completo: todas as configurações estão disponíveis.")
+
+    all_channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict)]
+    selectable_channels = [channel for channel in all_channels if channel.get("active", True)]
+    if not selectable_channels:
+        st.warning("Cadastre pelo menos um canal antes de continuar.")
+        return
+    saved_channel_id = str(record.get("channel_id") or "")
+    if saved_channel_id and not any(str(channel.get("id")) == saved_channel_id for channel in selectable_channels):
+        saved_channel = next((channel for channel in all_channels if str(channel.get("id")) == saved_channel_id), None)
+        if saved_channel:
+            selectable_channels.insert(0, saved_channel)
+    channel_index = next((index for index, channel in enumerate(selectable_channels) if str(channel.get("id")) == saved_channel_id), 0)
+    selected_channel = st.selectbox(
+        "Canal",
+        selectable_channels,
+        index=channel_index,
+        format_func=lambda channel: str(channel.get("name") or "Canal sem nome"),
+        key="new_video_resume_channel",
+    )
+
+    settings_from_form = render_video_generation_settings(
+        "new_video_resume",
+        current_language=str(record.get("language") or "pt"),
+        channel=selected_channel,
+        sections=selected_sections,
+        include_content=False,
+    )
+    merged_settings = {**persisted_settings, **settings_from_form}
+    still_missing = missing_setting_sections(merged_settings)
+    action_label = "Continuar criação" if still_missing else "Gerar apenas o vídeo"
+    if still_missing:
+        st.caption(f"Faltam: {', '.join(still_missing)}")
+    elif not missing_sections:
+        st.caption("Este roteiro será usado directamente, sem regenerar o conteúdo editorial guardado.")
+    if st.button(action_label, type="primary", use_container_width=True, key="new_video_resume_submit", icon=":material/movie:"):
+        if still_missing:
+            st.error(f"Complete as configurações seleccionadas: {', '.join(still_missing)}.")
+        elif not selected_channel.get("id"):
+            st.error("Seleccione um canal para continuar.")
+        else:
+            tasks = _create_video_task_from_saved_script(record, selected_channel, merged_settings)
+            st.success(f"Tarefa criada a partir de {record.get('title') or 'Roteiro sem título'}: {tasks[0].get('id') if tasks else '—'}.")
+
+
 def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "new_video"):
     st.title(page_title)
-    create_tab = render_localized_tabs(["Criar vídeo"])[0]
+    tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title == "Criação de Vídeos" else [])
+    tabs = render_localized_tabs(tab_labels)
+    create_tab = tabs[0]
+    draft_tab = tabs[1] if len(tabs) > 1 else None
     with create_tab:
         all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict)]
         active_channels = [c for c in all_channels if c.get("active", True)]
@@ -2035,7 +2226,9 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             st.info("Escolha a variante e clique em **Gerar imagem da thumbnail com Nano Banana**. A API key é configurada em Configuração API > API Keys.")
                     st.session_state[f"{prefix}_creative_payload"] = payload
 
+            st.session_state[f"{prefix}_generation_settings"] = dict(generation_settings)
             with st.form(f"{prefix}_form"):
+
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
                 language = generation_settings["script_language"]
                 fmt = generation_settings["video_format"]
@@ -2115,6 +2308,10 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.")
 
+    if draft_tab is not None:
+        with draft_tab:
+            render_video_from_draft()
+
 
 def render_music_creation():
     """Expose the complete video-creation UI under the music-oriented navigation entry without changing the original page."""
@@ -2189,6 +2386,7 @@ def render_scripts():
         )
         language = script_settings["script_language"]
         structure_notes = script_settings["script_structure_notes"]
+        st.session_state["pipeline_scripts_generation_settings"] = dict(script_settings)
         title = str(script_settings.get("video_subject") or "").strip()
         brief = str(script_settings.get("video_script") or "").strip() or title
         generate_col, clear_col = st.columns([1.4, 1])
