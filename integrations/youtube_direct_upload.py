@@ -155,8 +155,12 @@ class YouTubeDirectUploader:
             "initialMetadata": {
                 "title": {"newTitle": title},
                 "description": {"newDescription": description},
-                "privacy": {"newPrivacy": visibility},
+                "privacy": {"newPrivacy": visibility or "unlisted"},
                 "draftState": {"isDraft": False},
+                "allowEmbedding": {"newAllowEmbedding": True},
+                "allowAudioRemixing": {"newAllowAudioRemixing": True},
+                "allowVideoRemixing": {"newAllowVideoRemixing": True},
+                "notifySubscribers": {"newNotifySubscribers": True},
                 "targetedAudience": {"operation": "MDE_TARGETED_AUDIENCE_UPDATE_OPERATION_SET", "newTargetedAudience": "MDE_TARGETED_AUDIENCE_TYPE_ALL"},
             },
             "botguardClientResponse": f"${hashlib.sha1(os.urandom(16)).hexdigest()}",
@@ -192,7 +196,7 @@ class YouTubeDirectUploader:
                 response.raise_for_status()
                 offset += len(chunk)
 
-    def upload(self, video_path: str | Path, *, title: str, description: str = "", visibility: str = "private", chunk_size: int | None = None) -> DirectUploadResult:
+    def upload(self, video_path: str | Path, *, title: str, description: str = "", visibility: str = "unlisted", chunk_size: int | None = None) -> DirectUploadResult:
         path = Path(video_path)
         validation_error = validate_direct_upload(path, self.channel, self.settings, self.account, self.storage_root)
         if validation_error:

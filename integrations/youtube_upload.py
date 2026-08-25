@@ -58,13 +58,19 @@ def build_agent_video_metadata(
     tags: list[str] | None = None,
     category_id: str = "22",
     language: str = "pt-BR",
-    privacy_status: str = "private",
+    privacy_status: str = "unlisted",
     publish_at: str | None = None,
+    embeddable: bool = True,
+    notify_subscribers: bool = True,
+    allow_audio_remixing: bool = True,
+    allow_video_remixing: bool = True,
 ) -> dict[str, Any]:
     """Build the snippet/status payload used by PublishingSchedulingAgent."""
     status: dict[str, Any] = {
-        "privacyStatus": privacy_status or "private",
+        "privacyStatus": privacy_status or "unlisted",
         "selfDeclaredMadeForKids": False,
+        "embeddable": bool(embeddable),
+        "publicStatsViewable": True,
     }
     if publish_at and status["privacyStatus"] == "private":
         # YouTube requires a future publishAt with privacyStatus=private.
@@ -235,13 +241,17 @@ class _GoogleYouTubeBase:
                 language=language,
                 privacy_status=privacy_status,
                 publish_at=publish_at,
+                embeddable=True,
+                notify_subscribers=True,
+                allow_audio_remixing=True,
+                allow_video_remixing=True,
             )
             try:
                 from googleapiclient.http import MediaFileUpload
             except ImportError as exc:
                 raise RuntimeError("A biblioteca de upload Google ainda não está instalada.") from exc
             media = MediaFileUpload(str(path), mimetype="video/mp4", chunksize=8 * 1024 * 1024, resumable=True)
-            request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+            request = youtube.videos().insert(part="snippet,status", body=body, media_body=media, notifySubscribers=True)
             response = None
             while response is None:
                 _, response = request.next_chunk()
@@ -318,7 +328,7 @@ def upload_youtube_with_fallback(
     tags: list[str] | None = None,
     category_id: str = "22",
     language: str = "pt-BR",
-    privacy_status: str = "private",
+    privacy_status: str = "unlisted",
     publish_at: str | None = None,
     thumbnail_path: str | None = None,
     captions_path: str | None = None,

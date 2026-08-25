@@ -84,7 +84,7 @@ def upload_with_default_route(
     tags: list[str] | None = None,
     category_id: str = "22",
     language: str = "pt-BR",
-    privacy_status: str = "private",
+    privacy_status: str = "unlisted",
     thumbnail_path: str = "",
     captions_path: str = "",
     official_uploader: Callable[..., IntegrationResult] | None = None,
