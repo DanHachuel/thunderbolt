@@ -180,6 +180,73 @@ for _language_code, _navigation_values in UI_NAV_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_navigation_values)
 
 
+VIDEO_GENERATION_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Gerar tópico, roteiro e palavras-chave com IA",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "A gerar tópico, roteiro e palavras-chave com IA…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Tema, roteiro e palavras-chave gerados com IA.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.",
+    },
+    "en": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Generate topic, script and keywords with AI",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Generating topic, script and keywords with AI…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Topic, script and keywords generated with AI.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Fill in Video Subject or use the automatic generation button below the keywords.",
+    },
+    "zh": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "使用 AI 生成主题、脚本和关键词",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "正在使用 AI 生成主题、脚本和关键词…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "已使用 AI 生成主题、脚本和关键词。",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "请填写 Video Subject，或使用关键词下方的自动生成按钮。",
+    },
+    "de": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Thema, Skript und Keywords mit KI generieren",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Thema, Skript und Keywords werden mit KI generiert…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Thema, Skript und Keywords wurden mit KI generiert.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Füllen Sie Video Subject aus oder verwenden Sie die automatische Schaltfläche unter den Keywords.",
+    },
+    "vi": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Tạo chủ đề, kịch bản và từ khóa bằng AI",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Đang tạo chủ đề, kịch bản và từ khóa bằng AI…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Đã tạo chủ đề, kịch bản và từ khóa bằng AI.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Hãy điền Video Subject hoặc dùng nút tạo tự động bên dưới từ khóa.",
+    },
+    "tr": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Yapay zekâ ile konu, senaryo ve anahtar kelimeler oluştur",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Konu, senaryo ve anahtar kelimeler yapay zekâ ile oluşturuluyor…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Konu, senaryo ve anahtar kelimeler yapay zekâ ile oluşturuldu.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Video Subject alanını doldurun veya anahtar kelimelerin altındaki otomatik oluşturma düğmesini kullanın.",
+    },
+    "ru": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Создать тему, сценарий и ключевые слова с помощью ИИ",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Создание темы, сценария и ключевых слов с помощью ИИ…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Тема, сценарий и ключевые слова созданы с помощью ИИ.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Заполните Video Subject или используйте кнопку автоматической генерации под ключевыми словами.",
+    },
+    "es": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Generar tema, guion y palabras clave con IA",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Generando tema, guion y palabras clave con IA…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Tema, guion y palabras clave generados con IA.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Completa Video Subject o utiliza el botón de generación automática debajo de las palabras clave.",
+    },
+    "id": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Buat topik, skrip, dan kata kunci dengan AI",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Membuat topik, skrip, dan kata kunci dengan AI…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Topik, skrip, dan kata kunci dibuat dengan AI.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Isi Video Subject atau gunakan tombol pembuatan otomatis di bawah kata kunci.",
+    },
+    "it": {
+        "Gerar tópico, roteiro e palavras-chave com IA": "Genera argomento, copione e parole chiave con l'IA",
+        "A gerar tópico, roteiro e palavras-chave com IA…": "Generazione di argomento, copione e parole chiave con l'IA…",
+        "Tema, roteiro e palavras-chave gerados com IA.": "Argomento, copione e parole chiave generati con l'IA.",
+        "Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.": "Compila Video Subject oppure usa il pulsante di generazione automatica sotto le parole chiave.",
+    },
+}
+
+for _language_code, _video_generation_translation in VIDEO_GENERATION_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_video_generation_translation)
+
+
 _TAB_LABELS = (
     "Blueprints", "Brandings", "Pesquisa pública", "Cadastro manual", "Contas cadastradas", "Biblioteca",
     "Importar do YouTube", "Canais em lote gmail", "Criar vídeo", "Vídeos", "Novo roteiro/letra", "Histórico guardado",
