@@ -22,7 +22,7 @@ except (OSError, json.JSONDecodeError):
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.automation_worker import load_worker_status
-from hermes_ui.storage import BLUEPRINTS, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
+from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -3566,8 +3566,9 @@ def render_settings():
                         gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
 
                 with st.expander("LLM — providers e modelos", expanded=True):
-                    provider_options = ["moonshot", "shengsuanyun", "openai", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
-                    llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(settings.get("llm_provider", "moonshot")) if settings.get("llm_provider", "moonshot") in provider_options else 0)
+                    provider_options = ["openai", "moonshot", "shengsuanyun", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
+                    current_llm_provider = str(settings.get("llm_provider") or DEFAULT_LLM_PROVIDER).strip().lower()
+                    llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(current_llm_provider) if current_llm_provider in provider_options else 0)
                     st.markdown("**OpenAI/ NVIDIA NIM — API key, Base URL e modelo**")
                     st.caption("O provider interno continua a ser `openai`, mas pode usar qualquer endpoint OpenAI-compatible. Para NVIDIA NIM, a Base URL predefinida é `https://integrate.api.nvidia.com/v1`; o selector consulta `/models` e deixa um campo manual como fallback.")
                     openai_cols = st.columns(3)
