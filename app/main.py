@@ -3931,148 +3931,146 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, voice_test_tab = render_localized_tabs(["API Keys", "Teste de vozes"])
+    api_keys_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Fontes de Materiais", "Teste de Voz"])
 
     with api_keys_tab:
-        api_service_tab, material_sources_tab = render_localized_tabs(["Serviços e modelos", "Fontes de materiais"])
-        with api_service_tab:
-            with st.container(border=True):
-                st.subheader("API Keys")
-                port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
-                moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-                with st.form("settings_form"):
-                    with st.expander("Niche Finder — Kaggle", expanded=False):
-                        st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
-                        kaggle_cols = st.columns(3)
-                        with kaggle_cols[0]:
-                            kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
-                        with kaggle_cols[1]:
-                            kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
-                        with kaggle_cols[2]:
-                            kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
-                        _render_credential_status(kaggle_api_key)
+        with st.container(border=True):
+            st.subheader("API Keys")
+            moneyprinter_path = str(settings.get("moneyprinter_path") or "").strip()
+            st.caption(f"Pasta do motor de vídeo: `{moneyprinter_path or 'não configurada'}`")
+            with st.form("settings_form"):
+                with st.expander("Niche Finder — Kaggle", expanded=False):
+                    st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
+                    kaggle_cols = st.columns(3)
+                    with kaggle_cols[0]:
+                        kaggle_username = text_setting("Kaggle Username", "kaggle_username", help_text="Nome de utilizador da sua conta Kaggle, sem @ e sem URL.")
+                    with kaggle_cols[1]:
+                        kaggle_api_key = text_setting("Kaggle API Key", "kaggle_api_key", secret=True, help_text="Chave criada em Kaggle > Settings > API. Nunca é incluída no notebook ou no GitHub.")
+                    with kaggle_cols[2]:
+                        kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
+                    _render_credential_status(kaggle_api_key)
 
-                    with st.expander("Niche Finder — Apify", expanded=False):
-                        st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
-                        apify_cols = st.columns(4)
-                        with apify_cols[0]:
-                            apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
-                        with apify_cols[1]:
-                            apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
-                        with apify_cols[2]:
-                            apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
-                        with apify_cols[3]:
-                            apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
-                        _render_credential_status(apify_api_token)
+                with st.expander("Niche Finder — Apify", expanded=False):
+                    st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
+                    apify_cols = st.columns(4)
+                    with apify_cols[0]:
+                        apify_api_token = text_setting("Apify API Token", "apify_api_token", secret=True, help_text="Token pessoal da Apify. Não é incluído no workflow, logs ou GitHub.")
+                    with apify_cols[1]:
+                        apify_actor_id = text_setting("Apify Actor ID", "apify_actor_id", help_text="Por padrão: streamers~youtube-scraper.")
+                    with apify_cols[2]:
+                        apify_poll_interval = st.number_input("Intervalo de consulta (s)", min_value=1, max_value=120, value=int(settings.get("apify_poll_interval_seconds", 10)), step=1)
+                    with apify_cols[3]:
+                        apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
+                    _render_credential_status(apify_api_token)
 
-                    render_llm_provider_cards(settings, embedded=True)
+                render_llm_provider_cards(settings, embedded=True)
 
-                    with st.expander("Nano Banana — geração de thumbnails", expanded=False):
-                        st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
-                        nano_cols = st.columns(2)
-                        with nano_cols[0]:
-                            gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
-                            gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
-                        with nano_cols[1]:
-                            gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
-                            gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
-                        _render_credential_status(gemini_image_api_key)
+                with st.expander("Nano Banana — geração de thumbnails", expanded=False):
+                    st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
+                    nano_cols = st.columns(2)
+                    with nano_cols[0]:
+                        gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
+                        gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
+                    with nano_cols[1]:
+                        gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
+                        gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
+                    _render_credential_status(gemini_image_api_key)
 
 
-                    with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
-                        cols = st.columns(2)
-                        with cols[0]:
-                            azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
-                            _render_credential_status(azure_speech_key)
-                            azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
-                            siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
-                            _render_credential_status(siliconflow_tts_api_key)
-                            minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
-                            _render_credential_status(minimax_tts_api_key)
-                            minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
-                            minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
-                            minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
-                        with cols[1]:
-                            elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
-                            _render_credential_status(elevenlabs_api_key)
-                            elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
-                            chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
-                            chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
-                            _render_credential_status(chatterbox_api_key, local=True, required=False)
-                            chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
-                            sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
-                            _render_credential_status(sonilo_api_key)
-                            sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
-                            st.markdown("**Suno — agente musical opcional**")
-                            suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
-                            _render_credential_status(suno_api_key)
-                            suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
-                            suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
+                with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
+                    cols = st.columns(2)
+                    with cols[0]:
+                        azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
+                        _render_credential_status(azure_speech_key)
+                        azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
+                        siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                        _render_credential_status(siliconflow_tts_api_key)
+                        minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                        _render_credential_status(minimax_tts_api_key)
+                        minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
+                        minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
+                        minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
+                    with cols[1]:
+                        elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                        _render_credential_status(elevenlabs_api_key)
+                        elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
+                        chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
+                        chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                        _render_credential_status(chatterbox_api_key, local=True, required=False)
+                        chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
+                        sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                        _render_credential_status(sonilo_api_key)
+                        sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+                        st.markdown("**Suno — agente musical opcional**")
+                        suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                        _render_credential_status(suno_api_key)
+                        suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
+                        suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
-                    with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
-                        st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
-                        tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
-                        _render_credential_status(tiktok_client_key)
-                        tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
+                with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
+                    st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
+                    tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
+                    _render_credential_status(tiktok_client_key)
+                    tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
 
-                    with st.expander("Publicação através do Upload-Post", expanded=False):
-                        upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
-                        upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
-                        _render_credential_status(upload_post_api_key)
-                        upload_post_username = text_setting("Upload-Post username", "upload_post_username")
-                        upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
-                        upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+                with st.expander("Publicação através do Upload-Post", expanded=False):
+                    upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
+                    upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
+                    _render_credential_status(upload_post_api_key)
+                    upload_post_username = text_setting("Upload-Post username", "upload_post_username")
+                    upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
+                    upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
 
-                    with st.expander("Postiz — API key, integração e MCP", expanded=False):
-                        st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
-                        postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
-                        postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
-                        postiz_cols = st.columns(2)
-                        with postiz_cols[0]:
-                            postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
-                            _render_credential_status(postiz_api_key)
-                            postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
-                            postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
-                        with postiz_cols[1]:
-                            postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
-                            postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
-                        st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
+                with st.expander("Postiz — API key, integração e MCP", expanded=False):
+                    st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
+                    postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
+                    postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
+                    postiz_cols = st.columns(2)
+                    with postiz_cols[0]:
+                        postiz_api_key = text_setting("Postiz API key", "postiz_api_key", secret=True, help_text="API key criada nas definições do Postiz. A API HTTP usa o valor bruto no cabeçalho Authorization.")
+                        _render_credential_status(postiz_api_key)
+                        postiz_base_url = text_setting("Postiz Public API Base URL", "postiz_base_url", help_text="Cloud: https://api.postiz.com/public/v1 · Self-hosted: https://seu-servidor/api/public/v1")
+                        postiz_integration_id = text_setting("Postiz integração padrão", "postiz_integration_id", help_text="ID do canal/integração devolvido por GET /integrations.")
+                    with postiz_cols[1]:
+                        postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
+                        postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
+                    st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
 
-                    save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
-                    if save_all_settings:
-                        settings.update({
-                            "port": port, "moneyprinter_path": moneyprinter_path,
-                            "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
-                            "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                            "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
-                            "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
-                            "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
-                            "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
-                            "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
-                            "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
-                            "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint,
-                            "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
-                            "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
-                            "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
-                            "upload_post_auto_upload": upload_post_auto_upload,
-                            "postiz_enabled": postiz_enabled, "postiz_api_key": postiz_api_key, "postiz_base_url": postiz_base_url.strip() or "https://api.postiz.com/public/v1",
-                            "postiz_mcp_url": postiz_mcp_url.strip() or "https://api.postiz.com/mcp", "postiz_mode": postiz_mode,
-                            "postiz_integration_id": postiz_integration_id.strip(), "postiz_auto_publish": bool(postiz_auto_publish),
-                        })
-                        write_json("settings.json", settings)
-                        try:
-                            synced = sync_moneyprinter_config(settings, moneyprinter_path)
-                            if synced:
-                                st.success(f"Configurações guardadas e sincronizadas com {synced}")
-                            else:
-                                st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
-                        except Exception as exc:
-                            st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+                save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
+                if save_all_settings:
+                    settings.update({
+                        "moneyprinter_path": moneyprinter_path,
+                        "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
+                        "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
+                        "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
+                        "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
+                        "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
+                        "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
+                        "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
+                        "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
+                        "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint,
+                        "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
+                        "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
+                        "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
+                        "upload_post_auto_upload": upload_post_auto_upload,
+                        "postiz_enabled": postiz_enabled, "postiz_api_key": postiz_api_key, "postiz_base_url": postiz_base_url.strip() or "https://api.postiz.com/public/v1",
+                        "postiz_mcp_url": postiz_mcp_url.strip() or "https://api.postiz.com/mcp", "postiz_mode": postiz_mode,
+                        "postiz_integration_id": postiz_integration_id.strip(), "postiz_auto_publish": bool(postiz_auto_publish),
+                    })
+                    write_json("settings.json", settings)
+                    try:
+                        synced = sync_moneyprinter_config(settings, moneyprinter_path)
+                        if synced:
+                            st.success(f"Configurações guardadas e sincronizadas com {synced}")
+                        else:
+                            st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
+                    except Exception as exc:
+                        st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
         with material_sources_tab:
             render_material_source_api_keys(settings)
 
     with voice_test_tab:
-        st.subheader("Teste de vozes")
+        st.subheader("Teste de Voz")
         st.caption("Este painel é exclusivamente um preview. O áudio gerado não altera vídeos, tarefas, Blueprints ou a configuração da pipeline.")
         preview_cols = st.columns([1.1, 2.2, 1.2])
         with preview_cols[0]:
