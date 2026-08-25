@@ -34,7 +34,7 @@ from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEd
 from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
-from hermes_ui.material_sources import material_api_keys, material_source_catalog, selected_material_source, update_material_api_keys
+from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
@@ -3663,51 +3663,86 @@ def render_google_accounts():
         st.success("Configuração global do YouTube guardada em Contas Google.")
         st.rerun()
 
-def render_material_source_api_keys(settings: dict[str, Any]) -> None:
-    st.subheader("Fontes de materiais")
-    st.caption("Seleccione a fonte que será usada na pipeline e guarde uma ou mais API keys. Qualidade, endpoints e parâmetros internos são definidos pelo Thunderbolt.")
-    source_catalog = material_source_catalog()
-    source_codes = [item["code"] for item in source_catalog] + ["local"]
-    source_labels = {item["code"]: item["label"] for item in source_catalog} | {"local": "Ficheiros locais"}
-    source_help = {item["code"]: item["description"] for item in source_catalog} | {"local": "Usar materiais já existentes no storage local; não requer API key."}
-    selected_source = st.selectbox(
-        "Fonte de materiais",
-        source_codes,
-        index=source_codes.index(selected_material_source(settings)) if selected_material_source(settings) in source_codes else 0,
-        format_func=lambda value: source_labels.get(value, value),
-        key="material_source_selector",
-    )
-    st.caption(source_help.get(selected_source, ""))
-    current_keys = material_api_keys(settings, selected_source)
-    row_key = f"material_source_key_rows_{selected_source}"
-    row_count = max(len(current_keys), int(st.session_state.get(row_key, len(current_keys) or 1)))
-    if selected_source == "local":
-        _render_credential_status("", local=True, required=False)
-        st.info("A fonte local não usa API key. Os materiais devem existir na pasta configurada do storage.")
-        if st.button("Guardar fonte local", type="primary", key="save_local_material_source"):
-            settings["video_source"] = selected_source
-            write_json("settings.json", settings)
-            st.success("Fonte de materiais guardada: ficheiros locais.")
+def _persist_material_source_cards(settings: dict[str, Any], cards: list[dict[str, Any]], active_card_id: str = "") -> dict[str, Any]:
+    updated = apply_material_source_cards_to_settings(settings, cards, active_card_id)
+    write_json("settings.json", updated)
+    return updated
+
+
+def _material_source_card_definition(provider: str) -> dict[str, str]:
+    definition = material_source_definition(provider)
+    if definition is not None:
+        return definition
+    return {
+        "code": "local",
+        "label": "Ficheiros locais",
+        "description": "Usar materiais já existentes no storage local; não requer API key.",
+        "legacy_key": "",
+    }
+
+
+def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int) -> None:
+    card = normalize_material_card(cards[index], index)
+    cards[index] = card
+    card_id = str(card["id"])
+    provider = str(card.get("provider") or "pexels")
+    definition = _material_source_card_definition(provider)
+    is_local = provider == "local"
+    active_card_id = str(settings.get("material_active_card_id") or "")
+    with st.container(border=True):
+        header_cols = st.columns([3.2, 1.2])
+        with header_cols[0]:
+            st.subheader(definition["label"])
+            st.caption(definition["description"])
+        with header_cols[1]:
+            _render_credential_status("" if is_local else card.get("api_key"), local=is_local, required=not is_local)
+        with st.form(f"material_source_card_form_{card_id}"):
+            content_cols = st.columns(2)
+            with content_cols[0]:
+                if is_local:
+                    st.caption("Esta fonte não usa API key.")
+                    api_key = ""
+                else:
+                    api_key = st.text_input("API Key", value=str(card.get("api_key") or ""), type="password", key=f"material_card_{card_id}_api_key")
+            with content_cols[1]:
+                enabled = st.checkbox("Fonte activa", value=bool(card.get("enabled", True)), key=f"material_card_{card_id}_enabled")
+                selected = st.checkbox(
+                    "Usar esta fonte na pipeline",
+                    value=active_card_id == card_id,
+                    key=f"material_card_{card_id}_selected",
+                )
+            save_card = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"material_card_{card_id}_save")
+        if save_card:
+            cards[index] = {**card, "api_key": str(api_key or "").strip(), "enabled": bool(enabled)}
+            selected_id = card_id if selected and enabled else active_card_id
+            _persist_material_source_cards(settings, cards, selected_id)
+            st.success(f"Fonte {definition['label']} guardada.")
             st.rerun()
-        return
-    _render_credential_status(any(str(item or "").strip() for item in current_keys))
-    with st.form(f"material_api_keys_form_{selected_source}"):
-        key_values: list[str] = []
-        for index in range(row_count):
-            key_values.append(st.text_input(f"API Key {index + 1}", value=current_keys[index] if index < len(current_keys) else "", type="password", key=f"material_api_key_{selected_source}_{index}"))
-        save_keys = st.form_submit_button("Guardar fonte e chaves", type="primary", use_container_width=True)
-        add_key = st.form_submit_button("Adicionar outra chave", use_container_width=True)
-    if add_key:
-        st.session_state[row_key] = row_count + 1
-        st.rerun()
-    if save_keys:
-        update_material_api_keys(settings, selected_source, key_values)
-        settings["video_source"] = selected_source
+
+
+def render_material_source_api_keys(settings: dict[str, Any]) -> None:
+    st.subheader("Fontes de Materiais")
+    st.caption("Configure cada provedor num cartão independente. Pode repetir o mesmo provedor para guardar várias API keys; a fonte seleccionada será usada pela pipeline.")
+    migrated, changed = ensure_material_source_cards(settings)
+    cards = [dict(item) for item in migrated.get("material_source_cards", [])]
+    if changed:
         write_json("settings.json", settings)
-        st.session_state[row_key] = max(1, len(material_api_keys(settings, selected_source)))
-        st.success(f"Fonte {source_labels.get(selected_source, selected_source)} guardada com {len(material_api_keys(settings, selected_source))} chave(s).")
+    for index in range(len(cards)):
+        _render_material_source_card(settings, cards, index)
+
+    st.divider()
+    st.markdown("**Adicionar fonte de materiais**")
+    provider_codes = [item["code"] for item in material_source_catalog()] + ["local"]
+    provider_to_add = st.selectbox(
+        "Provedor de materiais",
+        provider_codes,
+        format_func=lambda value: _material_source_card_definition(value)["label"],
+        key="material_new_provider_choice",
+    )
+    if st.button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card"):
+        cards.append(new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
+        _persist_material_source_cards(settings, cards, str(settings.get("material_active_card_id") or ""))
         st.rerun()
-    st.caption(f"{len(current_keys)} chave(s) actualmente guardada(s) para {source_labels.get(selected_source, selected_source)}. As chaves são mantidas no storage local e usadas com rotação interna.")
 
 
 def _api_status_badge(label: str, kind: str = "missing") -> None:
@@ -3927,7 +3962,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Fontes de Materiais", "Teste de Voz"])
+    api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -4062,8 +4097,11 @@ def render_settings():
                             st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
                     except Exception as exc:
                         st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
-        with material_sources_tab:
-            render_material_source_api_keys(settings)
+    with google_accounts_tab:
+        render_google_accounts()
+
+    with material_sources_tab:
+        render_material_source_api_keys(settings)
 
     with voice_test_tab:
         st.subheader("Teste de Voz")
@@ -4527,7 +4565,6 @@ def main():
     ]
     settings_items = [
         ("MCP", ":material/hub:", "MCP"),
-        ("Contas Google", ":material/account_circle:", "Contas Google"),
         ("Notificações", ":material/notifications:", "Notificações"),
         ("Configuração API", ":material/settings:", "Configuração API"),
     ]
@@ -4585,7 +4622,8 @@ def main():
         "Blueprints": "Blueprints Youtube",
         "Configurações Técnicas": "Configuração API",
         "Models AI": "AI Influencers",
-        "Contas Google/YouTube — canais em lote": "Contas Google",
+        "Contas Google/YouTube — canais em lote": "Configuração API",
+        "Contas Google": "Configuração API",
     }
     all_children = [item for items in groups.values() for item in items]
     valid_targets = {item[0] for item in top_pages + all_children}
