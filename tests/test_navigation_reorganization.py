@@ -61,7 +61,8 @@ class NavigationReorganizationTests(unittest.TestCase):
             self.assertIn(f'"{label}"', MAIN_SOURCE)
 
     def test_video_backlog_is_not_nested_inside_video_creation(self):
-        self.assertIn('create_tab = render_localized_tabs(["Criar vídeo"])[0]', MAIN_SOURCE)
+        self.assertIn('tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title == "Criação de Vídeos" else [])', MAIN_SOURCE)
+        self.assertIn('draft_tab = tabs[1] if len(tabs) > 1 else None', MAIN_SOURCE)
         self.assertNotIn("with videos_tab:", MAIN_SOURCE)
         self.assertIn('"Backlog Vídeos": render_videos', MAIN_SOURCE)
 
