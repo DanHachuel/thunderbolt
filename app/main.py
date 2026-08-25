@@ -43,7 +43,7 @@ from hermes_ui.script_documents import list_script_documents, read_script_docume
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
@@ -492,6 +492,93 @@ def generate_topic_for_ui(settings: dict[str, Any], channel: dict, user_context:
     return generate_topic_for_channel(settings, channel, blueprint_for_channel(channel), user_context=user_context)
 
 
+def generate_video_content_for_ui(
+    settings: dict[str, Any],
+    channel: dict,
+    subject: str,
+    language: str,
+    generation_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generate the subject, script and English keywords in one MoneyPrinter-style action."""
+    subject = str(subject or "").strip()
+    topic_result: dict[str, Any] | None = None
+    if not subject:
+        topic_result = generate_topic_for_ui(settings, channel)
+        subject = str(topic_result.get("topic") or "").strip()
+    if not subject:
+        raise CreativeGenerationError("A IA não devolveu um Video Subject válido.")
+
+    blueprint = blueprint_for_channel(channel)
+    script_result = generate_script_document(
+        settings,
+        document_type="Roteiro de vídeo",
+        title=subject,
+        brief=subject,
+        language=str(language or channel.get("language") or "Português"),
+        channel=channel,
+        blueprint=blueprint,
+        structure_notes=str((generation_settings or {}).get("script_structure_notes") or ""),
+        generation_settings=generation_settings or {},
+    )
+    script = str(script_result.get("content") or "").strip()
+    keywords = generate_video_keywords(
+        settings,
+        channel,
+        subject,
+        script,
+        blueprint,
+        language=str(language or channel.get("language") or "Português"),
+    )
+    return {
+        "topic": subject,
+        "topic_result": topic_result,
+        "script_result": script_result,
+        "script": script,
+        "keywords": keywords,
+        "topic_source": "llm" if topic_result else "manual",
+    }
+
+
+def _generate_video_content_callback(prefix: str, channel: dict, fallback_language: str) -> None:
+    """Streamlit callback for the single button below Subject, Script and Keywords."""
+    settings = read_json("settings.json", {})
+    generation_settings = {
+        "video_subject": str(st.session_state.get(f"{prefix}_video_subject") or "").strip(),
+        "script_language": str(st.session_state.get(f"{prefix}_script_language") or fallback_language or "pt"),
+        "script_structure_notes": str(st.session_state.get(f"{prefix}_script_structure_notes") or "").strip(),
+        "generate_script_with_ai": True,
+    }
+    try:
+        result = generate_video_content_for_ui(
+            settings,
+            channel,
+            generation_settings["video_subject"],
+            generation_settings["script_language"],
+            generation_settings=generation_settings,
+        )
+        st.session_state[f"{prefix}_video_subject"] = result["topic"]
+        st.session_state[f"{prefix}_video_script"] = result["script"]
+        st.session_state[f"{prefix}_video_keywords"] = ", ".join(result["keywords"])
+        st.session_state["new_video_topic"] = result["topic"]
+        st.session_state["new_video_topic_meta"] = result.get("topic_result") or {
+            "topic": result["topic"],
+            "topic_source": result.get("topic_source", "manual"),
+        }
+        # A subject change invalidates a previously generated title/thumbnail package.
+        st.session_state.pop("new_video_creative_payload", None)
+        st.session_state[f"{prefix}_generate_content_notice"] = "Tema, roteiro e palavras-chave gerados com IA."
+        st.session_state.pop(f"{prefix}_generate_content_error", None)
+    except CreativeGenerationError as exc:
+        st.session_state[f"{prefix}_generate_content_error"] = str(exc)
+        st.session_state.pop(f"{prefix}_generate_content_notice", None)
+
+
+def _video_topic_source(subject: str) -> str:
+    meta = st.session_state.get("new_video_topic_meta") or {}
+    generated_topic = str(meta.get("topic") or "").strip() if isinstance(meta, dict) else ""
+    return "llm" if generated_topic and generated_topic == str(subject or "").strip() and meta.get("topic_source") == "llm" else "manual"
+
+
 def generate_creative_for_ui(settings: dict[str, Any], channel: dict, topic: str, topic_source: str = "manual") -> dict[str, Any]:
     creative = generate_creative_package(
         settings,
@@ -530,7 +617,13 @@ def voice_catalog(current: str = "") -> list[str]:
     return voices
 
 
-def render_video_generation_settings(prefix: str, *, current_language: str = "") -> dict[str, Any]:
+def render_video_generation_settings(
+    prefix: str,
+    *,
+    current_language: str = "",
+    channel: dict[str, Any] | None = None,
+    generate_content_callback: Any | None = None,
+) -> dict[str, Any]:
     """Render the shared MoneyPrinter-style settings and return a serializable payload."""
     settings: dict[str, Any] = {}
     st.markdown("### Video Subject Settings")
@@ -572,6 +665,19 @@ def render_video_generation_settings(prefix: str, *, current_language: str = "")
         key=f"{prefix}_video_keywords",
         height=90,
     )
+    if generate_content_callback is not None:
+        st.button(
+            "Gerar tópico, roteiro e palavras-chave com IA",
+            key=f"{prefix}_generate_video_content",
+            use_container_width=True,
+            type="secondary",
+            icon=":material/auto_awesome:",
+            on_click=generate_content_callback,
+        )
+        if st.session_state.get(f"{prefix}_generate_content_notice"):
+            st.success(st.session_state[f"{prefix}_generate_content_notice"])
+        if st.session_state.get(f"{prefix}_generate_content_error"):
+            st.error(st.session_state[f"{prefix}_generate_content_error"])
 
     st.markdown("### Video Settings")
     video_cols = st.columns(2)
@@ -596,6 +702,13 @@ def render_video_generation_settings(prefix: str, *, current_language: str = "")
     with audio_cols[0]:
         settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
         settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
+        if channel is not None:
+            channel_id = str(channel.get("id") or channel.get("name") or "")
+            channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()
+            channel_state_key = f"{prefix}_voice_channel_id"
+            if st.session_state.get(channel_state_key) != channel_id:
+                st.session_state[f"{prefix}_voice"] = channel_voice
+                st.session_state[channel_state_key] = channel_id
         current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
         voice_options = voice_catalog(current_voice)
         settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
@@ -1611,32 +1724,13 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     generation_settings = render_video_generation_settings(
                         "new_video",
                         current_language=str(st.session_state.get("video_language") or ""),
+                        channel=selected_one,
+                        generate_content_callback=lambda: _generate_video_content_callback(
+                            "new_video",
+                            selected_one,
+                            str(st.session_state.get("video_language") or "pt"),
+                        ),
                     )
-                topic = st.text_area(
-                    "Tópico ou briefing",
-                    value=st.session_state.get("new_video_topic", ""),
-                    key="new_video_topic",
-                    placeholder="Escreva um briefing ou gere-o com IA; não é obrigatório escrever manualmente.",
-                    help="Pode escrever o tema ou usar o botão abaixo para gerar um briefing específico com o Blueprint e o nicho do canal.",
-                )
-                topic_cols = st.columns([1, 1.8])
-                with topic_cols[0]:
-                    if st.button("Gerar tópico/briefing com IA", key="new_video_generate_topic", use_container_width=True):
-                        if selected_one is None:
-                            st.error("Seleccione primeiro um canal.")
-                        else:
-                            try:
-                                result = generate_topic_for_ui(read_json("settings.json", {}), selected_one, topic)
-                                st.session_state["new_video_topic"] = result["topic"]
-                                st.session_state["new_video_topic_meta"] = result
-                                st.success("Briefing gerado; reveja e edite o texto antes de criar as tarefas.")
-                                st.rerun()
-                            except CreativeGenerationError as exc:
-                                st.error(str(exc))
-                with topic_cols[1]:
-                    if st.session_state.get("new_video_topic_meta"):
-                        meta = st.session_state["new_video_topic_meta"]
-                        st.caption(f"Origem: IA · Nicho: {meta.get('niche', '—')} · Ângulo: {meta.get('angle', '—')}")
 
             if not generation_settings:
                 generation_settings = render_video_generation_settings(
@@ -1753,7 +1847,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                                 st.caption("A imagem ainda não foi gerada. Configure a API key em Configuração API > API Keys.")
                         st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
             else:
-                topic_for_creative = str(st.session_state.get("new_video_topic", "") or "").strip()
+                topic_for_creative = str(generation_settings.get("video_subject") or "").strip()
                 if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", use_container_width=True):
                     if selected_one is None:
                         st.error("Seleccione primeiro um canal.")
@@ -1764,7 +1858,13 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                                 topic_for_creative = str(topic_result["topic"]).strip()
                                 st.session_state["new_video_topic"] = topic_for_creative
                                 st.session_state["new_video_topic_meta"] = topic_result
-                            generated = generate_creative_for_ui(read_json("settings.json", {}), selected_one, topic_for_creative, topic_source="llm")
+                            generated = generate_creative_for_ui(
+                                read_json("settings.json", {}),
+                                selected_one,
+                                topic_for_creative,
+                                topic_source=_video_topic_source(topic_for_creative),
+                            )
+
                             st.session_state["new_video_creative_payload"] = generated
                             st.success("Tema, título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
                             st.rerun()
@@ -1866,28 +1966,27 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote geral {batch['id']} criado com {len(tasks)} tarefas independentes, uma por canal.")
                 else:
-                    topic_value = str(st.session_state.get("new_video_topic", "") or "").strip()
+                    topic_value = str(generation_settings.get("video_subject") or "").strip()
                     if not selected:
                         st.error("Seleccione um canal.")
                     else:
                         if not topic_value:
-                            try:
-                                topic_result = generate_topic_for_ui(read_json("settings.json", {}), selected_one or {})
-                                topic_value = str(topic_result["topic"]).strip()
-                                st.session_state["new_video_topic"] = topic_value
-                                st.session_state["new_video_topic_meta"] = topic_result
-                            except CreativeGenerationError as exc:
-                                st.error(f"Não foi possível gerar automaticamente o tema: {exc}")
-                                st.stop()
+                            st.error("Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.")
+                            st.stop()
                         quantity_value = int(quantity if mode == "same_channel" else 1)
                         payload = dict(st.session_state.get("new_video_creative_payload") or {})
                         if not payload.get("title") or not payload.get("thumbnail_variants"):
                             try:
-                                payload = generate_creative_for_ui(read_json("settings.json", {}), selected_one or {}, topic_value, topic_source="llm" if st.session_state.get("new_video_topic_meta") else "manual")
+                                payload = generate_creative_for_ui(
+                                    read_json("settings.json", {}),
+                                    selected_one or {},
+                                    topic_value,
+                                    topic_source=_video_topic_source(topic_value),
+                                )
                             except CreativeGenerationError as exc:
                                 st.warning(f"Título/thumbnail automáticos pendentes: {exc} A tarefa será criada com o tópico como título e sem ficheiro de thumbnail.")
                                 payload = {"topic": topic_value, "title": topic_value, "topic_source": "manual", "thumbnail_status": "pending_provider", "thumbnail_variants": [], "thumbnail_variant": {}, "thumbnail_prompt": "", "thumbnail_text": ""}
-                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or ("llm" if st.session_state.get("new_video_topic_meta") else "manual"), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
+                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or _video_topic_source(topic_value), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
                         batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.")
