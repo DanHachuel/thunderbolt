@@ -1,6 +1,7 @@
 import base64
 import binascii
 import hashlib
+import mimetypes
 import json
 import os
 import tempfile
@@ -72,6 +73,25 @@ def _extract_image_bytes(payload: dict[str, Any]) -> bytes:
     raise ThumbnailGenerationError("O Gemini concluiu a interação, mas não devolveu uma imagem inline.")
 
 
+def _image_input(path: Path) -> dict[str, str]:
+    if not path.is_file():
+        raise ThumbnailGenerationError("A imagem de referência da thumbnail não está disponível no storage.")
+    try:
+        image_data = path.read_bytes()
+    except OSError as exc:
+        raise ThumbnailGenerationError("Não foi possível ler a imagem de referência da thumbnail.") from exc
+    if not image_data:
+        raise ThumbnailGenerationError("A imagem de referência da thumbnail está vazia.")
+    mime_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+    if not mime_type.startswith("image/"):
+        mime_type = "image/jpeg"
+    return {
+        "type": "image",
+        "mime_type": mime_type,
+        "data": base64.b64encode(image_data).decode("ascii"),
+    }
+
+
 def _thumbnail_filename(prompt: str, topic: str, variant_index: int, model: str) -> str:
     source = f"{model}\n{topic.strip()}\n{variant_index}\n{prompt.strip()}".encode("utf-8")
     digest = hashlib.sha256(source).hexdigest()[:20]
@@ -84,6 +104,7 @@ def generate_thumbnail_image(
     *,
     topic: str = "",
     variant_index: int = 0,
+    reference_image: str | Path | None = None,
 ) -> Path:
     api_key = str(settings.get("gemini_image_api_key") or "").strip()
     if not api_key:
@@ -95,9 +116,15 @@ def generate_thumbnail_image(
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
     aspect_ratio = str(settings.get("gemini_image_aspect_ratio") or DEFAULT_ASPECT_RATIO).strip()
     image_size = str(settings.get("gemini_image_size") or DEFAULT_IMAGE_SIZE).strip()
+    request_input: str | list[dict[str, str]] = clean_prompt
+    if reference_image:
+        request_input = [
+            {"type": "text", "text": clean_prompt},
+            _image_input(Path(reference_image)),
+        ]
     body = {
         "model": model,
-        "input": clean_prompt,
+        "input": request_input,
         "response_format": {
             "type": "image",
             "mime_type": DEFAULT_MIME_TYPE,
