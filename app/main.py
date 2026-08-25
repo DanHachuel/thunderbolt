@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import re
 from contextlib import nullcontext
@@ -201,6 +202,30 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
+.tb-channel-kanban-card { box-sizing:border-box; min-height:330px; height:330px; padding:0.85rem 0.9rem; border:1px solid color-mix(in srgb, var(--tb-accent) 42%, currentColor 18%); border-radius:14px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; box-shadow:0 10px 24px color-mix(in srgb, currentColor 12%, transparent); overflow:hidden; }
+.tb-channel-kanban-card__header { display:flex; align-items:center; gap:0.58rem; min-width:0; }
+.tb-channel-kanban-card__avatar { width:46px; height:46px; flex:0 0 46px; border-radius:10px; object-fit:cover; background:color-mix(in srgb, var(--tb-accent) 14%, transparent); }
+.tb-channel-kanban-card__avatar--fallback { display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--tb-accent); }
+.tb-channel-kanban-card__identity { min-width:0; flex:1 1 auto; }
+.tb-channel-kanban-card__name { font-size:1rem; font-weight:750; line-height:1.18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-channel-kanban-card__niche { margin-top:0.22rem; font-size:0.76rem; opacity:.66; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-channel-kanban-card__badges { display:flex; gap:0.28rem; flex:0 0 auto; align-items:center; }
+.tb-channel-kanban-card__badge { padding:0.18rem 0.42rem; border-radius:6px; font-size:0.67rem; font-weight:750; line-height:1.1; white-space:nowrap; }
+.tb-channel-kanban-card__badge--youtube { background:#dc2626; color:#fff; }
+.tb-channel-kanban-card__badge--active { background:color-mix(in srgb, #22c55e 25%, transparent); color:#16a34a; border:1px solid color-mix(in srgb, #22c55e 50%, transparent); }
+.tb-channel-kanban-card__badge--inactive { background:color-mix(in srgb, #ef4444 18%, transparent); color:#dc2626; border:1px solid color-mix(in srgb, #ef4444 45%, transparent); }
+.tb-channel-kanban-card__rule { height:1px; margin:0.72rem 0 0.62rem; background:color-mix(in srgb, currentColor 13%, transparent); }
+.tb-channel-kanban-card__metrics { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0.34rem; }
+.tb-channel-kanban-card__metric { min-width:0; min-height:67px; padding:0.48rem 0.28rem 0.36rem; border-radius:8px; text-align:center; background:color-mix(in srgb, currentColor 4%, transparent); }
+.tb-channel-kanban-card__metric-value { font-size:1.12rem; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-channel-kanban-card__metric-label { margin-top:0.3rem; font-size:0.66rem; opacity:.64; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-channel-kanban-card__status-row { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.34rem; margin-top:0.6rem; }
+.tb-channel-kanban-card__status { min-width:0; padding:0.42rem 0.28rem; border-radius:8px; text-align:center; font-size:0.71rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-channel-kanban-card__status strong { font-size:0.92rem; margin-right:0.18rem; }
+.tb-channel-kanban-card__status--doing { color:#d97706; background:color-mix(in srgb, #f59e0b 14%, transparent); border:1px solid color-mix(in srgb, #f59e0b 35%, transparent); }
+.tb-channel-kanban-card__status--done { color:#16a34a; background:color-mix(in srgb, #22c55e 11%, transparent); border:1px solid color-mix(in srgb, #22c55e 30%, transparent); }
+.tb-channel-kanban-card__titles { margin-top:0.58rem; font-size:0.73rem; opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width: 900px) { .tb-channel-kanban-card { min-height:310px; height:310px; } .tb-channel-kanban-card__name { font-size:.9rem; } }
 .content-card { box-sizing:border-box; padding:1rem 1.1rem; border:1px solid rgba(128,128,128,.28); border-radius:14px; background:rgba(128,128,128,.10); color:inherit; min-height:110px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
 .content-card { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:color-mix(in srgb, currentColor 5%, transparent); box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent); }
 .content-label { color:inherit; opacity:.72; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
@@ -939,7 +964,7 @@ def render_channel_videos(channel: dict) -> None:
     channel_id = str(channel.get("id") or "")
     st.markdown("### Últimos 10 vídeos publicados")
     st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
-    refresh_col, view_col = st.columns([1.4, 1])
+    refresh_col = st.columns(1)[0]
     with refresh_col:
         if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
             result = fetch_channel_videos_public(channel, limit=10)
@@ -950,42 +975,25 @@ def render_channel_videos(channel: dict) -> None:
                 st.rerun()
             else:
                 st.warning(result.message)
-    with view_col:
-        view_mode = st.radio("Vista", ["Lista", "Kanban"], horizontal=True, key=f"channel_videos_view_{channel_id}", label_visibility="collapsed")
     videos = st.session_state.get(f"channel_videos_{channel_id}") or channel_videos_for(channel, limit=10)
     if not videos:
         st.info("Ainda não existem vídeos sincronizados. Clique em **Actualizar últimos 10 vídeos**.")
         return
-    if view_mode == "Lista":
-        for video in videos[:10]:
-            with st.container(border=True):
-                cols = st.columns([0.7, 3.4, 1.4, 1.1])
-                with cols[0]:
-                    if video.get("thumbnail_url"):
-                        st.image(video["thumbnail_url"], width=64)
-                    else:
-                        st.markdown("### YT")
-                with cols[1]:
-                    st.write(f"**{video.get('title', 'Vídeo sem título')}**")
-                    st.caption(f"{video.get('published_at') or 'Sem data'} · {video.get('url') or 'Sem URL'}")
-                with cols[2]:
-                    st.caption(str(video.get("status") or "publicado").title())
-                with cols[3]:
-                    render_channel_video_editor(video, channel_id)
-    else:
-        columns = st.columns(4)
-        groups = [("planejamento", "Planejamento"), ("produção", "Produção"), ("finalizado", "Finalizado"), ("publicado", "Agendado/Publicado")]
-        for column, (status_key, label) in zip(columns, groups):
-            with column:
-                st.markdown(f"**{label}**")
-                group = [video for video in videos[:10] if str(video.get("status") or "publicado").lower() in ({status_key} if status_key != "publicado" else {"publicado", "agendado"})]
-                if not group:
-                    st.caption("Sem vídeos")
-                for video in group:
-                    with st.container(border=True):
-                        st.write(f"**{video.get('title', 'Vídeo sem título')}**")
-                        st.caption(video.get("published_at") or "Sem data")
-                        render_channel_video_editor(video, channel_id)
+    for video in videos[:10]:
+        with st.container(border=True):
+            cols = st.columns([0.7, 3.4, 1.4, 1.1])
+            with cols[0]:
+                if video.get("thumbnail_url"):
+                    st.image(video["thumbnail_url"], width=64)
+                else:
+                    st.markdown("### YT")
+            with cols[1]:
+                st.write(f"**{video.get('title', 'Vídeo sem título')}**")
+                st.caption(f"{video.get('published_at') or 'Sem data'} · {video.get('url') or 'Sem URL'}")
+            with cols[2]:
+                st.caption(str(video.get("status") or "publicado").title())
+            with cols[3]:
+                render_channel_video_editor(video, channel_id)
 
 
 def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], youtube_account_labels: dict[str, str], youtube_accounts_by_id: dict[str, dict[str, Any]]) -> None:
@@ -1424,6 +1432,101 @@ def render_tiktok_prompt_masters():
                     st.error(str(exc))
 
 
+def _format_channel_metric(value: Any) -> str:
+    """Format a channel metric compactly for the Kanban card."""
+    if value is None or value == "":
+        return "—"
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return html.escape(str(value))
+    if abs(number) >= 1_000_000:
+        return f"{number / 1_000_000:.1f}M".replace(".0M", "M")
+    if abs(number) >= 1_000:
+        return f"{number / 1_000:.1f}K".replace(".0K", "K")
+    return f"{number:,}".replace(",", ".")
+
+
+def _channel_pipeline_counts(channel: dict[str, Any]) -> tuple[int, int, int]:
+    """Return in-production, completed and titled task counts for one channel."""
+    channel_id = str(channel.get("id") or "")
+    tasks = read_json("tasks.json", [])
+    if not channel_id or not isinstance(tasks, list):
+        return 0, 0, 0
+    related = [
+        task for task in tasks
+        if isinstance(task, dict) and str(task.get("channel_id") or "") == channel_id
+    ]
+    in_production = sum(1 for task in related if str(task.get("state") or "").lower() == "doing")
+    completed = sum(1 for task in related if str(task.get("state") or "").lower() == "done")
+    titled = sum(1 for task in related if str(task.get("title") or "").strip() or task.get("title_candidates"))
+    return in_production, completed, titled
+
+
+def _render_channel_kanban_card(channel: dict[str, Any]) -> None:
+    """Render one compact, square-style channel card for the global Kanban view."""
+    ui_language = current_ui_language()
+    name = html.escape(str(channel.get("name") or "Sem nome"))
+    niche = html.escape(channel_niche_label(channel))
+    thumbnail_url = str(channel.get("thumbnail_url") or "").strip()
+    if thumbnail_url:
+        avatar = f'<img class="tb-channel-kanban-card__avatar" src="{html.escape(thumbnail_url, quote=True)}" alt="">'
+    else:
+        avatar = '<div class="tb-channel-kanban-card__avatar tb-channel-kanban-card__avatar--fallback">YT</div>'
+    active = bool(channel.get("active", True))
+    active_label = ui_text("Activo" if active else "Inactivo", ui_language)
+    active_class = "active" if active else "inactive"
+    subscribers = _format_channel_metric(channel.get("subscriber_count"))
+    views = _format_channel_metric(channel.get("view_count"))
+    videos = _format_channel_metric(channel.get("video_count"))
+    in_production, completed, titled = _channel_pipeline_counts(channel)
+    youtube_label = ui_text("YouTube", ui_language)
+    subscribers_label = ui_text("Inscritos", ui_language)
+    views_label = ui_text("Visualizações", ui_language)
+    videos_label = ui_text("Vídeos", ui_language)
+    production_label = ui_text("Em produção", ui_language)
+    completed_label = ui_text("Finalizados", ui_language)
+    titles_label = ui_text("Títulos", ui_language)
+    st.markdown(
+        f"""
+        <div class="tb-channel-kanban-card">
+          <div class="tb-channel-kanban-card__header">
+            {avatar}
+            <div class="tb-channel-kanban-card__identity">
+              <div class="tb-channel-kanban-card__name">{name}</div>
+              <div class="tb-channel-kanban-card__niche">{niche}</div>
+            </div>
+            <div class="tb-channel-kanban-card__badges">
+              <span class="tb-channel-kanban-card__badge tb-channel-kanban-card__badge--youtube">{youtube_label}</span>
+              <span class="tb-channel-kanban-card__badge tb-channel-kanban-card__badge--{active_class}">{active_label}</span>
+            </div>
+          </div>
+          <div class="tb-channel-kanban-card__rule"></div>
+          <div class="tb-channel-kanban-card__metrics">
+            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{subscribers}</div><div class="tb-channel-kanban-card__metric-label">{subscribers_label}</div></div>
+            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{views}</div><div class="tb-channel-kanban-card__metric-label">{views_label}</div></div>
+            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{videos}</div><div class="tb-channel-kanban-card__metric-label">{videos_label}</div></div>
+          </div>
+          <div class="tb-channel-kanban-card__status-row">
+            <div class="tb-channel-kanban-card__status tb-channel-kanban-card__status--doing"><strong>{in_production}</strong>{production_label}</div>
+            <div class="tb-channel-kanban-card__status tb-channel-kanban-card__status--done"><strong>{completed}</strong>{completed_label}</div>
+          </div>
+          <div class="tb-channel-kanban-card__titles">▣ <strong>{titled}</strong> {titles_label}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_registered_channels_kanban(channels: list[dict[str, Any]]) -> None:
+    """Render all registered channels in a responsive three-column Kanban grid."""
+    for row_start in range(0, len(channels), 3):
+        channel_columns = st.columns(3)
+        for column, channel in zip(channel_columns, channels[row_start:row_start + 3]):
+            with column:
+                _render_channel_kanban_card(channel)
+
+
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -1439,7 +1542,11 @@ def render_channels():
     with import_tab:
         st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
         source = st.text_input("URL, handle ou ID do canal", placeholder="https://youtube.com/@seucanal", key="youtube_channel_source")
-        lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
+        lookup_cols = st.columns(2)
+        with lookup_cols[0]:
+            lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
+        with lookup_cols[1]:
+            st.radio("Apresentação dos canais", ["Lista", "Kanban"], horizontal=True, key="youtube_channels_view_mode")
         col1, col2 = st.columns([1, 1])
         with col1:
             if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
@@ -1674,6 +1781,9 @@ def render_channels():
     channels = read_json("channels.json", [])
     if not channels:
         st.info("Nenhum canal cadastrado.")
+        return
+    if st.session_state.get("youtube_channels_view_mode", "Lista") == "Kanban":
+        render_registered_channels_kanban(channels)
         return
     for channel in channels:
         channel_id = str(channel["id"])
