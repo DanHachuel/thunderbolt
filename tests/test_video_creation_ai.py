@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hermes_ui.creative_generation import CreativeGenerationError, generate_video_keywords
+from hermes_ui.languages import ui_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,16 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('st.session_state[f"{prefix}_video_script"] = result["script"]', MAIN_SOURCE)
         self.assertIn('st.session_state[f"{prefix}_video_keywords"] = ", ".join(result["keywords"])', MAIN_SOURCE)
         self.assertIn('topic_value = str(generation_settings.get("video_subject") or "").strip()', MAIN_SOURCE)
+        self.assertIn('"Salvar rascunho"', MAIN_SOURCE)
+        self.assertIn('if save_draft_callback is not None:', MAIN_SOURCE)
+        self.assertIn('render_new_video(page_title="Criação de Músicas", prefix="new_music")', MAIN_SOURCE)
+
+    def test_scripts_page_reuses_combined_ai_generation_with_selected_blueprint(self):
+        self.assertIn('"pipeline_scripts",', MAIN_SOURCE)
+        self.assertIn('generate_content_callback=lambda: _generate_video_content_callback(', MAIN_SOURCE)
+        self.assertIn('selected_blueprint,', MAIN_SOURCE)
+        self.assertIn('st.session_state["script_draft_keywords"]', MAIN_SOURCE)
+        self.assertIn('draft_kind": draft_kind', MAIN_SOURCE)
 
     def test_channel_voice_is_synchronised_before_audio_selectbox(self):
         self.assertIn('channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()', MAIN_SOURCE)
@@ -52,6 +63,13 @@ class VideoCreationAITests(unittest.TestCase):
             generate_video_keywords({}, {}, "", "script")
         with self.assertRaises(CreativeGenerationError):
             generate_video_keywords({}, {}, "subject", "")
+
+    def test_new_pipeline_labels_are_translated_for_all_supported_languages(self):
+        languages = ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it")
+        for language in languages:
+            self.assertTrue(ui_text("Thumbnails", language).strip())
+            self.assertTrue(ui_text("Salvar rascunho", language).strip())
+            self.assertTrue(ui_text("Refazer thumbnail", language).strip())
 
     def test_generation_button_is_translated_for_all_supported_languages(self):
         languages = ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it")

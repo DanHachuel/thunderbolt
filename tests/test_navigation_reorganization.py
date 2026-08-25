@@ -51,7 +51,7 @@ class NavigationReorganizationTests(unittest.TestCase):
         required = (
             "Arquivos Base", "Blueprints Youtube", "Prompt Masters",
             "Canais e Perfis de Vídeos", "Canais YouTube", "Contas TikTok", "Facebook Pages",
-            "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Upload",
+            "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
             "AI Influencers", "Personagens", "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Redes Sociais",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
             "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
@@ -64,6 +64,11 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertIn('create_tab = render_localized_tabs(["Criar vídeo"])[0]', MAIN_SOURCE)
         self.assertNotIn("with videos_tab:", MAIN_SOURCE)
         self.assertIn('"Backlog Vídeos": render_videos', MAIN_SOURCE)
+
+    def test_thumbnails_is_immediately_before_upload(self):
+        pipeline_block = MAIN_SOURCE.split("    pipeline_video_items = [", 1)[1].split("    ]", 1)[0]
+        self.assertLess(pipeline_block.index('("Thumbnails"'), pipeline_block.index('("Upload"'))
+        self.assertIn('"Thumbnails": render_thumbnails', MAIN_SOURCE)
 
     def test_batch_success_message_points_to_video_backlog(self):
         self.assertIn("Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.", MAIN_SOURCE)
@@ -86,7 +91,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Facebook Pages", "Prompt Masters", "Backlog Vídeos", "Música", "Upload Música",
             "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Growth",
             "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
-            "Documentação", "Tutorial Kaggle", "Tutorial Apify", "Pipeline Música", "módulos disponíveis",
+            "Documentação", "Tutorial Kaggle", "Tutorial Apify", "Pipeline Música", "Thumbnails", "módulos disponíveis",
         )
         navigation_source = LANGUAGES_SOURCE.split("UI_NAV_TRANSLATIONS", 1)[1]
         for language in languages:
