@@ -46,9 +46,17 @@ from hermes_ui.script_documents import list_script_documents, read_script_docume
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
-from hermes_ui.thumbnails import list_thumbnail_tasks, regenerate_thumbnail
+from hermes_ui.thumbnails import (
+    generate_thumbnail_for_task,
+    list_thumbnail_tasks,
+    regenerate_thumbnail,
+    regenerate_thumbnail_lettering,
+    regenerate_thumbnail_prompt,
+    regenerate_thumbnail_prompt_and_image,
+    upload_thumbnail_image,
+)
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel, generate_video_keywords
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
@@ -3215,9 +3223,31 @@ def render_videos():
                         st.rerun()
 
 
+def _thumbnail_editor_context(record: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Resolve the persisted task channel/Blueprint without requiring either one to remain registered."""
+    channel_id = str(record.get("channel_id") or "").strip()
+    channels = read_json("channels.json", [])
+    channel = next(
+        (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == channel_id),
+        None,
+    ) if isinstance(channels, list) else None
+    if not channel:
+        channel = {
+            "id": channel_id,
+            "name": record.get("channel_name") or "Canal sem nome",
+            "language": record.get("language") or "Português",
+            "default_blueprint_id": record.get("blueprint_id") or "",
+            "blueprint_id": record.get("blueprint_id") or "",
+        }
+    blueprint = blueprint_for_channel(channel)
+    if not blueprint and record.get("blueprint_id"):
+        blueprint = {"id": record.get("blueprint_id"), "name": record.get("blueprint_name") or record.get("blueprint_id")}
+    return channel, blueprint
+
+
 def render_thumbnails():
     st.title("Thumbnails")
-    st.caption("Biblioteca de thumbnails associadas às tarefas da pipeline. A refacção actualiza apenas a imagem da tarefa e preserva o histórico local.")
+    st.caption("Biblioteca de thumbnails associadas às tarefas da pipeline. Cada acção preserva a imagem anterior no histórico local.")
     records = list_thumbnail_tasks()
     if not records:
         st.info("Ainda não existem tarefas com thumbnail gerada ou prompt de imagem disponível.")
@@ -3225,8 +3255,9 @@ def render_thumbnails():
 
     settings = read_json("settings.json", {})
     for record in records:
+        task_id = record["task_id"]
         with st.container(border=True):
-            image_col, details_col, action_col = st.columns([1.35, 2.65, 1.25])
+            image_col, details_col, action_col = st.columns([1.25, 2.35, 1.7])
             with image_col:
                 image_path = record.get("image_path")
                 if image_path and image_path.is_file():
@@ -3236,32 +3267,157 @@ def render_thumbnails():
                     st.caption("Imagem ainda não gerada")
             with details_col:
                 st.write(f"**{record['title']}**")
-                st.caption(f"Canal: {record['channel_name']} · Tarefa: {record['task_id']}")
+                st.caption(f"Canal: {record['channel_name']} · Tarefa: {task_id}")
                 st.caption(f"Estado: {record['status']} · Variante: {record['variant_index'] + 1}")
                 if record["prompt"]:
                     with st.expander("Ver prompt da thumbnail", expanded=False):
                         st.code(record["prompt"], language="text")
                 else:
-                    st.warning("Esta tarefa não tem prompt de imagem. Não é possível refazer a thumbnail.")
+                    st.warning("A thumbnail não tem um prompt de imagem para gerar.")
+
             with action_col:
                 if st.button(
-                    "Refazer thumbnail",
-                    key=f"regenerate_thumbnail_{record['task_id']}",
+                    "Refazer Prompt Thumb",
+                    key=f"regenerate_thumbnail_{task_id}",
                     icon=":material/refresh:",
+                    use_container_width=True,
+                    disabled=not bool(record["title"] or record["topic"]),
+                ):
+                    try:
+                        with st.spinner("A refazer apenas o prompt da thumbnail…"):
+                            channel, blueprint = _thumbnail_editor_context(record)
+                            _task, prompt_variant = regenerate_thumbnail_prompt(
+                                task_id,
+                                settings,
+                                channel,
+                                blueprint=blueprint,
+                                language=str(record.get("language") or current_ui_language()),
+                            )
+                        record_notification(
+                            "thumbnail_generation_completed",
+                            "Prompt da thumbnail refeito",
+                            "Prompt da thumbnail actualizado; a imagem existente foi preservada.",
+                            metadata={
+                                "task_id": task_id,
+                                "channel_name": record["channel_name"],
+                                "prompt_regenerated": True,
+                                "prompt_only": True,
+                                "image_path": str(record.get("image_path") or ""),
+                            },
+                            dedupe_key=f"thumbnail:prompt-only:{task_id}:{prompt_variant.get('image_prompt', '')}",
+                        )
+                        st.success("Prompt da thumbnail actualizado; a imagem existente foi preservada.")
+                        st.rerun()
+                    except (CreativeGenerationError, ThumbnailGenerationError) as exc:
+                        st.error(str(exc))
+
+                if st.button(
+                    "Gerar Imagem",
+                    key=f"generate_thumbnail_image_{task_id}",
+                    icon=":material/image:",
                     use_container_width=True,
                     disabled=not bool(record["prompt"]),
                 ):
                     try:
-                        with st.spinner("A refazer a thumbnail…"):
-                            _task, image_path = regenerate_thumbnail(record["task_id"], settings)
+                        with st.spinner("A gerar a imagem com Nano Banana…"):
+                            _task, generated_path = generate_thumbnail_for_task(task_id, settings)
                         record_notification(
                             "thumbnail_generation_completed",
-                            f"Thumbnail refeita: {record['title']}",
-                            "A thumbnail da tarefa foi regenerada com sucesso.",
-                            metadata={"task_id": record["task_id"], "channel_name": record["channel_name"], "image_path": str(image_path)},
-                            dedupe_key=f"thumbnail:regenerated:{record['task_id']}:{image_path}",
+                            f"Thumbnail gerada: {record['title']}",
+                            "Thumbnail gerada com sucesso.",
+                            metadata={"task_id": task_id, "channel_name": record["channel_name"], "image_path": str(generated_path)},
+                            dedupe_key=f"thumbnail:generated:{task_id}:{generated_path}",
                         )
-                        st.success("Thumbnail refeita com sucesso.")
+                        st.success("Thumbnail gerada com sucesso.")
+                        st.rerun()
+                    except ThumbnailGenerationError as exc:
+                        st.error(str(exc))
+
+                if st.button(
+                    "Refazer Prompt e Gerar Imagem",
+                    key=f"regenerate_thumbnail_prompt_{task_id}",
+                    icon=":material/auto_awesome:",
+                    use_container_width=True,
+                    disabled=not bool(record["title"] or record["topic"]),
+                ):
+                    try:
+                        with st.spinner("A refazer o prompt e a imagem…"):
+                            channel, blueprint = _thumbnail_editor_context(record)
+                            variant = generate_thumbnail_prompt(
+                                settings,
+                                channel,
+                                record["title"] or record["topic"],
+                                current_prompt=record["prompt"],
+                                blueprint=blueprint,
+                                language=str(record.get("language") or current_ui_language()),
+                            )
+                            _task, generated_path = regenerate_thumbnail_prompt_and_image(task_id, settings, variant)
+                        record_notification(
+                            "thumbnail_generation_completed",
+                            f"Thumbnail renovada: {record['title']}",
+                            "Prompt da thumbnail e imagem actualizados.",
+                            metadata={"task_id": task_id, "channel_name": record["channel_name"], "image_path": str(generated_path), "prompt_regenerated": True},
+                            dedupe_key=f"thumbnail:prompt-regenerated:{task_id}:{generated_path}",
+                        )
+                        st.success("Prompt da thumbnail e imagem actualizados.")
+                        st.rerun()
+                    except (CreativeGenerationError, ThumbnailGenerationError) as exc:
+                        st.error(str(exc))
+
+                if st.button(
+                    "Refazer Lettering",
+                    key=f"regenerate_thumbnail_lettering_{task_id}",
+                    icon=":material/title:",
+                    use_container_width=True,
+                    disabled=not bool(record.get("image_path") and record["image_path"].is_file()),
+                ):
+                    try:
+                        with st.spinner("A refazer apenas o lettering…"):
+                            _task, generated_path = regenerate_thumbnail_lettering(
+                                task_id,
+                                settings,
+                                lettering_prompt=record.get("lettering_prompt") or "",
+                            )
+                        record_notification(
+                            "thumbnail_generation_completed",
+                            f"Lettering refeito: {record['title']}",
+                            "Lettering refeito; a imagem original foi usada como base.",
+                            metadata={"task_id": task_id, "channel_name": record["channel_name"], "image_path": str(generated_path), "lettering_only": True},
+                            dedupe_key=f"thumbnail:lettering:{task_id}:{generated_path}",
+                        )
+                        st.success("Lettering refeito; a imagem original foi usada como base.")
+                        st.rerun()
+                    except ThumbnailGenerationError as exc:
+                        st.error(str(exc))
+
+            uploaded = st.file_uploader(
+                "Upload Image",
+                type=["png", "jpg", "jpeg", "webp"],
+                key=f"thumbnail_upload_{task_id}",
+                help="Suba uma imagem para a associar a esta tarefa e à pipeline.",
+            )
+            if uploaded is not None:
+                uploaded_bytes = uploaded.getvalue()
+                uploaded_digest = hashlib.sha256(uploaded_bytes).hexdigest()
+                digest_key = f"thumbnail_upload_digest_{task_id}"
+                if st.session_state.get(digest_key) != uploaded_digest:
+                    try:
+                        with st.spinner("A guardar a imagem carregada…"):
+                            _task, uploaded_path = upload_thumbnail_image(
+                                task_id,
+                                uploaded_bytes,
+                                uploaded.name,
+                                uploaded.type,
+                            )
+                        st.session_state[digest_key] = uploaded_digest
+                        record_notification(
+                            "thumbnail_generation_completed",
+                            f"Thumbnail carregada: {record['title']}",
+                            "Imagem carregada e vinculada à tarefa.",
+                            metadata={"task_id": task_id, "channel_name": record["channel_name"], "image_path": str(uploaded_path), "source": "upload"},
+                            dedupe_key=f"thumbnail:uploaded:{task_id}:{uploaded_digest}",
+                        )
+                        st.success("Imagem carregada e vinculada à tarefa.")
                         st.rerun()
                     except ThumbnailGenerationError as exc:
                         st.error(str(exc))
