@@ -2836,7 +2836,7 @@ def render_automation():
         st.info("Ainda não existem vídeos cadastrados.")
     for task in tasks:
         with st.container(border=True):
-            task_cols = st.columns([2.6, 1.3, 1.3, 1.5])
+            task_cols = st.columns([2.45, 1.15, 1.15, 1.85])
             with task_cols[0]:
                 st.write(f"**{task.get('topic', 'Sem tópico')}**")
                 st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
@@ -2847,8 +2847,16 @@ def render_automation():
                 st.caption("Estilo")
                 st.write(task.get("style_wide", "—"))
             with task_cols[3]:
-                st.caption("Horário do canal")
-                st.write(task.get("automation_time", "00:00"))
+                state = str(task.get("state") or "")
+                start_col, stop_col = st.columns(2)
+                with start_col:
+                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                        transition_task(task["id"], "doing")
+                        st.rerun()
+                with stop_col:
+                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                        transition_task(task["id"], "blocked")
+                        st.rerun()
 
 
 def render_upload_direct():
