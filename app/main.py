@@ -826,9 +826,19 @@ def render_dashboard():
         with col:
             card(ui_text(label, ui_language), value, note)
     st.divider()
-    st.subheader(ui_text("Pipeline", ui_language))
+    st.subheader(ui_text("Pipeline Vídeos", ui_language))
     st.caption(ui_text("Filas locais e dependências da cascata", ui_language))
     queues = read_json("queues.json", {})
+    area_cards = [
+        ("Pipeline Vídeos", summary["total_tasks"], ui_text("total registado", ui_language)),
+        ("Pipeline Músicas", len(list_music_files()), ui_text("na biblioteca", ui_language)),
+        ("AI Influencers", "—", ui_text("módulos disponíveis", ui_language)),
+    ]
+    area_cols = st.columns(3)
+    for col, (label, value, note) in zip(area_cols, area_cards):
+        with col:
+            card(ui_text(label, ui_language), value, note)
+    st.divider()
     blueprint_count = len(list_blueprint_files())
     for row_start in range(0, len(STAGES), 3):
         queue_cols = st.columns(3)
@@ -1524,7 +1534,7 @@ def render_channels():
 
 def render_new_video(page_title: str = "Criação de Vídeos"):
     st.title(page_title)
-    create_tab, videos_tab = render_localized_tabs(["Criar vídeo", "Vídeos"])
+    create_tab = render_localized_tabs(["Criar vídeo"])[0]
     with create_tab:
         all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict)]
         active_channels = [c for c in all_channels if c.get("active", True)]
@@ -1881,8 +1891,6 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra a subaba Vídeos para acompanhar.")
-    with videos_tab:
-        render_videos()
 
 
 def render_music_creation():
@@ -4173,7 +4181,7 @@ def render_metadata_cleaner():
 
 
 def render_pipeline():
-    st.title("Pipeline")
+    st.title("Pipeline Vídeos")
     st.caption("Estado das filas locais e dependências da cascata")
     queues = read_json("queues.json", {})
     blueprint_count = len(list_blueprint_files())
@@ -4187,15 +4195,57 @@ def render_pipeline():
 
 
 def main():
-    pipeline_items = [
+    pipeline_video_items = [
         ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
-        ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
+        ("Backlog Vídeos", ":material/video_library:", "Backlog Vídeos"),
         ("Roteiros", ":material/article:", "Roteiros"),
         ("Upload", ":material/cloud_upload:", "Upload"),
     ]
-    pipeline_tiktok_items = [
-        ("Prompts Master", ":material/auto_awesome:", "Prompts Master"),
+    base_files_items = [
+        ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
+        ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
+    ]
+    channel_profile_items = [
+        ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
         ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
+        ("Facebook Pages", ":material/facebook:", "Facebook Pages"),
+    ]
+    music_items = [
+        ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
+        ("Upload Música", ":material/library_music:", "Upload Música"),
+    ]
+    models_ai_items = [
+        ("Personagens", ":material/person:", "Personagens"),
+        ("Geração de Conteúdo IA", ":material/auto_awesome:", "Geração de Conteúdo IA"),
+        ("Motion Control", ":material/motion_mode:", "Motion Control"),
+        ("UGC Products", ":material/shopping_bag:", "UGC Products"),
+        ("Redes Sociais", ":material/share:", "Redes Sociais"),
+    ]
+    growth_items = [
+        ("Analista Growth Youtube", ":material/analytics:", "Analista Growth Youtube"),
+        ("Analista Growth Tiktok", ":material/analytics:", "Analista Growth Tiktok"),
+        ("Analista Growth Instagram", ":material/analytics:", "Analista Growth Instagram"),
+    ]
+    documentation_items = [
+        ("Tutorial Meta", ":material/menu_book:", "Tutorial Meta"),
+        ("Tutorial Supabase", ":material/storage:", "Tutorial Supabase"),
+        ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
+        ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
+    ]
+    settings_items = [
+        ("MCP", ":material/hub:", "MCP"),
+        ("Contas Google", ":material/account_circle:", "Contas Google"),
+        ("Notificações", ":material/notifications:", "Notificações"),
+        ("Configuração API", ":material/settings:", "Configuração API"),
+    ]
+    niche_finder_items = [
+        ("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle"),
+        ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
+        ("Niche Finder Apify", ":material/api:", "Niche Finder Apify"),
+        ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
+    ]
+    automation_items = [
+        ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
     ]
     edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
@@ -4203,52 +4253,52 @@ def main():
         ("Editor Python", ":material/code:", "Editor Python"),
         ("Download Mídia", ":material/download:", "Download Mídia"),
     ]
-    models_ai_items = [
-        ("Personagens", ":material/person:", "Personagens"),
-        ("Redes Sociais", ":material/share:", "Redes Sociais"),
-        ("Tutorial Meta", ":material/menu_book:", "Tutorial Meta"),
-        ("Tutorial Supabase", ":material/storage:", "Tutorial Supabase"),
-    ]
-    settings_items = [
-        ("Canais Youtube", ":material/ondemand_video:", "Canais Youtube"),
-        ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
-        ("MCP", ":material/hub:", "MCP"),
-        ("Contas Google", ":material/account_circle:", "Contas Google"),
-        ("Configuração API", ":material/settings:", "Configuração API"),
-        ("Notificações", ":material/notifications:", "Notificações"),
-    ]
-    niche_finder_items = [
-        ("Niche Finder Kaggle", ":material/search:", "Niche Finder Kaggle"),
-        ("Niche Finder Apify", ":material/api:", "Niche Finder Apify"),
-    ]
-    automation_items = [
-        ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
-    ]
     top_pages = [
         ("Início", ":material/home:", "Início"),
-        ("Niche Finder", ":material/search:", "Niche Finder"),
-        ("Pipeline", ":material/account_tree:", "Pipeline"),
-        ("Pipeline TikTok", ":material/video_library:", "Pipeline TikTok"),
         ("Automação", ":material/schedule:", "Automação"),
-        ("Edição", ":material/edit:", "Edição"),
+        ("Niche Finder", ":material/search:", "Niche Finder"),
+        ("Pipeline Vídeos", ":material/account_tree:", "Pipeline Vídeos"),
         ("AI Influencers", ":material/smart_toy:", "AI Influencers"),
+        ("Arquivos Base", ":material/folder:", "Arquivos Base"),
+        ("Canais e Perfis de Vídeos", ":material/video_library:", "Canais e Perfis de Vídeos"),
+        ("Música", ":material/music_note:", "Música"),
+        ("Edição", ":material/edit:", "Edição"),
+        ("Growth", ":material/analytics:", "Growth"),
+        ("Documentação", ":material/menu_book:", "Documentação"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
+    groups = {
+        "Automação": automation_items,
+        "Niche Finder": niche_finder_items,
+        "Pipeline Vídeos": pipeline_video_items,
+        "AI Influencers": models_ai_items,
+        "Arquivos Base": base_files_items,
+        "Canais e Perfis de Vídeos": channel_profile_items,
+        "Música": music_items,
+        "Edição": edition_items,
+        "Growth": growth_items,
+        "Documentação": documentation_items,
+        "Configurações": settings_items,
+    }
     aliases = {
         "Dashboard": "Início",
         "Novo vídeo": "Criação de Vídeos",
-        "Vídeos": "Criação de Vídeos",
+        "Vídeos": "Backlog Vídeos",
         "Limpador de metadado": "Limpador de Metadados",
-        "Niche Finder": "Niche Finder Kaggle",
-        "Automação": "Automação Youtube",
-        "Canais": "Canais Youtube",
+        "Pipeline": "Pipeline Vídeos",
+        "Pipeline TikTok": "Canais e Perfis de Vídeos",
+        "Prompts Master": "Prompt Masters",
+        "Canais": "Canais YouTube",
+        "Canais Youtube": "Canais YouTube",
         "Blueprints": "Blueprints Youtube",
         "Configurações Técnicas": "Configuração API",
         "Models AI": "AI Influencers",
         "Contas Google/YouTube — canais em lote": "Contas Google",
     }
+    all_children = [item for items in groups.values() for item in items]
+    valid_targets = {item[0] for item in top_pages + all_children}
     current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
-    if current_page not in {item[0] for item in top_pages + pipeline_items + pipeline_tiktok_items + automation_items + edition_items + models_ai_items + niche_finder_items + settings_items}:
+    if current_page not in valid_targets:
         current_page = "Início"
     st.session_state["page"] = current_page
     ui_language = current_ui_language()
@@ -4258,7 +4308,7 @@ def main():
         st.session_state["page"] = target
         st.rerun()
 
-    def render_nav_button(target: str, icon: str, label: str, *, child: bool = False):
+    def render_nav_button(target: str, icon: str, label: str):
         display_label = ui_text(label, ui_language)
         if st.button(display_label, key=f"nav_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
             navigate(target)
@@ -4267,60 +4317,52 @@ def main():
         version_markup = f'<span class="tb-brand-version">{APP_VERSION}</span>' if APP_VERSION else ""
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
         for target, icon, label in top_pages:
-            if target == "Pipeline":
-                with st.expander(ui_text("Pipeline", ui_language), expanded=current_page in {item[0] for item in pipeline_items}, icon=":material/account_tree:"):
-                    for child_target, child_icon, child_label in pipeline_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Pipeline TikTok":
-                with st.expander(ui_text("Pipeline TikTok", ui_language), expanded=current_page in {item[0] for item in pipeline_tiktok_items}, icon=":material/video_library:"):
-                    for child_target, child_icon, child_label in pipeline_tiktok_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Automação":
-                with st.expander(ui_text("Automação", ui_language), expanded=current_page in {item[0] for item in automation_items}, icon=":material/schedule:"):
-                    for child_target, child_icon, child_label in automation_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Edição":
-                with st.expander(ui_text("Edição", ui_language), expanded=current_page in {item[0] for item in edition_items}, icon=":material/edit:"):
-                    for child_target, child_icon, child_label in edition_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "AI Influencers":
-                with st.expander(ui_text("AI Influencers", ui_language), expanded=current_page in {item[0] for item in models_ai_items}, icon=":material/smart_toy:"):
-                    for child_target, child_icon, child_label in models_ai_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Niche Finder":
-                with st.expander(ui_text("Niche Finder", ui_language), expanded=current_page in {item[0] for item in niche_finder_items}, icon=":material/search:"):
-                    for child_target, child_icon, child_label in niche_finder_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            elif target == "Configurações":
-                with st.expander(ui_text("Configurações", ui_language), expanded=current_page in {item[0] for item in settings_items}, icon=":material/settings:"):
-                    for child_target, child_icon, child_label in settings_items:
-                        render_nav_button(child_target, child_icon, child_label, child=True)
-            else:
+            children = groups.get(target)
+            if children is None:
                 render_nav_button(target, icon, label)
+                continue
+            child_targets = {item[0] for item in children}
+            with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):
+                for child_target, child_icon, child_label in children:
+                    render_nav_button(child_target, child_icon, child_label)
 
     renderers = {
         "Início": render_dashboard,
+        "Pipeline Vídeos": render_pipeline,
         "Criação de Vídeos": render_new_video,
+        "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
+        "Upload Música": lambda: render_edit_placeholder("Upload Música", ""),
         "Roteiros": render_scripts,
-        "Prompts Master": render_tiktok_prompt_masters,
+        "Upload": render_upload,
+        "Blueprints Youtube": render_blueprints,
+        "Prompt Masters": render_tiktok_prompt_masters,
+        "Canais YouTube": render_channels,
         "Contas TikTok": render_tiktok_accounts,
+        "Facebook Pages": lambda: render_edit_placeholder("Facebook Pages", ""),
         "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
+        "Tutorial Kaggle": lambda: render_edit_placeholder("Tutorial Kaggle", ""),
         "Niche Finder Apify": render_niche_finder_apify,
+        "Tutorial Apify": lambda: render_edit_placeholder("Tutorial Apify", ""),
         "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": render_cuts,
         "Editor Python": render_python_editor,
         "Download Mídia": render_media_download,
         "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
+        "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
+        "Geração de Conteúdo IA": lambda: render_edit_placeholder("Geração de Conteúdo IA", ""),
+        "Motion Control": lambda: render_edit_placeholder("Motion Control", ""),
+        "UGC Products": lambda: render_edit_placeholder("UGC Products", ""),
+        "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
+        "Analista Growth Youtube": lambda: render_edit_placeholder("Analista Growth Youtube", ""),
+        "Analista Growth Tiktok": lambda: render_edit_placeholder("Analista Growth Tiktok", ""),
+        "Analista Growth Instagram": lambda: render_edit_placeholder("Analista Growth Instagram", ""),
+        "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,
-        "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
-        "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
-        "Upload": render_upload,
-        "Canais Youtube": render_channels,
-        "Blueprints Youtube": render_blueprints,
+        "Configurações": lambda: render_edit_placeholder("Configurações", "Seleccione uma opção no menu expansível."),
         "MCP": render_mcp,
         "Contas Google": render_google_accounts,
         "Configuração API": render_settings,
