@@ -31,6 +31,9 @@ class ThemeAndBacklogTests(unittest.TestCase):
         self.assertIn("[theme.dark]", CONFIG_SOURCE)
         self.assertIn("[theme.light]", CONFIG_SOURCE)
         self.assertIn('[client]\ntoolbarMode = "auto"', CONFIG_SOURCE)
+        self.assertIn('hideWelcomeMessage = true', CONFIG_SOURCE)
+        self.assertNotIn('hideWarningOnDirectExecution', CONFIG_SOURCE)
+        self.assertNotIn('base = "dark"', CONFIG_SOURCE.split("[theme.dark]", 1)[0])
         theme_root = CONFIG_SOURCE.split("[theme.dark]", 1)[0]
         self.assertNotIn('base = "dark"', theme_root)
         self.assertNotIn('base = "light"', theme_root)
