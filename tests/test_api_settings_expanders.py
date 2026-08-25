@@ -42,17 +42,27 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('status_cols = st.columns(3)', MAIN_SOURCE)
         self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
-    def test_api_keys_material_sources_and_voice_are_direct_sibling_tabs(self):
-        tabs_position = MAIN_SOURCE.index('api_keys_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Fontes de Materiais", "Teste de Voz"])')
+    def test_api_keys_google_accounts_material_sources_and_voice_are_direct_sibling_tabs(self):
+        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])')
         api_position = MAIN_SOURCE.index('    with api_keys_tab:', tabs_position)
+        google_position = MAIN_SOURCE.index('    with google_accounts_tab:', tabs_position)
         material_position = MAIN_SOURCE.index('    with material_sources_tab:', tabs_position)
         voice_position = MAIN_SOURCE.index('    with voice_test_tab:', tabs_position)
-        self.assertLess(api_position, material_position)
+        self.assertLess(api_position, google_position)
+        self.assertLess(google_position, material_position)
         self.assertLess(material_position, voice_position)
-        api_block = MAIN_SOURCE[api_position:material_position]
+        api_block = MAIN_SOURCE[api_position:google_position]
         self.assertIn('with st.container(border=True):', api_block)
         self.assertIn('with st.form("settings_form"):', api_block)
+        self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:material_position])
         self.assertNotIn('render_localized_tabs(["Serviços e modelos", "Fontes de Materiais"])', MAIN_SOURCE)
+
+    def test_material_sources_use_individual_cards_and_add_provider_button(self):
+        self.assertIn('def _render_material_source_card(', MAIN_SOURCE)
+        self.assertIn('with st.container(border=True):', MAIN_SOURCE[MAIN_SOURCE.index('def _render_material_source_card('):])
+        self.assertIn('Configurar Nova Fonte de Materiais', MAIN_SOURCE)
+        self.assertIn('key="add_material_source_card"', MAIN_SOURCE)
+        self.assertIn('MATERIAL_CARDS_KEY = "material_source_cards"', (ROOT / "hermes_ui" / "material_sources.py").read_text(encoding="utf-8"))
 
     def test_streamlit_port_is_not_rendered_and_video_engine_path_is_read_only(self):
         self.assertNotIn('st.number_input("Porta Streamlit"', MAIN_SOURCE)
@@ -67,8 +77,21 @@ class ApiSettingsExpandersTests(unittest.TestCase):
     def test_new_api_tab_titles_have_all_language_translations(self):
         for language in LANGUAGE_CODES:
             self.assertIn("API Keys", UI_TRANSLATIONS[language])
+            self.assertIn("Contas Google", UI_TRANSLATIONS[language])
             self.assertIn("Fontes de Materiais", UI_TRANSLATIONS[language])
             self.assertIn("Teste de Voz", UI_TRANSLATIONS[language])
+
+    def test_material_card_labels_have_all_language_translations(self):
+        labels = (
+            "Configurar Nova Fonte de Materiais",
+            "Provedor de materiais",
+            "Fonte activa",
+            "Usar esta fonte na pipeline",
+            "Esta fonte não usa API key.",
+        )
+        for language in LANGUAGE_CODES:
+            for label in labels:
+                self.assertIn(label, UI_TRANSLATIONS[language])
 
     def test_new_api_expander_titles_have_all_language_translations(self):
         for language in LANGUAGE_CODES:

@@ -73,6 +73,12 @@ class NavigationReorganizationTests(unittest.TestCase):
         settings_block = MAIN_SOURCE.split("    settings_items = [", 1)[1].split("    ]", 1)[0]
         self.assertLess(settings_block.index('"Notificações"'), settings_block.index('"Configuração API"'))
 
+    def test_google_accounts_are_moved_to_api_settings_subtab(self):
+        settings_block = MAIN_SOURCE.split("    settings_items = [", 1)[1].split("    ]", 1)[0]
+        self.assertNotIn('("Contas Google",', settings_block)
+        self.assertIn('api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])', MAIN_SOURCE)
+        self.assertIn('"Contas Google": "Configuração API"', MAIN_SOURCE)
+
     def test_navigation_labels_have_translations_for_all_languages(self):
         languages = ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it")
         labels = (
