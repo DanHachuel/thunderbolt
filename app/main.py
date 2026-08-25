@@ -4208,7 +4208,7 @@ def main():
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
         ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
-        ("Facebook Pages", ":material/facebook:", "Facebook Pages"),
+        ("Facebook Pages", ":material/public:", "Facebook Pages"),
     ]
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
