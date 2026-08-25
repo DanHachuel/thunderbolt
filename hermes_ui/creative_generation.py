@@ -166,6 +166,66 @@ def generate_topic_for_channel(
     return result
 
 
+def generate_video_keywords(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    script: str,
+    blueprint: dict[str, Any] | None = None,
+    language: str = "",
+) -> list[str]:
+    """Generate SEO keywords for a video subject and script using the configured LLM.
+
+    This mirrors MoneyPrinterTurbo's ``llm.generate_terms`` step while keeping the
+    Thunderbolt provider configuration and blueprint context in one place.
+    """
+    topic = str(topic or "").strip()
+    script = str(script or "").strip()
+    if not topic:
+        raise CreativeGenerationError("É necessário um Video Subject antes de gerar palavras-chave.")
+    if not script:
+        raise CreativeGenerationError("É necessário um roteiro antes de gerar palavras-chave.")
+
+    context = channel_context(channel, blueprint)
+    system = (
+        "És um especialista de SEO para vídeos faceless e pesquisa de materiais. "
+        "Extrai entre 8 e 15 palavras-chave curtas, concretas e úteis para o vídeo. "
+        "Devolve as palavras-chave em inglês, sem hashtags, sem frases longas, sem duplicados "
+        "e sem comentários adicionais. Responde apenas com JSON válido na chave keywords."
+    )
+    user = json.dumps(
+        {
+            "channel": context,
+            "language": language or context["language"],
+            "video_subject": topic,
+            "video_script": script,
+            "reference_rules": reference_bundle(),
+            "requirements": {
+                "count": "8 to 15",
+                "language": "English",
+                "format": "short keyword phrases without hashtags",
+            },
+        },
+        ensure_ascii=False,
+    )
+    result = _chat_json(settings, system, user)
+    raw_keywords = result.get("keywords")
+    if isinstance(raw_keywords, str):
+        raw_keywords = re.split(r"[,\n;|]+", raw_keywords)
+    keywords = []
+    seen = set()
+    if isinstance(raw_keywords, list):
+        for item in raw_keywords:
+            value = re.sub(r"^#+", "", str(item or "").strip())
+            normalized = value.casefold()
+            if value and normalized not in seen:
+                keywords.append(value)
+                seen.add(normalized)
+    if not keywords:
+        keywords = _keywords_from_text(topic, script)
+    return keywords[:15]
+
+
 def _score(value: Any) -> int:
     try:
         return max(0, min(3, int(value)))
