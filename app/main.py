@@ -3579,7 +3579,7 @@ def render_settings():
                 st.subheader("API Keys")
                 port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
                 moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-                with st.expander("Niche Finder — execução remota no Kaggle", expanded=True):
+                with st.expander("Niche Finder — execução remota no Kaggle", expanded=False):
                     st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
                     kaggle_cols = st.columns(3)
                     with kaggle_cols[0]:
@@ -3589,7 +3589,7 @@ def render_settings():
                     with kaggle_cols[2]:
                         kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
 
-                with st.expander("Niche Finder — execução através da Apify", expanded=True):
+                with st.expander("Niche Finder — execução através da Apify", expanded=False):
                     st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
                     apify_cols = st.columns(4)
                     with apify_cols[0]:
@@ -3601,7 +3601,7 @@ def render_settings():
                     with apify_cols[3]:
                         apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
 
-                with st.expander("Nano Banana — geração de thumbnails", expanded=True):
+                with st.expander("Nano Banana — geração de thumbnails", expanded=False):
                     st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
                     nano_cols = st.columns(2)
                     with nano_cols[0]:
@@ -3611,7 +3611,7 @@ def render_settings():
                         gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
                         gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
 
-                with st.expander("LLM — providers e modelos", expanded=True):
+                with st.expander("LLM — providers e modelos", expanded=False):
                     provider_options = ["openai", "moonshot", "shengsuanyun", "gemini", "deepseek", "qwen", "azure", "volcengine", "grok", "minimax", "mimo", "cloudflare", "modelscope", "aihubmix", "aimlapi", "evolink", "ollama", "oneapi", "litellm", "groq", "pollinations"]
                     current_llm_provider = str(settings.get("llm_provider") or DEFAULT_LLM_PROVIDER).strip().lower()
                     llm_provider = st.selectbox("LLM provider", provider_options, index=provider_options.index(current_llm_provider) if current_llm_provider in provider_options else 0)
@@ -3667,7 +3667,7 @@ def render_settings():
                         with cols[2]:
                             settings[f"{prefix}_model_name"] = text_setting("Model", f"{prefix}_model_name")
 
-                with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=True):
+                with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
                     cols = st.columns(2)
                     with cols[0]:
                         azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
@@ -3690,19 +3690,19 @@ def render_settings():
                         suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
                         suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
-                with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=True):
+                with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
                     st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
                     tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
                     tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
 
-                with st.expander("Publicação através do Upload-Post"):
+                with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
                     upload_post_username = text_setting("Upload-Post username", "upload_post_username")
                     upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
                     upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
 
-                with st.expander("Postiz — API key, integração e MCP", expanded=True):
+                with st.expander("Postiz — API key, integração e MCP", expanded=False):
                     st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
                     postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
                     postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
