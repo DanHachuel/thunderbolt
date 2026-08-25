@@ -249,6 +249,60 @@ def _keywords_from_text(*values: str) -> list[str]:
     return result[:15]
 
 
+def generate_thumbnail_prompt(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    current_prompt: str = "",
+    blueprint: dict[str, Any] | None = None,
+    language: str = "",
+) -> dict[str, Any]:
+    """Create one image prompt while keeping visual direction and lettering separate."""
+    topic = str(topic or "").strip()
+    if not topic:
+        raise CreativeGenerationError("É necessário um tópico para refazer o prompt da thumbnail.")
+    context = channel_context(channel, blueprint)
+    system = (
+        "És um director de arte de thumbnails para YouTube. Refaz um prompt de imagem forte e específico "
+        "para o tópico fornecido, mantendo a intenção visual quando já existir um prompt. "
+        "Separa rigorosamente a imagem sem texto do lettering: image_prompt nunca deve pedir texto renderizado, "
+        "enquanto overlay_text deve ser curto, legível e ter no máximo quatro palavras. "
+        "Responde apenas com JSON válido nas chaves concept, overlay_text, composition, color_palette, subject, "
+        "image_prompt, title_synergy e lettering_prompt."
+    )
+    user = json.dumps(
+        {
+            "channel": context,
+            "language": language or context["language"],
+            "topic": topic,
+            "current_prompt": str(current_prompt or "").strip(),
+            "reference_rules": reference_bundle(),
+            "requirements": {
+                "image_prompt": "cinematic visual direction, no words, letters, logos or watermarks rendered in the image",
+                "overlay_text": "maximum 4 words, emotionally strong, not the full title",
+                "lettering_prompt": "instructions for changing only the lettering after the base image exists",
+            },
+        },
+        ensure_ascii=False,
+    )
+    result = _chat_json(settings, system, user)
+    image_prompt = str(result.get("image_prompt") or "").strip()
+    if not image_prompt:
+        raise CreativeGenerationError("O provider não devolveu um prompt de imagem válido.")
+    overlay_text = _short_overlay(result.get("overlay_text"))
+    return {
+        "concept": str(result.get("concept") or "Thumbnail renovada").strip(),
+        "overlay_text": overlay_text,
+        "composition": str(result.get("composition") or "").strip(),
+        "color_palette": str(result.get("color_palette") or "").strip(),
+        "subject": str(result.get("subject") or topic).strip(),
+        "image_prompt": image_prompt,
+        "title_synergy": str(result.get("title_synergy") or "").strip(),
+        "lettering_prompt": str(result.get("lettering_prompt") or "").strip(),
+        "status": "prompt_ready",
+    }
+
+
 def generate_creative_package(
     settings: dict[str, Any],
     channel: dict[str, Any],
