@@ -1,8 +1,12 @@
+import base64
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from hermes_ui.creative_generation import generate_thumbnail_prompt
+from hermes_ui.thumbnail_generation import generate_thumbnail_image
 from hermes_ui.thumbnails import (
     generate_thumbnail_for_task,
     list_thumbnail_tasks,
@@ -56,8 +60,8 @@ class ThumbnailPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             generated_path = Path(directory) / "new-thumbnail.jpg"
 
-            def fake_generate(settings, prompt, *, topic, variant_index):
-                captured.update({"settings": settings, "prompt": prompt, "topic": topic, "variant_index": variant_index})
+            def fake_generate(settings, prompt, *, topic, variant_index, **kwargs):
+                captured.update({"settings": settings, "prompt": prompt, "topic": topic, "variant_index": variant_index, "kwargs": kwargs})
                 return generated_path
 
             with patch("hermes_ui.thumbnails.read_json", return_value=tasks), patch("hermes_ui.thumbnails.write_json", side_effect=lambda _name, value: captured.update({"saved": value})), patch("hermes_ui.thumbnails.generate_thumbnail_image", side_effect=fake_generate):
@@ -67,6 +71,7 @@ class ThumbnailPipelineTests(unittest.TestCase):
         self.assertEqual(captured["prompt"], "new prompt")
         self.assertEqual(captured["topic"], "Título do vídeo")
         self.assertEqual(captured["variant_index"], 0)
+        self.assertEqual(captured["kwargs"]["lettering_text"], "Texto")
         self.assertEqual(task["state"], "doing")
         self.assertEqual(task["thumbnail_status"], "generated")
         self.assertEqual(task["artifacts"]["script"], "/tmp/script.txt")
@@ -91,6 +96,57 @@ class ThumbnailPipelineTests(unittest.TestCase):
         self.assertEqual(task["thumbnail_source"], "generated")
         self.assertEqual(task["artifacts"]["thumbnail"], str(generated_path))
         self.assertEqual(captured["saved"][0]["thumbnail_status"], "generated")
+
+    def test_thumbnail_prompt_has_lettering_fallback_when_provider_omits_overlay(self):
+        with patch(
+            "hermes_ui.creative_generation._chat_json",
+            return_value={"image_prompt": "cinematic man reading a book, high contrast"},
+        ):
+            variant = generate_thumbnail_prompt({}, {}, "Man With Book")
+        self.assertTrue(variant["overlay_text"])
+        self.assertEqual(variant["overlay_text"], "Man With Book")
+        self.assertTrue(variant["lettering_prompt"])
+
+    def test_image_payload_contains_exact_required_lettering(self):
+        image_payload = {
+            "status": "completed",
+            "steps": [{"content": [{"type": "image", "data": base64.b64encode(b"image").decode("ascii")}]}],
+        }
+        response = SimpleNamespace(status_code=200, json=lambda: image_payload)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("hermes_ui.thumbnail_generation.STORAGE", Path(directory)), patch("hermes_ui.thumbnail_generation.ensure_storage"), patch("hermes_ui.thumbnail_generation.requests.post", return_value=response) as request:
+                image_path = generate_thumbnail_image(
+                    {"gemini_image_api_key": "key"},
+                    "man reading a book, cinematic, high contrast",
+                    topic="Deep Focus Habits",
+                    lettering_text="FOCUS NOW",
+                    lettering_prompt="Bold white letters with a black outline.",
+                )
+                self.assertTrue(image_path.is_file())
+                image_bytes = image_path.read_bytes()
+        body = request.call_args.kwargs["json"]
+        prompt = body["input"]
+        self.assertIn("MANDATORY LETTERING LAYER", prompt)
+        self.assertIn("EXACT HEADLINE TO RENDER: <<<FOCUS NOW>>>", prompt)
+        self.assertIn("MUST visibly contain readable lettering", prompt)
+        self.assertIn("Bold white letters with a black outline.", prompt)
+        self.assertEqual(image_bytes, b"image")
+
+    def test_image_payload_falls_back_to_non_empty_lettering_for_legacy_task(self):
+        image_payload = {
+            "status": "completed",
+            "steps": [{"content": [{"type": "image", "data": base64.b64encode(b"image").decode("ascii")}]}],
+        }
+        response = SimpleNamespace(status_code=200, json=lambda: image_payload)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("hermes_ui.thumbnail_generation.STORAGE", Path(directory)), patch("hermes_ui.thumbnail_generation.ensure_storage"), patch("hermes_ui.thumbnail_generation.requests.post", return_value=response) as request:
+                generate_thumbnail_image(
+                    {"gemini_image_api_key": "key"},
+                    "person reading a book",
+                    topic="Man With Book",
+                )
+        prompt = request.call_args.kwargs["json"]["input"]
+        self.assertIn("EXACT HEADLINE TO RENDER: <<<MAN WITH BOOK>>>", prompt)
 
     def test_prompt_regeneration_persists_new_variant_and_image(self):
         tasks = [{
