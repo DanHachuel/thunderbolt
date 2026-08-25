@@ -128,14 +128,34 @@ def _account_session_info(account: dict[str, Any]) -> str:
 
 
 def account_innertube_api_key(account: dict[str, Any] | None, document: dict[str, Any] | None = None, settings: dict[str, Any] | None = None) -> str:
-    """Return the account-level key; document value is only a legacy migration fallback."""
+    """Return the global YouTube API key for every account.
+
+    The account and document values are retained only as read-only migration
+    fallbacks for installations created by older releases. A configured
+    ``direct_innertube_api_key`` always wins and is shared by the whole system.
+    """
     account = account or {}
     document = document or {}
     settings = settings or {}
+    global_key = str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or "").strip()
+    if global_key:
+        return global_key
+
+    # Before the global field existed, older releases could store different
+    # copies inside accounts. Use the first non-empty legacy value for every
+    # account until the settings page can migrate and remove those copies.
+    legacy_accounts = settings.get("youtube_batch_accounts", [])
+    if isinstance(legacy_accounts, list):
+        for legacy_account in legacy_accounts:
+            if not isinstance(legacy_account, dict):
+                continue
+            legacy_key = str(legacy_account.get("innertube_api_key") or legacy_account.get("INNERTUBE_API_KEY") or "").strip()
+            if legacy_key:
+                return legacy_key
+
     return str(
         account.get("innertube_api_key")
         or account.get("INNERTUBE_API_KEY")
-        or settings.get("direct_innertube_api_key")
         or document.get("INNERTUBE_API_KEY")
         or ""
     ).strip()
