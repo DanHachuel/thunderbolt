@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
+import http from "node:http";
+import net from "node:net";
 import { existsSync, mkdirSync, readFileSync, copyFileSync, readdirSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, resolve } from "node:path";
@@ -150,6 +152,51 @@ if (args[0] === "pipeline-worker" || args.includes("--pipeline-worker")) {
 }
 
 const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
+const publicPort = Number.parseInt(String(port), 10);
+const backendPort = Number.isFinite(publicPort) ? publicPort + 1 : 3031;
+const supportedLanguages = new Set(["en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it"]);
+
+const proxy = http.createServer((request, response) => {
+  const requestUrl = new URL(request.url || "/", `http://localhost:${publicPort}`);
+  const pathParts = requestUrl.pathname.split("/").filter(Boolean);
+  const languagePrefix = pathParts.length === 1 && supportedLanguages.has(pathParts[0]) ? pathParts[0] : "";
+  if (languagePrefix) {
+    requestUrl.pathname = "/";
+    requestUrl.searchParams.set("lang", languagePrefix);
+    response.writeHead(302, { Location: `${requestUrl.pathname}?${requestUrl.searchParams.toString()}` });
+    response.end();
+    return;
+  }
+  const upstream = http.request({
+    hostname: "127.0.0.1",
+    port: backendPort,
+    method: request.method,
+    path: `${requestUrl.pathname}${requestUrl.search}`,
+    headers: { ...request.headers, host: `127.0.0.1:${backendPort}` },
+  }, (upstreamResponse) => {
+    response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
+    upstreamResponse.pipe(response);
+  });
+  upstream.on("error", (error) => {
+    response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+    response.end(`Thunderbolt backend indisponível: ${error.message}`);
+  });
+  request.pipe(upstream);
+});
+
+proxy.on("upgrade", (request, clientSocket, head) => {
+  const upstreamSocket = net.connect(backendPort, "127.0.0.1", () => {
+    const headers = Object.entries(request.headers)
+      .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(", ") : value}`)
+      .join("\\r\\n");
+    upstreamSocket.write(`GET ${request.url} HTTP/1.1\\r\\n${headers}\\r\\n\\r\\n`);
+    if (head.length) upstreamSocket.write(head);
+    clientSocket.pipe(upstreamSocket).pipe(clientSocket);
+  });
+  upstreamSocket.on("error", () => clientSocket.destroy());
+});
+
+proxy.listen(publicPort, "127.0.0.1");
 const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
   cwd: root,
   stdio: "inherit",
@@ -162,7 +209,7 @@ const pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
   env: runtimeEnv,
   windowsHide: false,
 });
-const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", port, "--server.address", "localhost"], {
+const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
   cwd: root,
   stdio: "inherit",
   env: runtimeEnv,
@@ -170,6 +217,7 @@ const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", po
 });
 
 const stopWorker = () => {
+  proxy.close();
   if (!worker.killed) worker.kill();
   if (!pipelineWorker.killed) pipelineWorker.kill();
 };
