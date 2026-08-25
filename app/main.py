@@ -3853,10 +3853,6 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             test_result = test_llm_provider_card(edited)
             edited["test_result"] = stamp_test_result(test_result)
             _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or card_id))
-            if test_result.get("ok"):
-                st.success(f"Teste API: {test_result['message']}")
-            else:
-                st.error(f"Teste API: {test_result['message']}")
         elif refresh_clicked:
             try:
                 from integrations.openai_model_discovery import fetch_openai_compatible_models
@@ -3880,7 +3876,7 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
         saved_test = edited.get("test_result") or card.get("test_result")
         if isinstance(saved_test, dict) and saved_test.get("message"):
             if saved_test.get("status") == "success":
-                st.success(f"Último teste: {saved_test['message']}")
+                st.success("Último teste: API Key OK")
             else:
                 st.error(f"Último teste: {saved_test['message']}")
 
