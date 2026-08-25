@@ -34,6 +34,18 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertIn('(\"Facebook Pages\", \":material/public:\", \"Facebook Pages\")', MAIN_SOURCE)
         self.assertIn('(\"Configurações\", \":material/settings:\", \"Configurações\")', MAIN_SOURCE)
 
+    def test_navigation_widget_keys_are_scoped_by_group(self):
+        self.assertIn('key=f"nav_{scope}_{target}"', MAIN_SOURCE)
+        self.assertIn('render_nav_button(child_target, child_icon, child_label, target)', MAIN_SOURCE)
+        self.assertNotIn('key=f"nav_{target}"', MAIN_SOURCE)
+
+    def test_niche_finder_tutorials_are_documentation_only(self):
+        niche_block = MAIN_SOURCE.split("    niche_finder_items = [", 1)[1].split("    ]", 1)[0]
+        documentation_block = MAIN_SOURCE.split("    documentation_items = [", 1)[1].split("    ]", 1)[0]
+        for label in ("Tutorial Kaggle", "Tutorial Apify"):
+            self.assertNotIn(f'("{label}"', niche_block)
+            self.assertIn(f'("{label}"', documentation_block)
+
     def test_requested_groups_and_children_are_present(self):
         required = (
             "Arquivos Base", "Blueprints Youtube", "Prompt Masters",
