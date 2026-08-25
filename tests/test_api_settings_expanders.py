@@ -60,6 +60,10 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('moneyprinter_path = str(settings.get("moneyprinter_path") or "").strip()', MAIN_SOURCE)
         self.assertIn('st.caption(f"Pasta do motor de vídeo:', MAIN_SOURCE)
 
+    def test_llm_api_key_success_message_is_short_and_model_count_is_not_shown(self):
+        self.assertIn('st.success("Último teste: API Key OK")', MAIN_SOURCE)
+        self.assertNotIn('API OK — {_safe_url(base_url)} respondeu com {len(models)} modelo(s).', MAIN_SOURCE)
+
     def test_new_api_tab_titles_have_all_language_translations(self):
         for language in LANGUAGE_CODES:
             self.assertIn("API Keys", UI_TRANSLATIONS[language])
