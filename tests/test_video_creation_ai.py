@@ -28,6 +28,11 @@ class VideoCreationAITests(unittest.TestCase):
 
     def test_scripts_page_reuses_combined_ai_generation_with_selected_blueprint(self):
         self.assertIn('"pipeline_scripts",', MAIN_SOURCE)
+        scripts_source = MAIN_SOURCE.split("def render_scripts():", 1)[1].split("@st.cache_data", 1)[0]
+        self.assertNotIn('st.text_input("Título", key="script_title"', scripts_source)
+        self.assertNotIn('"Tema ou briefing"', scripts_source)
+        self.assertIn('title = str(script_settings.get("video_subject") or "").strip()', scripts_source)
+        self.assertIn('brief = str(script_settings.get("video_script") or "").strip() or title', scripts_source)
         self.assertIn('generate_content_callback=lambda: _generate_video_content_callback(', MAIN_SOURCE)
         self.assertIn('selected_blueprint,', MAIN_SOURCE)
         self.assertIn('st.session_state["script_draft_keywords"]', MAIN_SOURCE)
