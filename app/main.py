@@ -159,6 +159,7 @@ st.markdown("""
 */
 :root { --tb-accent:#35a7ff; --tb-gold:#c59b55; }
 [data-testid="stAppViewContainer"] { background:transparent; color:inherit; }
+[data-testid="stSidebar"] { background:rgba(128,128,128,.04); border-right:1px solid rgba(128,128,128,.20); }
 [data-testid="stSidebar"] { background:color-mix(in srgb, currentColor 4%, transparent); border-right:1px solid color-mix(in srgb, currentColor 16%, transparent); }
 [data-testid="stSidebar"] .block-container { padding-top:0.28rem; padding-bottom:0.45rem; }
 [data-testid="stSidebar"] > div:first-child { padding-top:0.28rem; }
@@ -171,31 +172,41 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stButton"] button [data-testid="stMarkdownContainer"] { flex:1 1 auto !important; width:100% !important; text-align:left !important; }
 [data-testid="stSidebar"] [data-testid="stButton"] p { margin:0; line-height:1; width:100%; text-align:left !important; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:rgba(128,128,128,.08); border-color:rgba(128,128,128,.25); color:inherit; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:color-mix(in srgb, currentColor 8%, transparent); border-color:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:rgba(128,128,128,.14); color:inherit; border-color:rgba(128,128,128,.30); }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:color-mix(in srgb, currentColor 12%, transparent); color:inherit; border-color:color-mix(in srgb, currentColor 22%, transparent); }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:rgba(128,128,128,.20); color:inherit; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span,
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:inherit; }
 [data-testid="stSidebar"] [data-testid="stExpander"] { border:0 !important; background:transparent !important; margin:0.02rem 0 !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] details { border:0 !important; background:transparent !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary { min-height:1.72rem; padding:0.10rem 0.52rem !important; border-radius:7px; color:inherit; font-size:0.86rem; font-weight:650; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background:rgba(128,128,128,.08); }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background:color-mix(in srgb, currentColor 8%, transparent); }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
-.content-card { box-sizing:border-box; padding:1rem 1.1rem; border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:14px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; min-height:110px; box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent); }
+.content-card { box-sizing:border-box; padding:1rem 1.1rem; border:1px solid rgba(128,128,128,.28); border-radius:14px; background:rgba(128,128,128,.10); color:inherit; min-height:110px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+.content-card { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:color-mix(in srgb, currentColor 5%, transparent); box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent); }
 .content-label { color:inherit; opacity:.72; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
 .content-value { color:inherit; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
 .content-card .small-muted { color:inherit; opacity:.72; }
-.stage { border-left:3px solid var(--tb-accent); padding:.65rem .8rem; margin:.4rem 0; background:color-mix(in srgb, currentColor 4%, transparent); border-radius:8px; }
+.stage { border-left:3px solid var(--tb-accent); padding:.65rem .8rem; margin:.4rem 0; background:rgba(128,128,128,.06); border-radius:8px; }
+.stage { background:color-mix(in srgb, currentColor 4%, transparent); }
 .small-muted { color:inherit; opacity:.65; font-size:.85rem; }
-.tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:18px; background:radial-gradient(circle at 50% 0, color-mix(in srgb, var(--tb-gold) 16%, transparent), transparent 58%), color-mix(in srgb, currentColor 4%, transparent); box-shadow:0 18px 48px color-mix(in srgb, currentColor 12%, transparent); }
+.tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid rgba(128,128,128,.28); border-radius:18px; background:rgba(128,128,128,.06); box-shadow:0 18px 48px rgba(0,0,0,.12); }
+.tb-cuts-hero { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:radial-gradient(circle at 50% 0, color-mix(in srgb, var(--tb-gold) 16%, transparent), transparent 58%), color-mix(in srgb, currentColor 4%, transparent); box-shadow:0 18px 48px color-mix(in srgb, currentColor 12%, transparent); }
 .tb-cuts-hero .tb-cuts-kicker { color:var(--tb-gold); font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; font-weight:700; }
 .tb-cuts-hero h2 { color:inherit; font-family:Georgia,serif; font-size:2rem; font-weight:500; margin:.42rem 0 .25rem; text-transform:lowercase; }
 .tb-cuts-hero p { color:inherit; opacity:.68; margin:0 auto; max-width:620px; font-size:.9rem; }
 [data-testid="stRadio"] [role="radiogroup"] { gap:.6rem; }
-[data-testid="stRadio"] label { border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:12px; padding:.65rem .8rem; background:color-mix(in srgb, currentColor 4%, transparent); min-height:4.3rem; }
-[data-testid="stRadio"] label:has(input:checked) { border-color:var(--tb-gold); background:linear-gradient(145deg, color-mix(in srgb, var(--tb-gold) 24%, transparent), color-mix(in srgb, currentColor 6%, transparent)); }
+[data-testid="stRadio"] label { border:1px solid rgba(128,128,128,.28); border-radius:12px; padding:.65rem .8rem; background:rgba(128,128,128,.06); min-height:4.3rem; }
+[data-testid="stRadio"] label { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:color-mix(in srgb, currentColor 4%, transparent); }
+[data-testid="stRadio"] label:has(input:checked) { border-color:var(--tb-gold); background:rgba(197,155,85,.24); }
+[data-testid="stRadio"] label:has(input:checked) { background:linear-gradient(145deg, color-mix(in srgb, var(--tb-gold) 24%, transparent), color-mix(in srgb, currentColor 6%, transparent)); }
+[data-testid="stStatusWidget"] { border-color:rgba(128,128,128,.28) !important; background:rgba(128,128,128,.06) !important; }
 [data-testid="stStatusWidget"] { border-color:color-mix(in srgb, currentColor 18%, transparent) !important; background:color-mix(in srgb, currentColor 4%, transparent) !important; }
 /* O menu de idiomas usa layout nativo da aplicação; o toolbar do Streamlit não é alterado. */
 
