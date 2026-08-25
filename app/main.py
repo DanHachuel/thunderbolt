@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from contextlib import nullcontext
 from datetime import date, datetime
 import sys
 import uuid
@@ -3752,7 +3753,7 @@ def _persist_llm_cards(settings: dict[str, Any], cards: list[dict[str, Any]], ac
     return updated
 
 
-def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int) -> None:
+def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int, *, embedded: bool = False) -> None:
     card = normalize_llm_card(cards[index], index)
     cards[index] = card
     card_id = str(card["id"])
@@ -3766,7 +3767,8 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
         with header_cols[1]:
             status_kind, status_label = _llm_card_config_status(card)
             _api_status_badge(status_label, status_kind)
-        with st.form(f"llm_card_form_{card_id}"):
+        card_form = nullcontext() if embedded else st.form(f"llm_card_form_{card_id}")
+        with card_form:
             key_col, model_col = st.columns(2)
             with key_col:
                 api_key = card.get("api_key", "")
@@ -3806,9 +3808,9 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             with action_col:
                 action_buttons = st.columns(2)
                 with action_buttons[0]:
-                    refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
+                    refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True, key=f"llm_card_{card_id}_refresh")
                 with action_buttons[1]:
-                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True, key=f"llm_card_{card_id}_test")
 
             extra_values: dict[str, str] = {}
             if definition.extra_fields:
@@ -3839,10 +3841,10 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                     key=f"llm_card_{card_id}_telegram",
                 )
 
-            save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True)
+            save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")
             remove_clicked = False
             if definition.code != "openai":
-                remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True)
+                remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True, key=f"llm_card_{card_id}_remove")
 
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "telegram_llm": bool(telegram_llm), **extra_values})
@@ -3883,7 +3885,7 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                 st.error(f"Último teste: {saved_test['message']}")
 
 
-def render_llm_provider_cards(settings: dict[str, Any]) -> None:
+def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = False) -> None:
     """Renderizar cartões LLM fora da form global para permitir acções por cartão."""
     migrated, changed = ensure_llm_provider_cards(settings)
     cards = [dict(item) for item in migrated.get(LLM_CARDS_KEY, [])]
@@ -3893,7 +3895,7 @@ def render_llm_provider_cards(settings: dict[str, Any]) -> None:
     with st.expander("LLM — providers e modelos", expanded=False):
         st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; o cartão activo é usado pela geração de conteúdo.")
         for index in range(len(cards)):
-            _render_llm_card(settings, cards, index)
+            _render_llm_card(settings, cards, index, embedded=embedded)
         st.divider()
         st.markdown("**Adicionar provider LLM**")
         provider_codes = [item.code for item in LLM_PROVIDER_CATALOG]
@@ -3903,7 +3905,12 @@ def render_llm_provider_cards(settings: dict[str, Any]) -> None:
             format_func=lambda value: ui_text(provider_definition(value).label, current_ui_language()),
             key="llm_new_provider_choice",
         )
-        if st.button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card"):
+        add_provider_clicked = (
+            st.form_submit_button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card")
+            if embedded
+            else st.button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card")
+        )
+        if add_provider_clicked:
             new_card = new_llm_card(provider_to_add, card_id=f"llm-{provider_to_add}-{uuid.uuid4().hex[:8]}")
             cards.append(new_card)
             _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or DEFAULT_LLM_CARD_ID))
@@ -3933,7 +3940,6 @@ def render_settings():
                 st.subheader("API Keys")
                 port = st.number_input("Porta Streamlit", 1, 65535, int(settings.get("port", 3030)))
                 moneyprinter_path = st.text_input("Pasta do motor de vídeo", settings.get("moneyprinter_path", ""), key="settings_moneyprinter_path")
-                render_llm_provider_cards(settings)
                 with st.form("settings_form"):
                     with st.expander("Niche Finder — Kaggle", expanded=False):
                         st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
@@ -3958,6 +3964,8 @@ def render_settings():
                         with apify_cols[3]:
                             apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
                         _render_credential_status(apify_api_token)
+
+                    render_llm_provider_cards(settings, embedded=True)
 
                     with st.expander("Nano Banana — geração de thumbnails", expanded=False):
                         st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
