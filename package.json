@@ -20,6 +20,7 @@
     "seed/prompt_masters/**/*.md",
     "seed/blueprints/**/*.json",
     "seed/skills/*.md",
+    "seed/skills/*.py",
     "seed/references/*.md",
     "README.md",
     "MANUAL-INSTALACAO.md",
