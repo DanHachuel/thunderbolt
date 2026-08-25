@@ -244,6 +244,14 @@ _OPTION_TRANSLATED_STREAMLIT_METHODS = {"selectbox", "radio", "multiselect", "se
 _STREAMLIT_I18N_INSTALLED = False
 
 
+def _translated_option_label(value: Any, selected_language: str, formatter: Any = None) -> str:
+    """Return a valid Streamlit display label without changing the stored option value."""
+    formatted = formatter(value) if formatter is not None else value
+    if isinstance(formatted, str):
+        return ui_text(formatted, selected_language)
+    return str(formatted)
+
+
 def _translate_streamlit_arguments(method_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
     if not args and "label" not in kwargs:
         return args, kwargs
@@ -256,12 +264,13 @@ def _translate_streamlit_arguments(method_name: str, args: tuple[Any, ...], kwar
     for keyword in ("placeholder", "help"):
         if isinstance(kwargs.get(keyword), str):
             kwargs[keyword] = ui_text(kwargs[keyword], selected_language)
-    if method_name in _OPTION_TRANSLATED_STREAMLIT_METHODS and len(translated_args) >= 2:
+    has_options = len(translated_args) >= 2 or "options" in kwargs
+    if method_name in _OPTION_TRANSLATED_STREAMLIT_METHODS and has_options:
         existing_format_func = kwargs.get("format_func")
         if existing_format_func is None:
-            kwargs["format_func"] = lambda value: ui_text(value, selected_language) if isinstance(value, str) else value
+            kwargs["format_func"] = lambda value, language=selected_language: _translated_option_label(value, language)
         else:
-            kwargs["format_func"] = lambda value, formatter=existing_format_func: ui_text(formatter(value), selected_language) if isinstance(formatter(value), str) else formatter(value)
+            kwargs["format_func"] = lambda value, formatter=existing_format_func, language=selected_language: _translated_option_label(value, language, formatter)
     return tuple(translated_args), kwargs
 
 
