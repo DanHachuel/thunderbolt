@@ -25,4 +25,4 @@ secondaryBackgroundColor = "#EEF2F7"
 toolbarMode = "auto"
 
 [logger]
-hideWarningOnDirectExecution = true
+hideWelcomeMessage = true
