@@ -15,13 +15,13 @@ class NavigationReorganizationTests(unittest.TestCase):
             '"Início"',
             '"Automação"',
             '"Niche Finder"',
-            '"Pipeline Vídeos"',
-            '"AI Influencers"',
             '"Arquivos Base"',
             '"Canais e Perfis de Vídeos"',
-            '"Música"',
-            '"Edição"',
             '"Growth"',
+            '"Pipeline Vídeos"',
+            '"Pipeline Música"',
+            '"AI Influencers"',
+            '"Edição"',
             '"Documentação"',
             '"Configurações"',
         ]
@@ -32,7 +32,8 @@ class NavigationReorganizationTests(unittest.TestCase):
     def test_navigation_icons_are_valid_and_settings_remains_visible(self):
         self.assertNotIn(":material/facebook:", MAIN_SOURCE)
         self.assertIn('(\"Facebook Pages\", \":material/public:\", \"Facebook Pages\")', MAIN_SOURCE)
-        self.assertIn('(\"Configurações\", \":material/settings:\", \"Configurações\")', MAIN_SOURCE)
+        self.assertIn('("Configurações", ":material/settings:", "Configurações")', MAIN_SOURCE)
+        self.assertIn('"Música": "Pipeline Música"', MAIN_SOURCE)
 
     def test_navigation_widget_keys_are_scoped_by_group(self):
         self.assertIn('key=f"nav_{scope}_{target}"', MAIN_SOURCE)
@@ -52,7 +53,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Canais e Perfis de Vídeos", "Canais YouTube", "Contas TikTok", "Facebook Pages",
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Upload",
             "AI Influencers", "Personagens", "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Redes Sociais",
-            "Música", "Criação de Músicas", "Upload Música",
+            "Pipeline Música", "Criação de Músicas", "Upload Música",
             "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
             "Documentação", "Tutorial Meta", "Tutorial Supabase", "Tutorial Kaggle", "Tutorial Apify",
         )
@@ -79,7 +80,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Facebook Pages", "Prompt Masters", "Backlog Vídeos", "Música", "Upload Música",
             "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Growth",
             "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
-            "Documentação", "Tutorial Kaggle", "Tutorial Apify", "Pipeline Músicas", "módulos disponíveis",
+            "Documentação", "Tutorial Kaggle", "Tutorial Apify", "Pipeline Música", "módulos disponíveis",
         )
         navigation_source = LANGUAGES_SOURCE.split("UI_NAV_TRANSLATIONS", 1)[1]
         for language in languages:
