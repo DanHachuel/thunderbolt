@@ -14,6 +14,7 @@ from hermes_ui.creative_generation import CreativeGenerationError, generate_crea
 from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
+from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.thumbnail_generation import generate_thumbnail_image
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
@@ -120,12 +121,14 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
         raise PipelineError("A etapa Vídeo não recebeu um tema válido.")
     settings = _settings()
     env = os.environ.copy()
-    provider = str(settings.get("llm_provider") or "openai").strip()
+    card = active_llm_card(settings)
+    provider = str(card.get("provider") or "openai").strip()
+    definition = provider_definition(provider)
     env_values = {
         "MPT_LLM_PROVIDER": provider,
-        "MPT_LLM_API_KEY": str(settings.get(f"{provider}_api_key") or "").strip(),
-        "MPT_LLM_BASE_URL": str(settings.get(f"{provider}_base_url") or "").strip(),
-        "MPT_LLM_MODEL_NAME": str(settings.get(f"{provider}_model_name") or "").strip(),
+        "MPT_LLM_API_KEY": str(card.get("api_key") or "").strip(),
+        "MPT_LLM_BASE_URL": str(card.get("base_url") or definition.default_base_url or "").strip(),
+        "MPT_LLM_MODEL_NAME": str(card.get("model") or "").strip(),
         "MPT_PEXELS_API_KEY": str(settings.get("pexels_api_key") or "").strip(),
     }
     for key, value in env_values.items():
