@@ -180,9 +180,10 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
-.content-card { padding:1rem 1.1rem; border:1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius:14px; background:color-mix(in srgb, currentColor 4%, transparent); min-height:110px; }
-.content-label { color:inherit; opacity:.62; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
-.content-value { color:inherit; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
+.content-card { box-sizing:border-box; padding:1rem 1.1rem; border:1px solid #2b3b4d; border-radius:14px; background:#121b26; min-height:110px; box-shadow:0 4px 14px rgba(0,0,0,.18); }
+.content-label { color:#b9c7d6; opacity:.92; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
+.content-value { color:#f4f8fb; font-size:1.8rem; font-weight:700; margin-top:.3rem; }
+.content-card .small-muted { color:#a9b8c8; opacity:.9; }
 .stage { border-left:3px solid var(--tb-accent); padding:.65rem .8rem; margin:.4rem 0; background:color-mix(in srgb, currentColor 4%, transparent); border-radius:8px; }
 .small-muted { color:inherit; opacity:.65; font-size:.85rem; }
 .tb-cuts-hero { max-width:860px; margin:0 auto 1.1rem; padding:1.6rem 1.4rem 1.35rem; text-align:center; border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:18px; background:radial-gradient(circle at 50% 0, color-mix(in srgb, var(--tb-gold) 16%, transparent), transparent 58%), color-mix(in srgb, currentColor 4%, transparent); box-shadow:0 18px 48px color-mix(in srgb, currentColor 12%, transparent); }
