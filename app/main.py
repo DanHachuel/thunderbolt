@@ -2838,7 +2838,7 @@ def render_python_editor():
 
 
 def render_videos():
-    st.subheader("Backlog Vídeos")
+    st.subheader("Backlog Videos")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
     tasks = read_json("tasks.json", [])
