@@ -42,6 +42,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.languages import LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
+from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
@@ -4380,6 +4381,13 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
                     value=active_card_id == card_id,
                     key=f"material_card_{card_id}_selected",
                 )
+            if not is_local:
+                _render_api_test_control(
+                    settings,
+                    f"material:{card_id}",
+                    lambda: test_material_source_credentials(provider, api_key),
+                    widget_key=f"api_test_material_{card_id}",
+                )
             save_card = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"material_card_{card_id}_save")
         if save_card:
             cards[index] = {**card, "api_key": str(api_key or "").strip(), "enabled": bool(enabled)}
@@ -4436,6 +4444,61 @@ def _credential_status(value: Any, *, local: bool = False, required: bool = True
 def _render_credential_status(value: Any, *, local: bool = False, required: bool = True) -> None:
     kind, label = _credential_status(value, local=local, required=required)
     _api_status_badge(label, kind)
+
+
+def _persist_api_test_result(settings: dict[str, Any], test_key: str, result: dict[str, Any]) -> dict[str, Any]:
+    """Persist only the safe diagnosis fields; never store credentials or endpoint details."""
+    safe_result = {
+        "status": str(result.get("status") or "error"),
+        "message": str(result.get("message") or "A chamada de diagnóstico falhou.")[:240],
+        "status_code": result.get("status_code"),
+        "checked_at": str(result.get("checked_at") or ""),
+    }
+    stored = settings.get("api_test_results")
+    if not isinstance(stored, dict):
+        stored = {}
+    stored[str(test_key)] = safe_result
+    settings["api_test_results"] = stored
+    write_json("settings.json", settings)
+    return safe_result
+
+
+def _render_api_test_feedback(settings: dict[str, Any], test_key: str, result: dict[str, Any] | None = None) -> None:
+    """Render the same compact green/red feedback for every non-LLM API card."""
+    current = result
+    if current is None:
+        stored = settings.get("api_test_results")
+        current = stored.get(test_key) if isinstance(stored, dict) else None
+    if not isinstance(current, dict):
+        return
+    status = str(current.get("status") or "error")
+    language = current_ui_language()
+    if status == "success":
+        st.success(ui_text("Último teste: API Key OK", language))
+        return
+    if status == "missing":
+        st.error(ui_text("Último teste: falta configuração", language))
+        return
+    if status == "unsupported":
+        st.warning(ui_text("Último teste: requer autorização ou endpoint seguro", language))
+        return
+    code = current.get("status_code")
+    suffix = f" (HTTP {int(code)})" if isinstance(code, int) and code > 0 else ""
+    st.error(ui_text("Último teste: chamada falhou", language) + suffix)
+
+
+def _render_api_test_control(settings: dict[str, Any], test_key: str, callback: Any, *, widget_key: str) -> None:
+    """Render a form-safe diagnostic button and persist its redacted result."""
+    if st.form_submit_button("Testar chamada API", use_container_width=True, key=widget_key):
+        with st.spinner(ui_text("A testar chamada API…", current_ui_language())):
+            try:
+                result = callback()
+            except Exception:
+                result = {"status": "error", "message": "A chamada de diagnóstico falhou."}
+        _persist_api_test_result(settings, test_key, result)
+        _render_api_test_feedback(settings, test_key, result)
+    else:
+        _render_api_test_feedback(settings, test_key)
 
 
 def _llm_card_config_status(card: dict[str, Any]) -> tuple[str, str]:
@@ -4649,6 +4712,12 @@ def render_settings():
                     with kaggle_cols[2]:
                         kaggle_kernel_slug = text_setting("Slug da kernel", "kaggle_kernel_slug", help_text="Identificador da kernel remota, por exemplo thunderbolt-niche-finder.")
                     _render_credential_status(kaggle_api_key)
+                    _render_api_test_control(
+                        settings,
+                        "kaggle",
+                        lambda: test_kaggle_credentials(kaggle_username, kaggle_api_key),
+                        widget_key="api_test_kaggle",
+                    )
 
                 with st.expander("Niche Finder — Apify", expanded=False):
                     st.caption("O token fica guardado apenas no storage local. A aba Niche Finder Apify só usa este serviço depois de clicar no botão de pesquisa.")
@@ -4662,6 +4731,12 @@ def render_settings():
                     with apify_cols[3]:
                         apify_run_timeout = st.number_input("Limite da execução (s)", min_value=30, max_value=7200, value=int(settings.get("apify_run_timeout_seconds", 900)), step=30)
                     _render_credential_status(apify_api_token)
+                    _render_api_test_control(
+                        settings,
+                        "apify",
+                        lambda: test_apify_credentials(apify_api_token),
+                        widget_key="api_test_apify",
+                    )
 
                 render_llm_provider_cards(settings, embedded=True)
 
@@ -4675,6 +4750,12 @@ def render_settings():
                         gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
                         gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
                     _render_credential_status(gemini_image_api_key)
+                    _render_api_test_control(
+                        settings,
+                        "nano_banana",
+                        lambda: test_nano_banana_credentials(gemini_image_api_key, gemini_image_model),
+                        widget_key="api_test_nano_banana",
+                    )
 
 
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
@@ -4707,11 +4788,65 @@ def render_settings():
                         suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
                         suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
 
+                    st.markdown(f"**{ui_text('Testar credenciais TTS e música', current_ui_language())}**")
+                    voice_test_cols = st.columns(3)
+                    with voice_test_cols[0]:
+                        _render_api_test_control(
+                            settings,
+                            "voice:azure_speech",
+                            lambda: test_voice_provider("azure_speech", {"azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region}),
+                            widget_key="api_test_voice_azure",
+                        )
+                        _render_api_test_control(
+                            settings,
+                            "voice:siliconflow",
+                            lambda: test_voice_provider("siliconflow", {"siliconflow_tts_api_key": siliconflow_tts_api_key}),
+                            widget_key="api_test_voice_siliconflow",
+                        )
+                        _render_api_test_control(
+                            settings,
+                            "voice:minimax",
+                            lambda: test_voice_provider("minimax", {"minimax_tts_api_key": minimax_tts_api_key, "minimax_tts_base_url": minimax_tts_base_url}),
+                            widget_key="api_test_voice_minimax",
+                        )
+                    with voice_test_cols[1]:
+                        _render_api_test_control(
+                            settings,
+                            "voice:elevenlabs",
+                            lambda: test_voice_provider("elevenlabs", {"elevenlabs_api_key": elevenlabs_api_key}),
+                            widget_key="api_test_voice_elevenlabs",
+                        )
+                        _render_api_test_control(
+                            settings,
+                            "voice:chatterbox",
+                            lambda: test_voice_provider("chatterbox", {"chatterbox_api_key": chatterbox_api_key, "chatterbox_base_url": chatterbox_base_url}),
+                            widget_key="api_test_voice_chatterbox",
+                        )
+                    with voice_test_cols[2]:
+                        _render_api_test_control(
+                            settings,
+                            "voice:sonilo",
+                            lambda: test_voice_provider("sonilo", {"sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url}),
+                            widget_key="api_test_voice_sonilo",
+                        )
+                        _render_api_test_control(
+                            settings,
+                            "voice:suno",
+                            lambda: test_voice_provider("suno", {"suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint}),
+                            widget_key="api_test_voice_suno",
+                        )
+
                 with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
                     st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
                     tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
                     _render_credential_status(tiktok_client_key)
                     tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
+                    _render_api_test_control(
+                        settings,
+                        "tiktok",
+                        lambda: test_tiktok_credentials(tiktok_client_key, tiktok_client_secret, settings.get("tiktok_access_token", "")),
+                        widget_key="api_test_tiktok",
+                    )
 
                 with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
@@ -4720,6 +4855,12 @@ def render_settings():
                     upload_post_username = text_setting("Upload-Post username", "upload_post_username")
                     upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
                     upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
+                    _render_api_test_control(
+                        settings,
+                        "upload_post",
+                        lambda: test_upload_post_credentials(upload_post_api_key, settings.get("upload_post_base_url", "https://api.upload-post.com/api")),
+                        widget_key="api_test_upload_post",
+                    )
 
                 with st.expander("Postiz — API key, integração e MCP", expanded=False):
                     st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
@@ -4735,6 +4876,12 @@ def render_settings():
                         postiz_mcp_url = text_setting("Postiz MCP URL", "postiz_mcp_url", help_text="Cloud: https://api.postiz.com/mcp · o cliente acrescenta a API key conforme o modo escolhido.")
                         postiz_auto_publish = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)))
                     st.caption("No Upload, a aba Postiz permite carregar as integrações e enviar vídeos manualmente. No fluxo recomendado, Postiz só é tentado depois da API Oficial e do Upload directo.")
+                    _render_api_test_control(
+                        settings,
+                        "postiz",
+                        lambda: test_postiz_credentials(postiz_api_key, postiz_base_url),
+                        widget_key="api_test_postiz",
+                    )
 
                 save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
                 if save_all_settings:
