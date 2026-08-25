@@ -223,12 +223,33 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
     _update(task_id, stage="keywords", state="doing", progress=48)
     variant = creative.get("thumbnail_variant") if isinstance(creative.get("thumbnail_variant"), dict) else {}
-    prompt_payload = {"topic": topic, "title": title, "keywords": keywords, "thumbnail": variant, "requirements": {"aspect_ratio": "16:9", "resolution": "1920x1080", "max_elements": 3, "max_overlay_words": 4}}
+    prompt_payload = {
+        "topic": topic,
+        "title": title,
+        "keywords": keywords,
+        "thumbnail": variant,
+        "requirements": {
+            "aspect_ratio": "16:9",
+            "resolution": "1920x1080",
+            "max_elements": 3,
+            "max_overlay_words": 4,
+            "lettering_required": True,
+            "lettering_text": str(variant.get("overlay_text") or ""),
+            "lettering_prompt": str(variant.get("lettering_prompt") or ""),
+        },
+    }
     prompt_artifact = _save_json_artifact(task_id, "thumbnail-prompt", prompt_payload)
     artifacts = {**artifacts, "thumbnail_prompt_json": prompt_artifact}
     _update(task_id, stage="thumbnail_prompt", state="doing", progress=52, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
     _update(task_id, stage="thumbnail", state="doing", progress=56, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
-    thumbnail_path = generate_thumbnail_image(settings, str(variant.get("image_prompt") or ""), topic=topic, variant_index=0)
+    thumbnail_path = generate_thumbnail_image(
+        settings,
+        str(variant.get("image_prompt") or ""),
+        topic=topic,
+        variant_index=0,
+        lettering_text=str(variant.get("overlay_text") or ""),
+        lettering_prompt=str(variant.get("lettering_prompt") or ""),
+    )
     artifacts["thumbnail"] = str(thumbnail_path)
     _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=62)
 

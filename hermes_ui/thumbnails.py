@@ -205,6 +205,8 @@ def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple
         record["prompt"],
         topic=record["title"] or record["topic"],
         variant_index=record["variant_index"],
+        lettering_text=record.get("thumbnail_text") or "",
+        lettering_prompt=record.get("lettering_prompt") or "",
     )
     _persist_thumbnail_result(tasks, task, record, image_path)
     write_json("tasks.json", tasks)
@@ -258,6 +260,8 @@ def regenerate_thumbnail_prompt_and_image(
         prompt,
         topic=record["title"] or record["topic"],
         variant_index=record["variant_index"],
+        lettering_text=str((variant or {}).get("overlay_text") or ""),
+        lettering_prompt=str((variant or {}).get("lettering_prompt") or ""),
     )
     _persist_thumbnail_result(tasks, task, record, image_path, variant=variant, source="prompt_regenerated")
     write_json("tasks.json", tasks)
@@ -298,6 +302,7 @@ def regenerate_thumbnail_lettering(
         topic=record["title"] or record["topic"],
         variant_index=record["variant_index"],
         reference_image=previous_image,
+        lettering_prompt=edit_prompt,
     )
     variant = _variant_for_record(record)
     variant["image_prompt"] = base_prompt
