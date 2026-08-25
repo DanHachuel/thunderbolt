@@ -2152,7 +2152,16 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
                             if st.button("Gerar imagem com Nano Banana", key=f"{prefix}_general_generate_thumbnail_{channel['id']}", use_container_width=True):
                                 try:
-                                    thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                    thumbnail_path = str(
+                                        generate_thumbnail_image(
+                                            read_json("settings.json", {}),
+                                            variant.get("image_prompt", ""),
+                                            topic=str(payload.get("topic") or ""),
+                                            variant_index=variant_index,
+                                            lettering_text=str(variant.get("overlay_text") or payload.get("thumbnail_text") or ""),
+                                            lettering_prompt=str(variant.get("lettering_prompt") or ""),
+                                        )
+                                    )
                                     variant["image_path"] = thumbnail_path
                                     payload["thumbnail_path"] = thumbnail_path
                                     payload["thumbnail_status"] = "generated"
@@ -2216,7 +2225,16 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
                         if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", use_container_width=True):
                             try:
-                                thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                thumbnail_path = str(
+                                    generate_thumbnail_image(
+                                        read_json("settings.json", {}),
+                                        variant.get("image_prompt", ""),
+                                        topic=str(payload.get("topic") or ""),
+                                        variant_index=variant_index,
+                                        lettering_text=str(variant.get("overlay_text") or payload.get("thumbnail_text") or ""),
+                                        lettering_prompt=str(variant.get("lettering_prompt") or ""),
+                                    )
+                                )
                                 variant["image_path"] = thumbnail_path
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
