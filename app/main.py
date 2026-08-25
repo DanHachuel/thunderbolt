@@ -1718,13 +1718,16 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                 if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", use_container_width=True):
                     if selected_one is None:
                         st.error("Seleccione primeiro um canal.")
-                    elif not topic_for_creative:
-                        st.error("Escreva ou gere primeiro um tópico/briefing.")
                     else:
                         try:
-                            generated = generate_creative_for_ui(read_json("settings.json", {}), selected_one, topic_for_creative, topic_source="llm" if st.session_state.get("new_video_topic_meta") else "manual")
+                            if not topic_for_creative:
+                                topic_result = generate_topic_for_ui(read_json("settings.json", {}), selected_one)
+                                topic_for_creative = str(topic_result["topic"]).strip()
+                                st.session_state["new_video_topic"] = topic_for_creative
+                                st.session_state["new_video_topic_meta"] = topic_result
+                            generated = generate_creative_for_ui(read_json("settings.json", {}), selected_one, topic_for_creative, topic_source="llm")
                             st.session_state["new_video_creative_payload"] = generated
-                            st.success("Título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
+                            st.success("Tema, título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
                             st.rerun()
                         except CreativeGenerationError as exc:
                             st.error(str(exc))
@@ -1825,9 +1828,18 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.success(f"Lote geral {batch['id']} criado com {len(tasks)} tarefas independentes, uma por canal.")
                 else:
                     topic_value = str(st.session_state.get("new_video_topic", "") or "").strip()
-                    if not topic_value or not selected:
-                        st.error("Escreva ou gere um tópico e seleccione um canal.")
+                    if not selected:
+                        st.error("Seleccione um canal.")
                     else:
+                        if not topic_value:
+                            try:
+                                topic_result = generate_topic_for_ui(read_json("settings.json", {}), selected_one or {})
+                                topic_value = str(topic_result["topic"]).strip()
+                                st.session_state["new_video_topic"] = topic_value
+                                st.session_state["new_video_topic_meta"] = topic_result
+                            except CreativeGenerationError as exc:
+                                st.error(f"Não foi possível gerar automaticamente o tema: {exc}")
+                                st.stop()
                         quantity_value = int(quantity if mode == "same_channel" else 1)
                         payload = dict(st.session_state.get("new_video_creative_payload") or {})
                         if not payload.get("title") or not payload.get("thumbnail_variants"):
@@ -3169,7 +3181,8 @@ def render_upload_conventional():
                 tags_raw = st.text_input("Tags separadas por vírgula", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"yt_tags_{task['id']}")
                 yt_cols = st.columns(3)
                 with yt_cols[0]:
-                    privacy_status = st.selectbox("Privacidade", ["private", "unlisted", "public"], key=f"yt_privacy_{task['id']}")
+                    privacy_status = st.selectbox("Privacidade", ["private", "unlisted", "public"], index=1, key=f"yt_privacy_{task['id']}")
+                    st.caption("Fluxo recomendado: não listado · incorporação activa · permitir remix de áudio e vídeo · publicar no feed de subscritos.")
                 with yt_cols[1]:
                     category_id = st.text_input("Category ID", value="22", key=f"yt_category_{task['id']}")
                 with yt_cols[2]:
