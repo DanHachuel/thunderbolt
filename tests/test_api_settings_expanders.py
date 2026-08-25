@@ -74,6 +74,33 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('st.success("Último teste: API Key OK")', MAIN_SOURCE)
         self.assertNotIn('API OK — {_safe_url(base_url)} respondeu com {len(models)} modelo(s).', MAIN_SOURCE)
 
+    def test_every_non_llm_api_key_expander_has_a_diagnostic_control(self):
+        expected_controls = (
+            'widget_key="api_test_kaggle"',
+            'widget_key="api_test_apify"',
+            'widget_key="api_test_nano_banana"',
+            'widget_key="api_test_voice_azure"',
+            'widget_key="api_test_voice_siliconflow"',
+            'widget_key="api_test_voice_minimax"',
+            'widget_key="api_test_voice_elevenlabs"',
+            'widget_key="api_test_voice_chatterbox"',
+            'widget_key="api_test_voice_sonilo"',
+            'widget_key="api_test_voice_suno"',
+            'widget_key="api_test_tiktok"',
+            'widget_key="api_test_upload_post"',
+            'widget_key="api_test_postiz"',
+        )
+        for control in expected_controls:
+            self.assertIn(control, MAIN_SOURCE)
+        self.assertIn('if st.form_submit_button("Testar chamada API"', MAIN_SOURCE)
+        self.assertIn('settings["api_test_results"] = stored', MAIN_SOURCE)
+        self.assertNotIn('widget_key="api_test_llm"', MAIN_SOURCE)
+
+    def test_material_remote_cards_have_diagnostic_controls_but_local_source_does_not_fake_one(self):
+        self.assertIn('test_material_source_credentials(provider, api_key)', MAIN_SOURCE)
+        self.assertIn('f"material:{card_id}"', MAIN_SOURCE)
+        self.assertIn('if not is_local:', MAIN_SOURCE)
+
     def test_new_api_tab_titles_have_all_language_translations(self):
         for language in LANGUAGE_CODES:
             self.assertIn("API Keys", UI_TRANSLATIONS[language])
@@ -97,6 +124,20 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         for language in LANGUAGE_CODES:
             self.assertIn("Niche Finder — Kaggle", UI_TRANSLATIONS[language])
             self.assertIn("Niche Finder — Apify", UI_TRANSLATIONS[language])
+
+    def test_api_test_feedback_has_all_language_translations(self):
+        labels = (
+            "Testar chamada API",
+            "A testar chamada API…",
+            "Último teste: API Key OK",
+            "Último teste: falta configuração",
+            "Último teste: requer autorização ou endpoint seguro",
+            "Último teste: chamada falhou",
+            "Testar credenciais TTS e música",
+        )
+        for language in LANGUAGE_CODES:
+            for label in labels:
+                self.assertIn(label, UI_TRANSLATIONS[language])
 
 
 if __name__ == "__main__":
