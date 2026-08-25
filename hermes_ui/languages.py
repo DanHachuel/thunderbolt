@@ -141,6 +141,45 @@ UI_TRANSLATIONS: dict[str, dict[str, str]] = {
 }
 
 
+# Labels introduced by the reorganised sidebar. They are merged into the
+# existing UI translation index so every navigation control uses the same
+# translation path as the legacy pages.
+UI_NAV_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "Arquivos Base": "Arquivos Base", "Pipeline Vídeos": "Pipeline Vídeos", "Canais e Perfis de Vídeos": "Canais e Perfis de Vídeos", "Canais YouTube": "Canais YouTube", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Backlog Vídeos", "Música": "Música", "Upload Música": "Upload Música", "Geração de Conteúdo IA": "Geração de Conteúdo IA", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "Analista Growth Youtube", "Analista Growth Tiktok": "Analista Growth Tiktok", "Analista Growth Instagram": "Analista Growth Instagram", "Documentação": "Documentação", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Músicas": "Pipeline Músicas", "módulos disponíveis": "módulos disponíveis",
+    },
+    "en": {
+        "Arquivos Base": "Base Files", "Pipeline Vídeos": "Video Pipeline", "Canais e Perfis de Vídeos": "Video Channels & Profiles", "Canais YouTube": "YouTube Channels", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video Backlog", "Música": "Music", "Upload Música": "Music Upload", "Geração de Conteúdo IA": "AI Content Generation", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "YouTube Growth Analyst", "Analista Growth Tiktok": "TikTok Growth Analyst", "Analista Growth Instagram": "Instagram Growth Analyst", "Documentação": "Documentation", "Tutorial Kaggle": "Kaggle Tutorial", "Tutorial Apify": "Apify Tutorial", "Pipeline Músicas": "Music Pipeline", "módulos disponíveis": "available modules",
+    },
+    "zh": {
+        "Arquivos Base": "基础文件", "Pipeline Vídeos": "视频流程", "Canais e Perfis de Vídeos": "视频频道与资料", "Canais YouTube": "YouTube 频道", "Facebook Pages": "Facebook 页面", "Prompt Masters": "主提示词", "Backlog Vídeos": "视频待办", "Música": "音乐", "Upload Música": "音乐上传", "Geração de Conteúdo IA": "AI 内容生成", "Motion Control": "动作控制", "UGC Products": "UGC 产品", "Growth": "增长", "Analista Growth Youtube": "YouTube 增长分析师", "Analista Growth Tiktok": "TikTok 增长分析师", "Analista Growth Instagram": "Instagram 增长分析师", "Documentação": "文档", "Tutorial Kaggle": "Kaggle 教程", "Tutorial Apify": "Apify 教程", "Pipeline Músicas": "音乐流程", "módulos disponíveis": "可用模块",
+    },
+    "de": {
+        "Arquivos Base": "Basisdateien", "Pipeline Vídeos": "Video-Pipeline", "Canais e Perfis de Vídeos": "Videokanäle und Profile", "Canais YouTube": "YouTube-Kanäle", "Facebook Pages": "Facebook-Seiten", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video-Backlog", "Música": "Musik", "Upload Música": "Musik-Upload", "Geração de Conteúdo IA": "KI-Inhaltserstellung", "Motion Control": "Motion Control", "UGC Products": "UGC-Produkte", "Growth": "Wachstum", "Analista Growth Youtube": "YouTube-Wachstumsanalyst", "Analista Growth Tiktok": "TikTok-Wachstumsanalyst", "Analista Growth Instagram": "Instagram-Wachstumsanalyst", "Documentação": "Dokumentation", "Tutorial Kaggle": "Kaggle-Tutorial", "Tutorial Apify": "Apify-Tutorial", "Pipeline Músicas": "Musik-Pipeline", "módulos disponíveis": "verfügbare Module",
+    },
+    "vi": {
+        "Arquivos Base": "Tệp cơ sở", "Pipeline Vídeos": "Quy trình video", "Canais e Perfis de Vídeos": "Kênh và hồ sơ video", "Canais YouTube": "Kênh YouTube", "Facebook Pages": "Trang Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Danh sách video", "Música": "Âm nhạc", "Upload Música": "Tải nhạc lên", "Geração de Conteúdo IA": "Tạo nội dung AI", "Motion Control": "Điều khiển chuyển động", "UGC Products": "Sản phẩm UGC", "Growth": "Tăng trưởng", "Analista Growth Youtube": "Chuyên viên phân tích tăng trưởng YouTube", "Analista Growth Tiktok": "Chuyên viên phân tích tăng trưởng TikTok", "Analista Growth Instagram": "Chuyên viên phân tích tăng trưởng Instagram", "Documentação": "Tài liệu", "Tutorial Kaggle": "Hướng dẫn Kaggle", "Tutorial Apify": "Hướng dẫn Apify", "Pipeline Músicas": "Quy trình âm nhạc", "módulos disponíveis": "mô-đun khả dụng",
+    },
+    "tr": {
+        "Arquivos Base": "Temel Dosyalar", "Pipeline Vídeos": "Video Akışı", "Canais e Perfis de Vídeos": "Video Kanalları ve Profilleri", "Canais YouTube": "YouTube Kanalları", "Facebook Pages": "Facebook Sayfaları", "Prompt Masters": "Prompt Master'lar", "Backlog Vídeos": "Video Bekleme Listesi", "Música": "Müzik", "Upload Música": "Müzik Yükleme", "Geração de Conteúdo IA": "Yapay Zekâ İçeriği Oluşturma", "Motion Control": "Hareket Kontrolü", "UGC Products": "UGC Ürünleri", "Growth": "Büyüme", "Analista Growth Youtube": "YouTube Büyüme Analisti", "Analista Growth Tiktok": "TikTok Büyüme Analisti", "Analista Growth Instagram": "Instagram Büyüme Analisti", "Documentação": "Dokümantasyon", "Tutorial Kaggle": "Kaggle Eğitimi", "Tutorial Apify": "Apify Eğitimi", "Pipeline Músicas": "Müzik Akışı", "módulos disponíveis": "kullanılabilir modüller",
+    },
+    "ru": {
+        "Arquivos Base": "Базовые файлы", "Pipeline Vídeos": "Конвейер видео", "Canais e Perfis de Vídeos": "Каналы и профили видео", "Canais YouTube": "Каналы YouTube", "Facebook Pages": "Страницы Facebook", "Prompt Masters": "Мастер-промпты", "Backlog Vídeos": "Очередь видео", "Música": "Музыка", "Upload Música": "Загрузка музыки", "Geração de Conteúdo IA": "Генерация контента ИИ", "Motion Control": "Управление движением", "UGC Products": "UGC-продукты", "Growth": "Рост", "Analista Growth Youtube": "Аналитик роста YouTube", "Analista Growth Tiktok": "Аналитик роста TikTok", "Analista Growth Instagram": "Аналитик роста Instagram", "Documentação": "Документация", "Tutorial Kaggle": "Руководство Kaggle", "Tutorial Apify": "Руководство Apify", "Pipeline Músicas": "Конвейер музыки", "módulos disponíveis": "доступные модули",
+    },
+    "es": {
+        "Arquivos Base": "Archivos base", "Pipeline Vídeos": "Flujo de vídeos", "Canais e Perfis de Vídeos": "Canales y perfiles de vídeo", "Canais YouTube": "Canales de YouTube", "Facebook Pages": "Páginas de Facebook", "Prompt Masters": "Prompts maestros", "Backlog Vídeos": "Cola de vídeos", "Música": "Música", "Upload Música": "Subir música", "Geração de Conteúdo IA": "Generación de contenido con IA", "Motion Control": "Control de movimiento", "UGC Products": "Productos UGC", "Growth": "Crecimiento", "Analista Growth Youtube": "Analista de crecimiento de YouTube", "Analista Growth Tiktok": "Analista de crecimiento de TikTok", "Analista Growth Instagram": "Analista de crecimiento de Instagram", "Documentação": "Documentación", "Tutorial Kaggle": "Tutorial de Kaggle", "Tutorial Apify": "Tutorial de Apify", "Pipeline Músicas": "Flujo de música", "módulos disponíveis": "módulos disponibles",
+    },
+    "id": {
+        "Arquivos Base": "File Dasar", "Pipeline Vídeos": "Alur Video", "Canais e Perfis de Vídeos": "Kanal dan Profil Video", "Canais YouTube": "Kanal YouTube", "Facebook Pages": "Halaman Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Antrean Video", "Música": "Musik", "Upload Música": "Unggah Musik", "Geração de Conteúdo IA": "Pembuatan Konten AI", "Motion Control": "Kontrol Gerakan", "UGC Products": "Produk UGC", "Growth": "Pertumbuhan", "Analista Growth Youtube": "Analis Pertumbuhan YouTube", "Analista Growth Tiktok": "Analis Pertumbuhan TikTok", "Analista Growth Instagram": "Analis Pertumbuhan Instagram", "Documentação": "Dokumentasi", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Músicas": "Alur Musik", "módulos disponíveis": "modul tersedia",
+    },
+    "it": {
+        "Arquivos Base": "File di base", "Pipeline Vídeos": "Pipeline video", "Canais e Perfis de Vídeos": "Canali e profili video", "Canais YouTube": "Canali YouTube", "Facebook Pages": "Pagine Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Coda video", "Música": "Musica", "Upload Música": "Caricamento musica", "Geração de Conteúdo IA": "Generazione di contenuti IA", "Motion Control": "Controllo del movimento", "UGC Products": "Prodotti UGC", "Growth": "Crescita", "Analista Growth Youtube": "Analista della crescita YouTube", "Analista Growth Tiktok": "Analista della crescita TikTok", "Analista Growth Instagram": "Analista della crescita Instagram", "Documentação": "Documentazione", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Músicas": "Pipeline musicale", "módulos disponíveis": "moduli disponibili",
+    },
+}
+for _language_code, _navigation_values in UI_NAV_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_navigation_values)
+
+
 _TAB_LABELS = (
     "Blueprints", "Brandings", "Pesquisa pública", "Cadastro manual", "Contas cadastradas", "Biblioteca",
     "Importar do YouTube", "Canais em lote gmail", "Criar vídeo", "Vídeos", "Novo roteiro/letra", "Histórico guardado",
