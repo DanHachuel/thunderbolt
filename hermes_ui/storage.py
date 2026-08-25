@@ -34,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "metadata_edits.json": [],
         "python_editor_edits.json": [],
         "scripts.json": [],
+        "drafts.json": [],
         "mcp_server.json": {
         "enabled": False,
         "host": "127.0.0.1",
