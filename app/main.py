@@ -22,6 +22,7 @@ except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
+from hermes_ui.drafts import save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
@@ -45,6 +46,7 @@ from hermes_ui.script_documents import list_script_documents, read_script_docume
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from hermes_ui.thumbnails import list_thumbnail_tasks, regenerate_thumbnail
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -520,17 +522,19 @@ def generate_video_content_for_ui(
     subject: str,
     language: str,
     generation_settings: dict[str, Any] | None = None,
+    blueprint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate the subject, script and English keywords in one MoneyPrinter-style action."""
     subject = str(subject or "").strip()
     topic_result: dict[str, Any] | None = None
     if not subject:
-        topic_result = generate_topic_for_ui(settings, channel)
+        selected_blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
+        topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)
         subject = str(topic_result.get("topic") or "").strip()
     if not subject:
         raise CreativeGenerationError("A IA não devolveu um Video Subject válido.")
 
-    blueprint = blueprint_for_channel(channel)
+    blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
     script_result = generate_script_document(
         settings,
         document_type="Roteiro de vídeo",
@@ -561,7 +565,7 @@ def generate_video_content_for_ui(
     }
 
 
-def _generate_video_content_callback(prefix: str, channel: dict, fallback_language: str) -> None:
+def _generate_video_content_callback(prefix: str, channel: dict, fallback_language: str, blueprint: dict[str, Any] | None = None) -> None:
     """Streamlit callback for the single button below Subject, Script and Keywords."""
     settings = read_json("settings.json", {})
     generation_settings = {
@@ -577,17 +581,30 @@ def _generate_video_content_callback(prefix: str, channel: dict, fallback_langua
             generation_settings["video_subject"],
             generation_settings["script_language"],
             generation_settings=generation_settings,
+            blueprint=blueprint,
         )
         st.session_state[f"{prefix}_video_subject"] = result["topic"]
         st.session_state[f"{prefix}_video_script"] = result["script"]
         st.session_state[f"{prefix}_video_keywords"] = ", ".join(result["keywords"])
-        st.session_state["new_video_topic"] = result["topic"]
-        st.session_state["new_video_topic_meta"] = result.get("topic_result") or {
+        if prefix == "pipeline_scripts":
+            script_result = result.get("script_result") or {}
+            st.session_state["script_draft"] = {
+                "title": result["topic"],
+                "summary": str(script_result.get("summary") or ""),
+                "content": result["script"],
+                "keywords": result["keywords"],
+            }
+            st.session_state["script_draft_title"] = result["topic"]
+            st.session_state["script_draft_summary"] = str(script_result.get("summary") or "")
+            st.session_state["script_draft_content"] = result["script"]
+            st.session_state["script_draft_keywords"] = ", ".join(result["keywords"])
+        st.session_state[f"{prefix}_topic"] = result["topic"]
+        st.session_state[f"{prefix}_topic_meta"] = result.get("topic_result") or {
             "topic": result["topic"],
             "topic_source": result.get("topic_source", "manual"),
         }
         # A subject change invalidates a previously generated title/thumbnail package.
-        st.session_state.pop("new_video_creative_payload", None)
+        st.session_state.pop(f"{prefix}_creative_payload", None)
         st.session_state[f"{prefix}_generate_content_notice"] = "Tema, roteiro e palavras-chave gerados com IA."
         st.session_state.pop(f"{prefix}_generate_content_error", None)
     except CreativeGenerationError as exc:
@@ -595,8 +612,57 @@ def _generate_video_content_callback(prefix: str, channel: dict, fallback_langua
         st.session_state.pop(f"{prefix}_generate_content_notice", None)
 
 
-def _video_topic_source(subject: str) -> str:
-    meta = st.session_state.get("new_video_topic_meta") or {}
+def _save_pipeline_draft_callback(
+    prefix: str,
+    draft_kind: str,
+    page_title: str,
+    *,
+    channel: dict[str, Any] | None = None,
+    blueprint: dict[str, Any] | None = None,
+    document_type: str = "video_script",
+    title: str = "",
+    brief: str = "",
+) -> None:
+    """Persist the current editable pipeline fields as a local draft."""
+    channel = channel or {}
+    blueprint = blueprint or {}
+    is_script_draft = prefix == "pipeline_scripts"
+    subject = str(st.session_state.get(f"{prefix}_video_subject") or "").strip()
+    script = str(st.session_state.get(f"{prefix}_video_script") or "").strip()
+    keywords = str(st.session_state.get(f"{prefix}_video_keywords") or (st.session_state.get("script_draft_keywords") if is_script_draft else "") or "").strip()
+    draft_title = str((st.session_state.get("script_draft_title") if is_script_draft else "") or title or subject or page_title).strip()
+    draft_brief = str((st.session_state.get("script_brief") if is_script_draft else "") or brief or subject).strip()
+    draft_content = str((st.session_state.get("script_draft_content") if is_script_draft else "") or script).strip()
+    if not any((draft_title, draft_brief, draft_content, keywords)):
+        st.session_state[f"{prefix}_save_draft_error"] = "Preencha pelo menos um campo antes de guardar o rascunho."
+        st.session_state.pop(f"{prefix}_save_draft_notice", None)
+        return
+
+    record = save_draft(
+        {
+            "draft_kind": draft_kind,
+            "page": page_title,
+            "title": draft_title,
+            "brief": draft_brief,
+            "content": draft_content,
+            "video_subject": subject,
+            "video_script": script,
+            "video_keywords": keywords,
+            "summary": str((st.session_state.get("script_draft_summary") if is_script_draft else "") or "").strip(),
+            "document_type": document_type,
+            "language": str(st.session_state.get(f"{prefix}_script_language") or "").strip(),
+            "channel_id": str(channel.get("id") or ""),
+            "channel_name": str(channel.get("name") or "Documento independente"),
+            "blueprint_id": str(blueprint.get("id") or ""),
+            "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        }
+    )
+    st.session_state[f"{prefix}_save_draft_notice"] = f"Rascunho guardado localmente: {record['id']}."
+    st.session_state.pop(f"{prefix}_save_draft_error", None)
+
+
+def _video_topic_source(subject: str, prefix: str = "new_video") -> str:
+    meta = st.session_state.get(f"{prefix}_topic_meta") or {}
     generated_topic = str(meta.get("topic") or "").strip() if isinstance(meta, dict) else ""
     return "llm" if generated_topic and generated_topic == str(subject or "").strip() and meta.get("topic_source") == "llm" else "manual"
 
@@ -645,6 +711,7 @@ def render_video_generation_settings(
     current_language: str = "",
     channel: dict[str, Any] | None = None,
     generate_content_callback: Any | None = None,
+    save_draft_callback: Any | None = None,
 ) -> dict[str, Any]:
     """Render the shared MoneyPrinter-style settings and return a serializable payload."""
     settings: dict[str, Any] = {}
@@ -700,6 +767,20 @@ def render_video_generation_settings(
             st.success(st.session_state[f"{prefix}_generate_content_notice"])
         if st.session_state.get(f"{prefix}_generate_content_error"):
             st.error(st.session_state[f"{prefix}_generate_content_error"])
+
+    if save_draft_callback is not None:
+        st.button(
+            "Salvar rascunho",
+            key=f"{prefix}_save_draft",
+            use_container_width=True,
+            type="secondary",
+            icon=":material/save:",
+            on_click=save_draft_callback,
+        )
+        if st.session_state.get(f"{prefix}_save_draft_notice"):
+            st.success(st.session_state[f"{prefix}_save_draft_notice"])
+        if st.session_state.get(f"{prefix}_save_draft_error"):
+            st.error(st.session_state[f"{prefix}_save_draft_error"])
 
     st.markdown("### Video Settings")
     video_cols = st.columns(2)
@@ -1667,7 +1748,7 @@ def render_channels():
             render_channel_videos(channel)
 
 
-def render_new_video(page_title: str = "Criação de Vídeos"):
+def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "new_video"):
     st.title(page_title)
     create_tab = render_localized_tabs(["Criar vídeo"])[0]
     with create_tab:
@@ -1680,7 +1761,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                 "Modo de criação",
                 ["Canal específico", "Lote no mesmo canal", "Lote geral"],
                 horizontal=True,
-                key="new_video_mode",
+                key=f"{prefix}_mode",
             )
             mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
             selected_one: dict[str, Any] | None = None
@@ -1701,11 +1782,11 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.caption(f"**{channel.get('name', 'Canal')}** · {status} · Blueprint: **{summary['name']}** · Voz: {summary['voice'] or 'Sem voz padrão'}")
                 general_context = st.text_area(
                     "Contexto opcional para todos os canais",
-                    value=st.session_state.get("new_video_general_context", ""),
-                    key="new_video_general_context",
+                    value=st.session_state.get(f"{prefix}_general_context", ""),
+                    key=f"{prefix}_general_context",
                     placeholder="Opcional: campanha, época, evento ou restrição editorial comum. O tema final será individual por canal.",
                 )
-                if st.button("Gerar tópicos individuais para todos os canais", key="new_video_generate_general_topics", use_container_width=True):
+                if st.button("Gerar tópicos individuais para todos os canais", key=f"{prefix}_generate_general_topics", use_container_width=True):
                     settings = read_json("settings.json", {})
                     generated_topics: dict[str, dict[str, Any]] = {}
                     errors: list[str] = []
@@ -1719,9 +1800,9 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         for error in errors:
                             st.error(error)
                     else:
-                        st.session_state["new_video_general_topics"] = generated_topics
+                        st.session_state[f"{prefix}_general_topics"] = generated_topics
                         st.success(f"Foram gerados {len(generated_topics)} briefings independentes.")
-                general_topics = st.session_state.get("new_video_general_topics", {})
+                general_topics = st.session_state.get(f"{prefix}_general_topics", {})
                 if general_topics:
                     st.subheader("Briefings por canal")
                     for channel in all_channels:
@@ -1729,35 +1810,56 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         if result:
                             st.write(f"**{channel.get('name', 'Canal')}**")
                             st.caption(f"{result.get('niche', '')} · {result.get('angle', '')}")
-                            st.text_area("Briefing gerado", value=result.get("topic", ""), key=f"new_video_general_topic_{channel['id']}", height=80)
+                            st.text_area("Briefing gerado", value=result.get("topic", ""), key=f"{prefix}_general_topic_{channel['id']}", height=80)
                 generation_settings = render_video_generation_settings(
-                    "new_video",
+                    prefix,
                     current_language=str(st.session_state.get("video_language") or ""),
+                    save_draft_callback=lambda: _save_pipeline_draft_callback(
+                        prefix,
+                        "music" if page_title == "Criação de Músicas" else "video",
+                        page_title,
+                        channel=selected_one,
+                        blueprint=blueprint_for_channel(selected_one or {}),
+                    ),
                 )
             else:
                 if not active_channels:
                     st.warning("Não existem canais activos disponíveis para os modos de canal específico.")
                     selected = []
                 else:
-                    selected_one = st.selectbox("Canal", active_channels, format_func=lambda c: c["name"], key="new_video_channel")
+                    selected_one = st.selectbox("Canal", active_channels, format_func=lambda c: c["name"], key=f"{prefix}_channel")
                     selected = [selected_one["id"]]
                     # Intentionally sits between Canal and the generation settings, as requested.
                     render_channel_blueprint_panel(selected_one)
                     generation_settings = render_video_generation_settings(
-                        "new_video",
+                        prefix,
                         current_language=str(st.session_state.get("video_language") or ""),
                         channel=selected_one,
                         generate_content_callback=lambda: _generate_video_content_callback(
-                            "new_video",
+                            prefix,
                             selected_one,
                             str(st.session_state.get("video_language") or "pt"),
+                        ),
+                        save_draft_callback=lambda: _save_pipeline_draft_callback(
+                            prefix,
+                            "music" if page_title == "Criação de Músicas" else "video",
+                            page_title,
+                            channel=selected_one,
+                            blueprint=blueprint_for_channel(selected_one or {}),
                         ),
                     )
 
             if not generation_settings:
                 generation_settings = render_video_generation_settings(
-                    "new_video",
+                    prefix,
                     current_language=str(st.session_state.get("video_language") or ""),
+                    save_draft_callback=lambda: _save_pipeline_draft_callback(
+                        prefix,
+                        "music" if page_title == "Criação de Músicas" else "video",
+                        page_title,
+                        channel=selected_one,
+                        blueprint=blueprint_for_channel(selected_one or {}),
+                    ),
                 )
             wide_style_label = generation_settings["video_source"]
             style_ia = generation_settings.get("style_ia", "")
@@ -1765,47 +1867,47 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
             music_source = ""
             if wide_style_label == "Apenas Música":
                 st.caption("Apenas Música não gera Pexels/Pixabay nem fundo IA; o áudio musical será usado como elemento principal.")
-                music_source = st.radio("Fonte da música", ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API"], horizontal=True, key="new_video_music_source")
+                music_source = st.radio("Fonte da música", ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API"], horizontal=True, key=f"{prefix}_music_source")
                 if music_source == "Ficheiro existente":
                     local_music = list_music_files()
                     if local_music:
-                        selected_music = st.selectbox("Música local", local_music, format_func=lambda item: item.name, key="new_video_music_existing")
+                        selected_music = st.selectbox("Música local", local_music, format_func=lambda item: item.name, key=f"{prefix}_music_existing")
                         music_path = str(selected_music)
                     else:
                         st.warning("Ainda não existem músicas em storage/music. Escolha Carregar ficheiro ou Criar via Suno API.")
                 elif music_source == "Carregar ficheiro":
-                    uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key="new_video_music_upload")
-                    if uploaded_music and st.button("Guardar música local", key="new_video_music_store", use_container_width=True):
+                    uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key=f"{prefix}_music_upload")
+                    if uploaded_music and st.button("Guardar música local", key=f"{prefix}_music_store", use_container_width=True):
                         try:
                             stored_music = store_music_file(uploaded_music.name, uploaded_music.getvalue())
-                            st.session_state["new_video_music_path"] = str(stored_music)
+                            st.session_state[f"{prefix}_music_path"] = str(stored_music)
                             st.success(f"Música guardada em `{stored_music}`")
                         except (OSError, ValueError) as exc:
                             st.error(str(exc))
-                    music_path = st.session_state.get("new_video_music_path", "")
+                    music_path = st.session_state.get(f"{prefix}_music_path", "")
                 else:
-                    suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="new_video_suno_prompt")
-                    suno_title = st.text_input("Título da música", value=st.session_state.get("new_video_topic") or "Thunderbolt music", key="new_video_suno_title")
-                    if st.button("Solicitar música no Suno", key="new_video_suno_request", use_container_width=True):
+                    suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key=f"{prefix}_suno_prompt")
+                    suno_title = st.text_input("Título da música", value=st.session_state.get(f"{prefix}_topic") or "Thunderbolt music", key=f"{prefix}_suno_title")
+                    if st.button("Solicitar música no Suno", key=f"{prefix}_suno_request", use_container_width=True):
                         suno_result = request_suno_generation(read_json("settings.json", {}), suno_prompt, suno_title)
                         (st.success if suno_result["ok"] else st.error)(suno_result["message"])
                         if suno_result["ok"]:
                             try:
                                 generated = materialize_suno_audio(suno_result.get("data", {}), suno_title or "suno-generated.mp3")
                                 if generated:
-                                    st.session_state["new_video_music_path"] = str(generated)
+                                    st.session_state[f"{prefix}_music_path"] = str(generated)
                                     st.success(f"Música descarregada para `{generated}`")
                                 else:
                                     st.info("O pedido foi aceite, mas o endpoint ainda não devolveu uma URL de áudio. Consulte o estado no serviço Suno e adicione o ficheiro quando estiver pronto.")
                             except (OSError, requests.RequestException, ValueError) as exc:
                                 st.warning(f"Pedido criado, mas não foi possível descarregar o áudio: {exc}")
-                    music_path = st.session_state.get("new_video_music_path", "")
+                    music_path = st.session_state.get(f"{prefix}_music_path", "")
 
             payloads: dict[str, dict[str, Any]] = {}
             if mode == "general":
-                existing_topics = st.session_state.get("new_video_general_topics", {})
-                payloads = dict(st.session_state.get("new_video_general_payloads", {}))
-                if st.button("Gerar títulos e thumbnails para todos os canais", key="new_video_generate_general_creative", use_container_width=True):
+                existing_topics = st.session_state.get(f"{prefix}_general_topics", {})
+                payloads = dict(st.session_state.get(f"{prefix}_general_payloads", {}))
+                if st.button("Gerar títulos e thumbnails para todos os canais", key=f"{prefix}_generate_general_creative", use_container_width=True):
                     settings = read_json("settings.json", {})
                     new_payloads: dict[str, dict[str, Any]] = {}
                     errors: list[str] = []
@@ -1824,11 +1926,11 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         for error in errors:
                             st.error(error)
                     else:
-                        st.session_state["new_video_general_topics"] = {cid: {"topic": item["topic"], "topic_source": "llm"} for cid, item in new_payloads.items()}
-                        st.session_state["new_video_general_payloads"] = new_payloads
+                        st.session_state[f"{prefix}_general_topics"] = {cid: {"topic": item["topic"], "topic_source": "llm"} for cid, item in new_payloads.items()}
+                        st.session_state[f"{prefix}_general_payloads"] = new_payloads
                         payloads = new_payloads
                         st.success(f"Pacote criativo pronto para {len(new_payloads)} canais.")
-                payloads = st.session_state.get("new_video_general_payloads", payloads)
+                payloads = st.session_state.get(f"{prefix}_general_payloads", payloads)
                 for channel in all_channels:
                     payload = payloads.get(channel["id"])
                     if not payload:
@@ -1836,12 +1938,12 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     with st.expander(f"{channel.get('name', 'Canal')} — título e thumbnail", expanded=False):
                         title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
                         if title_options:
-                            selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"new_video_general_title_{channel['id']}")
+                            selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_general_title_{channel['id']}")
                             payload["title"] = selected_title
                         variants = payload.get("thumbnail_variants", [])
                         if variants:
                             labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
-                            selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"new_video_general_thumbnail_{channel['id']}")
+                            selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"{prefix}_general_thumbnail_{channel['id']}")
                             variant_index = labels.index(selected_variant_label)
                             variant = variants[variant_index]
                             payload["thumbnail_variant"] = variant
@@ -1849,13 +1951,13 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             payload["thumbnail_text"] = variant.get("overlay_text", "")
                             st.caption(f"{variant.get('composition', '')} · {variant.get('color_palette', '')}")
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                            if st.button("Gerar imagem com Nano Banana", key=f"new_video_general_generate_thumbnail_{channel['id']}", use_container_width=True):
+                            if st.button("Gerar imagem com Nano Banana", key=f"{prefix}_general_generate_thumbnail_{channel['id']}", use_container_width=True):
                                 try:
                                     thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
                                     variant["image_path"] = thumbnail_path
                                     payload["thumbnail_path"] = thumbnail_path
                                     payload["thumbnail_status"] = "generated"
-                                    st.session_state["new_video_general_payloads"] = payloads
+                                    st.session_state[f"{prefix}_general_payloads"] = payloads
                                     record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": channel.get("name") or "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
                                     st.success("Thumbnail gerada com Nano Banana.")
                                     st.rerun()
@@ -1870,7 +1972,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
             else:
                 topic_for_creative = str(generation_settings.get("video_subject") or "").strip()
-                if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", use_container_width=True):
+                if st.button("Gerar títulos e thumbnails com IA", key=f"{prefix}_generate_creative", use_container_width=True):
                     if selected_one is None:
                         st.error("Seleccione primeiro um canal.")
                     else:
@@ -1878,33 +1980,33 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             if not topic_for_creative:
                                 topic_result = generate_topic_for_ui(read_json("settings.json", {}), selected_one)
                                 topic_for_creative = str(topic_result["topic"]).strip()
-                                st.session_state["new_video_topic"] = topic_for_creative
-                                st.session_state["new_video_topic_meta"] = topic_result
+                                st.session_state[f"{prefix}_topic"] = topic_for_creative
+                                st.session_state[f"{prefix}_topic_meta"] = topic_result
                             generated = generate_creative_for_ui(
                                 read_json("settings.json", {}),
                                 selected_one,
                                 topic_for_creative,
-                                topic_source=_video_topic_source(topic_for_creative),
+                                topic_source=_video_topic_source(topic_for_creative, prefix),
                             )
 
-                            st.session_state["new_video_creative_payload"] = generated
+                            st.session_state[f"{prefix}_creative_payload"] = generated
                             st.success("Tema, título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
                             st.rerun()
                         except CreativeGenerationError as exc:
                             st.error(str(exc))
-                payload = st.session_state.get("new_video_creative_payload")
+                payload = st.session_state.get(f"{prefix}_creative_payload")
                 if payload:
                     st.subheader("Título e Thumbnail automáticos")
                     title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
                     if title_options:
-                        selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key="new_video_title_choice")
+                        selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_title_choice")
                         payload["title"] = selected_title
                         with st.expander(f"Ver {len(title_options)} candidatos de título"):
                             st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
                     variants = payload.get("thumbnail_variants", [])
                     if variants:
                         labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
-                        selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key="new_video_thumbnail_choice")
+                        selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"{prefix}_thumbnail_choice")
                         variant_index = labels.index(selected_variant_label)
                         variant = variants[variant_index]
                         payload["thumbnail_variant"] = variant
@@ -1913,13 +2015,13 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
                         st.code(variant.get("image_prompt", ""), language="text")
                         thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                        if st.button("Gerar imagem da thumbnail com Nano Banana", key="new_video_generate_thumbnail_image", use_container_width=True):
+                        if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", use_container_width=True):
                             try:
                                 thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
                                 variant["image_path"] = thumbnail_path
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
-                                st.session_state["new_video_creative_payload"] = payload
+                                st.session_state[f"{prefix}_creative_payload"] = payload
                                 record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": selected_one.get("name") if selected_one else "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
                                 st.success("Thumbnail gerada com Nano Banana.")
                                 st.rerun()
@@ -1931,9 +2033,9 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             payload["thumbnail_status"] = "generated"
                         else:
                             st.info("Escolha a variante e clique em **Gerar imagem da thumbnail com Nano Banana**. A API key é configurada em Configuração API > API Keys.")
-                    st.session_state["new_video_creative_payload"] = payload
+                    st.session_state[f"{prefix}_creative_payload"] = payload
 
-            with st.form("new_video_form"):
+            with st.form(f"{prefix}_form"):
                 quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
                 language = generation_settings["script_language"]
                 fmt = generation_settings["video_format"]
@@ -1945,12 +2047,12 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
                     st.stop()
                 if mode == "general":
-                    payloads = dict(st.session_state.get("new_video_general_payloads", {}))
-                    topics = dict(st.session_state.get("new_video_general_topics", {}))
+                    payloads = dict(st.session_state.get(f"{prefix}_general_payloads", {}))
+                    topics = dict(st.session_state.get(f"{prefix}_general_topics", {}))
                     channels_by_id = {str(channel["id"]): channel for channel in all_channels}
                     payloads_need_refresh = len(payloads) != len(selected) or any(
-                        str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip()
-                        and str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip() != str((payloads.get(channel_id) or {}).get("topic") or "").strip()
+                        str(st.session_state.get(f"{prefix}_general_topic_{channel_id}", "") or "").strip()
+                        and str(st.session_state.get(f"{prefix}_general_topic_{channel_id}", "") or "").strip() != str((payloads.get(channel_id) or {}).get("topic") or "").strip()
                         for channel_id in selected
                     )
                     if payloads_need_refresh:
@@ -1960,7 +2062,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         with st.spinner("A gerar automaticamente um pacote criativo independente para cada canal…"):
                             for channel_id in selected:
                                 channel = channels_by_id[channel_id]
-                                edited_topic = str(st.session_state.get(f"new_video_general_topic_{channel_id}", "") or "").strip()
+                                edited_topic = str(st.session_state.get(f"{prefix}_general_topic_{channel_id}", "") or "").strip()
                                 topic_result = topics.get(channel_id) or {}
                                 try:
                                     if not edited_topic:
@@ -1979,8 +2081,8 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             st.error("O Lote geral não foi criado porque faltou gerar o conteúdo específico de pelo menos um canal.")
                         else:
                             payloads = generated_payloads
-                            st.session_state["new_video_general_payloads"] = payloads
-                            st.session_state["new_video_general_topics"] = {cid: {"topic": payload["topic"], "topic_source": payload.get("topic_source", "llm")} for cid, payload in payloads.items()}
+                            st.session_state[f"{prefix}_general_payloads"] = payloads
+                            st.session_state[f"{prefix}_general_topics"] = {cid: {"topic": payload["topic"], "topic_source": payload.get("topic_source", "llm")} for cid, payload in payloads.items()}
                     if len(payloads) == len(selected):
                         batch_topic = "Lote geral — um vídeo independente por canal"
                         channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings} for cid, payload in payloads.items()}
@@ -1996,14 +2098,14 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             st.error("Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.")
                             st.stop()
                         quantity_value = int(quantity if mode == "same_channel" else 1)
-                        payload = dict(st.session_state.get("new_video_creative_payload") or {})
+                        payload = dict(st.session_state.get(f"{prefix}_creative_payload") or {})
                         if not payload.get("title") or not payload.get("thumbnail_variants"):
                             try:
                                 payload = generate_creative_for_ui(
                                     read_json("settings.json", {}),
                                     selected_one or {},
                                     topic_value,
-                                    topic_source=_video_topic_source(topic_value),
+                                    topic_source=_video_topic_source(topic_value, prefix),
                                 )
                             except CreativeGenerationError as exc:
                                 st.warning(f"Título/thumbnail automáticos pendentes: {exc} A tarefa será criada com o tópico como título e sem ficheiro de thumbnail.")
@@ -2016,7 +2118,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
 
 def render_music_creation():
     """Expose the complete video-creation UI under the music-oriented navigation entry without changing the original page."""
-    render_new_video(page_title="Criação de Músicas")
+    render_new_video(page_title="Criação de Músicas", prefix="new_music")
 
 
 def render_scripts():
@@ -2072,9 +2174,29 @@ def render_scripts():
             placeholder="Descreva o tema, a mensagem, o conflito ou a ideia musical que o Blueprint deve orientar.",
         )
         legacy_script_language = str(st.session_state.get("script_language") or "")
+        script_subject_key = "pipeline_scripts_video_subject"
+        if script_subject_key not in st.session_state:
+            st.session_state[script_subject_key] = str(brief or title or "")
         script_settings = render_video_generation_settings(
             "pipeline_scripts",
             current_language=legacy_script_language or str(read_json("settings.json", {}).get("video_language") or "pt"),
+            channel=selected_channel,
+            generate_content_callback=lambda: _generate_video_content_callback(
+                "pipeline_scripts",
+                selected_channel or {},
+                str(st.session_state.get("pipeline_scripts_script_language") or language_code(legacy_script_language or "pt")),
+                selected_blueprint,
+            ),
+            save_draft_callback=lambda: _save_pipeline_draft_callback(
+                "pipeline_scripts",
+                "script",
+                "Roteiros",
+                channel=selected_channel,
+                blueprint=selected_blueprint,
+                document_type="video_script" if document_type == "Roteiro de vídeo" else "music_lyrics",
+                title=title,
+                brief=brief,
+            ),
         )
         language = script_settings["script_language"]
         structure_notes = script_settings["script_structure_notes"]
@@ -2084,7 +2206,7 @@ def render_scripts():
         with clear_col:
             clear_clicked = st.button("Limpar rascunho", use_container_width=True, key="clear_script_document")
         if clear_clicked:
-            for key in ("script_draft", "script_draft_title", "script_draft_content", "script_draft_summary"):
+            for key in ("script_draft", "script_draft_title", "script_draft_content", "script_draft_summary", "script_draft_keywords"):
                 st.session_state.pop(key, None)
             st.rerun()
         if generate_clicked:
@@ -2129,8 +2251,11 @@ def render_scripts():
                 st.session_state["script_draft_summary"] = str(draft.get("summary") or "")
             if "script_draft_content" not in st.session_state:
                 st.session_state["script_draft_content"] = str(draft.get("content") or "")
+            if "script_draft_keywords" not in st.session_state:
+                st.session_state["script_draft_keywords"] = str(draft.get("keywords") or "")
             draft_title = st.text_input("Título do rascunho", key="script_draft_title")
             draft_summary = st.text_input("Resumo", key="script_draft_summary")
+            draft_keywords = st.text_area("Palavras-chave", height=90, key="script_draft_keywords")
             draft_content = st.text_area("Conteúdo guardado", height=460, key="script_draft_content")
             if st.button("Guardar documento no storage", type="primary", use_container_width=True, key="save_script_document"):
                 try:
@@ -2139,6 +2264,7 @@ def render_scripts():
                             **draft,
                             "title": draft_title,
                             "summary": draft_summary,
+                            "keywords": draft_keywords,
                             "content": draft_content,
                             "document_type": "video_script" if document_type == "Roteiro de vídeo" else "music_lyrics",
                             "language": language,
@@ -2898,6 +3024,58 @@ def render_videos():
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
                         transition_task(task["id"], "blocked")
                         st.rerun()
+
+
+def render_thumbnails():
+    st.title("Thumbnails")
+    st.caption("Biblioteca de thumbnails associadas às tarefas da pipeline. A refacção actualiza apenas a imagem da tarefa e preserva o histórico local.")
+    records = list_thumbnail_tasks()
+    if not records:
+        st.info("Ainda não existem tarefas com thumbnail gerada ou prompt de imagem disponível.")
+        return
+
+    settings = read_json("settings.json", {})
+    for record in records:
+        with st.container(border=True):
+            image_col, details_col, action_col = st.columns([1.35, 2.65, 1.25])
+            with image_col:
+                image_path = record.get("image_path")
+                if image_path and image_path.is_file():
+                    st.image(str(image_path), use_container_width=True)
+                else:
+                    st.markdown("### Sem imagem")
+                    st.caption("Imagem ainda não gerada")
+            with details_col:
+                st.write(f"**{record['title']}**")
+                st.caption(f"Canal: {record['channel_name']} · Tarefa: {record['task_id']}")
+                st.caption(f"Estado: {record['status']} · Variante: {record['variant_index'] + 1}")
+                if record["prompt"]:
+                    with st.expander("Ver prompt da thumbnail", expanded=False):
+                        st.code(record["prompt"], language="text")
+                else:
+                    st.warning("Esta tarefa não tem prompt de imagem. Não é possível refazer a thumbnail.")
+            with action_col:
+                if st.button(
+                    "Refazer thumbnail",
+                    key=f"regenerate_thumbnail_{record['task_id']}",
+                    icon=":material/refresh:",
+                    use_container_width=True,
+                    disabled=not bool(record["prompt"]),
+                ):
+                    try:
+                        with st.spinner("A refazer a thumbnail…"):
+                            _task, image_path = regenerate_thumbnail(record["task_id"], settings)
+                        record_notification(
+                            "thumbnail_generation_completed",
+                            f"Thumbnail refeita: {record['title']}",
+                            "A thumbnail da tarefa foi regenerada com sucesso.",
+                            metadata={"task_id": record["task_id"], "channel_name": record["channel_name"], "image_path": str(image_path)},
+                            dedupe_key=f"thumbnail:regenerated:{record['task_id']}:{image_path}",
+                        )
+                        st.success("Thumbnail refeita com sucesso.")
+                        st.rerun()
+                    except ThumbnailGenerationError as exc:
+                        st.error(str(exc))
 
 
 def render_automation():
@@ -4548,6 +4726,7 @@ def main():
         ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
         ("Backlog Vídeos", ":material/video_library:", "Backlog Vídeos"),
         ("Roteiros", ":material/article:", "Roteiros"),
+        ("Thumbnails", ":material/image:", "Thumbnails"),
         ("Upload", ":material/cloud_upload:", "Upload"),
     ]
     base_files_items = [
@@ -4682,6 +4861,7 @@ def main():
         "Criação de Músicas": render_music_creation,
         "Upload Música": lambda: render_edit_placeholder("Upload Música", ""),
         "Roteiros": render_scripts,
+        "Thumbnails": render_thumbnails,
         "Upload": render_upload,
         "Blueprints Youtube": render_blueprints,
         "Prompt Masters": render_tiktok_prompt_masters,
