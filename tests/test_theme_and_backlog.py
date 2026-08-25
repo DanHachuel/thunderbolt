@@ -5,12 +5,19 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
 CONFIG_SOURCE = (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
+LANGUAGES_SOURCE = (ROOT / "hermes_ui" / "languages.py").read_text(encoding="utf-8")
 
 
 class ThemeAndBacklogTests(unittest.TestCase):
     def test_backlog_uses_canonical_title(self):
-        self.assertIn('st.subheader("Backlog Vídeos")', MAIN_SOURCE)
+        self.assertIn('st.subheader("Backlog Videos")', MAIN_SOURCE)
+        self.assertNotIn('st.subheader("Backlog Vídeos")', MAIN_SOURCE)
         self.assertNotIn('st.subheader("Vídeos e backlog")', MAIN_SOURCE)
+
+    def test_canonical_backlog_key_is_translated_for_all_languages(self):
+        for language_code in ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it"):
+            self.assertIn(f'"{language_code}"', LANGUAGES_SOURCE)
+        self.assertIn('UI_TRANSLATIONS[_language_code]["Backlog Videos"]', LANGUAGES_SOURCE)
 
     def test_backlog_cards_match_automation_start_stop_controls(self):
         self.assertIn('key=f"automation_start_{task[\'id\']}"', MAIN_SOURCE)
