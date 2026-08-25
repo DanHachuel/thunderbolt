@@ -65,10 +65,18 @@ class UILanguagePickerTests(unittest.TestCase):
         for extra_code in ("pl", "ga", "ar", "he"):
             self.assertNotIn(extra_code, options)
 
-    def test_new_ui_codes_have_safe_english_translation_fallback(self):
-        for code in ("pl", "ga", "ar", "he"):
+    def test_new_ui_codes_have_real_translations_for_core_ui(self):
+        expected = {
+            "pl": {"Início": "Strona główna", "Configuração API": "Konfiguracja API", "Language": "Język", "Testar chamada API": "Testuj wywołanie API"},
+            "ga": {"Início": "Baile", "Configuração API": "Cumraíocht API", "Language": "Teanga", "Testar chamada API": "Tástáil glao API"},
+            "ar": {"Início": "الصفحة الرئيسية", "Configuração API": "إعداد API", "Language": "اللغة", "Testar chamada API": "اختبار استدعاء API"},
+            "he": {"Início": "דף הבית", "Configuração API": "הגדרת API", "Language": "שפה", "Testar chamada API": "בדיקת קריאת API"},
+        }
+        for code, translations in expected.items():
             self.assertIn(code, UI_TRANSLATIONS)
-            self.assertEqual(UI_TRANSLATIONS[code]["Language"], "Language")
+            for source, translated in translations.items():
+                self.assertEqual(UI_TRANSLATIONS[code][source], translated)
+                self.assertNotEqual(UI_TRANSLATIONS[code][source], UI_TRANSLATIONS["en"][source])
 
 
 if __name__ == "__main__":
