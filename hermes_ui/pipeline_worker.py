@@ -174,17 +174,34 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         _update(task_id, topic=topic, topic_source="llm", ai_generation={"topic": topic_result}, progress=12)
 
     _update(task_id, stage="script", state="doing", progress=18, error=None)
-    script = generate_script_document(
-        settings,
-        document_type="Roteiro de vídeo",
-        title=str(task.get("title") or topic),
-        brief=topic,
-        language=str(task.get("language") or channel.get("language") or "Português"),
-        channel=channel,
-        blueprint=blueprint,
-        structure_notes=str((task.get("generation_settings") or {}).get("script_structure_notes") or ""),
-        generation_settings=task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {},
-    )
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    provided_script = str(generation_settings.get("video_script") or "").strip()
+    if provided_script:
+        script = {
+            "document_type": "video_script",
+            "title": str(task.get("title") or topic),
+            "summary": topic,
+            "content": provided_script,
+            "language": str(task.get("language") or channel.get("language") or "Português"),
+            "blueprint_id": str(blueprint.get("id") or ""),
+            "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+            "channel_id": str(channel.get("id") or ""),
+            "channel_name": str(channel.get("name") or "Canal sem nome"),
+            "generation_settings": generation_settings,
+            "generated_by": "video_creation_form",
+        }
+    else:
+        script = generate_script_document(
+            settings,
+            document_type="Roteiro de vídeo",
+            title=str(task.get("title") or topic),
+            brief=topic,
+            language=str(task.get("language") or channel.get("language") or "Português"),
+            channel=channel,
+            blueprint=blueprint,
+            structure_notes=str(generation_settings.get("script_structure_notes") or ""),
+            generation_settings=generation_settings,
+        )
     script_record = save_script_document(script)
     artifacts = dict(task.get("artifacts") or {})
     artifacts["script"] = script_record.get("path", "")
@@ -193,7 +210,11 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     _update(task_id, stage="title", state="doing", progress=35)
     creative = generate_creative_package(settings, channel, topic, blueprint, language=str(task.get("language") or channel.get("language") or "Português"))
     title = str(creative.get("title") or topic).strip()
-    keywords = creative.get("keywords") if isinstance(creative.get("keywords"), list) else _keywords(topic, title, str(channel.get("niche") or ""))
+    provided_keywords = generation_settings.get("video_keywords")
+    if isinstance(provided_keywords, str):
+        provided_keywords = re.split(r"[,\n;|]+", provided_keywords)
+    provided_keywords = [str(item).strip() for item in provided_keywords or [] if str(item).strip()]
+    keywords = provided_keywords[:15] or (creative.get("keywords") if isinstance(creative.get("keywords"), list) else _keywords(topic, title, str(channel.get("niche") or "")))
     title_artifact = _save_json_artifact(task_id, "title-keywords", {"topic": topic, "title": title, "keywords": keywords, "title_candidates": creative.get("title_candidates", [])})
     _update(task_id, title=title, tags=keywords, artifacts={**artifacts, "title_keywords": title_artifact}, title_candidates=creative.get("title_candidates", []), progress=45)
 
