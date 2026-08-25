@@ -41,6 +41,9 @@ class ThemeAndBacklogTests(unittest.TestCase):
     def test_dashboard_cards_do_not_force_dark_palette(self):
         self.assertIn(".content-card {", MAIN_SOURCE)
         self.assertIn("background:color-mix(in srgb, currentColor 5%, transparent)", MAIN_SOURCE)
+        self.assertIn("background:rgba(128,128,128,.10)", MAIN_SOURCE)
+        self.assertIn("border:1px solid rgba(128,128,128,.28)", MAIN_SOURCE)
+        self.assertIn("box-shadow:0 4px 14px rgba(0,0,0,.12)", MAIN_SOURCE)
         self.assertNotIn("background:#121b26", MAIN_SOURCE)
         self.assertNotIn("color:#f4f8fb; font-size:1.8rem", MAIN_SOURCE)
 
