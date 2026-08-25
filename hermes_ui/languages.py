@@ -229,34 +229,34 @@ for _language_code, _api_key_values in _API_KEY_EXPANDER_TRANSLATIONS.items():
 # translation path as the legacy pages.
 UI_NAV_TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt": {
-        "Arquivos Base": "Arquivos Base", "Pipeline Vídeos": "Pipeline Vídeos", "Canais e Perfis de Vídeos": "Canais e Perfis de Vídeos", "Canais YouTube": "Canais YouTube", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Backlog Vídeos", "Música": "Música", "Upload Música": "Upload Música", "Geração de Conteúdo IA": "Geração de Conteúdo IA", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "Analista Growth Youtube", "Analista Growth Tiktok": "Analista Growth Tiktok", "Analista Growth Instagram": "Analista Growth Instagram", "Documentação": "Documentação", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Pipeline Música", "módulos disponíveis": "módulos disponíveis",
+        "Arquivos Base": "Arquivos Base", "Pipeline Vídeos": "Pipeline Vídeos", "Canais e Perfis de Vídeos": "Canais e Perfis de Vídeos", "Canais YouTube": "Canais YouTube", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Backlog Vídeos", "Thumbnails": "Thumbnails", "Música": "Música", "Upload Música": "Upload Música", "Geração de Conteúdo IA": "Geração de Conteúdo IA", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "Analista Growth Youtube", "Analista Growth Tiktok": "Analista Growth Tiktok", "Analista Growth Instagram": "Analista Growth Instagram", "Documentação": "Documentação", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Pipeline Música", "módulos disponíveis": "módulos disponíveis",
     },
     "en": {
-        "Arquivos Base": "Base Files", "Pipeline Vídeos": "Video Pipeline", "Canais e Perfis de Vídeos": "Video Channels & Profiles", "Canais YouTube": "YouTube Channels", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video Backlog", "Música": "Music", "Upload Música": "Music Upload", "Geração de Conteúdo IA": "AI Content Generation", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "YouTube Growth Analyst", "Analista Growth Tiktok": "TikTok Growth Analyst", "Analista Growth Instagram": "Instagram Growth Analyst", "Documentação": "Documentation", "Tutorial Kaggle": "Kaggle Tutorial", "Tutorial Apify": "Apify Tutorial", "Pipeline Música": "Music Pipeline", "módulos disponíveis": "available modules",
+        "Arquivos Base": "Base Files", "Pipeline Vídeos": "Video Pipeline", "Canais e Perfis de Vídeos": "Video Channels & Profiles", "Canais YouTube": "YouTube Channels", "Facebook Pages": "Facebook Pages", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video Backlog", "Thumbnails": "Thumbnails", "Música": "Music", "Upload Música": "Music Upload", "Geração de Conteúdo IA": "AI Content Generation", "Motion Control": "Motion Control", "UGC Products": "UGC Products", "Growth": "Growth", "Analista Growth Youtube": "YouTube Growth Analyst", "Analista Growth Tiktok": "TikTok Growth Analyst", "Analista Growth Instagram": "Instagram Growth Analyst", "Documentação": "Documentation", "Tutorial Kaggle": "Kaggle Tutorial", "Tutorial Apify": "Apify Tutorial", "Pipeline Música": "Music Pipeline", "módulos disponíveis": "available modules",
     },
     "zh": {
-        "Arquivos Base": "基础文件", "Pipeline Vídeos": "视频流程", "Canais e Perfis de Vídeos": "视频频道与资料", "Canais YouTube": "YouTube 频道", "Facebook Pages": "Facebook 页面", "Prompt Masters": "主提示词", "Backlog Vídeos": "视频待办", "Música": "音乐", "Upload Música": "音乐上传", "Geração de Conteúdo IA": "AI 内容生成", "Motion Control": "动作控制", "UGC Products": "UGC 产品", "Growth": "增长", "Analista Growth Youtube": "YouTube 增长分析师", "Analista Growth Tiktok": "TikTok 增长分析师", "Analista Growth Instagram": "Instagram 增长分析师", "Documentação": "文档", "Tutorial Kaggle": "Kaggle 教程", "Tutorial Apify": "Apify 教程", "Pipeline Música": "音乐流程", "módulos disponíveis": "可用模块",
+        "Arquivos Base": "基础文件", "Pipeline Vídeos": "视频流程", "Canais e Perfis de Vídeos": "视频频道与资料", "Canais YouTube": "YouTube 频道", "Facebook Pages": "Facebook 页面", "Prompt Masters": "主提示词", "Backlog Vídeos": "视频待办", "Thumbnails": "缩略图", "Música": "音乐", "Upload Música": "音乐上传", "Geração de Conteúdo IA": "AI 内容生成", "Motion Control": "动作控制", "UGC Products": "UGC 产品", "Growth": "增长", "Analista Growth Youtube": "YouTube 增长分析师", "Analista Growth Tiktok": "TikTok 增长分析师", "Analista Growth Instagram": "Instagram 增长分析师", "Documentação": "文档", "Tutorial Kaggle": "Kaggle 教程", "Tutorial Apify": "Apify 教程", "Pipeline Música": "音乐流程", "módulos disponíveis": "可用模块",
     },
     "de": {
-        "Arquivos Base": "Basisdateien", "Pipeline Vídeos": "Video-Pipeline", "Canais e Perfis de Vídeos": "Videokanäle und Profile", "Canais YouTube": "YouTube-Kanäle", "Facebook Pages": "Facebook-Seiten", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video-Backlog", "Música": "Musik", "Upload Música": "Musik-Upload", "Geração de Conteúdo IA": "KI-Inhaltserstellung", "Motion Control": "Motion Control", "UGC Products": "UGC-Produkte", "Growth": "Wachstum", "Analista Growth Youtube": "YouTube-Wachstumsanalyst", "Analista Growth Tiktok": "TikTok-Wachstumsanalyst", "Analista Growth Instagram": "Instagram-Wachstumsanalyst", "Documentação": "Dokumentation", "Tutorial Kaggle": "Kaggle-Tutorial", "Tutorial Apify": "Apify-Tutorial", "Pipeline Música": "Musik-Pipeline", "módulos disponíveis": "verfügbare Module",
+        "Arquivos Base": "Basisdateien", "Pipeline Vídeos": "Video-Pipeline", "Canais e Perfis de Vídeos": "Videokanäle und Profile", "Canais YouTube": "YouTube-Kanäle", "Facebook Pages": "Facebook-Seiten", "Prompt Masters": "Prompt Masters", "Backlog Vídeos": "Video-Backlog", "Thumbnails": "Thumbnails", "Música": "Musik", "Upload Música": "Musik-Upload", "Geração de Conteúdo IA": "KI-Inhaltserstellung", "Motion Control": "Motion Control", "UGC Products": "UGC-Produkte", "Growth": "Wachstum", "Analista Growth Youtube": "YouTube-Wachstumsanalyst", "Analista Growth Tiktok": "TikTok-Wachstumsanalyst", "Analista Growth Instagram": "Instagram-Wachstumsanalyst", "Documentação": "Dokumentation", "Tutorial Kaggle": "Kaggle-Tutorial", "Tutorial Apify": "Apify-Tutorial", "Pipeline Música": "Musik-Pipeline", "módulos disponíveis": "verfügbare Module",
     },
     "vi": {
-        "Arquivos Base": "Tệp cơ sở", "Pipeline Vídeos": "Quy trình video", "Canais e Perfis de Vídeos": "Kênh và hồ sơ video", "Canais YouTube": "Kênh YouTube", "Facebook Pages": "Trang Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Danh sách video", "Música": "Âm nhạc", "Upload Música": "Tải nhạc lên", "Geração de Conteúdo IA": "Tạo nội dung AI", "Motion Control": "Điều khiển chuyển động", "UGC Products": "Sản phẩm UGC", "Growth": "Tăng trưởng", "Analista Growth Youtube": "Chuyên viên phân tích tăng trưởng YouTube", "Analista Growth Tiktok": "Chuyên viên phân tích tăng trưởng TikTok", "Analista Growth Instagram": "Chuyên viên phân tích tăng trưởng Instagram", "Documentação": "Tài liệu", "Tutorial Kaggle": "Hướng dẫn Kaggle", "Tutorial Apify": "Hướng dẫn Apify", "Pipeline Música": "Quy trình âm nhạc", "módulos disponíveis": "mô-đun khả dụng",
+        "Arquivos Base": "Tệp cơ sở", "Pipeline Vídeos": "Quy trình video", "Canais e Perfis de Vídeos": "Kênh và hồ sơ video", "Canais YouTube": "Kênh YouTube", "Facebook Pages": "Trang Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Danh sách video", "Thumbnails": "Ảnh thu nhỏ", "Música": "Âm nhạc", "Upload Música": "Tải nhạc lên", "Geração de Conteúdo IA": "Tạo nội dung AI", "Motion Control": "Điều khiển chuyển động", "UGC Products": "Sản phẩm UGC", "Growth": "Tăng trưởng", "Analista Growth Youtube": "Chuyên viên phân tích tăng trưởng YouTube", "Analista Growth Tiktok": "Chuyên viên phân tích tăng trưởng TikTok", "Analista Growth Instagram": "Chuyên viên phân tích tăng trưởng Instagram", "Documentação": "Tài liệu", "Tutorial Kaggle": "Hướng dẫn Kaggle", "Tutorial Apify": "Hướng dẫn Apify", "Pipeline Música": "Quy trình âm nhạc", "módulos disponíveis": "mô-đun khả dụng",
     },
     "tr": {
-        "Arquivos Base": "Temel Dosyalar", "Pipeline Vídeos": "Video Akışı", "Canais e Perfis de Vídeos": "Video Kanalları ve Profilleri", "Canais YouTube": "YouTube Kanalları", "Facebook Pages": "Facebook Sayfaları", "Prompt Masters": "Prompt Master'lar", "Backlog Vídeos": "Video Bekleme Listesi", "Música": "Müzik", "Upload Música": "Müzik Yükleme", "Geração de Conteúdo IA": "Yapay Zekâ İçeriği Oluşturma", "Motion Control": "Hareket Kontrolü", "UGC Products": "UGC Ürünleri", "Growth": "Büyüme", "Analista Growth Youtube": "YouTube Büyüme Analisti", "Analista Growth Tiktok": "TikTok Büyüme Analisti", "Analista Growth Instagram": "Instagram Büyüme Analisti", "Documentação": "Dokümantasyon", "Tutorial Kaggle": "Kaggle Eğitimi", "Tutorial Apify": "Apify Eğitimi", "Pipeline Música": "Müzik Akışı", "módulos disponíveis": "kullanılabilir modüller",
+        "Arquivos Base": "Temel Dosyalar", "Pipeline Vídeos": "Video Akışı", "Canais e Perfis de Vídeos": "Video Kanalları ve Profilleri", "Canais YouTube": "YouTube Kanalları", "Facebook Pages": "Facebook Sayfaları", "Prompt Masters": "Prompt Master'lar", "Backlog Vídeos": "Video Bekleme Listesi", "Thumbnails": "Küçük resimler", "Música": "Müzik", "Upload Música": "Müzik Yükleme", "Geração de Conteúdo IA": "Yapay Zekâ İçeriği Oluşturma", "Motion Control": "Hareket Kontrolü", "UGC Products": "UGC Ürünleri", "Growth": "Büyüme", "Analista Growth Youtube": "YouTube Büyüme Analisti", "Analista Growth Tiktok": "TikTok Büyüme Analisti", "Analista Growth Instagram": "Instagram Büyüme Analisti", "Documentação": "Dokümantasyon", "Tutorial Kaggle": "Kaggle Eğitimi", "Tutorial Apify": "Apify Eğitimi", "Pipeline Música": "Müzik Akışı", "módulos disponíveis": "kullanılabilir modüller",
     },
     "ru": {
-        "Arquivos Base": "Базовые файлы", "Pipeline Vídeos": "Конвейер видео", "Canais e Perfis de Vídeos": "Каналы и профили видео", "Canais YouTube": "Каналы YouTube", "Facebook Pages": "Страницы Facebook", "Prompt Masters": "Мастер-промпты", "Backlog Vídeos": "Очередь видео", "Música": "Музыка", "Upload Música": "Загрузка музыки", "Geração de Conteúdo IA": "Генерация контента ИИ", "Motion Control": "Управление движением", "UGC Products": "UGC-продукты", "Growth": "Рост", "Analista Growth Youtube": "Аналитик роста YouTube", "Analista Growth Tiktok": "Аналитик роста TikTok", "Analista Growth Instagram": "Аналитик роста Instagram", "Documentação": "Документация", "Tutorial Kaggle": "Руководство Kaggle", "Tutorial Apify": "Руководство Apify", "Pipeline Música": "Конвейер музыки", "módulos disponíveis": "доступные модули",
+        "Arquivos Base": "Базовые файлы", "Pipeline Vídeos": "Конвейер видео", "Canais e Perfis de Vídeos": "Каналы и профили видео", "Canais YouTube": "Каналы YouTube", "Facebook Pages": "Страницы Facebook", "Prompt Masters": "Мастер-промпты", "Backlog Vídeos": "Очередь видео", "Thumbnails": "Миниатюры", "Música": "Музыка", "Upload Música": "Загрузка музыки", "Geração de Conteúdo IA": "Генерация контента ИИ", "Motion Control": "Управление движением", "UGC Products": "UGC-продукты", "Growth": "Рост", "Analista Growth Youtube": "Аналитик роста YouTube", "Analista Growth Tiktok": "Аналитик роста TikTok", "Analista Growth Instagram": "Аналитик роста Instagram", "Documentação": "Документация", "Tutorial Kaggle": "Руководство Kaggle", "Tutorial Apify": "Руководство Apify", "Pipeline Música": "Конвейер музыки", "módulos disponíveis": "доступные модули",
     },
     "es": {
-        "Arquivos Base": "Archivos base", "Pipeline Vídeos": "Flujo de vídeos", "Canais e Perfis de Vídeos": "Canales y perfiles de vídeo", "Canais YouTube": "Canales de YouTube", "Facebook Pages": "Páginas de Facebook", "Prompt Masters": "Prompts maestros", "Backlog Vídeos": "Cola de vídeos", "Música": "Música", "Upload Música": "Subir música", "Geração de Conteúdo IA": "Generación de contenido con IA", "Motion Control": "Control de movimiento", "UGC Products": "Productos UGC", "Growth": "Crecimiento", "Analista Growth Youtube": "Analista de crecimiento de YouTube", "Analista Growth Tiktok": "Analista de crecimiento de TikTok", "Analista Growth Instagram": "Analista de crecimiento de Instagram", "Documentação": "Documentación", "Tutorial Kaggle": "Tutorial de Kaggle", "Tutorial Apify": "Tutorial de Apify", "Pipeline Música": "Flujo de música", "módulos disponíveis": "módulos disponibles",
+        "Arquivos Base": "Archivos base", "Pipeline Vídeos": "Flujo de vídeos", "Canais e Perfis de Vídeos": "Canales y perfiles de vídeo", "Canais YouTube": "Canales de YouTube", "Facebook Pages": "Páginas de Facebook", "Prompt Masters": "Prompts maestros", "Backlog Vídeos": "Cola de vídeos", "Thumbnails": "Miniaturas", "Música": "Música", "Upload Música": "Subir música", "Geração de Conteúdo IA": "Generación de contenido con IA", "Motion Control": "Control de movimiento", "UGC Products": "Productos UGC", "Growth": "Crecimiento", "Analista Growth Youtube": "Analista de crecimiento de YouTube", "Analista Growth Tiktok": "Analista de crecimiento de TikTok", "Analista Growth Instagram": "Analista de crecimiento de Instagram", "Documentação": "Documentación", "Tutorial Kaggle": "Tutorial de Kaggle", "Tutorial Apify": "Tutorial de Apify", "Pipeline Música": "Flujo de música", "módulos disponíveis": "módulos disponibles",
     },
     "id": {
-        "Arquivos Base": "File Dasar", "Pipeline Vídeos": "Alur Video", "Canais e Perfis de Vídeos": "Kanal dan Profil Video", "Canais YouTube": "Kanal YouTube", "Facebook Pages": "Halaman Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Antrean Video", "Música": "Musik", "Upload Música": "Unggah Musik", "Geração de Conteúdo IA": "Pembuatan Konten AI", "Motion Control": "Kontrol Gerakan", "UGC Products": "Produk UGC", "Growth": "Pertumbuhan", "Analista Growth Youtube": "Analis Pertumbuhan YouTube", "Analista Growth Tiktok": "Analis Pertumbuhan TikTok", "Analista Growth Instagram": "Analis Pertumbuhan Instagram", "Documentação": "Dokumentasi", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Alur Musik", "módulos disponíveis": "modul tersedia",
+        "Arquivos Base": "File Dasar", "Pipeline Vídeos": "Alur Video", "Canais e Perfis de Vídeos": "Kanal dan Profil Video", "Canais YouTube": "Kanal YouTube", "Facebook Pages": "Halaman Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Antrean Video", "Thumbnails": "Thumbnail", "Música": "Musik", "Upload Música": "Unggah Musik", "Geração de Conteúdo IA": "Pembuatan Konten AI", "Motion Control": "Kontrol Gerakan", "UGC Products": "Produk UGC", "Growth": "Pertumbuhan", "Analista Growth Youtube": "Analis Pertumbuhan YouTube", "Analista Growth Tiktok": "Analis Pertumbuhan TikTok", "Analista Growth Instagram": "Analis Pertumbuhan Instagram", "Documentação": "Dokumentasi", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Alur Musik", "módulos disponíveis": "modul tersedia",
     },
     "it": {
-        "Arquivos Base": "File di base", "Pipeline Vídeos": "Pipeline video", "Canais e Perfis de Vídeos": "Canali e profili video", "Canais YouTube": "Canali YouTube", "Facebook Pages": "Pagine Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Coda video", "Música": "Musica", "Upload Música": "Caricamento musica", "Geração de Conteúdo IA": "Generazione di contenuti IA", "Motion Control": "Controllo del movimento", "UGC Products": "Prodotti UGC", "Growth": "Crescita", "Analista Growth Youtube": "Analista della crescita YouTube", "Analista Growth Tiktok": "Analista della crescita TikTok", "Analista Growth Instagram": "Analista della crescita Instagram", "Documentação": "Documentazione", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Pipeline musicale", "módulos disponíveis": "moduli disponibili",
+        "Arquivos Base": "File di base", "Pipeline Vídeos": "Pipeline video", "Canais e Perfis de Vídeos": "Canali e profili video", "Canais YouTube": "Canali YouTube", "Facebook Pages": "Pagine Facebook", "Prompt Masters": "Prompt Master", "Backlog Vídeos": "Coda video", "Thumbnails": "Miniature", "Música": "Musica", "Upload Música": "Caricamento musica", "Geração de Conteúdo IA": "Generazione di contenuti IA", "Motion Control": "Controllo del movimento", "UGC Products": "Prodotti UGC", "Growth": "Crescita", "Analista Growth Youtube": "Analista della crescita YouTube", "Analista Growth Tiktok": "Analista della crescita TikTok", "Analista Growth Instagram": "Analista della crescita Instagram", "Documentação": "Documentazione", "Tutorial Kaggle": "Tutorial Kaggle", "Tutorial Apify": "Tutorial Apify", "Pipeline Música": "Pipeline musicale", "módulos disponíveis": "moduli disponibili",
     },
 }
 for _language_code, _navigation_values in UI_NAV_TRANSLATIONS.items():
@@ -405,6 +405,72 @@ VIDEO_GENERATION_TRANSLATIONS: dict[str, dict[str, str]] = {
 
 for _language_code, _video_generation_translation in VIDEO_GENERATION_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_video_generation_translation)
+
+
+_PIPELINE_FEATURE_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {
+        "Thumbnails": "Thumbnails", "Refazer thumbnail": "Refazer thumbnail", "Salvar rascunho": "Salvar rascunho",
+        "Rascunho guardado localmente": "Rascunho guardado localmente", "Thumbnail refeita com sucesso.": "Thumbnail refeita com sucesso.",
+        "Ver prompt da thumbnail": "Ver prompt da thumbnail", "Sem imagem": "Sem imagem", "Imagem ainda não gerada": "Imagem ainda não gerada",
+        "Palavras-chave": "Palavras-chave", "Título do rascunho": "Título do rascunho",
+    },
+    "en": {
+        "Thumbnails": "Thumbnails", "Refazer thumbnail": "Regenerate thumbnail", "Salvar rascunho": "Save draft",
+        "Rascunho guardado localmente": "Draft saved locally", "Thumbnail refeita com sucesso.": "Thumbnail regenerated successfully.",
+        "Ver prompt da thumbnail": "View thumbnail prompt", "Sem imagem": "No image", "Imagem ainda não gerada": "Image not generated yet",
+        "Palavras-chave": "Keywords", "Título do rascunho": "Draft title",
+    },
+    "zh": {
+        "Thumbnails": "缩略图", "Refazer thumbnail": "重新生成缩略图", "Salvar rascunho": "保存草稿",
+        "Rascunho guardado localmente": "草稿已保存到本地", "Thumbnail refeita com sucesso.": "缩略图已成功重新生成。",
+        "Ver prompt da thumbnail": "查看缩略图提示词", "Sem imagem": "无图像", "Imagem ainda não gerada": "尚未生成图像",
+        "Palavras-chave": "关键词", "Título do rascunho": "草稿标题",
+    },
+    "de": {
+        "Thumbnails": "Thumbnails", "Refazer thumbnail": "Thumbnail neu generieren", "Salvar rascunho": "Entwurf speichern",
+        "Rascunho guardado localmente": "Entwurf lokal gespeichert", "Thumbnail refeita com sucesso.": "Thumbnail erfolgreich neu generiert.",
+        "Ver prompt da thumbnail": "Thumbnail-Prompt anzeigen", "Sem imagem": "Kein Bild", "Imagem ainda não gerada": "Bild noch nicht generiert",
+        "Palavras-chave": "Schlüsselwörter", "Título do rascunho": "Entwurfstitel",
+    },
+    "vi": {
+        "Thumbnails": "Ảnh thu nhỏ", "Refazer thumbnail": "Tạo lại ảnh thu nhỏ", "Salvar rascunho": "Lưu bản nháp",
+        "Rascunho guardado localmente": "Đã lưu bản nháp cục bộ", "Thumbnail refeita com sucesso.": "Đã tạo lại ảnh thu nhỏ thành công.",
+        "Ver prompt da thumbnail": "Xem prompt ảnh thu nhỏ", "Sem imagem": "Không có hình ảnh", "Imagem ainda não gerada": "Chưa tạo hình ảnh",
+        "Palavras-chave": "Từ khóa", "Título do rascunho": "Tiêu đề bản nháp",
+    },
+    "tr": {
+        "Thumbnails": "Küçük resimler", "Refazer thumbnail": "Küçük resmi yeniden oluştur", "Salvar rascunho": "Taslağı kaydet",
+        "Rascunho guardado localmente": "Taslak yerel olarak kaydedildi", "Thumbnail refeita com sucesso.": "Küçük resim başarıyla yeniden oluşturuldu.",
+        "Ver prompt da thumbnail": "Küçük resim istemini görüntüle", "Sem imagem": "Görsel yok", "Imagem ainda não gerada": "Görsel henüz oluşturulmadı",
+        "Palavras-chave": "Anahtar kelimeler", "Título do rascunho": "Taslak başlığı",
+    },
+    "ru": {
+        "Thumbnails": "Миниатюры", "Refazer thumbnail": "Создать миниатюру заново", "Salvar rascunho": "Сохранить черновик",
+        "Rascunho guardado localmente": "Черновик сохранён локально", "Thumbnail refeita com sucesso.": "Миниатюра успешно создана заново.",
+        "Ver prompt da thumbnail": "Показать промпт миниатюры", "Sem imagem": "Нет изображения", "Imagem ainda não gerada": "Изображение ещё не создано",
+        "Palavras-chave": "Ключевые слова", "Título do rascunho": "Название черновика",
+    },
+    "es": {
+        "Thumbnails": "Miniaturas", "Refazer thumbnail": "Regenerar miniatura", "Salvar rascunho": "Guardar borrador",
+        "Rascunho guardado localmente": "Borrador guardado localmente", "Thumbnail refeita com sucesso.": "Miniatura regenerada correctamente.",
+        "Ver prompt da thumbnail": "Ver prompt de la miniatura", "Sem imagem": "Sin imagen", "Imagem ainda não gerada": "Imagen aún no generada",
+        "Palavras-chave": "Palabras clave", "Título do rascunho": "Título del borrador",
+    },
+    "id": {
+        "Thumbnails": "Thumbnail", "Refazer thumbnail": "Buat ulang thumbnail", "Salvar rascunho": "Simpan draf",
+        "Rascunho guardado localmente": "Draf disimpan secara lokal", "Thumbnail refeita com sucesso.": "Thumbnail berhasil dibuat ulang.",
+        "Ver prompt da thumbnail": "Lihat prompt thumbnail", "Sem imagem": "Tidak ada gambar", "Imagem ainda não gerada": "Gambar belum dibuat",
+        "Palavras-chave": "Kata kunci", "Título do rascunho": "Judul draf",
+    },
+    "it": {
+        "Thumbnails": "Miniature", "Refazer thumbnail": "Rigenera miniatura", "Salvar rascunho": "Salva bozza",
+        "Rascunho guardado localmente": "Bozza salvata localmente", "Thumbnail refeita com sucesso.": "Miniatura rigenerata con successo.",
+        "Ver prompt da thumbnail": "Mostra prompt della miniatura", "Sem imagem": "Nessuna immagine", "Imagem ainda não gerada": "Immagine non ancora generata",
+        "Palavras-chave": "Parole chiave", "Título do rascunho": "Titolo della bozza",
+    },
+}
+for _language_code, _pipeline_feature_translation in _PIPELINE_FEATURE_TRANSLATIONS.items():
+    UI_TRANSLATIONS[_language_code].update(_pipeline_feature_translation)
 
 
 _TAB_LABELS = (
