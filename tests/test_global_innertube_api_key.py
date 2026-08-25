@@ -28,6 +28,24 @@ class GlobalInnertubeApiKeyTests(unittest.TestCase):
         self.assertNotIn('st.selectbox("Conta Google/YouTube"', renderer)
         self.assertNotIn('key=f"innertube_api_key_{selected_key_account_id}"', renderer)
 
+    def test_google_account_cards_show_shared_configured_badge(self):
+        start = MAIN_SOURCE.index("def render_google_accounts():")
+        end = MAIN_SOURCE.find("\ndef ", start + 1)
+        renderer = MAIN_SOURCE[start:end if end != -1 else None]
+
+        self.assertIn('with st.container(border=True):', renderer)
+        self.assertIn('account_ready = bool(', renderer)
+        self.assertIn('_api_status_badge("Configured" if account_ready else "Missing configuration"', renderer)
+        self.assertIn('with st.expander("Detalhes da conta Google", expanded=False):', renderer)
+
+    def test_global_innertube_key_shows_shared_configured_badge(self):
+        start = MAIN_SOURCE.index("def render_google_accounts():")
+        end = MAIN_SOURCE.find("\ndef ", start + 1)
+        renderer = MAIN_SOURCE[start:end if end != -1 else None]
+
+        self.assertIn('_render_credential_status(current_innertube_api_key)', renderer)
+        self.assertIn('innertube_status_cols = st.columns([3.2, 1.2])', renderer)
+
     def test_global_key_takes_precedence_over_legacy_account_values(self):
         account = {"id": "one", "innertube_api_key": "legacy-account-key"}
         document = {"INNERTUBE_API_KEY": "legacy-document-key"}
