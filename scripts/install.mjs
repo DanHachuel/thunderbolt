@@ -302,6 +302,9 @@ function writeSettings(moneyprinterPath) {
     try { settings = JSON.parse(readFileSync(settingsPath, "utf8")); } catch { settings = {}; }
   }
   settings.moneyprinter_path = moneyprinterPath;
+  if (!settings.llm_provider || String(settings.llm_provider).trim().toLowerCase() === "moonshot") {
+    settings.llm_provider = "openai";
+  }
   settings.port = Number(process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || settings.port || 3030);
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
 }
