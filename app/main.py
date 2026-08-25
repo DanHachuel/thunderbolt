@@ -43,6 +43,7 @@ from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QU
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.languages import LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
+from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
@@ -5057,6 +5058,13 @@ def render_models_ai_tutorial():
         return
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
+def render_niche_tutorial(tutorial_kind: str):
+    ui_language = current_ui_language()
+    st.title(tutorial_title(tutorial_kind, ui_language))
+    st.caption(tutorial_caption(tutorial_kind, ui_language))
+    st.markdown(tutorial_body(tutorial_kind, ui_language), unsafe_allow_html=False)
+
+
 def render_supabase_tutorial():
     tutorial_url = "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-supabase.md"
     tutorial_path = ROOT / "seed" / "references" / "guide-supabase.md"
@@ -5490,9 +5498,9 @@ def main():
         "Facebook Pages": lambda: render_edit_placeholder("Facebook Pages", ""),
         "Automação Youtube": render_automation,
         "Niche Finder Kaggle": render_niche_finder,
-        "Tutorial Kaggle": lambda: render_edit_placeholder("Tutorial Kaggle", ""),
+        "Tutorial Kaggle": lambda: render_niche_tutorial("kaggle"),
         "Niche Finder Apify": render_niche_finder_apify,
-        "Tutorial Apify": lambda: render_edit_placeholder("Tutorial Apify", ""),
+        "Tutorial Apify": lambda: render_niche_tutorial("apify"),
         "Edição": lambda: render_edit_placeholder("Edição", "Seleccione uma das abas de edição no menu expansível."),
         "Limpador de Metadados": render_metadata_cleaner,
         "Cortes": render_cuts,
