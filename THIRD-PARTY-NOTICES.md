@@ -13,3 +13,15 @@ Thunderbolt adapts the data-analysis ideas and parts of the clustering/tag-assoc
 ## yt-dlp
 
 Thunderbolt depends on and embeds the Python API of [yt-dlp](https://github.com/yt-dlp/yt-dlp) for public media downloads. yt-dlp is distributed under [The Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE), subject to the notices and licensing information maintained by the upstream project. This dependency is separate from Thunderbolt's MIT License.
+
+## ytmusicapi
+
+Thunderbolt depends on [sigma67/ytmusicapi](https://github.com/sigma67/ytmusicapi) for the optional YouTube Music browser-authenticated music-upload workflow. Consulte a licença MIT, os avisos e as condições de distribuição mantidos no projecto upstream. Esta dependência é separada da licença MIT do Thunderbolt.
+
+## Pushtunes
+
+Thunderbolt depends on [Psy-Q/pushtunes](https://pypi.org/project/pushtunes/) for the optional library-synchronisation workflow between local Subsonic/Jellyfin/CSV sources and Spotify, YouTube Music or Tidal. Pushtunes is distributed under the GNU Affero General Public License v3.0 or later; this notice does not change Thunderbolt's own licence and users should consult the complete upstream licence and notices before redistributing the combined runtime.
+
+## JewelMusic SDK
+
+The JewelMusic upload adapter follows the documented HTTP contract and API examples from [jewelmusic/sdk](https://github.com/jewelmusic/sdk), which is published under the MIT License. The Python package `jewelmusic-sdk` was not available on PyPI at implementation time, so Thunderbolt does not bundle that unavailable package; the adapter uses the documented `POST /v1/tracks/upload` request directly and retains attribution to the upstream SDK repository.

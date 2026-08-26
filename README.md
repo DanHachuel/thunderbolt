@@ -11,11 +11,13 @@ A primeira versão implementa a camada UI independente com:
 | Área | Incluído |
 |---|---|
 | Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
-| Pipeline | Menu expansível com Criação de Vídeos, Criação de Músicas, Roteiros e Upload |
+| Pipeline Vídeos | Menu expansível com Criação de Vídeos, Backlog Vídeos, Roteiros, Thumbnails e Upload |
+| Pipeline Música | Menu expansível com Criação de Músicas e Upload Música |
 | Blueprints Youtube | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
 | Canais Youtube | Subabas de importação pública sem API Key, Canais em lote gmail por conta Google/YouTube via OAuth e cadastro manual independente; cartões com botão Editar, nicho/referências visível, Prompts do Canal/Blueprint, Narrador/voz e gestão dos últimos 10 vídeos |
 | Criação de Vídeos / Criação de Músicas | Subabas Criar vídeo e Vídeos; idiomas históricos preservados e dez códigos MoneyPrinterTurbo com bandeiras; Pexels/Pixabay, full IA com Estilo IA e Apenas Música com agente musical; a segunda página reutiliza o mesmo fluxo com título próprio |
+| Upload Música | Subabas **JewelMusic**, **Pushtunes** e **ytmusicapi** para upload de ficheiros, sincronização de bibliotecas e envio autenticado para YouTube Music; credenciais locais e histórico em `uploads.json` |
 | Automação | Menu expansível com a subaba **Automação Youtube**, onde ficam os vídeos e canais, selectores editáveis de Blueprint/voz padrão, Automação ON, horário diário HH:MM e worker local baseado no relógio do computador |
 | AI Influencers | Menu expansível com Personagens, Redes Sociais, Tutorial Meta e Tutorial Supabase; conteúdo interno localizado |
 | Niche Finder | Menu expansível com duas alternativas independentes: Niche Finder Kaggle e Niche Finder Apify, com parâmetros, execução e resultados separados |
@@ -32,6 +34,16 @@ A página **Upload** contém quatro subabas: **Upload convencional**, **Upload d
 A API key, o username/perfil e a lista inicial de plataformas continuam em **Configuração API > API Keys > Serviços e modelos**, no expander **Publicação através do Upload-Post**. A subaba não pede novamente a credencial. O cliente envia `multipart/form-data` para `https://api.upload-post.com/api/upload`, repete `platform[]` para cada destino e guarda a resposta, o `request_id` e o resultado no histórico local de uploads. A opção **Processar em segundo plano** usa `async_upload=true` quando a API estiver configurada para processamento assíncrono.
 
 O Upload-Post é independente do Postiz: Postiz continua a usar o seu fluxo próprio de asset + post, enquanto Upload-Post publica directamente nas plataformas ligadas ao username configurado. Uma publicação aceite pelo Upload-Post também é reconciliada no centro de **Notificações**.
+
+## Upload Música — JewelMusic, Pushtunes e ytmusicapi
+
+A página **Upload Música** contém três subabas independentes. **JewelMusic** usa a API documentada do [JewelMusic SDK](https://github.com/jewelmusic/sdk) para enviar tracks com metadados de título, artista, álbum, ano e género; a API key, a Base URL, o proxy opcional e o timeout ficam no storage local. O teste de ligação é read-only e não cria uma track.
+
+**Pushtunes** usa o pacote [Pushtunes](https://pypi.org/project/pushtunes/) instalado pelo Thunderbolt para sincronizar tracks, álbuns ou playlists entre uma fonte Subsonic/Jellyfin/CSV/Spotify/YouTube Music e um destino Spotify/YouTube Music/Tidal/CSV. A UI aceita perfil `.toml`, CSV, `browser.json`, `tidal-session.json`, playlist, similaridade, directório de trabalho e credenciais Spotify; a execução chama o CLI sem shell e mascara segredos na saída. Pushtunes é uma sincronização de biblioteca, não um upload de bytes de um MP3 isolado.
+
+**ytmusicapi** adapta o [ytmusicapi](https://github.com/sigma67/ytmusicapi) para upload directo de MP3, M4A, WMA, FLAC ou OGG para YouTube Music. O método exige um `browser.json` configurado pelo utilizador, que pode ser carregado na subaba e guardado em `storage/ytmusicapi/`; o teste consulta a biblioteca de uploads sem escrever. O histórico de cada operação é guardado localmente em `uploads.json` e não inclui o conteúdo dos segredos.
+
+As credenciais destes três métodos são opcionais e independentes das credenciais de vídeo. O instalador acrescenta `ytmusicapi` e `pushtunes`; o adaptador JewelMusic usa o contrato HTTP documentado porque o SDK Python upstream não estava publicado no PyPI no momento da implementação. Consulte `THIRD-PARTY-NOTICES.md` antes de redistribuir o runtime.
 
 ## Upload directo — credenciais por conta e por canal
 
@@ -56,15 +68,15 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` define **Dark** como base inicial e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.35
+## Navegação da UI 0.3.36
 
-A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
+A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
 A subaba **Tutorial Supabase** apresenta o guia de criação das tabelas `plans` e `posts` e do bucket `instagram-images`, com ligação para a fonte original no GitHub. As duas frases promocionais da comunidade foram omitidas. Todas as subabas internas também são localizadas pelo helper nativo de tabs:
 
 O conteúdo interno das páginas também é localizado, não apenas a navegação: títulos, subtítulos, descrições, labels de campos, placeholders, opções de selectores, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML são traduzidos no idioma seleccionado através da camada global de conteúdo. Valores técnicos, chaves de estado, IDs de formulários, nomes de ficheiros, URLs e dados introduzidos pelo utilizador permanecem inalterados.
 
-Todas as subabas internas também são localizadas pelo helper nativo de tabs: **Blueprints/Brandings**, **Pesquisa pública/Cadastro manual/Contas cadastradas**, **Upload/Biblioteca**, **Importar do YouTube/Canais em lote gmail/Cadastro manual**, **Criar vídeo/Vídeos**, **Novo roteiro/letra/Histórico guardado**, as três abas de análise de clusters, as quatro abas de cortes, **Vídeos/Código Python**, as quatro opções de Upload, **API Keys/Teste de vozes**, **Serviços e modelos/Fontes de materiais**, **Client MCP/Servidor MCP/Skill** e **Notificações/Geral/Telegram**. As chaves técnicas e a ordem funcional permanecem inalteradas.
+Todas as subabas internas também são localizadas pelo helper nativo de tabs: **Blueprints/Brandings**, **Pesquisa pública/Cadastro manual/Contas cadastradas**, **Upload/Biblioteca**, **Importar do YouTube/Canais em lote gmail/Cadastro manual**, **Criar vídeo/Vídeos**, **Novo roteiro/letra/Histórico guardado**, as três abas de análise de clusters, as quatro abas de cortes, **Vídeos/Código Python**, as quatro opções de Upload, **JewelMusic/Pushtunes/ytmusicapi**, **API Keys/Teste de vozes**, **Serviços e modelos/Fontes de materiais**, **Client MCP/Servidor MCP/Skill** e **Notificações/Geral/Telegram**. As chaves técnicas e a ordem funcional permanecem inalteradas.
 
 Dentro de **Configurações > Contas Google**, a UI contém os cartões expansíveis de contas Google/YouTube, `sessionInfo` por conta, documentos de Upload directo, o formulário **Adicionar outra conta Gmail**, o bloco global de `INNERTUBE_API_KEY` e a configuração global do YouTube (OAuth Client ID, OAuth Client Secret e YouTube Data API Key). A página **Configuração API** contém as restantes credenciais, providers, modelos, serviços, Nano Banana, TikTok e Postiz.
 

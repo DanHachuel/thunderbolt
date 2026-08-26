@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import mimetypes
 import re
 from contextlib import nullcontext
 from datetime import date, datetime
@@ -64,6 +65,7 @@ from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdap
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
 from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPTIONS, normalize_upload_post_platforms
+from integrations.music_uploads import JewelMusicAdapter, PushtunesAdapter, YTMusicApiAdapter, MUSIC_UPLOAD_EXTENSIONS, PUSHTUNES_OPERATIONS, PUSHTUNES_SOURCES, PUSHTUNES_TARGETS, YT_MUSIC_UPLOAD_EXTENSIONS
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
@@ -3707,6 +3709,277 @@ def render_upload_direct():
                     (st.success if result.ok else st.error)(result.message)
 
 
+def _persist_music_upload_settings(updates: dict[str, Any]) -> dict[str, Any]:
+    settings = read_json("settings.json", {})
+    settings.update(updates)
+    write_json("settings.json", settings)
+    return settings
+
+
+def _render_music_source(prefix: str, extensions: set[str]) -> str:
+    source_mode = st.radio(
+        "Origem da música",
+        ["Ficheiro existente", "Carregar ficheiro"],
+        horizontal=True,
+        key=f"{prefix}_music_source_mode",
+    )
+    selected_path = str(st.session_state.get(f"{prefix}_music_path") or "")
+    if source_mode == "Ficheiro existente":
+        existing = [path for path in list_music_files() if path.suffix.lower() in extensions]
+        if existing:
+            selected = st.selectbox(
+                "Música local",
+                existing,
+                index=next((index for index, item in enumerate(existing) if str(item) == selected_path), 0),
+                format_func=lambda item: item.name,
+                key=f"{prefix}_music_existing",
+            )
+            selected_path = str(selected)
+            st.session_state[f"{prefix}_music_path"] = selected_path
+        else:
+            st.info("Ainda não existem ficheiros compatíveis em storage/music. Escolha Carregar ficheiro.")
+            selected_path = ""
+    else:
+        uploaded = st.file_uploader(
+            "Carregar ficheiro de música",
+            type=sorted(extension.lstrip(".") for extension in extensions),
+            key=f"{prefix}_music_file_upload",
+        )
+        if uploaded is not None and st.button("Guardar música no storage local", key=f"{prefix}_music_store", use_container_width=True):
+            try:
+                stored = store_music_file(uploaded.name, uploaded.getvalue())
+                selected_path = str(stored)
+                st.session_state[f"{prefix}_music_path"] = selected_path
+                st.success(f"Música guardada em `{stored}`.")
+            except (OSError, ValueError) as exc:
+                st.error(str(exc))
+        selected_path = str(st.session_state.get(f"{prefix}_music_path") or selected_path)
+    if selected_path and Path(selected_path).is_file():
+        st.caption(f"Ficheiro seleccionado: `{selected_path}`")
+        return selected_path
+    return ""
+
+
+def _record_music_upload(destination: str, result: IntegrationResult, *, music_path: str = "", target: dict[str, Any] | None = None) -> dict[str, Any]:
+    record = {
+        "id": uuid.uuid4().hex,
+        "destination": destination,
+        "music_path": music_path,
+        "target": target or {},
+        "status": "published" if result.ok else "failed",
+        "message": result.message,
+        "data": result.data,
+        "created_at": now(),
+    }
+    uploads = read_json("uploads.json", [])
+    uploads.append(record)
+    write_json("uploads.json", uploads)
+    reconcile_persisted_notifications()
+    return record
+
+
+def _render_music_upload_history() -> None:
+    records = [
+        record
+        for record in read_json("uploads.json", [])
+        if isinstance(record, dict)
+        and any(name in str(record.get("destination") or "").lower() for name in ("jewelmusic", "pushtunes", "youtube music", "ytmusicapi"))
+    ]
+    st.divider()
+    st.subheader("Histórico de uploads de música")
+    if not records:
+        st.caption("Ainda não existem uploads de música registados.")
+        return
+    for record in reversed(records[-20:]):
+        status = "Concluído" if record.get("status") == "published" else "Falhou"
+        path = Path(str(record.get("music_path") or ""))
+        with st.container(border=True):
+            st.write(f"**{record.get('destination', 'Upload musical')}** · {status}")
+            st.caption(f"{record.get('created_at', '—')} · {path.name if path.name else record.get('target', {})}")
+            st.write(record.get("message", ""))
+            if path.is_file():
+                st.download_button(
+                    "Descarregar cópia local",
+                    data=path.read_bytes(),
+                    file_name=path.name,
+                    mime=mimetypes.guess_type(path.name)[0] or "audio/mpeg",
+                    key=f"music_history_download_{record.get('id')}",
+                )
+
+
+def _render_jewelmusic_upload_tab() -> None:
+    st.subheader("JewelMusic")
+    st.caption("Upload de tracks para o JewelMusic através do endpoint documentado do SDK, com distribuição posterior para as plataformas disponíveis na sua conta.")
+    st.info("A API Key é guardada apenas no settings.json local. O teste consulta /v1/ping e não cria uma track.")
+    settings = read_json("settings.json", {})
+    with st.form("jewelmusic_settings_form"):
+        enabled = st.checkbox("Activar JewelMusic", value=bool(settings.get("jewelmusic_enabled", False)))
+        api_key = st.text_input("JewelMusic API Key", value=str(settings.get("jewelmusic_api_key") or ""), type="password")
+        base_url = st.text_input("Base URL", value=str(settings.get("jewelmusic_base_url") or "https://api.jewelmusic.com"))
+        proxy_url = st.text_input("Proxy opcional", value=str(settings.get("jewelmusic_proxy_url") or ""), placeholder="http://127.0.0.1:8080")
+        timeout_seconds = st.number_input("Timeout (segundos)", min_value=5, max_value=900, value=int(settings.get("jewelmusic_timeout_seconds", 120)), step=5)
+        save = st.form_submit_button("Guardar configuração JewelMusic", type="primary", use_container_width=True)
+    if save:
+        settings = _persist_music_upload_settings({
+            "jewelmusic_enabled": bool(enabled),
+            "jewelmusic_api_key": api_key.strip(),
+            "jewelmusic_base_url": base_url.strip().rstrip("/"),
+            "jewelmusic_proxy_url": proxy_url.strip(),
+            "jewelmusic_timeout_seconds": int(timeout_seconds),
+        })
+        st.success("Configuração JewelMusic guardada no storage local.")
+    adapter = JewelMusicAdapter(settings)
+    if st.button("Testar conexão JewelMusic", key="jewelmusic_test", use_container_width=True):
+        test_result = adapter.test_connection()
+        (st.success if test_result.ok else st.error)(test_result.message)
+    music_path = _render_music_source("jewelmusic", MUSIC_UPLOAD_EXTENSIONS)
+    metadata_cols = st.columns(4)
+    with metadata_cols[0]:
+        title = st.text_input("Título", value=Path(music_path).stem if music_path else "", key="jewelmusic_title")
+    with metadata_cols[1]:
+        artist = st.text_input("Artista", key="jewelmusic_artist")
+    with metadata_cols[2]:
+        album = st.text_input("Álbum", key="jewelmusic_album")
+    with metadata_cols[3]:
+        year = st.text_input("Ano", key="jewelmusic_year")
+    genre = st.text_input("Género", key="jewelmusic_genre")
+    if st.button("Enviar música para JewelMusic", type="primary", key="jewelmusic_upload", use_container_width=True, disabled=not bool(music_path)):
+        result = JewelMusicAdapter(read_json("settings.json", {})).upload_track(music_path, title=title, artist=artist, album=album, year=year, genre=genre)
+        _record_music_upload("JewelMusic", result, music_path=music_path, target={"artist": artist, "title": title})
+        (st.success if result.ok else st.error)(result.message)
+
+
+def _store_pushtunes_csv(uploaded: Any) -> str:
+    target = STORAGE / "music" / "pushtunes-source.csv"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(uploaded.getvalue())
+    return str(target)
+
+
+def _render_pushtunes_upload_tab() -> None:
+    st.subheader("Pushtunes")
+    st.caption("Sincronização de biblioteca a partir de Subsonic, Jellyfin ou CSV para Spotify, YouTube Music ou Tidal. Pushtunes não transforma um MP3 isolado num upload; para isso use JewelMusic ou ytmusicapi.")
+    st.warning("O Pushtunes usa as credenciais próprias dos serviços. O Thunderbolt apenas inicia o comando local com parâmetros separados e mascara os segredos na saída.")
+    settings = read_json("settings.json", {})
+    with st.form("pushtunes_settings_form"):
+        enabled = st.checkbox("Activar Pushtunes", value=bool(settings.get("pushtunes_enabled", False)))
+        executable = st.text_input("Executável ou módulo", value=str(settings.get("pushtunes_executable") or "pushtunes"), help="Por padrão é usado o comando pushtunes instalado no ambiente Python do Thunderbolt.")
+        source = st.selectbox("Fonte", list(PUSHTUNES_SOURCES), index=list(PUSHTUNES_SOURCES).index(str(settings.get("pushtunes_source") or "csv")) if str(settings.get("pushtunes_source") or "csv") in PUSHTUNES_SOURCES else 0, format_func=lambda value: {"csv": "CSV local", "subsonic": "Subsonic/Navidrome", "jellyfin": "Jellyfin", "spotify": "Spotify", "ytm": "YouTube Music"}.get(value, value))
+        target = st.selectbox("Destino", list(PUSHTUNES_TARGETS), index=list(PUSHTUNES_TARGETS).index(str(settings.get("pushtunes_target") or "ytm")) if str(settings.get("pushtunes_target") or "ytm") in PUSHTUNES_TARGETS else 0, format_func=lambda value: {"spotify": "Spotify", "ytm": "YouTube Music", "tidal": "Tidal", "csv": "CSV"}.get(value, value))
+        operation = st.selectbox("Operação", list(PUSHTUNES_OPERATIONS), index=list(PUSHTUNES_OPERATIONS).index(str(settings.get("pushtunes_operation") or "tracks")) if str(settings.get("pushtunes_operation") or "tracks") in PUSHTUNES_OPERATIONS else 0, format_func=lambda value: {"tracks": "Tracks", "albums": "Álbuns", "playlist": "Playlist"}.get(value, value))
+        profile = st.text_input("Perfil Pushtunes (.toml), opcional", value=str(settings.get("pushtunes_profile") or ""))
+        csv_file = st.text_input("Caminho CSV", value=str(settings.get("pushtunes_csv_file") or ""))
+        ytm_auth_file = st.text_input("Caminho browser.json do YouTube Music", value=str(settings.get("pushtunes_ytm_auth_file") or ""))
+        tidal_session_file = st.text_input("Caminho tidal-session.json do Tidal", value=str(settings.get("pushtunes_tidal_session_file") or ""))
+        playlist_name = st.text_input("Nome da playlist", value=str(settings.get("pushtunes_playlist_name") or ""))
+        similarity = st.slider("Similaridade mínima", min_value=0.0, max_value=1.0, value=float(settings.get("pushtunes_similarity", 0.8)), step=0.05)
+        working_directory = st.text_input("Directório de trabalho", value=str(settings.get("pushtunes_working_directory") or ""))
+        spotify_client_id = st.text_input("Spotify Client ID", value=str(settings.get("pushtunes_spotify_client_id") or ""))
+        spotify_client_secret = st.text_input("Spotify Client Secret", value=str(settings.get("pushtunes_spotify_client_secret") or ""), type="password")
+        spotify_redirect_uri = st.text_input("Spotify Redirect URI", value=str(settings.get("pushtunes_spotify_redirect_uri") or ""))
+        timeout_seconds = st.number_input("Timeout Pushtunes (segundos)", min_value=30, max_value=3600, value=int(settings.get("pushtunes_timeout_seconds", 1800)), step=30)
+        save = st.form_submit_button("Guardar configuração Pushtunes", type="primary", use_container_width=True)
+    if save:
+        settings = _persist_music_upload_settings({
+            "pushtunes_enabled": bool(enabled),
+            "pushtunes_executable": executable.strip() or "pushtunes",
+            "pushtunes_source": source,
+            "pushtunes_target": target,
+            "pushtunes_operation": operation,
+            "pushtunes_profile": profile.strip(),
+            "pushtunes_csv_file": csv_file.strip(),
+            "pushtunes_ytm_auth_file": ytm_auth_file.strip(),
+            "pushtunes_tidal_session_file": tidal_session_file.strip(),
+            "pushtunes_playlist_name": playlist_name.strip(),
+            "pushtunes_similarity": float(similarity),
+            "pushtunes_working_directory": working_directory.strip(),
+            "pushtunes_spotify_client_id": spotify_client_id.strip(),
+            "pushtunes_spotify_client_secret": spotify_client_secret.strip(),
+            "pushtunes_spotify_redirect_uri": spotify_redirect_uri.strip(),
+            "pushtunes_timeout_seconds": int(timeout_seconds),
+        })
+        st.success("Configuração Pushtunes guardada no storage local.")
+    if source == "csv":
+        st.caption("Pode carregar o CSV nesta página e usar o caminho guardado como origem Pushtunes.")
+        csv_upload = st.file_uploader("Carregar CSV de origem Pushtunes", type=["csv"], key="pushtunes_csv_upload")
+        if csv_upload is not None and st.button("Guardar CSV Pushtunes no storage", key="pushtunes_csv_store", use_container_width=True):
+            stored_csv = _store_pushtunes_csv(csv_upload)
+            settings = _persist_music_upload_settings({"pushtunes_csv_file": stored_csv})
+            st.success(f"CSV guardado em `{stored_csv}`.")
+    adapter = PushtunesAdapter(read_json("settings.json", {}))
+    status = adapter.status()
+    (st.success if status.ok else st.warning)(status.message)
+    if st.button("Validar instalação e configuração Pushtunes", key="pushtunes_test", use_container_width=True):
+        check = PushtunesAdapter(read_json("settings.json", {})).status()
+        (st.success if check.ok else st.error)(check.message)
+    if st.button("Executar sincronização Pushtunes", type="primary", key="pushtunes_sync", use_container_width=True, disabled=not status.ok):
+        result = PushtunesAdapter(read_json("settings.json", {})).sync()
+        _record_music_upload(f"Pushtunes ({adapter.source} → {adapter.target})", result, target={"source": adapter.source, "target": adapter.target, "operation": adapter.operation})
+        (st.success if result.ok else st.error)(result.message)
+        if result.data.get("stdout") or result.data.get("stderr"):
+            with st.expander("Saída técnica do Pushtunes"):
+                st.text(result.data.get("stdout", ""))
+                if result.data.get("stderr"):
+                    st.text(result.data["stderr"])
+
+
+def _store_ytmusicapi_auth(uploaded: Any) -> str:
+    target = STORAGE / "ytmusicapi" / "browser.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(uploaded.getvalue())
+    return str(target)
+
+
+def _render_ytmusicapi_upload_tab() -> None:
+    st.subheader("ytmusicapi")
+    st.caption("Upload de músicas para YouTube Music através da API não oficial ytmusicapi. O serviço exige autenticação de browser e aceita MP3, M4A, WMA, FLAC ou OGG até 300 MB.")
+    st.warning("Use um browser.json exportado/configurado pelo ytmusicapi. Não cole cookies ou tokens na conversa, no GitHub ou em issues; o ficheiro fica apenas no storage local.")
+    settings = read_json("settings.json", {})
+    with st.form("ytmusicapi_settings_form"):
+        enabled = st.checkbox("Activar ytmusicapi", value=bool(settings.get("ytmusicapi_enabled", False)))
+        auth_file = st.text_input("Caminho do browser.json", value=str(settings.get("ytmusicapi_auth_file") or ""))
+        proxy_url = st.text_input("Proxy opcional", value=str(settings.get("ytmusicapi_proxy_url") or ""), placeholder="http://127.0.0.1:8080")
+        timeout_seconds = st.number_input("Timeout (segundos)", min_value=30, max_value=900, value=int(settings.get("ytmusicapi_timeout_seconds", 240)), step=10)
+        save = st.form_submit_button("Guardar configuração ytmusicapi", type="primary", use_container_width=True)
+    if save:
+        settings = _persist_music_upload_settings({
+            "ytmusicapi_enabled": bool(enabled),
+            "ytmusicapi_auth_file": auth_file.strip(),
+            "ytmusicapi_proxy_url": proxy_url.strip(),
+            "ytmusicapi_timeout_seconds": int(timeout_seconds),
+        })
+        st.success("Configuração ytmusicapi guardada no storage local.")
+    auth_upload = st.file_uploader("Carregar browser.json", type=["json"], key="ytmusicapi_auth_upload")
+    if auth_upload is not None and st.button("Guardar browser.json no storage local", key="ytmusicapi_auth_store", use_container_width=True):
+        stored_auth = _store_ytmusicapi_auth(auth_upload)
+        settings = _persist_music_upload_settings({"ytmusicapi_auth_file": stored_auth, "ytmusicapi_enabled": True})
+        st.success(f"Ficheiro de autenticação guardado em `{stored_auth}`.")
+    adapter = YTMusicApiAdapter(read_json("settings.json", {}))
+    status = adapter.status()
+    (st.success if status.ok else st.warning)(status.message)
+    if st.button("Testar autenticação ytmusicapi", key="ytmusicapi_test", use_container_width=True):
+        result = YTMusicApiAdapter(read_json("settings.json", {})).test_connection()
+        (st.success if result.ok else st.error)(result.message)
+    music_path = _render_music_source("ytmusicapi", YT_MUSIC_UPLOAD_EXTENSIONS)
+    if st.button("Enviar música para YouTube Music", type="primary", key="ytmusicapi_upload", use_container_width=True, disabled=not bool(music_path) or not status.ok):
+        result = YTMusicApiAdapter(read_json("settings.json", {})).upload_song(music_path)
+        _record_music_upload("ytmusicapi / YouTube Music", result, music_path=music_path, target={"service": "youtube_music"})
+        (st.success if result.ok else st.error)(result.message)
+
+
+def render_music_upload() -> None:
+    st.title("Upload Música")
+    st.caption("Carregue e encaminhe músicas por JewelMusic, sincronize bibliotecas com Pushtunes ou envie directamente para YouTube Music com ytmusicapi. As credenciais e o histórico permanecem locais.")
+    jewel_tab, pushtunes_tab, ytmusicapi_tab = render_localized_tabs(["JewelMusic", "Pushtunes", "ytmusicapi"])
+    with jewel_tab:
+        _render_jewelmusic_upload_tab()
+    with pushtunes_tab:
+        _render_pushtunes_upload_tab()
+    with ytmusicapi_tab:
+        _render_ytmusicapi_upload_tab()
+    _render_music_upload_history()
+
+
 def render_upload():
     st.title("Upload")
     upload_tab, direct_tab, postiz_tab, upload_post_tab = render_localized_tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])
@@ -5561,7 +5834,7 @@ def main():
         "Criação de Vídeos": render_new_video,
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
-        "Upload Música": lambda: render_edit_placeholder("Upload Música", ""),
+        "Upload Música": render_music_upload,
         "Roteiros": render_scripts,
         "Thumbnails": render_thumbnails,
         "Upload": render_upload,
