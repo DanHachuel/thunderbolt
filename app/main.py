@@ -5336,76 +5336,98 @@ def render_settings():
                 render_media_provider_cards(settings, embedded=True)
 
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
-                    cols = st.columns(2)
-                    with cols[0]:
+                    st.caption("Cada serviço está separado no seu próprio cartão. Os botões de teste ficam dentro do cartão correspondente e fazem apenas diagnóstico, sem gerar áudio ou música.")
+
+                    with st.container(border=True):
+                        st.markdown("#### Azure Speech")
+                        st.caption("TTS da Microsoft Azure para narração e catálogo de vozes.")
                         azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
                         _render_credential_status(azure_speech_key)
                         azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
-                        siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
-                        _render_credential_status(siliconflow_tts_api_key)
-                        minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
-                        _render_credential_status(minimax_tts_api_key)
-                        minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
-                        minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
-                        minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
-                    with cols[1]:
-                        elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
-                        _render_credential_status(elevenlabs_api_key)
-                        elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
-                        chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
-                        chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
-                        _render_credential_status(chatterbox_api_key, local=True, required=False)
-                        chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
-                        sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
-                        _render_credential_status(sonilo_api_key)
-                        sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
-                        st.markdown("**Suno — agente musical opcional**")
-                        suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
-                        _render_credential_status(suno_api_key)
-                        suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
-                        suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
-
-                    st.markdown(f"**{ui_text('Testar credenciais TTS e música', current_ui_language())}**")
-                    voice_test_cols = st.columns(3)
-                    with voice_test_cols[0]:
                         _render_api_test_control(
                             settings,
                             "voice:azure_speech",
                             lambda: test_voice_provider("azure_speech", {"azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region}),
                             widget_key="api_test_voice_azure",
                         )
-                        _render_api_test_control(
-                            settings,
-                            "voice:siliconflow",
-                            lambda: test_voice_provider("siliconflow", {"siliconflow_tts_api_key": siliconflow_tts_api_key}),
-                            widget_key="api_test_voice_siliconflow",
-                        )
-                        _render_api_test_control(
-                            settings,
-                            "voice:minimax",
-                            lambda: test_voice_provider("minimax", {"minimax_tts_api_key": minimax_tts_api_key, "minimax_tts_base_url": minimax_tts_base_url}),
-                            widget_key="api_test_voice_minimax",
-                        )
-                    with voice_test_cols[1]:
+
+                    with st.container(border=True):
+                        st.markdown("#### ElevenLabs")
+                        st.caption("TTS ElevenLabs para vozes multilíngues.")
+                        elevenlabs_api_key = text_setting("ElevenLabs API key", "elevenlabs_api_key", secret=True)
+                        _render_credential_status(elevenlabs_api_key)
+                        elevenlabs_model_id = text_setting("ElevenLabs model", "elevenlabs_model_id")
                         _render_api_test_control(
                             settings,
                             "voice:elevenlabs",
                             lambda: test_voice_provider("elevenlabs", {"elevenlabs_api_key": elevenlabs_api_key}),
                             widget_key="api_test_voice_elevenlabs",
                         )
-                        _render_api_test_control(
-                            settings,
-                            "voice:chatterbox",
-                            lambda: test_voice_provider("chatterbox", {"chatterbox_api_key": chatterbox_api_key, "chatterbox_base_url": chatterbox_base_url}),
-                            widget_key="api_test_voice_chatterbox",
-                        )
-                    with voice_test_cols[2]:
-                        _render_api_test_control(
-                            settings,
-                            "voice:sonilo",
-                            lambda: test_voice_provider("sonilo", {"sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url}),
-                            widget_key="api_test_voice_sonilo",
-                        )
+
+                    tts_cols = st.columns(2)
+                    with tts_cols[0]:
+                        with st.container(border=True):
+                            st.markdown("#### SiliconFlow")
+                            st.caption("Provider TTS SiliconFlow.")
+                            siliconflow_tts_api_key = text_setting("SiliconFlow TTS API key", "siliconflow_tts_api_key", secret=True)
+                            _render_credential_status(siliconflow_tts_api_key)
+                            _render_api_test_control(
+                                settings,
+                                "voice:siliconflow",
+                                lambda: test_voice_provider("siliconflow", {"siliconflow_tts_api_key": siliconflow_tts_api_key}),
+                                widget_key="api_test_voice_siliconflow",
+                            )
+
+                        with st.container(border=True):
+                            st.markdown("#### MiniMax TTS")
+                            st.caption("Provider MiniMax com endpoint, modelo e voz configuráveis.")
+                            minimax_tts_api_key = text_setting("MiniMax TTS API key", "minimax_tts_api_key", secret=True)
+                            _render_credential_status(minimax_tts_api_key)
+                            minimax_tts_base_url = text_setting("MiniMax TTS Base URL", "minimax_tts_base_url")
+                            minimax_tts_model_id = text_setting("MiniMax TTS model", "minimax_tts_model_id")
+                            minimax_tts_voice_id = text_setting("MiniMax TTS voice ID", "minimax_tts_voice_id")
+                            _render_api_test_control(
+                                settings,
+                                "voice:minimax",
+                                lambda: test_voice_provider("minimax", {"minimax_tts_api_key": minimax_tts_api_key, "minimax_tts_base_url": minimax_tts_base_url}),
+                                widget_key="api_test_voice_minimax",
+                            )
+
+                    with tts_cols[1]:
+                        with st.container(border=True):
+                            st.markdown("#### Chatterbox")
+                            st.caption("Provider compatível com a API OpenAI; pode ser local e sem API key.")
+                            chatterbox_base_url = text_setting("Chatterbox Base URL", "chatterbox_base_url")
+                            chatterbox_api_key = text_setting("Chatterbox API key", "chatterbox_api_key", secret=True)
+                            _render_credential_status(chatterbox_api_key, local=True, required=False)
+                            chatterbox_model_id = text_setting("Chatterbox model", "chatterbox_model_id")
+                            _render_api_test_control(
+                                settings,
+                                "voice:chatterbox",
+                                lambda: test_voice_provider("chatterbox", {"chatterbox_api_key": chatterbox_api_key, "chatterbox_base_url": chatterbox_base_url}),
+                                widget_key="api_test_voice_chatterbox",
+                            )
+
+                        with st.container(border=True):
+                            st.markdown("#### Sonilo")
+                            st.caption("Provider TTS Sonilo com endpoint próprio.")
+                            sonilo_api_key = text_setting("Sonilo API key", "sonilo_api_key", secret=True)
+                            _render_credential_status(sonilo_api_key)
+                            sonilo_base_url = text_setting("Sonilo Base URL", "sonilo_base_url")
+                            _render_api_test_control(
+                                settings,
+                                "voice:sonilo",
+                                lambda: test_voice_provider("sonilo", {"sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url}),
+                                widget_key="api_test_voice_sonilo",
+                            )
+
+                    with st.container(border=True):
+                        st.markdown("#### Suno — agente musical opcional")
+                        st.caption("Suno é utilizado para criação de música e fica separado dos providers de voz/TTS.")
+                        suno_api_key = text_setting("Suno API key", "suno_api_key", secret=True)
+                        _render_credential_status(suno_api_key)
+                        suno_api_base_url = text_setting("Suno API Base URL", "suno_api_base_url", help_text="Use o endpoint compatível fornecido pelo seu acesso Suno; não é inventado pelo Thunderbolt.")
+                        suno_api_endpoint = text_setting("Suno API endpoint", "suno_api_endpoint", help_text="Ex.: /api/generate")
                         _render_api_test_control(
                             settings,
                             "voice:suno",

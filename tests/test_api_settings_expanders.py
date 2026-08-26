@@ -23,6 +23,24 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         for label in labels:
             self.assertIn(f'st.expander("{label}", expanded=False)', MAIN_SOURCE)
 
+    def test_voice_services_are_split_into_provider_cards(self):
+        start = MAIN_SOURCE.index('with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):')
+        end = MAIN_SOURCE.index('with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):', start)
+        voice_block = MAIN_SOURCE[start:end]
+        for provider in ("Azure Speech", "ElevenLabs", "SiliconFlow", "MiniMax TTS", "Chatterbox", "Sonilo", "Suno — agente musical opcional"):
+            self.assertIn(f'st.markdown("#### {provider}")', voice_block)
+        self.assertNotIn('voice_test_cols', voice_block)
+        for widget_key in (
+            'api_test_voice_azure',
+            'api_test_voice_elevenlabs',
+            'api_test_voice_siliconflow',
+            'api_test_voice_minimax',
+            'api_test_voice_chatterbox',
+            'api_test_voice_sonilo',
+            'api_test_voice_suno',
+        ):
+            self.assertIn(f'widget_key="{widget_key}"', voice_block)
+
     def test_api_settings_form_and_saved_configuration_remain_present(self):
         self.assertIn('with st.form("settings_form"):', MAIN_SOURCE)
         self.assertIn('st.form_submit_button("Guardar configurações do Thunderbolt"', MAIN_SOURCE)
