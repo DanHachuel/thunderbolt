@@ -614,6 +614,27 @@ for _language_code, _tab_translation in TAB_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_tab_translation)
 
 
+_NOTIFICATION_TAB_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "pt": {"Geral": "Geral", "Telegram": "Telegram"},
+    "en": {"Geral": "General", "Telegram": "Telegram"},
+    "zh": {"Geral": "常规", "Telegram": "Telegram"},
+    "de": {"Geral": "Allgemein", "Telegram": "Telegram"},
+    "vi": {"Geral": "Chung", "Telegram": "Telegram"},
+    "tr": {"Geral": "Genel", "Telegram": "Telegram"},
+    "ru": {"Geral": "Общие", "Telegram": "Telegram"},
+    "es": {"Geral": "General", "Telegram": "Telegram"},
+    "id": {"Geral": "Umum", "Telegram": "Telegram"},
+    "it": {"Geral": "Generale", "Telegram": "Telegram"},
+    "pl": {"Geral": "Ogólne", "Telegram": "Telegram"},
+    "ga": {"Geral": "Ginearálta", "Telegram": "Telegram"},
+    "ar": {"Geral": "عام", "Telegram": "Telegram"},
+    "he": {"Geral": "כללי", "Telegram": "Telegram"},
+}
+for _language_code, _notification_tab_translation in _NOTIFICATION_TAB_TRANSLATIONS.items():
+    if _language_code in UI_TRANSLATIONS:
+        UI_TRANSLATIONS[_language_code].update(_notification_tab_translation)
+
+
 TUTORIAL_TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt": {"Tutorial Supabase": "Tutorial Supabase", "Guia de configuração do Supabase para automações com n8n.": "Guia de configuração do Supabase para automações com n8n."},
     "en": {"Tutorial Supabase": "Supabase Tutorial", "Guia de configuração do Supabase para automações com n8n.": "Supabase setup guide for n8n automations."},

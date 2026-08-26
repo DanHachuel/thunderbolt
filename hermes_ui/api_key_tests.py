@@ -213,6 +213,18 @@ def test_postiz_credentials(api_key: str, base_url: str = "https://api.postiz.co
     return _get(f"{base}/integrations", headers={"Authorization": api_key})
 
 
+def test_telegram_credentials(bot_token: str, chat_id: str) -> dict[str, Any]:
+    """Validate the Telegram bot token with getMe without sending a message."""
+    bot_token = str(bot_token or "").strip()
+    chat_id = str(chat_id or "").strip()
+    if not bot_token or not chat_id:
+        return _missing("Introduza o Bot Token e o Chat ID Telegram antes de testar.")
+    result = _get(f"https://api.telegram.org/bot{bot_token}/getMe")
+    if result.get("ok"):
+        result["message"] = "Bot Token Telegram válido. O Chat ID foi aceite localmente; o teste não enviou mensagem."
+    return result
+
+
 def test_material_source_credentials(provider: str, api_key: str) -> dict[str, Any]:
     """Run a read-only provider-specific check for material source cards."""
     provider = str(provider or "").strip().lower()

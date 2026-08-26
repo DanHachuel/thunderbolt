@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -40,6 +41,8 @@ EVENT_CATALOG: tuple[dict[str, str], ...] = (
     {"code": "mcp_operation_completed", "category": "Integrações", "label": "Operação MCP concluída", "description": "Quando uma operação mutável de integração MCP terminar com sucesso."},
 )
 EVENTS_BY_CODE = {item["code"]: item for item in EVENT_CATALOG}
+LOGGER = logging.getLogger(__name__)
+
 SENSITIVE_MARKERS = (
     "token",
     "secret",
@@ -119,6 +122,24 @@ def _history() -> list[dict[str, Any]]:
     return [item for item in saved if isinstance(item, dict)]
 
 
+def _dispatch_telegram_notification(entry: dict[str, Any]) -> None:
+    """Deliver a persisted event to Telegram without affecting local flows."""
+    try:
+        settings = storage.read_json("settings.json", {})
+        if not isinstance(settings, dict) or not bool(settings.get("telegram_enabled", False)):
+            return
+        from integrations.telegram_gateway import send_notification_to_telegram
+
+        result = send_notification_to_telegram(entry, settings)
+        if not result.ok:
+            error_type = result.data.get("error_type") if isinstance(result.data, dict) else ""
+            if error_type != "missing_configuration":
+                LOGGER.warning("Telegram notification delivery failed (%s).", error_type or "unknown_error")
+    except Exception as exc:
+        # External notification delivery must never break production, uploads or UI.
+        LOGGER.warning("Telegram notification delivery failed (%s).", type(exc).__name__)
+
+
 def record_notification(
     event_type: str,
     title: str,
@@ -151,6 +172,7 @@ def record_notification(
         "dedupe_key": str(dedupe_key or ""),
     }
     storage.write_json(NOTIFICATIONS_FILE, [entry, *history][:MAX_NOTIFICATIONS])
+    _dispatch_telegram_notification(entry)
     return entry
 
 

@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.2.89
+> **Versão deste manual:** 0.3.35
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install
+npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.2.77 install
+npx --yes @danhachuel/thunderbolt@0.3.35 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -196,7 +196,7 @@ O Thunderbolt inclui as dez opções de idioma usadas pelo fluxo MoneyPrinterTur
 
 No topo da área principal, o menu nativo de idioma segue o padrão do MoneyPrinterTurbo e mostra o rótulo **Language** acima do selector. Cada opção apresenta o nome e o código, acompanhados por uma imagem SVG local da bandeira; não depende de emojis nem de siglas da fonte do sistema. A escolha fica guardada como `ui_language` em `storage/state/settings.json` e, quando existe um caminho MoneyPrinterTurbo configurado, é sincronizada com `[ui].language` no `config.toml`. O dashboard inicial, o interior das páginas e as abas da barra lateral usam o mesmo idioma seleccionado. O toolbar do Streamlit não é manipulado: o indicador de execução, **Deploy** e o menu de três pontos permanecem nativos e clicáveis. Na Criação de Vídeos e em Roteiros, o selector **Script Language** mantém o catálogo de vídeo independente, mas guarda o código curto; essa escolha é sincronizada com `[ui].video_language`.
 
-Todas as subabas internas e o conteúdo das páginas também são traduzidos nos dez idiomas. Isso inclui títulos, subtítulos, descrições, labels, placeholders, opções, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML. Valores técnicos, IDs, URLs, nomes de ficheiros e dados introduzidos pelo utilizador permanecem inalterados. As subabas internas traduzidas incluem: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais e Client MCP/Servidor MCP/Skill. A ordem e as chaves internas dos widgets permanecem estáveis.
+Todas as subabas internas e o conteúdo das páginas também são traduzidos nos dez idiomas. Isso inclui títulos, subtítulos, descrições, labels, placeholders, opções, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML. Valores técnicos, IDs, URLs, nomes de ficheiros e dados introduzidos pelo utilizador permanecem inalterados. As subabas internas traduzidas incluem: Blueprints/Brandings, Pesquisa pública/Cadastro manual/Contas cadastradas, Upload/Biblioteca, Importar do YouTube/Canais em lote gmail/Cadastro manual, Criar vídeo/Vídeos, Novo roteiro/letra/Histórico guardado, análise de clusters, edição de cortes, Vídeos/Código Python, as quatro opções de Upload, API Keys/Teste de vozes, Serviços e modelos/Fontes de materiais, Client MCP/Servidor MCP/Skill e Notificações Geral/Telegram. A ordem e as chaves internas dos widgets permanecem estáveis.
 
 ### Temas Light e Dark
 
@@ -357,7 +357,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## 8. Configuração inicial da UI
 
-Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** está reservada para futuros eventos locais. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
+Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** contém as subabas **Geral** e **Telegram**. A subaba Geral mantém o histórico e as preferências dos eventos locais; a subaba Telegram envia esses mesmos eventos para o Chat ID configurado. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
 | Configuração | Finalidade |
 |---|---|
@@ -378,6 +378,16 @@ Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**,
 | Apify API Token | Token pessoal da Apify, guardado mascarado no storage local e usado apenas pela alternativa Apify |
 | Apify Actor ID | Actor usado pela alternativa Apify, por padrão `streamers~youtube-scraper` |
 | Apify polling/timeout | Intervalo de consulta e limite máximo da execução do actor |
+| Telegram Bot Token | Token criado pelo BotFather, guardado apenas no storage local |
+| Telegram Chat ID | Utilizador, grupo ou canal que receberá as notificações |
+| Telegram Proxy | Proxy HTTP/HTTPS/SOCKS opcional para ambientes sem acesso directo |
+| Telegram timeout | Limite de espera de cada envio, entre 5 e 120 segundos |
+
+### Telegram Gateway
+
+Em **Configurações > Notificações > Telegram**, active **Activar notificações Telegram**, introduza o **Telegram Bot Token** criado pelo BotFather e o **Telegram Chat ID** de destino. O botão **Testar chamada API** executa apenas o método read-only `getMe` para validar o bot; não envia uma mensagem de teste. O proxy é opcional e o suporte SOCKS depende das dependências instaladas pelo `requirements.txt`.
+
+Depois de guardar, cada nova notificação permitida pelas preferências da subaba **Geral** é enviada pela Bot API oficial do Telegram através de `sendMessage`. A notificação continua a ser persistida localmente mesmo que o Telegram esteja indisponível, o Chat ID esteja errado ou a API devolva um erro; a falha externa nunca interrompe a produção, os uploads ou a UI. A integração é apenas outbound: não recebe comandos, não faz polling e não expõe o Bot Token em logs, metadados ou no GitHub.
 
 As credenciais devem ser inseridas apenas na configuração local. A Kaggle API Key pertence exclusivamente à alternativa Kaggle. O Apify API Token pertence exclusivamente à alternativa Apify e não é usado para Kaggle; os resultados e histórico Apify ficam separados em `niche_apify_runs.json`. A Data API Key, o OAuth Client ID e o OAuth Client Secret são valores diferentes; Client ID + Secret não geram uma API Key nem um token OAuth até a conta ser autorizada. Não coloque nenhum deles no GitHub, no `package.json`, em blueprints ou em ficheiros de estado versionados.
 
@@ -448,7 +458,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
