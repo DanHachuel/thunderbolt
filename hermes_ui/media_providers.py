@@ -12,6 +12,12 @@ MEDIA_VIDEO_ACTIVE_CARD_KEY = "media_video_active_card_id"
 MEDIA_IMAGE_ACTIVE_PROVIDER_KEY = "media_image_provider"
 MEDIA_VIDEO_ACTIVE_PROVIDER_KEY = "media_video_provider"
 
+# Mantidos internamente para preservar compatibilidade e controlar o prompt dos providers.
+INTERNAL_IMAGE_ASPECT_RATIO = "16:9"
+INTERNAL_IMAGE_SIZE = "1K"
+INTERNAL_VIDEO_ASPECT_RATIO = "16:9"
+INTERNAL_VIDEO_SIZE = "1080p"
+
 
 @dataclass(frozen=True, slots=True)
 class MediaProviderDefinition:
@@ -35,7 +41,6 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
         default_base_url="https://generativelanguage.googleapis.com/v1beta",
         supports_image=True,
         api_style="gemini_interactions",
-        extra_fields=("aspect_ratio", "image_size"),
         description="Geração de imagem nativa Gemini para thumbnails e artes.",
     ),
     MediaProviderDefinition(
@@ -170,6 +175,9 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
     }
     for field in definition.extra_fields:
         result[field] = str(source.get(field) or "").strip()
+    if provider == "nano_banana":
+        result["aspect_ratio"] = str(source.get("aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO).strip()
+        result["image_size"] = str(source.get("image_size") or INTERNAL_IMAGE_SIZE).strip()
     test_result = source.get("test_result")
     if isinstance(test_result, Mapping) and str(test_result.get("status") or "") in {"success", "error"}:
         result["test_result"] = {
@@ -215,8 +223,8 @@ def ensure_media_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, 
                     "api_key": legacy_key,
                     "model": legacy_model,
                     "base_url": "https://generativelanguage.googleapis.com/v1beta",
-                    "aspect_ratio": str(result.get("gemini_image_aspect_ratio") or "16:9"),
-                    "image_size": str(result.get("gemini_image_size") or "1K"),
+                    "aspect_ratio": str(result.get("gemini_image_aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO),
+                    "image_size": str(result.get("gemini_image_size") or INTERNAL_IMAGE_SIZE),
                     "enabled": True,
                 },
                 0,
@@ -267,8 +275,8 @@ def apply_media_provider_cards_to_settings(settings: Mapping[str, Any], cards: l
     if nano_card:
         result["gemini_image_api_key"] = str(nano_card.get("api_key") or "")
         result["gemini_image_model"] = str(nano_card.get("model") or "gemini-3.1-flash-image")
-        result["gemini_image_aspect_ratio"] = str(nano_card.get("aspect_ratio") or result.get("gemini_image_aspect_ratio") or "16:9")
-        result["gemini_image_size"] = str(nano_card.get("image_size") or result.get("gemini_image_size") or "1K")
+        result["gemini_image_aspect_ratio"] = str(nano_card.get("aspect_ratio") or result.get("gemini_image_aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO)
+        result["gemini_image_size"] = str(nano_card.get("image_size") or result.get("gemini_image_size") or INTERNAL_IMAGE_SIZE)
     return result
 
 

@@ -31,6 +31,14 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertEqual(migrated["media_provider_cards"][0]["api_key"], "secret")
         self.assertEqual(migrated["media_image_active_card_id"], "media-nano-banana-default")
 
+    def test_nano_card_defaults_are_internal_and_not_catalog_extra_fields(self):
+        card = media_providers.normalize_media_card({"provider": "nano_banana"})
+        definition = media_providers.media_provider_definition("nano_banana")
+        self.assertEqual(card["aspect_ratio"], "16:9")
+        self.assertEqual(card["image_size"], "1K")
+        self.assertNotIn("aspect_ratio", definition.extra_fields)
+        self.assertNotIn("image_size", definition.extra_fields)
+
     def test_pools_filter_capabilities_and_prioritize_active_card(self):
         settings = {
             "media_provider_cards": [
@@ -66,7 +74,31 @@ class MediaProvidersTests(unittest.TestCase):
             output = media_generation.generate_image_for_card({}, card, "prompt", topic="topic", variant_index=2)
         self.assertEqual(output, Path("thumbnail.jpg"))
         self.assertEqual(generator.call_args.args[0]["gemini_image_api_key"], "secret")
+        self.assertIn("16:9", generator.call_args.args[1])
+        self.assertIn("1K", generator.call_args.args[1])
         self.assertEqual(generator.call_args.kwargs["variant_index"], 2)
+
+    def test_image_request_keeps_size_and_aspect_ratio_inside_prompt(self):
+        response = Mock(status_code=200)
+        card = {"provider": "huggingface", "model": "black-forest-labs/FLUX.1-dev", "base_url": "https://router.huggingface.co/v1", "api_style": "huggingface"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("16:9", prompt)
+        self.assertIn("1K", prompt)
+        self.assertNotIn("size", post.call_args.kwargs["json"])
+        self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
+
+    def test_video_request_keeps_size_and_aspect_ratio_inside_prompt(self):
+        response = Mock(status_code=200)
+        card = {"provider": "pollinations", "model": "video-model", "base_url": "https://gen.pollinations.ai/v1", "api_style": "openai_compatible"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._video_request(card, "video prompt")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("16:9", prompt)
+        self.assertIn("1080p", prompt)
+        self.assertNotIn("size", post.call_args.kwargs["json"])
+        self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
 
     def test_video_result_accepts_direct_url_or_task_id(self):
         self.assertEqual(media_generation._video_result({"url": "https://example/video.mp4"}), ("https://example/video.mp4", ""))
