@@ -7,9 +7,11 @@ from hermes_ui.llm_providers import (
     DEFAULT_LLM_CARD_ID,
     LLM_ACTIVE_CARD_KEY,
     LLM_CARDS_KEY,
+    active_llm_card,
     apply_llm_cards_to_settings,
     ensure_llm_provider_cards,
     provider_definition,
+    telegram_llm_card,
     test_llm_provider_card,
 )
 
@@ -82,6 +84,32 @@ class LlmProviderCardTests(TestCase):
         self.assertFalse(settings[LLM_CARDS_KEY][0]["telegram_llm"])
         self.assertTrue(settings[LLM_CARDS_KEY][1]["telegram_llm"])
         self.assertEqual(settings["llm_telegram_card_id"], "two")
+
+    def test_telegram_card_is_not_active_normal_llm_and_priority_is_ignored(self) -> None:
+        settings = {
+            LLM_CARDS_KEY: [
+                {"id": "telegram", "provider": "openai", "priority": 1, "enabled": True, "telegram_llm": True, "api_key": "telegram-key", "model": "telegram-model"},
+                {"id": "normal", "provider": "groq", "priority": 2, "enabled": True, "telegram_llm": False, "api_key": "normal-key", "model": "normal-model"},
+            ],
+        }
+        migrated, _ = ensure_llm_provider_cards(settings)
+        self.assertEqual(migrated[LLM_ACTIVE_CARD_KEY], "normal")
+        self.assertEqual(active_llm_card(settings)["id"], "normal")
+        self.assertEqual(telegram_llm_card(settings)["id"], "telegram")
+
+    def test_all_telegram_cards_leave_the_normal_pool_without_wiping_legacy_values(self) -> None:
+        settings = {
+            "openai_api_key": "legacy-key",
+            "openai_model_name": "legacy-model",
+            LLM_CARDS_KEY: [
+                {"id": "telegram", "provider": "openai", "priority": 1, "enabled": True, "telegram_llm": True, "api_key": "telegram-key", "model": "telegram-model"},
+            ],
+        }
+        applied = apply_llm_cards_to_settings(settings, settings[LLM_CARDS_KEY])
+        self.assertEqual(applied[LLM_ACTIVE_CARD_KEY], "")
+        self.assertEqual(applied["llm_telegram_card_id"], "telegram")
+        self.assertEqual(applied["openai_api_key"], "legacy-key")
+        self.assertEqual(applied["openai_model_name"], "legacy-model")
 
     def test_missing_key_is_redacted_and_success_is_stable(self) -> None:
         missing = test_llm_provider_card({"provider": "groq", "model": "llama"})

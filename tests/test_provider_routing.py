@@ -69,6 +69,32 @@ class ProviderRoutingTests(unittest.TestCase):
         ordered = provider_routing.enabled_cards(settings, provider_routing.POOL_LLM)
         self.assertEqual([card["id"] for card in ordered], ["first", "second", "third"])
 
+    def test_llm_pool_excludes_telegram_cards_even_when_enabled(self):
+        settings = {
+            "llm_provider_cards": [
+                {"id": "telegram", "provider": "openai", "priority": 1, "enabled": True, "telegram_llm": True},
+                {"id": "normal", "provider": "groq", "priority": 2, "enabled": True, "telegram_llm": False},
+            ],
+        }
+        ordered = provider_routing.enabled_cards(settings, provider_routing.POOL_LLM)
+        self.assertEqual([card["id"] for card in ordered], ["normal"])
+
+    def test_direct_llm_candidates_also_exclude_telegram_cards(self):
+        settings = {"provider_cooldown_seconds": 0}
+        cards = [
+            {"id": "telegram", "provider": "openai", "priority": 1, "enabled": True, "telegram_llm": True},
+            {"id": "normal", "provider": "groq", "priority": 2, "enabled": True, "telegram_llm": False},
+        ]
+        used = []
+
+        def request(card):
+            used.append(card["id"])
+            return FakeResponse(200, {"ok": True})
+
+        routed = provider_routing.route_json_request(settings, pool=provider_routing.POOL_LLM, cards=cards, request=request, cooldown_seconds=0)
+        self.assertEqual(routed.card["id"], "normal")
+        self.assertEqual(used, ["normal"])
+
     def test_llm_failover_tries_all_priorities_by_default(self):
         settings = {"provider_max_attempts": 3, "provider_cooldown_seconds": 0}
         cards = [
