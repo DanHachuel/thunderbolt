@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,11 +22,16 @@ from hermes_ui.thumbnail_generation import generate_thumbnail_image
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
-STALE_TASK_SECONDS = 2 * 60 * 60
+STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
+WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
 
 
 class PipelineError(RuntimeError):
     """Raised when a pipeline stage cannot complete with an actionable error."""
+
+
+class PipelineStopped(PipelineError):
+    """Raised when the user stops a task while the worker is processing it."""
 
 
 def _now() -> str:
@@ -41,16 +48,45 @@ def _lock_path() -> Path:
     return STORAGE / "state" / PIPELINE_LOCK_FILENAME
 
 
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def _acquire_lock() -> Path | None:
     path = _lock_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(descriptor, str(os.getpid()).encode("ascii"))
-        os.close(descriptor)
-        return path
     except FileExistsError:
-        return None
+        try:
+            old_pid = int(path.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            old_pid = 0
+        if _pid_alive(old_pid):
+            return None
+        try:
+            path.unlink()
+        except OSError:
+            return None
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return None
+    try:
+        os.write(descriptor, str(os.getpid()).encode("ascii"))
+    finally:
+        os.close(descriptor)
+    return path
 
 
 def _write_worker_state(**updates: Any) -> None:
@@ -62,6 +98,71 @@ def _write_worker_state(**updates: Any) -> None:
     write_json(PIPELINE_LOG_FILENAME, state)
 
 
+def _worker_heartbeat(**updates: Any) -> None:
+    _write_worker_state(
+        worker_pid=os.getpid(),
+        last_heartbeat_at=_now(),
+        **updates,
+    )
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def load_pipeline_worker_status() -> dict[str, Any]:
+    """Return the persisted worker heartbeat for the Backlog UI."""
+    status = read_json(PIPELINE_LOG_FILENAME, {})
+    if not isinstance(status, dict):
+        status = {}
+    heartbeat_at = _parse_timestamp(status.get("last_heartbeat_at"))
+    status["alive"] = bool(
+        heartbeat_at
+        and (datetime.now(timezone.utc) - heartbeat_at.astimezone(timezone.utc)).total_seconds()
+        <= WORKER_HEARTBEAT_TIMEOUT_SECONDS
+    )
+    return status
+
+
+def _recover_stale_tasks() -> list[str]:
+    """Convert abandoned doing tasks to failed after the worker timeout window."""
+    from hermes_ui.domain import update_task
+
+    recovered: list[str] = []
+    current_time = datetime.now(timezone.utc)
+    for task in read_json("tasks.json", []):
+        if not isinstance(task, dict) or str(task.get("state") or "") != "doing":
+            continue
+        updated_at = _parse_timestamp(task.get("updated_at"))
+        if not updated_at:
+            continue
+        age_seconds = (current_time - updated_at.astimezone(timezone.utc)).total_seconds()
+        if age_seconds <= STALE_TASK_SECONDS:
+            continue
+        task_id = str(task.get("id") or "")
+        if not task_id:
+            continue
+        message = (
+            f"A tarefa ficou sem heartbeat durante mais de {STALE_TASK_SECONDS // 60} minutos. "
+            "Foi marcada como falhada para evitar execução eterna; reveja o log do worker."
+        )
+        update_task(task_id, {"state": "failed", "error": message, "failed_stage": task.get("stage") or "pipeline"})
+        recovered.append(task_id)
+    return recovered
+
+
+def recover_stale_tasks() -> list[str]:
+    """Public wrapper used by the UI to recover tasks after an abrupt worker exit."""
+    return _recover_stale_tasks()
+
+
 def _task_by_id(task_id: str) -> dict[str, Any] | None:
     return next((task for task in read_json("tasks.json", []) if isinstance(task, dict) and task.get("id") == task_id), None)
 
@@ -69,9 +170,20 @@ def _task_by_id(task_id: str) -> dict[str, Any] | None:
 def _update(task_id: str, **updates: Any) -> dict[str, Any]:
     from hermes_ui.domain import update_task
 
+    current = _task_by_id(task_id)
+    if not current:
+        raise PipelineError(f"Tarefa {task_id} deixou de existir durante a execução.")
+    if str(current.get("state") or "") in {"blocked", "cancelled"}:
+        raise PipelineStopped("A tarefa foi parada pelo utilizador.")
     updated = update_task(task_id, updates)
     if not updated:
         raise PipelineError(f"Tarefa {task_id} deixou de existir durante a execução.")
+    _worker_heartbeat(
+        task_id=task_id,
+        status="running",
+        stage=str(updated.get("stage") or "pipeline"),
+        progress=int(updated.get("progress") or 0),
+    )
     return updated
 
 
@@ -111,6 +223,75 @@ def _save_json_artifact(task_id: str, name: str, payload: dict[str, Any]) -> str
     return str(path)
 
 
+def _configured_moneyprinter_root(settings: dict[str, Any]) -> Path | None:
+    """Resolve the installed MoneyPrinterTurbo project selected by the user."""
+    configured = str(settings.get("moneyprinter_path") or os.environ.get("MONEYPRINTER_PATH") or "").strip()
+    if not configured:
+        return None
+    root = Path(configured).expanduser().resolve()
+    if not (root / "cli.py").is_file():
+        raise PipelineError(f"A pasta configurada do MoneyPrinterTurbo não contém cli.py: {root}")
+    if not ((root / "config.toml").is_file() or (root / "config.example.toml").is_file()):
+        raise PipelineError(f"A pasta configurada do MoneyPrinterTurbo não contém config.toml: {root}")
+    return root
+
+
+def _helper_output_value(output: str, key: str) -> str:
+    match = re.search(rf"(?m)^{re.escape(key)}=(.+)$", output)
+    return match.group(1).strip() if match else ""
+
+
+def _redact_helper_output(text: str) -> str:
+    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY"):
+        secret = os.environ.get(key, "").strip()
+        if secret:
+            text = text.replace(secret, "[redacted]")
+    return text
+
+
+def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, str]:
+    """Persist only bounded helper diagnostics and return its declared file paths."""
+    task_id = str(task.get("id") or "").strip()
+    if not task_id:
+        return {}
+    log_file = _helper_output_value(output, "LOG_FILE")
+    result_file = _helper_output_value(output, "RESULT_FILE")
+    try:
+        payload: dict[str, Any] = {
+            "captured_at": _now(),
+            "log_file": log_file,
+            "result_file": result_file,
+            "output_tail": _redact_helper_output(output[-6000:]),
+        }
+        artifact_path = _save_json_artifact(task_id, "video-diagnostics", payload)
+        current = _task_by_id(task_id) or task
+        artifacts = dict(current.get("artifacts") or {})
+        artifacts["video_diagnostics"] = artifact_path
+        updates: dict[str, Any] = {"artifacts": artifacts}
+        if log_file:
+            updates["video_log"] = log_file
+            artifacts["video_log"] = log_file
+        if result_file:
+            updates["video_result"] = result_file
+            artifacts["video_result"] = result_file
+        from hermes_ui.domain import update_task
+        update_task(task_id, updates)
+        return {"log_file": log_file, "result_file": result_file, "artifact": artifact_path}
+    except Exception:
+        # Diagnostics must never hide the actual generation error.
+        return {"log_file": log_file, "result_file": result_file}
+
+
+def _stop_process(process: subprocess.Popen[str]) -> None:
+    if process.poll() is None:
+        process.kill()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 def _run_video_helper(task: dict[str, Any]) -> Path:
     helper_dir = Path(__file__).resolve().parents[1] / "seed" / "skills"
     helper = helper_dir / "mpt_agent.py"
@@ -120,6 +301,10 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     if not subject:
         raise PipelineError("A etapa Vídeo não recebeu um tema válido.")
     settings = _settings()
+    configured_root = _configured_moneyprinter_root(settings)
+    task_id = str(task.get("id") or "").strip()
+    if not task_id:
+        raise PipelineError("A tarefa de vídeo não tem um identificador válido.")
     env = os.environ.copy()
     card = active_llm_card(settings)
     provider = str(card.get("provider") or "openai").strip()
@@ -134,23 +319,97 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     for key, value in env_values.items():
         if value:
             env[key] = value
-    command = ["uv", "run", "--no-project", "--python", "3.11", "python", "mpt_agent.py", "--subject", subject]
+    command = ["uv", "run", "--no-project", "--python", "3.11", "python", "mpt_agent.py"]
+    if configured_root:
+        command.extend(["--root", str(configured_root)])
+    command.extend(["--subject", subject])
+    output_lines: list[str] = []
+    line_queue: queue.Queue[str | None] = queue.Queue()
+    started_at = time.monotonic()
+    process: subprocess.Popen[str] | None = None
+
+    def _read_output() -> None:
+        if process is None or process.stdout is None:
+            line_queue.put(None)
+            return
+        for line in iter(process.stdout.readline, ""):
+            line_queue.put(line.rstrip())
+        process.stdout.close()
+        line_queue.put(None)
+
     try:
-        result = subprocess.run(command, cwd=helper_dir, env=env, capture_output=True, text=True, timeout=VIDEO_TIMEOUT_SECONDS, check=False)
+        process = subprocess.Popen(
+            command,
+            cwd=helper_dir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
     except FileNotFoundError as exc:
         raise PipelineError("O comando uv não está instalado; não foi possível iniciar a geração de vídeo.") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise PipelineError(f"A etapa Vídeo excedeu o limite de {VIDEO_TIMEOUT_SECONDS // 60} minutos e foi encerrada.") from exc
-    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
-    if result.returncode == 10:
+
+    reader = threading.Thread(target=_read_output, name=f"mpt-output-{task.get('id', 'video')}", daemon=True)
+    reader.start()
+    output_finished = False
+    last_heartbeat = 0.0
+    try:
+        while True:
+            try:
+                line = line_queue.get(timeout=0.5)
+                if line is None:
+                    output_finished = True
+                elif line:
+                    output_lines.append(line)
+            except queue.Empty:
+                pass
+            elapsed = time.monotonic() - started_at
+            if elapsed - last_heartbeat >= 5:
+                # O helper expõe o resultado final, mas não uma percentagem estável.
+                # Mantemos uma faixa reservada para a etapa de vídeo e avançamos-a
+                # lentamente enquanto o processo responde, sem fingir conclusão.
+                video_progress = min(79, 68 + int(elapsed // 15))
+                current_task = _task_by_id(task_id)
+                if current_task and str(current_task.get("state") or "") in {"blocked", "cancelled"}:
+                    _stop_process(process)
+                    raise PipelineStopped("A tarefa foi parada pelo utilizador.")
+                _update(
+                    task_id,
+                    progress=video_progress,
+                    video_elapsed_seconds=int(elapsed),
+                )
+                _worker_heartbeat(
+                    task_id=str(task.get("id") or ""),
+                    status="running",
+                    stage="video",
+                    progress=video_progress,
+                    video_elapsed_seconds=int(elapsed),
+                )
+                last_heartbeat = elapsed
+            if process.poll() is not None and output_finished:
+                break
+            if elapsed >= VIDEO_TIMEOUT_SECONDS:
+                _stop_process(process)
+                raise PipelineError(f"A etapa Vídeo excedeu o limite de {VIDEO_TIMEOUT_SECONDS // 60} minutos e foi encerrada.")
+    finally:
+        reader.join(timeout=2)
+        _persist_video_diagnostics(task, "\n".join(output_lines))
+    if process.returncode is None:
+        process.wait(timeout=5)
+    result_code = process.returncode
+    output = "\n".join(output_lines)
+    _persist_video_diagnostics(task, output)
+    if result_code == 10:
         raise PipelineError("A geração de vídeo precisa de credenciais adicionais do MoneyPrinterTurbo.")
-    if result.returncode != 0:
-        detail = output[-1200:].strip() or "erro sem detalhes devolvidos pelo helper"
+    if result_code != 0:
+        detail = _redact_helper_output(output[-1200:]).strip() or "erro sem detalhes devolvidos pelo helper"
         raise PipelineError(f"MoneyPrinterTurbo falhou na etapa Vídeo: {detail}")
     match = re.search(r"(?m)^VIDEO_FILE=(.+)$", output)
     video_path = Path(match.group(1).strip()).expanduser() if match else None
     if not video_path or not video_path.is_file() or video_path.stat().st_size <= 0:
-        result_file = Path.home() / "MoneyPrinterTurbo" / ".agent-logs" / "moneyprinterturbo-video" / "latest-result.json"
+        result_root = configured_root or (Path.home() / "MoneyPrinterTurbo")
+        result_file = result_root / ".agent-logs" / "moneyprinterturbo-video" / "latest-result.json"
         if result_file.is_file():
             try:
                 payload = json.loads(result_file.read_text(encoding="utf-8"))
@@ -285,23 +544,33 @@ def run_once() -> dict[str, Any]:
     if lock is None:
         return {"ok": True, "busy": True}
     try:
+        recovered = _recover_stale_tasks()
         tasks = read_json("tasks.json", [])
         candidate = next((task for task in tasks if isinstance(task, dict) and task.get("state") in {"to_do", "doing"}), None)
         if not candidate:
-            _write_worker_state(last_task_id=None, last_error="", status="idle")
-            return {"ok": True, "status": "idle"}
+            _worker_heartbeat(last_task_id=None, last_error="", status="idle", stage="idle", progress=0, recovered_task_ids=recovered)
+            return {"ok": True, "status": "idle", "recovered_task_ids": recovered}
         task_id = str(candidate.get("id") or "")
-        _write_worker_state(last_task_id=task_id, status="running", last_error="")
+        _worker_heartbeat(last_task_id=task_id, status="running", stage=str(candidate.get("stage") or "pipeline"), progress=int(candidate.get("progress") or 0), last_error="", recovered_task_ids=recovered)
         try:
             result = _run_task(candidate)
-            _write_worker_state(status="completed", last_error="")
-            return {"ok": True, "task_id": task_id, "task": result}
+            _worker_heartbeat(status="completed", last_error="", stage=str(result.get("stage") or "upload"), progress=100, task_id=task_id)
+            return {"ok": True, "task_id": task_id, "task": result, "recovered_task_ids": recovered}
+        except PipelineStopped as exc:
+            current_task = _task_by_id(task_id) or candidate
+            current_state = str(current_task.get("state") or "")
+            if current_state not in {"blocked", "cancelled"}:
+                from hermes_ui.domain import update_task
+                update_task(task_id, {"state": "blocked", "error": str(exc), "failed_stage": current_task.get("stage") or "pipeline"})
+            _worker_heartbeat(status="stopped", last_error=str(exc), stage=str(current_task.get("stage") or "pipeline"), progress=int(current_task.get("progress") or 0), task_id=task_id)
+            return {"ok": True, "task_id": task_id, "status": "stopped", "recovered_task_ids": recovered}
         except Exception as exc:
             message = str(exc)[:2000]
             from hermes_ui.domain import update_task
-            update_task(task_id, {"state": "failed", "error": message})
-            _write_worker_state(status="failed", last_error=message)
-            return {"ok": False, "task_id": task_id, "error": message}
+            current_task = _task_by_id(task_id) or candidate
+            update_task(task_id, {"state": "failed", "error": message, "failed_stage": current_task.get("stage") or "pipeline"})
+            _worker_heartbeat(status="failed", last_error=message, stage=str(current_task.get("stage") or "pipeline"), progress=int(current_task.get("progress") or 0), task_id=task_id)
+            return {"ok": False, "task_id": task_id, "error": message, "recovered_task_ids": recovered}
     finally:
         try:
             lock.unlink()
@@ -311,6 +580,7 @@ def run_once() -> dict[str, Any]:
 
 def run_worker(interval_seconds: int = 5) -> None:
     ensure_storage()
+    _worker_heartbeat(status="starting", stage="idle", progress=0, last_error="")
     while True:
         run_once()
         time.sleep(max(2, int(interval_seconds)))

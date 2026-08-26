@@ -6,7 +6,7 @@ import json
 import mimetypes
 import re
 from contextlib import nullcontext
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import sys
 import uuid
 from pathlib import Path
@@ -26,6 +26,7 @@ except (OSError, json.JSONDecodeError):
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
+from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
 from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
@@ -2449,6 +2450,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.")
 
+    _render_pipeline_progress_panel()
     if draft_tab is not None:
         with draft_tab:
             render_video_from_draft()
@@ -3315,10 +3317,106 @@ def render_python_editor():
                 st.error(str(exc))
 
 
+_PIPELINE_STAGE_LABELS = {
+    "niche": "Tema",
+    "blueprint": "Blueprint",
+    "brand": "Branding",
+    "topic": "Tema",
+    "script": "Roteiro",
+    "title": "Título",
+    "keywords": "Keywords",
+    "thumbnail_prompt": "Prompt da thumbnail",
+    "thumbnail": "Thumbnail",
+    "video": "Vídeo",
+    "edit": "Edição",
+    "upload": "Upload",
+    "idle": "A aguardar",
+}
+
+
+def _pipeline_progress_value(task: dict[str, Any]) -> int:
+    try:
+        return max(0, min(100, int(task.get("progress") or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _pipeline_stage_label(task: dict[str, Any]) -> str:
+    stage = str(task.get("stage") or "pipeline")
+    return _PIPELINE_STAGE_LABELS.get(stage, stage.replace("_", " ").title())
+
+
+def _pipeline_time_age(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "sem actualização registada"
+    try:
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        seconds = max(0, int((datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()))
+    except ValueError:
+        return f"última actualização: {text}"
+    if seconds < 60:
+        return f"actualizado há {seconds}s"
+    if seconds < 3600:
+        return f"actualizado há {seconds // 60}min"
+    return f"actualizado há {seconds // 3600}h"
+
+
+def _render_pipeline_worker_banner(worker_status: dict[str, Any], active_count: int) -> None:
+    if worker_status.get("alive"):
+        stage = _PIPELINE_STAGE_LABELS.get(str(worker_status.get("stage") or "idle"), str(worker_status.get("stage") or "idle"))
+        progress = max(0, min(100, int(worker_status.get("progress") or 0)))
+        st.success(f"Worker de vídeo activo · {active_count} tarefa(s) em execução · {stage} · {progress}%")
+    else:
+        st.warning("Worker de vídeo sem heartbeat recente. O launcher deve estar aberto para processar as tarefas.")
+    heartbeat = worker_status.get("last_heartbeat_at") or worker_status.get("updated_at")
+    if heartbeat:
+        st.caption(f"{_pipeline_time_age(heartbeat)} · timeout de execução: {STALE_TASK_SECONDS // 60} minutos")
+    if worker_status.get("last_error"):
+        st.error(f"Último erro do worker: {worker_status['last_error']}")
+
+
+@st.fragment(run_every=5.0)
+def _render_pipeline_progress_live() -> None:
+    """Poll the persisted pipeline state only while video tasks are active."""
+    worker_status = load_pipeline_worker_status()
+    tasks = read_json("tasks.json", [])
+    active = [task for task in tasks if isinstance(task, dict) and str(task.get("state") or "") == "doing"]
+    if not worker_status.get("alive") and active:
+        recovered = recover_stale_tasks()
+        if recovered:
+            tasks = read_json("tasks.json", [])
+            active = [task for task in tasks if isinstance(task, dict) and str(task.get("state") or "") == "doing"]
+            worker_status = load_pipeline_worker_status()
+    if not active:
+        # A fragment that was already polling must stop itself after the worker
+        # reaches done/failed; otherwise Streamlit keeps refreshing an obsolete
+        # fragment even though the page no longer renders an active task.
+        st.rerun(scope="app")
+        return
+    _render_pipeline_worker_banner(worker_status, len(active))
+    for task in active:
+        progress = _pipeline_progress_value(task)
+        label = str(task.get("title") or task.get("topic") or task.get("id") or "Vídeo")
+        st.progress(progress, text=f"{label} · {_pipeline_stage_label(task)} · {progress}%")
+        st.caption(f"{task.get('channel_name') or 'Canal'} · {_pipeline_time_age(task.get('updated_at'))}")
+        if task.get("error"):
+            st.error(str(task.get("error")))
+
+
+def _render_pipeline_progress_panel() -> None:
+    tasks = read_json("tasks.json", [])
+    if any(isinstance(task, dict) and str(task.get("state") or "") == "doing" for task in tasks):
+        _render_pipeline_progress_live()
+
+
 def render_videos():
     st.subheader("Backlog Videos")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
+    _render_pipeline_progress_panel()
     tasks = read_json("tasks.json", [])
     if not tasks:
         st.info("Nenhum vídeo criado.")
@@ -3341,8 +3439,16 @@ def render_videos():
                     prompt_note = ' · prompt pronto' if task.get('thumbnail_prompt') else ''
                     st.caption(f"Thumbnail: {status}{prompt_note}")
             with cols[1]: st.write(task.get("format", "wide"))
-            with cols[2]: st.write(task.get("stage", "—"))
-            with cols[3]: st.write(task.get("state", "—"))
+            with cols[2]:
+                st.write(_pipeline_stage_label(task))
+                if str(task.get("state") or "") in {"to_do", "doing", "blocked"}:
+                    progress = _pipeline_progress_value(task)
+                    st.progress(progress, text=f"{progress}%")
+            with cols[3]:
+                st.write(task.get("state", "—"))
+                if task.get("error"):
+                    st.caption(str(task.get("error"))[:240])
+
             with cols[4]:
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)

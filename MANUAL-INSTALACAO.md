@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.36
+> **Versão deste manual:** 0.3.37
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.3.36 install
+npx.cmd --yes @danhachuel/thunderbolt@0.3.37 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.3.36 install
+npx --yes @danhachuel/thunderbolt@0.3.37 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -200,7 +200,7 @@ Todas as subabas internas e o conteúdo das páginas também são traduzidos nos
 
 ### Temas Light e Dark
 
-A aplicação usa o mecanismo nativo de temas do Streamlit e é distribuída com `.streamlit/config.toml`, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O ficheiro define **Dark** como base inicial. A alternância para **Light** e o regresso a **Dark** ficam exclusivamente no menu nativo de três pontos do Streamlit, no local original do toolbar; não existe um selector Theme dentro da página. Os componentes próprios da UI herdam as cores do tema activo através de `currentColor` e `color-mix`. O toolbar nativo, o indicador de execução, **Deploy** e o menu principal continuam sem sobreposições CSS.
+A aplicação usa o mecanismo nativo de temas do Streamlit e é distribuída com `.streamlit/config.toml`, seguindo o padrão de configuração do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O ficheiro disponibiliza as variantes nomeadas **Dark** e **Light**. A alternância entre elas fica exclusivamente no menu nativo de três pontos do Streamlit, no local original do toolbar; não existe um selector Theme dentro da página. Os componentes próprios da UI herdam as cores do tema activo através de `currentColor` e `color-mix`. O toolbar nativo, o indicador de execução, **Deploy** e o menu principal continuam sem sobreposições CSS.
 
 ## 4. Diagnóstico antes de iniciar
 
@@ -386,6 +386,16 @@ Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**,
 | Telegram Proxy | Proxy HTTP/HTTPS/SOCKS opcional para ambientes sem acesso directo |
 | Telegram timeout | Limite de espera de cada envio, entre 5 e 120 segundos |
 
+### Execução do pipeline de vídeos e acompanhamento
+
+Ao clicar em **Start** no **Backlog Vídeos**, a tarefa passa para `doing` e é processada pelo worker de pipeline iniciado pelo launcher normal. O worker grava o estado em `storage/state/pipeline_worker.json` e actualiza `updated_at`, a etapa e a percentagem em `storage/state/tasks.json`. O painel do Backlog consulta esse estado automaticamente a cada cinco segundos e mostra o worker, a etapa corrente, a percentagem, a idade da actualização e a mensagem de erro quando existe.
+
+A percentagem representa o avanço conhecido do pipeline: tema, roteiro, título/keywords, thumbnail, vídeo e upload. Durante a chamada longa ao MoneyPrinterTurbo, a UI mantém um heartbeat a cada cinco segundos e avança apenas dentro da faixa reservada à geração do vídeo; não apresenta 100% antes de existir um MP4 válido. O worker passa explicitamente a **Pasta do motor de vídeo** configurada na UI ao helper, por isso o clone usado, os logs e o manifesto pertencem à instalação seleccionada pelo utilizador.
+
+Uma execução da etapa Vídeo tem limite de 20 minutos. Se o processo externo terminar com erro, exceder o limite, devolver um resultado inválido ou ocorrer uma excepção inesperada, a tarefa é marcada como `failed`, com a etapa em `failed_stage`. As últimas linhas devolvidas pelo helper, sem as credenciais configuradas, são guardadas num artefacto `video-diagnostics` e as referências `video_log`/`video_result` ficam associadas à tarefa. Se o utilizador clicar em **Stop**, a tarefa passa para `blocked`, o subprocesso é terminado cooperativamente e o worker não substitui esse estado por `failed`.
+
+Se o launcher ou o worker for encerrado abruptamente, uma tarefa `doing` sem actualização durante 25 minutos é recuperada e marcada como `failed`, evitando estados indefinidos eternos. Para processar novas tarefas, deixe a aplicação iniciada com o comando normal; o painel avisa quando não existe heartbeat recente do worker.
+
 ### Upload Música — JewelMusic, Pushtunes e ytmusicapi
 
 A área **Pipeline Música > Upload Música** separa três métodos com contratos diferentes. Em **JewelMusic**, active a integração, introduza a API Key fornecida pelo dashboard da JewelMusic e confirme a Base URL oficial `https://api.jewelmusic.com` e, se necessário, configure proxy e timeout. Carregue ou seleccione um ficheiro de música, indique artista e título e clique em **Enviar música para JewelMusic**. O teste de ligação consulta `/v1/ping`; o upload envia `multipart/form-data` para `/v1/tracks/upload` com os metadados preenchidos.
@@ -471,7 +481,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.36 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.37 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
