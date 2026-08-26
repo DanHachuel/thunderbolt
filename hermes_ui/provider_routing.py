@@ -276,17 +276,18 @@ def classify_response(response: Any) -> None:
 
 
 def enabled_cards(settings: Mapping[str, Any], pool: str) -> list[dict[str, Any]]:
-    """Return cards in priority order; capability filtering is applied by media adapters."""
+    """Return cards in deterministic priority order; media pools keep active-card preference."""
     if pool == POOL_LLM:
         migrated, _ = ensure_llm_provider_cards(settings)
         raw_cards = migrated.get("llm_provider_cards", [])
         cards = [normalize_llm_card(item, index) for index, item in enumerate(raw_cards)] if isinstance(raw_cards, list) else []
-        active_id = str(migrated.get(LLM_ACTIVE_CARD_KEY) or "")
-    else:
-        raw_cards = settings.get("media_provider_cards", [])
-        cards = [dict(item) for item in raw_cards if isinstance(item, Mapping)] if isinstance(raw_cards, list) else []
-        active_key = "media_image_active_card_id" if pool == POOL_IMAGE else "media_video_active_card_id"
-        active_id = str(settings.get(active_key) or "")
+        enabled = [(index, card) for index, card in enumerate(cards) if bool(card.get("enabled", True))]
+        enabled.sort(key=lambda pair: (int(pair[1].get("priority", 1)), pair[0]))
+        return [card for _index, card in enabled]
+    raw_cards = settings.get("media_provider_cards", [])
+    cards = [dict(item) for item in raw_cards if isinstance(item, Mapping)] if isinstance(raw_cards, list) else []
+    active_key = "media_image_active_card_id" if pool == POOL_IMAGE else "media_video_active_card_id"
+    active_id = str(settings.get(active_key) or "")
     enabled = [card for card in cards if bool(card.get("enabled", True))]
     if active_id:
         enabled.sort(key=lambda item: 0 if str(item.get("id")) == active_id else 1)
@@ -363,16 +364,28 @@ def route_json_request(
     max_attempts: int | None = None,
     cooldown_seconds: float | None = None,
 ) -> RoutedResponse:
-    """Execute a JSON request over eligible cards with bounded, classified failover."""
+    """Execute a JSON request over eligible cards with classified priority failover."""
     if pool not in POOLS:
         raise ProviderRoutingError(f"Pool de providers inválido: {pool}")
     candidates = [dict(item) for item in (cards if cards is not None else enabled_cards(settings, pool))]
+    if pool == POOL_LLM:
+        candidates = [
+            card
+            for _index, card in sorted(
+                enumerate(candidates),
+                key=lambda pair: (int(pair[1].get("priority", pair[0] + 1)), pair[0]),
+            )
+        ]
     if not candidates:
         raise ProviderRoutingError(f"Não existem providers activos no pool {pool}.")
     try:
-        maximum = max(1, min(len(candidates), int(max_attempts or settings.get("provider_max_attempts", DEFAULT_MAX_ATTEMPTS))))
+        if pool == POOL_LLM and max_attempts is None:
+            maximum = len(candidates)
+        else:
+            configured_max_attempts = max_attempts if max_attempts is not None else settings.get("provider_max_attempts")
+            maximum = max(1, min(len(candidates), int(configured_max_attempts or DEFAULT_MAX_ATTEMPTS)))
     except (TypeError, ValueError):
-        maximum = min(len(candidates), DEFAULT_MAX_ATTEMPTS)
+        maximum = len(candidates) if pool == POOL_LLM else min(len(candidates), DEFAULT_MAX_ATTEMPTS)
     cooldown = float(cooldown_seconds if cooldown_seconds is not None else settings.get("provider_cooldown_seconds", DEFAULT_COOLDOWN_SECONDS))
     attempts: list[dict[str, Any]] = []
     for card in candidates[:maximum]:
