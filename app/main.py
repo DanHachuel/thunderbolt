@@ -5597,18 +5597,21 @@ def render_logs():
     st.dataframe(
         rows,
         use_container_width=True,
+        height=520,
         hide_index=True,
         column_config={
-            "Operação": st.column_config.TextColumn("Operação", width="medium"),
-            "Estado": st.column_config.TextColumn("Estado", width="small"),
-            "Data": st.column_config.TextColumn("Data", width="small"),
-            "Hora": st.column_config.TextColumn("Hora", width="small"),
-            "Registo": st.column_config.TextColumn("Registo", width="medium"),
-            "Origem": st.column_config.TextColumn("Origem", width="small"),
-            "Progresso": st.column_config.TextColumn("Progresso", width="small"),
-            "Detalhes": st.column_config.TextColumn("Detalhes", width="large"),
+            # Fixed minimum widths keep the long Detalhes column navigable on narrow screens.
+            "Operação": st.column_config.TextColumn("Operação", width=190),
+            "Estado": st.column_config.TextColumn("Estado", width=115),
+            "Data": st.column_config.TextColumn("Data", width=105),
+            "Hora": st.column_config.TextColumn("Hora", width=105),
+            "Registo": st.column_config.TextColumn("Registo", width=280),
+            "Origem": st.column_config.TextColumn("Origem", width=130),
+            "Progresso": st.column_config.TextColumn("Progresso", width=100),
+            "Detalhes": st.column_config.TextColumn("Detalhes", width=760),
         },
     )
+    st.caption("Quando a tabela exceder a largura disponível, utilize a barra de rolagem horizontal na parte inferior para consultar todo o conteúdo das células.")
 
 
 def render_notifications():
