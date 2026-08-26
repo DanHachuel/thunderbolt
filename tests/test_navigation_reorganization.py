@@ -85,29 +85,27 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertIn('api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])', MAIN_SOURCE)
         self.assertIn('"Contas Google": "Configuração API"', MAIN_SOURCE)
 
-    def test_channels_presentation_selector_is_global_not_per_channel(self):
-        self.assertIn('st.radio("Apresentação dos canais", ["Lista", "Kanban"]', MAIN_SOURCE)
-        self.assertIn('key="youtube_channels_view_mode"', MAIN_SOURCE)
-        self.assertIn('if st.session_state.get("youtube_channels_view_mode", "Lista") == "Kanban":', MAIN_SOURCE)
-        self.assertIn('render_registered_channels_kanban(channels)', MAIN_SOURCE)
-        self.assertIn('for row_start in range(0, len(channels), 3):', MAIN_SOURCE)
+    def test_channels_are_always_rendered_in_the_list_view(self):
+        self.assertNotIn('st.radio("Apresentação dos canais", ["Lista", "Kanban"]', MAIN_SOURCE)
+        self.assertNotIn('key="youtube_channels_view_mode"', MAIN_SOURCE)
+        self.assertNotIn('render_registered_channels_kanban(channels)', MAIN_SOURCE)
+        self.assertIn('for channel in channels:', MAIN_SOURCE)
         self.assertNotIn('channel_videos_view_', MAIN_SOURCE)
 
-    def test_kanban_cards_match_dashboard_card_outline_style(self):
-        self.assertIn('border:1px solid color-mix(in srgb, currentColor 18%, transparent);', MAIN_SOURCE)
-        self.assertIn('box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent);', MAIN_SOURCE)
+    def test_list_cards_keep_the_shared_outline_style(self):
         self.assertIn('.content-card { border:1px solid color-mix(in srgb, currentColor 18%, transparent);', MAIN_SOURCE)
+        self.assertIn('with st.container(border=True):', MAIN_SOURCE)
+        self.assertIn('st.columns(4, gap="small")', MAIN_SOURCE)
 
     def test_list_mode_keeps_registered_channel_cards_and_video_details(self):
-        kanban_branch = MAIN_SOURCE.split('if st.session_state.get("youtube_channels_view_mode", "Lista") == "Kanban":', 1)[1]
-        list_branch = kanban_branch.split('    for channel in channels:', 1)[1]
+        list_branch = MAIN_SOURCE.split('    for channel in channels:', 1)[1]
         self.assertIn('with st.container(border=True):', list_branch)
         self.assertIn('render_channel_videos(channel)', list_branch)
         self.assertIn('render_channel_video_editor(video, channel_id)', MAIN_SOURCE)
 
-    def test_channel_view_labels_have_translations_for_all_languages(self):
+    def test_channel_default_labels_have_translations_for_all_languages(self):
         languages = ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it")
-        labels = ("Apresentação dos canais", "Lista", "Kanban", "YouTube", "Inscritos", "Visualizações", "Vídeos", "Em produção", "Finalizados", "Títulos", "Activo", "Inactivo")
+        labels = ("Idioma", "Blueprint Padrão", "Nicho", "Narrador/Voz Padrão", "YouTube", "Inscritos", "Vídeos", "Activo", "Inactivo")
         for language in languages:
             for label in labels:
                 self.assertTrue(ui_text(label, language).strip(), f"empty translation for {label} in {language}")

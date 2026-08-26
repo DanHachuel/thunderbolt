@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.37
+> **Versão deste manual:** 0.3.38
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.3.37 install
+npx.cmd --yes @danhachuel/thunderbolt@0.3.38 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.3.37 install
+npx --yes @danhachuel/thunderbolt@0.3.38 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -459,11 +459,11 @@ A subaba de fontes não é um painel de tuning: endpoints, proxy, qualidade, cor
 
 ## Gestão de Canais, edição e vídeos recentes
 
-Na página **Configurações > Canais Youtube**, cada canal cadastrado aparece num cartão com o botão **Editar**. O editor permite alterar o nome, URL, handle, idioma, estilo wide, **Canais de Referência / Nicho**, **Prompts do Canal** (Blueprint padrão), **Narrador** (Voz padrão), conta Google do Upload directo, descrição e Automação ON/horário. Guardar alterações actualiza o mesmo registo local; não é necessário apagar e criar o canal novamente.
+Na página **Configurações > Canais Youtube**, cada canal cadastrado aparece num cartão com o botão **Editar**. O editor permite alterar o nome, URL, handle, idioma, estilo wide, **Nicho**, **Blueprint Padrão**, **Narrador/Voz Padrão**, conta Google do Upload directo, descrição e Automação ON/horário. Guardar alterações actualiza o mesmo registo local; não é necessário apagar e criar o canal novamente.
 
-O cartão mostra o nicho ou Canais de Referência imediatamente abaixo do nome. Os três blocos de gestão usam os rótulos **Prompts do Canal**, **Canais de Referência** e **Narrador**, com botões que abrem o editor do próprio canal.
+O cartão mostra o nicho imediatamente abaixo do nome. Os quatro blocos compactos de gestão usam os rótulos **Blueprint Padrão**, **Nicho**, **Narrador/Voz Padrão** e **Idioma**, com os botões de edição correspondentes; o idioma é apenas apresentado a partir da configuração já guardada no canal.
 
-A secção **Últimos 10 vídeos publicados** fica abaixo das configurações do canal e não dentro de Criação de Vídeos. Clique em **Actualizar últimos 10 vídeos** para consultar o feed RSS público do YouTube sem Data API Key. Os resultados são guardados em `storage/state/channel_videos.json`. A vista **Lista** apresenta título, data, URL, estado e botão **Editar vídeo**; a vista **Kanban** separa Planejamento, Produção, Finalizado e Agendado/Publicado. A edição local permite alterar título, estado, data, URL e notas. Essas alterações são overrides de gestão local e não publicam automaticamente no YouTube.
+A secção **Últimos 10 vídeos publicados** fica abaixo das configurações do canal, dentro de um expander fechado por defeito, e não dentro de Criação de Vídeos. Clique no expander e depois em **Actualizar últimos 10 vídeos** para consultar o feed RSS público do YouTube sem Data API Key. Os resultados são guardados em `storage/state/channel_videos.json`. A única vista disponível é **Lista**, que apresenta título, data, URL, estado e botão **Editar vídeo**. A edição local permite alterar título, estado, data, URL e notas. Essas alterações são overrides de gestão local e não publicam automaticamente no YouTube.
 
 ## Canais em lote por conta Google/YouTube
 
@@ -481,7 +481,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.37 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.38 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -519,7 +519,7 @@ O modo `Pexels/Pixabay` representa materiais de stock. Ao seleccionar `full_ia`,
 
 A aba **Roteiros**, colocada entre **Criação de Músicas** e **Upload**, permite seleccionar um canal opcional, um Blueprint, **Roteiro de vídeo** ou **Letra de música**, idioma, tema e estrutura. O botão **Gerar com IA a partir do Blueprint** usa o provider LLM configurado e devolve um rascunho Markdown editável; o utilizador deve rever e clicar em **Guardar documento no storage**. Os ficheiros são guardados em `storage/scripts/` e o índice em `storage/state/scripts.json`; o caminho absoluto aparece no topo da página. Na subaba **Vídeos** de **Criação de Vídeos**, a aplicação mostra a frase `Os vídeos são guardados em <storage>/videos`, que identifica a pasta local dos vídeos.
 
-A aba **Automação Youtube**, dentro do menu expansível **Automação**, lista os canais e vídeos, permite escolher e guardar **Blueprint padrão** e **Voz padrão** por canal, guarda **Automação ON** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais Youtube** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, gera um briefing, título e pacote de thumbnail específicos com o provider LLM configurado, cria o lote agendado na fila e evita duplicar o mesmo canal no mesmo dia. Se a geração não puder ser executada, o erro fica registado e o placeholder antigo não é usado.
+A aba **Automação Youtube**, dentro do menu expansível **Automação**, lista os canais e vídeos e apresenta nos cards os mesmos quatro elementos do cadastro: **Idioma Padrão**, **Blueprint Padrão**, **Nicho Padrão** e **Narrador/Voz Padrão**. Blueprint e Narrador/Voz continuam editáveis no card; Idioma e Nicho são mostrados a partir da configuração guardada no canal. A aba também guarda **Automação ON** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais Youtube** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, gera um briefing, título e pacote de thumbnail específicos com o provider LLM configurado, cria o lote agendado na fila e evita duplicar o mesmo canal no mesmo dia. Se a geração não puder ser executada, o erro fica registado e o placeholder antigo não é usado.
 
 A área **Teste de vozes**, dentro de **Configurações > Configuração API**, é isolada da pipeline. O preview pode ser reproduzido e descarregado de `storage/voice_previews/`. Caminhos vazios, directórios, ficheiros vazios e previews sem permissões de leitura são ignorados com uma mensagem clara, sem traceback. Se uma instalação antiga mostrar que `edge-tts` está em falta, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o detector reinstala apenas a dependência ausente.
 

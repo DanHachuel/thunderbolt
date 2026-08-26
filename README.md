@@ -69,7 +69,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.37
+## Navegação da UI 0.3.38
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -91,11 +91,11 @@ A página **Edição > Download Mídia** utiliza a API Python do [yt-dlp](https:
 
 ## Canais Youtube — edição por cartão e vídeos recentes
 
-A página **Canais Youtube** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Canais de Referência / Nicho**, **Prompts do Canal** (Blueprint padrão), **Narrador** (voz padrão), conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.
+A página **Canais Youtube** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Nicho**, **Blueprint Padrão**, **Narrador/Voz Padrão**, conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.
 
-Os blocos do cartão usam a nomenclatura solicitada: **Prompts do Canal**, **Canais de Referência** e **Narrador**. Os botões de acção abrem o mesmo editor persistente, sem criar um segundo canal nem perder as associações existentes.
+Os quatro blocos compactos do cartão usam a nomenclatura solicitada: **Blueprint Padrão**, **Nicho**, **Narrador/Voz Padrão** e **Idioma**. Os botões de acção abrem o mesmo editor persistente, sem criar um segundo canal nem perder as associações existentes.
 
-Abaixo do cartão, a secção **Últimos 10 vídeos publicados** usa o feed público RSS do YouTube, sem Data API Key. O carregamento ocorre quando se clica em **Actualizar últimos 10 vídeos**, evitando chamadas automáticas ao abrir a página. Os vídeos ficam guardados em `storage/state/channel_videos.json` e podem ser apresentados em **Lista** ou **Kanban**, nos grupos Planejamento, Produção, Finalizado e Agendado/Publicado. Cada vídeo tem **Editar vídeo** para alterar localmente o título, estado, data, URL e notas. A fonte pública não substitui o vídeo nem publica alterações no YouTube; os campos editáveis são overrides locais de gestão.
+Abaixo do cartão, a secção **Últimos 10 vídeos publicados** fica num expander fechado por defeito e usa o feed público RSS do YouTube, sem Data API Key. O carregamento ocorre quando se clica em **Actualizar últimos 10 vídeos**, evitando chamadas automáticas ao abrir a página. Os vídeos ficam guardados em `storage/state/channel_videos.json` e são apresentados apenas no modo **Lista**. Cada vídeo tem **Editar vídeo** para alterar localmente o título, estado, data, URL e notas. A fonte pública não substitui o vídeo nem publica alterações no YouTube; os campos editáveis são overrides locais de gestão.
 
 ## Criação de Vídeos — geração editorial por canal
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import html
 import json
 import mimetypes
 import re
@@ -208,30 +207,6 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stExpander"] summary p { margin:0; line-height:1; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div { padding:0 0 0 0.42rem !important; }
 [data-testid="stSidebar"] [data-testid="stExpander"] > div [data-testid="stButton"] button { padding-left:0.92rem; font-size:0.83rem; min-height:1.62rem; height:1.62rem; }
-.tb-channel-kanban-card { box-sizing:border-box; min-height:330px; height:330px; padding:0.85rem 0.9rem; border:1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius:14px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent); overflow:hidden; }
-.tb-channel-kanban-card__header { display:flex; align-items:center; gap:0.58rem; min-width:0; }
-.tb-channel-kanban-card__avatar { width:46px; height:46px; flex:0 0 46px; border-radius:10px; object-fit:cover; background:color-mix(in srgb, var(--tb-accent) 14%, transparent); }
-.tb-channel-kanban-card__avatar--fallback { display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--tb-accent); }
-.tb-channel-kanban-card__identity { min-width:0; flex:1 1 auto; }
-.tb-channel-kanban-card__name { font-size:1rem; font-weight:750; line-height:1.18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tb-channel-kanban-card__niche { margin-top:0.22rem; font-size:0.76rem; opacity:.66; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tb-channel-kanban-card__badges { display:flex; gap:0.28rem; flex:0 0 auto; align-items:center; }
-.tb-channel-kanban-card__badge { padding:0.18rem 0.42rem; border-radius:6px; font-size:0.67rem; font-weight:750; line-height:1.1; white-space:nowrap; }
-.tb-channel-kanban-card__badge--youtube { background:#dc2626; color:#fff; }
-.tb-channel-kanban-card__badge--active { background:color-mix(in srgb, #22c55e 25%, transparent); color:#16a34a; border:1px solid color-mix(in srgb, #22c55e 50%, transparent); }
-.tb-channel-kanban-card__badge--inactive { background:color-mix(in srgb, #ef4444 18%, transparent); color:#dc2626; border:1px solid color-mix(in srgb, #ef4444 45%, transparent); }
-.tb-channel-kanban-card__rule { height:1px; margin:0.72rem 0 0.62rem; background:color-mix(in srgb, currentColor 13%, transparent); }
-.tb-channel-kanban-card__metrics { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0.34rem; }
-.tb-channel-kanban-card__metric { min-width:0; min-height:67px; padding:0.48rem 0.28rem 0.36rem; border-radius:8px; text-align:center; background:color-mix(in srgb, currentColor 4%, transparent); }
-.tb-channel-kanban-card__metric-value { font-size:1.12rem; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tb-channel-kanban-card__metric-label { margin-top:0.3rem; font-size:0.66rem; opacity:.64; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tb-channel-kanban-card__status-row { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0.34rem; margin-top:0.6rem; }
-.tb-channel-kanban-card__status { min-width:0; padding:0.42rem 0.28rem; border-radius:8px; text-align:center; font-size:0.71rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tb-channel-kanban-card__status strong { font-size:0.92rem; margin-right:0.18rem; }
-.tb-channel-kanban-card__status--doing { color:#d97706; background:color-mix(in srgb, #f59e0b 14%, transparent); border:1px solid color-mix(in srgb, #f59e0b 35%, transparent); }
-.tb-channel-kanban-card__status--done { color:#16a34a; background:color-mix(in srgb, #22c55e 11%, transparent); border:1px solid color-mix(in srgb, #22c55e 30%, transparent); }
-.tb-channel-kanban-card__titles { margin-top:0.58rem; font-size:0.73rem; opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-@media (max-width: 900px) { .tb-channel-kanban-card { min-height:310px; height:310px; } .tb-channel-kanban-card__name { font-size:.9rem; } }
 .content-card { box-sizing:border-box; padding:1rem 1.1rem; border:1px solid rgba(128,128,128,.28); border-radius:14px; background:rgba(128,128,128,.10); color:inherit; min-height:110px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
 .content-card { border:1px solid color-mix(in srgb, currentColor 18%, transparent); background:color-mix(in srgb, currentColor 5%, transparent); box-shadow:0 4px 14px color-mix(in srgb, currentColor 12%, transparent); }
 .content-label { color:inherit; opacity:.72; font-size:.8rem; text-transform:uppercase; letter-spacing:.07em; }
@@ -968,38 +943,38 @@ def render_channel_video_editor(video: dict, channel_id: str) -> None:
 
 def render_channel_videos(channel: dict) -> None:
     channel_id = str(channel.get("id") or "")
-    st.markdown("### Últimos 10 vídeos publicados")
-    st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
-    refresh_col = st.columns(1)[0]
-    with refresh_col:
-        if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
-            result = fetch_channel_videos_public(channel, limit=10)
-            if result.ok:
-                videos = _merge_channel_videos(channel_id, result.data.get("videos", []))
-                st.session_state[f"channel_videos_{channel_id}"] = videos
-                st.success(result.message)
-                st.rerun()
-            else:
-                st.warning(result.message)
-    videos = st.session_state.get(f"channel_videos_{channel_id}") or channel_videos_for(channel, limit=10)
-    if not videos:
-        st.info("Ainda não existem vídeos sincronizados. Clique em **Actualizar últimos 10 vídeos**.")
-        return
-    for video in videos[:10]:
-        with st.container(border=True):
-            cols = st.columns([0.7, 3.4, 1.4, 1.1])
-            with cols[0]:
-                if video.get("thumbnail_url"):
-                    st.image(video["thumbnail_url"], width=64)
+    with st.expander("Últimos 10 vídeos publicados", expanded=False):
+        st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
+        refresh_col = st.columns(1)[0]
+        with refresh_col:
+            if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
+                result = fetch_channel_videos_public(channel, limit=10)
+                if result.ok:
+                    videos = _merge_channel_videos(channel_id, result.data.get("videos", []))
+                    st.session_state[f"channel_videos_{channel_id}"] = videos
+                    st.success(result.message)
+                    st.rerun()
                 else:
-                    st.markdown("### YT")
-            with cols[1]:
-                st.write(f"**{video.get('title', 'Vídeo sem título')}**")
-                st.caption(f"{video.get('published_at') or 'Sem data'} · {video.get('url') or 'Sem URL'}")
-            with cols[2]:
-                st.caption(str(video.get("status") or "publicado").title())
-            with cols[3]:
-                render_channel_video_editor(video, channel_id)
+                    st.warning(result.message)
+        videos = st.session_state.get(f"channel_videos_{channel_id}") or channel_videos_for(channel, limit=10)
+        if not videos:
+            st.info("Ainda não existem vídeos sincronizados. Clique em **Actualizar últimos 10 vídeos**.")
+            return
+        for video in videos[:10]:
+            with st.container(border=True):
+                cols = st.columns([0.7, 3.4, 1.4, 1.1])
+                with cols[0]:
+                    if video.get("thumbnail_url"):
+                        st.image(video["thumbnail_url"], width=64)
+                    else:
+                        st.markdown("### YT")
+                with cols[1]:
+                    st.write(f"**{video.get('title', 'Vídeo sem título')}**")
+                    st.caption(f"{video.get('published_at') or 'Sem data'} · {video.get('url') or 'Sem URL'}")
+                with cols[2]:
+                    st.caption(str(video.get("status") or "publicado").title())
+                with cols[3]:
+                    render_channel_video_editor(video, channel_id)
 
 
 def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], youtube_account_labels: dict[str, str], youtube_accounts_by_id: dict[str, dict[str, Any]]) -> None:
@@ -1021,10 +996,10 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             style_options = ["Pexels/Pixabay", "full_ia", "Apenas Música"]
             style_value = {"pexels": "Pexels/Pixabay", "music": "Apenas Música"}.get(str(channel.get("style_wide") or "pexels"), str(channel.get("style_wide") or "Pexels/Pixabay"))
             edited_style = st.selectbox("Estilo wide", style_options, index=style_options.index(style_value) if style_value in style_options else 0)
-            edited_niche = st.text_input("Canais de Referência / Nicho", value=str(channel.get("niche") or channel_niche_label(channel) if channel_niche_label(channel) != "SEM NICHO CONFIGURADO" else "") )
+            edited_niche = st.text_input("Nicho", value=str(channel.get("niche") or channel_niche_label(channel) if channel_niche_label(channel) != "SEM NICHO CONFIGURADO" else "") )
         with edit_cols[1]:
-            edited_blueprint = st.selectbox("Prompts do Canal", blueprint_ids, index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"))
-            edited_voice = st.selectbox("Narrador", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
+            edited_blueprint = st.selectbox("Blueprint Padrão", blueprint_ids, index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"))
+            edited_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
             edited_account = st.selectbox("Conta Google para Upload directo", account_ids, index=account_ids.index(current_account) if current_account in account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"))
             edited_description = st.text_area("Descrição", value=str(channel.get("description") or ""), height=100)
             edited_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"edit_automation_{channel_id}")
@@ -1438,101 +1413,6 @@ def render_tiktok_prompt_masters():
                     st.error(str(exc))
 
 
-def _format_channel_metric(value: Any) -> str:
-    """Format a channel metric compactly for the Kanban card."""
-    if value is None or value == "":
-        return "—"
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return html.escape(str(value))
-    if abs(number) >= 1_000_000:
-        return f"{number / 1_000_000:.1f}M".replace(".0M", "M")
-    if abs(number) >= 1_000:
-        return f"{number / 1_000:.1f}K".replace(".0K", "K")
-    return f"{number:,}".replace(",", ".")
-
-
-def _channel_pipeline_counts(channel: dict[str, Any]) -> tuple[int, int, int]:
-    """Return in-production, completed and titled task counts for one channel."""
-    channel_id = str(channel.get("id") or "")
-    tasks = read_json("tasks.json", [])
-    if not channel_id or not isinstance(tasks, list):
-        return 0, 0, 0
-    related = [
-        task for task in tasks
-        if isinstance(task, dict) and str(task.get("channel_id") or "") == channel_id
-    ]
-    in_production = sum(1 for task in related if str(task.get("state") or "").lower() == "doing")
-    completed = sum(1 for task in related if str(task.get("state") or "").lower() == "done")
-    titled = sum(1 for task in related if str(task.get("title") or "").strip() or task.get("title_candidates"))
-    return in_production, completed, titled
-
-
-def _render_channel_kanban_card(channel: dict[str, Any]) -> None:
-    """Render one compact, square-style channel card for the global Kanban view."""
-    ui_language = current_ui_language()
-    name = html.escape(str(channel.get("name") or "Sem nome"))
-    niche = html.escape(channel_niche_label(channel))
-    thumbnail_url = str(channel.get("thumbnail_url") or "").strip()
-    if thumbnail_url:
-        avatar = f'<img class="tb-channel-kanban-card__avatar" src="{html.escape(thumbnail_url, quote=True)}" alt="">'
-    else:
-        avatar = '<div class="tb-channel-kanban-card__avatar tb-channel-kanban-card__avatar--fallback">YT</div>'
-    active = bool(channel.get("active", True))
-    active_label = ui_text("Activo" if active else "Inactivo", ui_language)
-    active_class = "active" if active else "inactive"
-    subscribers = _format_channel_metric(channel.get("subscriber_count"))
-    views = _format_channel_metric(channel.get("view_count"))
-    videos = _format_channel_metric(channel.get("video_count"))
-    in_production, completed, titled = _channel_pipeline_counts(channel)
-    youtube_label = ui_text("YouTube", ui_language)
-    subscribers_label = ui_text("Inscritos", ui_language)
-    views_label = ui_text("Visualizações", ui_language)
-    videos_label = ui_text("Vídeos", ui_language)
-    production_label = ui_text("Em produção", ui_language)
-    completed_label = ui_text("Finalizados", ui_language)
-    titles_label = ui_text("Títulos", ui_language)
-    st.markdown(
-        f"""
-        <div class="tb-channel-kanban-card">
-          <div class="tb-channel-kanban-card__header">
-            {avatar}
-            <div class="tb-channel-kanban-card__identity">
-              <div class="tb-channel-kanban-card__name">{name}</div>
-              <div class="tb-channel-kanban-card__niche">{niche}</div>
-            </div>
-            <div class="tb-channel-kanban-card__badges">
-              <span class="tb-channel-kanban-card__badge tb-channel-kanban-card__badge--youtube">{youtube_label}</span>
-              <span class="tb-channel-kanban-card__badge tb-channel-kanban-card__badge--{active_class}">{active_label}</span>
-            </div>
-          </div>
-          <div class="tb-channel-kanban-card__rule"></div>
-          <div class="tb-channel-kanban-card__metrics">
-            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{subscribers}</div><div class="tb-channel-kanban-card__metric-label">{subscribers_label}</div></div>
-            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{views}</div><div class="tb-channel-kanban-card__metric-label">{views_label}</div></div>
-            <div class="tb-channel-kanban-card__metric"><div class="tb-channel-kanban-card__metric-value">{videos}</div><div class="tb-channel-kanban-card__metric-label">{videos_label}</div></div>
-          </div>
-          <div class="tb-channel-kanban-card__status-row">
-            <div class="tb-channel-kanban-card__status tb-channel-kanban-card__status--doing"><strong>{in_production}</strong>{production_label}</div>
-            <div class="tb-channel-kanban-card__status tb-channel-kanban-card__status--done"><strong>{completed}</strong>{completed_label}</div>
-          </div>
-          <div class="tb-channel-kanban-card__titles">▣ <strong>{titled}</strong> {titles_label}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_registered_channels_kanban(channels: list[dict[str, Any]]) -> None:
-    """Render all registered channels in a responsive three-column Kanban grid."""
-    for row_start in range(0, len(channels), 3):
-        channel_columns = st.columns(3)
-        for column, channel in zip(channel_columns, channels[row_start:row_start + 3]):
-            with column:
-                _render_channel_kanban_card(channel)
-
-
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -1552,7 +1432,7 @@ def render_channels():
         with lookup_cols[0]:
             lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
         with lookup_cols[1]:
-            st.radio("Apresentação dos canais", ["Lista", "Kanban"], horizontal=True, key="youtube_channels_view_mode")
+            st.caption("Os canais cadastrados são apresentados apenas em lista.")
         col1, col2 = st.columns([1, 1])
         with col1:
             if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
@@ -1588,17 +1468,17 @@ def render_channels():
                 handle = st.text_input("Handle", value=imported.get("handle", ""), key="yt_import_handle")
                 language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index(language_code(imported.get("language") or "pt")), format_func=language_label, key="yt_import_language")
                 style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="yt_import_style")
-                blueprint = st.selectbox("Blueprint padrão do canal", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
+                blueprint = st.selectbox("Blueprint Padrão", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
                 voice_options = voice_catalog(imported.get("default_voice") or imported.get("voice", ""))
                 current_voice = imported.get("default_voice") or imported.get("voice", "")
-                voice = st.selectbox("Voz padrão do canal", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key="yt_import_voice")
+                voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key="yt_import_voice")
                 imported_account_id = str(imported.get("google_account_id", ""))
                 google_account_id = st.selectbox("Conta Google para Upload directo", youtube_account_ids, index=youtube_account_ids.index(imported_account_id) if imported_account_id in youtube_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item), key="yt_import_google_account_id")
                 st.caption("O DELEGATED_SESSION_ID é lido exclusivamente do documento JSON da conta Google associada.")
                 automation_on = st.toggle("Automação ON", value=bool(imported.get("automation_on", False)), key="yt_import_automation_on")
                 automation_time = st.text_input("Horário diário (HH:MM)", value=imported.get("automation_time", "00:00"), key="yt_import_automation_time")
                 description = st.text_area("Descrição", value=imported.get("description", ""), key="yt_import_description")
-                niche = st.text_input("Canais de Referência / Nicho", value=imported.get("niche", ""), key="yt_import_niche")
+                niche = st.text_input("Nicho", value=imported.get("niche", ""), key="yt_import_niche")
                 metrics = st.columns(3)
                 with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=int(imported.get("subscriber_count") or 0), key="yt_import_subscribers")
                 with metrics[1]: video_count = st.number_input("Vídeos", min_value=0, value=int(imported.get("video_count") or 0), key="yt_import_videos")
@@ -1734,15 +1614,15 @@ def render_channels():
             url = st.text_input("URL do canal", placeholder="https://youtube.com/@seucanal", key="manual_channel_url")
             handle = st.text_input("Handle", placeholder="@seucanal", key="manual_channel_handle")
             description = st.text_area("Descrição", key="manual_channel_description")
-            niche = st.text_input("Canais de Referência / Nicho", placeholder="Ex.: História militar, mistérios, ciência", key="manual_channel_niche")
+            niche = st.text_input("Nicho", placeholder="Ex.: História militar, mistérios, ciência", key="manual_channel_niche")
             language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="manual_channel_language")
             style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="manual_channel_style")
             manual_blueprint_items = blueprint_catalog()
             manual_blueprint_ids = [item[0] for item in manual_blueprint_items]
             manual_blueprint_labels = {item[0]: item[1] for item in manual_blueprint_items}
-            blueprint = st.selectbox("Blueprint padrão do canal", manual_blueprint_ids, format_func=lambda item: manual_blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="manual_channel_blueprint")
+            blueprint = st.selectbox("Blueprint Padrão", manual_blueprint_ids, format_func=lambda item: manual_blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="manual_channel_blueprint")
             voice_options = voice_catalog()
-            voice = st.selectbox("Voz padrão do canal", voice_options, format_func=lambda item: item or "Sem voz padrão", key="manual_channel_voice")
+            voice = st.selectbox("Narrador/Voz Padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="manual_channel_voice")
             google_account_id = st.selectbox("Conta Google para Upload directo", youtube_account_ids, format_func=lambda item: youtube_account_labels.get(item, item), key="manual_channel_google_account_id")
             st.caption("O DELEGATED_SESSION_ID é lido exclusivamente do documento JSON da conta Google associada.")
             automation_on = st.toggle("Automação ON", value=False, key="manual_channel_automation_on")
@@ -1788,9 +1668,6 @@ def render_channels():
     if not channels:
         st.info("Nenhum canal cadastrado.")
         return
-    if st.session_state.get("youtube_channels_view_mode", "Lista") == "Kanban":
-        render_registered_channels_kanban(channels)
-        return
     for channel in channels:
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
@@ -1828,22 +1705,25 @@ def render_channels():
                 render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
             else:
                 summary = channel_blueprint_summary(channel)
-                block_cols = st.columns(3)
+                channel_language = language_label(channel.get("language") or "pt")
+                block_cols = st.columns(4, gap="small")
                 with block_cols[0]:
-                    st.markdown(f"**Prompts do Canal**\n\n{summary['name']}")
-                    if st.button("Editar Prompts", key=f"edit_prompts_{channel_id}", use_container_width=True):
+                    st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
+                    if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", use_container_width=True):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[1]:
-                    st.markdown(f"**Canais de Referência**\n\n{channel_niche_label(channel)}")
+                    st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
                     if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", use_container_width=True):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[2]:
-                    st.markdown(f"**Narrador**\n\n{summary['voice'] or 'Sem voz padrão'}")
-                    if st.button("Configurar Narrador", key=f"edit_voice_{channel_id}", use_container_width=True):
+                    st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
+                    if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", use_container_width=True):
                         st.session_state[edit_key] = True
                         st.rerun()
+                with block_cols[3]:
+                    st.markdown(f"**Idioma**\n\n{channel_language}")
 
             channel_account_ids = list(youtube_account_ids)
             current_channel_account_id = str(channel.get("google_account_id", ""))
@@ -3691,20 +3571,25 @@ def render_automation():
             with cols[1]:
                 st.write(f"**{channel.get('name', 'Sem nome')}**")
                 st.caption(channel.get("handle") or channel.get("url") or "sem URL")
-                st.caption(f"Blueprint actual: {channel.get('default_blueprint_id') or channel.get('blueprint_id') or '—'} · Voz actual: {channel.get('default_voice') or channel.get('voice') or '—'}")
             blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            default_cols = st.columns(2)
+            default_cols = st.columns(4, gap="small")
             with default_cols[0]:
+                st.markdown("**Idioma Padrão**")
+                st.caption(language_label(channel.get("language") or "pt"))
+            with default_cols[1]:
                 automation_blueprint = st.selectbox(
-                    "Blueprint padrão",
+                    "Blueprint Padrão",
                     blueprint_ids,
                     index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
                     format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
                     key=f"automation_blueprint_{channel_id}",
                 )
-            with default_cols[1]:
+            with default_cols[2]:
+                st.markdown("**Nicho Padrão**")
+                st.caption(channel_niche_label(channel))
+            with default_cols[3]:
                 automation_voice = st.selectbox(
-                    "Voz padrão",
+                    "Narrador/Voz Padrão",
                     voice_options,
                     index=voice_options.index(current_voice) if current_voice in voice_options else 0,
                     format_func=lambda item: item or "Sem voz padrão",
