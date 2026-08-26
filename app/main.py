@@ -362,8 +362,13 @@ def save_ui_language(value: str) -> str:
     return normalized
 
 
+def normalize_video_language(value: Any, default: str = "pt") -> str:
+    raw = str(value or "").strip()
+    return "music" if raw.casefold() == "music" else language_code(raw, default=default)
+
+
 def save_video_language(value: str) -> str:
-    normalized = "music" if str(value or "").strip().casefold() == "music" else language_code(value)
+    normalized = normalize_video_language(value)
     settings = read_json("settings.json", {})
     settings["video_language"] = normalized
     write_json("settings.json", settings)
@@ -486,6 +491,13 @@ def blueprint_for_channel(channel: dict) -> dict[str, Any]:
     return {"id": blueprint_id, "name": blueprint_id}
 
 
+def channel_video_language(channel: dict[str, Any] | None, fallback: str = "pt") -> str:
+    """Return the channel's canonical video language, preserving legacy labels."""
+    if not isinstance(channel, dict):
+        return normalize_video_language(fallback)
+    return normalize_video_language(channel.get("language") or fallback)
+
+
 def channel_blueprint_summary(channel: dict) -> dict[str, str]:
     blueprint = blueprint_for_channel(channel)
     configured_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
@@ -501,12 +513,13 @@ def channel_blueprint_summary(channel: dict) -> dict[str, str]:
 def render_channel_blueprint_panel(channel: dict, *, compact: bool = False) -> None:
     summary = channel_blueprint_summary(channel)
     voice = summary["voice"] or "Sem voz padrão"
+    video_language = language_label(channel_video_language(channel))
     if summary["name"] == "SEM BLUEPRINT CONFIGURADO":
-        st.warning("**SEM BLUEPRINT CONFIGURADO** · configure um Blueprint padrão na aba Canais.")
+        st.warning(f"**SEM BLUEPRINT CONFIGURADO** · configure um Blueprint padrão na aba Canais. · **Idioma:** {video_language}")
     elif compact:
-        st.caption(f"**Blueprint:** {summary['name']} · **Voz:** {voice}")
+        st.caption(f"**Blueprint:** {summary['name']} · **Voz:** {voice} · **Idioma:** {video_language}")
     else:
-        st.info(f"**Blueprint utilizado pelo canal:** {summary['name']} · `{summary['id']}` · **Voz:** {voice}")
+        st.info(f"**Blueprint utilizado pelo canal:** {summary['name']} · `{summary['id']}` · **Voz:** {voice} · **Idioma:** {video_language}")
 
 
 def creative_payload_from_result(channel: dict, topic: str, creative: dict, topic_source: str = "manual") -> dict[str, Any]:
@@ -746,7 +759,15 @@ def render_video_generation_settings(
                 key=f"{prefix}_video_subject",
                 placeholder="Ex.: How AI is changing everyday life",
             )
-            normalized_current_language = "music" if str(current_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"} else language_code(current_language)
+            normalized_current_language = normalize_video_language(current_language)
+            if channel is not None:
+                channel_id = str(channel.get("id") or channel.get("name") or "")
+                channel_language_state_key = f"{prefix}_language_channel_id"
+                if st.session_state.get(channel_language_state_key) != channel_id:
+                    channel_language = channel_video_language(channel, fallback=normalized_current_language)
+                    st.session_state[f"{prefix}_script_language"] = channel_language
+                    st.session_state[channel_language_state_key] = channel_id
+                normalized_current_language = normalize_video_language(st.session_state.get(f"{prefix}_script_language") or normalized_current_language)
             settings["script_language"] = st.selectbox(
                 "Script Language",
                 VIDEO_LANGUAGE_SELECTION_OPTIONS,
