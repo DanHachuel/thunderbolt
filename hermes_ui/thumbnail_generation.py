@@ -182,7 +182,6 @@ def generate_thumbnail_image(
         "response_format": {
             "type": "image",
             "mime_type": DEFAULT_MIME_TYPE,
-            "delivery": "inline",
             "aspect_ratio": aspect_ratio,
             "image_size": image_size,
         },

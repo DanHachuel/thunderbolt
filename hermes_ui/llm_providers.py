@@ -397,6 +397,10 @@ def test_llm_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+# This callable is a production diagnostic helper, not a pytest test function.
+test_llm_provider_card.__test__ = False
+
+
 def stamp_test_result(result: Mapping[str, Any]) -> dict[str, Any]:
     status = "success" if result.get("ok") else "error"
     return {

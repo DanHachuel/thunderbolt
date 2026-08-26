@@ -89,6 +89,10 @@ DEFAULTS: dict[str, Any] = {
         "moneyprinter_path": "",
         "script_interval_minutes": 10,
         "llm_rpm_limit": 40,
+        "llm_rpm_limit_enabled": False,
+        "llm_rpm_window_seconds": 60,
+        "provider_max_attempts": 3,
+        "provider_cooldown_seconds": 2,
         "video_concurrency": 3,
         "upload_concurrency": 2,
         "youtube_api_key": "",
@@ -160,6 +164,23 @@ DEFAULTS: dict[str, Any] = {
         "gemini_image_model": "gemini-3.1-flash-image",
         "gemini_image_aspect_ratio": "16:9",
         "gemini_image_size": "1K",
+        "media_provider_cards": [{
+            "id": "media-nano-banana-default",
+            "provider": "nano_banana",
+            "api_key": "",
+            "model": "gemini-3.1-flash-image",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "enabled": True,
+            "priority": 0,
+            "supports_image": True,
+            "supports_video": False,
+            "supports_text": False,
+        }],
+        "media_image_active_card_id": "media-nano-banana-default",
+        "media_video_active_card_id": "",
+        "media_image_provider": "nano_banana",
+        "media_video_provider": "",
+        "media_video_pool_enabled": False,
         "deepseek_api_key": "",
         "deepseek_base_url": "",
         "deepseek_model_name": "",
@@ -347,15 +368,18 @@ def _migrate_settings(settings: Any) -> tuple[dict[str, Any], bool]:
         changed = True
 
     # Import localmente para evitar que o módulo de catálogo dependa do storage.
-    # Settings antigos com um provider explícito continuam a ser devolvidos sem
-    # alteração textual; os consumidores/UI fazem a materialização preguiçosa dos
-    # cartões, evitando alterar dados durante uma simples leitura de compatibilidade.
-    if "llm_provider_cards" not in migrated and provider not in LEGACY_DEFAULT_LLM_PROVIDERS:
-        return settings, changed
+    # Materializar ambos os schemas durante a leitura mantém settings antigos
+    # compatíveis, sem eliminar as chaves legadas que ainda são consumidas pelo
+    # pipeline e pela UI.
     from hermes_ui.llm_providers import ensure_llm_provider_cards
+    from hermes_ui.media_providers import ensure_media_provider_cards
 
-    migrated, cards_changed = ensure_llm_provider_cards(migrated)
-    return migrated, changed or cards_changed
+    if "llm_provider_cards" in migrated or provider in LEGACY_DEFAULT_LLM_PROVIDERS:
+        migrated, cards_changed = ensure_llm_provider_cards(migrated)
+    else:
+        cards_changed = False
+    migrated, media_changed = ensure_media_provider_cards(migrated)
+    return migrated, changed or cards_changed or media_changed
 
 
 def ensure_storage() -> None:

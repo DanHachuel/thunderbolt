@@ -51,7 +51,6 @@ def test_thumbnail_uses_interactions_api_and_saves_inline_image():
             assert request["json"]["response_format"] == {
                 "type": "image",
                 "mime_type": "image/jpeg",
-                "delivery": "inline",
                 "aspect_ratio": "16:9",
                 "image_size": "1K",
             }

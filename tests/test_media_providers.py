@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import base64
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from hermes_ui import media_generation, media_providers
+from hermes_ui.provider_routing import POOL_IMAGE, RoutedResponse
+
+
+class MediaProvidersTests(unittest.TestCase):
+    def test_catalog_contains_requested_current_providers_and_excludes_deprecated_names(self):
+        codes = {item["code"] for item in media_providers.media_provider_catalog()}
+        self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai"}.issubset(codes))
+        self.assertNotIn("nexaapi", codes)
+        self.assertNotIn("openimagegen", codes)
+
+    def test_legacy_nano_settings_migrate_to_image_card(self):
+        migrated, changed = media_providers.ensure_media_provider_cards(
+            {
+                "gemini_image_api_key": "secret",
+                "gemini_image_model": "gemini-3.1-flash-image",
+                "gemini_image_aspect_ratio": "16:9",
+                "gemini_image_size": "1K",
+            }
+        )
+        self.assertTrue(changed)
+        self.assertEqual(migrated["media_provider_cards"][0]["provider"], "nano_banana")
+        self.assertEqual(migrated["media_provider_cards"][0]["api_key"], "secret")
+        self.assertEqual(migrated["media_image_active_card_id"], "media-nano-banana-default")
+
+    def test_pools_filter_capabilities_and_prioritize_active_card(self):
+        settings = {
+            "media_provider_cards": [
+                {"id": "video", "provider": "fal_ai", "model": "video-model", "supports_video": True, "supports_image": False, "enabled": True, "priority": 2},
+                {"id": "image", "provider": "nano_banana", "model": "image-model", "supports_video": False, "supports_image": True, "enabled": True, "priority": 3},
+            ],
+            "media_image_active_card_id": "image",
+            "media_video_active_card_id": "video",
+        }
+        self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "image")], ["image"])
+        self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "video")], ["video"])
+
+    def test_openai_compatible_image_base64_is_saved(self):
+        encoded = base64.b64encode(b"image").decode("ascii")
+        card = {
+            "id": "hf",
+            "provider": "huggingface",
+            "api_key": "secret",
+            "model": "black-forest-labs/FLUX.1-dev",
+            "base_url": "https://router.huggingface.co/v1",
+            "api_style": "huggingface",
+        }
+        routed = RoutedResponse(card=card, payload={"data": [{"b64_json": encoded}]}, attempts=())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(media_generation, "STORAGE", Path(temp_dir)), patch.object(media_generation, "ensure_storage", lambda: None), patch.object(media_generation, "route_json_request", return_value=routed):
+                output = media_generation.generate_image_for_card({}, card, "a clean image", topic="topic")
+            self.assertEqual(output.read_bytes(), b"image")
+            self.assertEqual(output.parent, Path(temp_dir) / "thumbnails")
+
+    def test_nano_card_delegates_to_existing_gemini_adapter(self):
+        card = {"id": "nano", "provider": "nano_banana", "api_key": "secret", "model": "gemini-3.1-flash-image"}
+        with patch.object(media_generation, "generate_thumbnail_image", return_value=Path("thumbnail.jpg")) as generator:
+            output = media_generation.generate_image_for_card({}, card, "prompt", topic="topic", variant_index=2)
+        self.assertEqual(output, Path("thumbnail.jpg"))
+        self.assertEqual(generator.call_args.args[0]["gemini_image_api_key"], "secret")
+        self.assertEqual(generator.call_args.kwargs["variant_index"], 2)
+
+    def test_video_result_accepts_direct_url_or_task_id(self):
+        self.assertEqual(media_generation._video_result({"url": "https://example/video.mp4"}), ("https://example/video.mp4", ""))
+        self.assertEqual(media_generation._video_result({"task_id": "task-1"}), ("", "task-1"))
+
+    def test_image_pool_fails_over_only_for_retryable_provider_errors(self):
+        cards = [
+            {"id": "first", "provider": "huggingface", "supports_image": True, "enabled": True},
+            {"id": "second", "provider": "pollinations", "supports_image": True, "enabled": True},
+        ]
+        with patch.object(media_generation, "media_cards_for_pool", return_value=cards), patch.object(
+            media_generation,
+            "generate_image_for_card",
+            side_effect=[media_generation.MediaGenerationError("HTTP 429 quota"), Path("fallback.jpg")],
+        ) as generate:
+            output = media_generation.generate_image_from_pool({}, "prompt")
+        self.assertEqual(output, Path("fallback.jpg"))
+        self.assertEqual(generate.call_count, 2)
+
+    def test_image_pool_does_not_fail_over_for_invalid_payload(self):
+        cards = [
+            {"id": "first", "provider": "huggingface", "supports_image": True, "enabled": True},
+            {"id": "second", "provider": "pollinations", "supports_image": True, "enabled": True},
+        ]
+        with patch.object(media_generation, "media_cards_for_pool", return_value=cards), patch.object(
+            media_generation,
+            "generate_image_for_card",
+            side_effect=media_generation.MediaGenerationError("HTTP 400 invalid request"),
+        ) as generate:
+            with self.assertRaises(media_generation.MediaGenerationError):
+                media_generation.generate_image_from_pool({}, "prompt")
+        self.assertEqual(generate.call_count, 1)
+
+    def test_video_pool_fails_over_for_transient_provider_error(self):
+        cards = [
+            {"id": "first", "provider": "fal_ai", "supports_video": True, "enabled": True},
+            {"id": "second", "provider": "pollinations", "supports_video": True, "enabled": True},
+        ]
+        with patch.object(media_generation, "media_cards_for_pool", return_value=cards), patch.object(
+            media_generation,
+            "generate_video_for_card",
+            side_effect=[media_generation.MediaGenerationError("timeout"), Path("fallback.mp4")],
+        ) as generate:
+            output = media_generation.generate_video_from_pool({}, "prompt")
+        self.assertEqual(output, Path("fallback.mp4"))
+        self.assertEqual(generate.call_count, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

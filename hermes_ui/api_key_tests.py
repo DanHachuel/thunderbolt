@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import requests
@@ -108,6 +108,38 @@ def test_nano_banana_credentials(api_key: str, model: str) -> dict[str, Any]:
         f"https://generativelanguage.googleapis.com/v1beta/{model_path}",
         headers={"x-goog-api-key": api_key},
     )
+
+
+def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
+    """Run a bounded, non-generative check for an image/video provider card."""
+    source = dict(card) if isinstance(card, Mapping) else {}
+    provider = str(source.get("provider") or "").strip().lower()
+    api_key = str(source.get("api_key") or "").strip()
+    model = str(source.get("model") or "").strip()
+    base_url = str(source.get("base_url") or "").strip().rstrip("/")
+    api_style = str(source.get("api_style") or "").strip().lower()
+    if provider == "nano_banana":
+        return test_nano_banana_credentials(api_key, model)
+    if not base_url:
+        return _result("missing", "Complete a Base URL antes de testar.")
+    if provider not in {"inferenceport", "ollama", "lmstudio"} and not api_key:
+        return _missing("Introduza a API key/token antes de testar este provider.")
+    if not model and provider not in {"inferenceport", "cloudflare_workers_ai"}:
+        return _result("missing", "Complete o modelo antes de testar.")
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    if provider == "cloudflare_workers_ai":
+        account_id = str(source.get("account_id") or "").strip()
+        if not account_id:
+            return _result("missing", "Complete o Account ID do Cloudflare antes de testar.")
+        endpoint = f"{base_url}/accounts/{quote(account_id, safe='')}/ai/models/search"
+        return _get(endpoint, headers=headers, params={"search": model or "stable-diffusion"})
+    if api_style in {"openai_compatible", "huggingface", "agnes", "kie"} or provider in {"pollinations", "huggingface", "agnes", "kie_ai", "inferenceport"}:
+        endpoint = _models_endpoint(base_url)
+    elif provider == "fal_ai":
+        endpoint = f"{base_url}/models" if base_url.endswith("/v1") else base_url
+    else:
+        endpoint = base_url
+    return _get(endpoint, headers=headers)
 
 
 def test_azure_speech_credentials(api_key: str, region: str) -> dict[str, Any]:

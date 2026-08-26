@@ -8,8 +8,47 @@ from pathlib import Path
 from typing import Any
 
 from .creative_generation import generate_thumbnail_prompt
+from .media_generation import generate_image_from_pool
+from .media_providers import media_cards_for_pool
 from .storage import STORAGE, now, read_json, write_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+
+
+def _generate_image_with_pool(
+    settings: dict[str, Any],
+    prompt: str,
+    *,
+    topic: str,
+    variant_index: int,
+    lettering_text: str = "",
+    lettering_prompt: str = "",
+    reference_image: Path | None = None,
+) -> Path:
+    """Use the legacy Nano adapter when it is the only active image card.
+
+    This keeps existing callers and test seams stable while multiple configured
+    cards use the new image router and failover path.
+    """
+    cards = media_cards_for_pool(settings, "image")
+    if len(cards) == 1 and str(cards[0].get("provider") or "") == "nano_banana":
+        return generate_thumbnail_image(
+            settings,
+            prompt,
+            topic=topic,
+            variant_index=variant_index,
+            reference_image=reference_image,
+            lettering_text=lettering_text,
+            lettering_prompt=lettering_prompt,
+        )
+    return generate_image_from_pool(
+        settings,
+        prompt,
+        topic=topic,
+        variant_index=variant_index,
+        reference_image=reference_image,
+        lettering_text=lettering_text,
+        lettering_prompt=lettering_prompt,
+    )
 
 
 def _as_path(value: Any) -> Path | None:
@@ -200,7 +239,7 @@ def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple
     if not record["prompt"]:
         raise ThumbnailGenerationError("A thumbnail não tem um prompt de imagem para gerar.")
     _archive_image(str(task_id), record.get("image_path"))
-    image_path = generate_thumbnail_image(
+    image_path = _generate_image_with_pool(
         settings,
         record["prompt"],
         topic=record["title"] or record["topic"],
@@ -255,7 +294,7 @@ def regenerate_thumbnail_prompt_and_image(
     if not prompt:
         raise ThumbnailGenerationError("O provider não devolveu um prompt de imagem válido.")
     _archive_image(str(task_id), record.get("image_path"))
-    image_path = generate_thumbnail_image(
+    image_path = _generate_image_with_pool(
         settings,
         prompt,
         topic=record["title"] or record["topic"],
@@ -296,7 +335,7 @@ def regenerate_thumbnail_lettering(
         "Não adicionar logótipos, marcas de água ou outros elementos."
     )
     _archive_image(str(task_id), previous_image)
-    image_path = generate_thumbnail_image(
+    image_path = _generate_image_with_pool(
         settings,
         combined_prompt,
         topic=record["title"] or record["topic"],

@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.42
+> **Versão deste manual:** 0.3.43
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -23,7 +23,7 @@ A instalação assistida cria um ambiente local separado para evitar misturar as
 | FFmpeg | Disponibilizado pelo pacote Python `imageio-ffmpeg` |
 | Porta da aplicação | `3030`, configurável com `THUNDERBOLT_PORT` |
 
-A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local. O idioma da interface e o idioma dos vídeos são preferências independentes.
+A aplicação não instala drivers de GPU, Docker, modelos Whisper ou credenciais externas. As chaves de API do MoneyPrinterTurbo são configuradas na aba **Configurações** e sincronizadas com o `config.toml` do clone local. O idioma da interface e o idioma dos vídeos são preferências independentes. Os providers de LLM, imagem e vídeo ficam no storage local e nunca são incluídos no pacote, nos logs ou no GitHub.
 
 O MoneyPrinterTurbo declara Python 3.11 ou superior como requisito e documenta a instalação com `uv` ou com `venv + pip`. A aplicação segue o mesmo princípio e adiciona um instalador assistido próprio.[1]
 
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.3.42 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.43 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.3.42 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.43 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -114,7 +114,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@VERSAO install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.43 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -355,7 +355,37 @@ Se o PowerShell bloquear a activação do ambiente virtual, execute uma vez, com
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-## 8. Configuração inicial da UI
+## 4. Configuração inicial
+
+### 4.1 Pools de LLM, imagem e vídeo
+
+Em **Configuração API > API Keys**, o expander **LLM — providers e modelos** continua a guardar cartões independentes para os providers textuais. Pode manter várias API keys do mesmo provider em cartões distintos; a geração textual percorre o **pool LLM** e tenta o cartão seguinte apenas em quota, timeout, erro de transporte ou falha transitória.
+
+O bloco **Limite LLM NVIDIA NIM** permite ligar **Activar limitador NVIDIA NIM — 40 RPM**. O valor padrão é 40 pedidos numa janela de 60 segundos. O contador é persistido localmente por cartão/chave e aplica-se à criação manual, aos workers e às automações. A opção vem desligada para não alterar instalações existentes; ligue-a quando o endpoint activo for NVIDIA NIM e a sua conta tiver esse limite.
+
+O expander **Imagem e Video** substitui o antigo bloco isolado da Nano Banana. Os cartões disponíveis são **Nano Banana**, **Pollinations.ai**, **Agnes AI**, **Hugging Face Inference API**, **Cloudflare Workers AI**, **InferencePort Proxy**, **阿里云 (Alibaba Cloud Model Studio)**, **KIE AI** e **FAL AI**. Em cada cartão, configure a API key/token, o modelo, a Base URL, o estado **Provider activo**, a participação no **Pool Imagem**, a participação no **Pool Vídeo** e a prioridade. O botão **Testar Chamada API** faz apenas uma verificação read-only; não inicia geração de imagem ou vídeo.
+
+| Provider | Configuração mínima | Pool suportado |
+|---|---|---|
+| Nano Banana | API key, modelo Gemini e parâmetros da imagem | Imagem |
+| Pollinations.ai | API key/token, modelo e Base URL | Imagem e vídeo |
+| Agnes AI | API key, modelo e Base URL | Imagem e vídeo |
+| Hugging Face Inference API | Token, modelo e `https://router.huggingface.co/v1` | Imagem |
+| Cloudflare Workers AI | Token, Account ID e modelo `@cf/...` | Imagem |
+| InferencePort Proxy | Endpoint local `http://localhost:8080/v1`; chave opcional | Imagem e vídeo |
+| Alibaba Cloud Model Studio | API key, modelo, região e Base URL DashScope | Imagem e vídeo |
+| KIE AI | API key, modelo e Base URL | Imagem e vídeo |
+| FAL AI | API key, rota/modelo de queue e Base URL | Imagem e vídeo |
+
+Existem três pools independentes: uma falha no pool LLM não é substituída por imagem, e uma falha no pool de imagem não é encaminhada para vídeo. O selector **Provider principal de imagem** define a ordem inicial do pool de imagem. **Usar pool de vídeo externo** deve ser ligado explicitamente para usar os cartões de vídeo; quando permanece desligado, o worker continua a usar o motor local MoneyPrinterTurbo.
+
+O failover não mascara erros de configuração. HTTP 429, timeout, HTTP 408/425, HTTP 5xx e falhas de transporte são elegíveis para o provider seguinte, com cooldown persistente por cartão. HTTP 400, 401, 403, 404 e payload inválido permanecem como erros accionáveis e não são repetidos indefinidamente.
+
+### 4.2 Nano Banana e thumbnails
+
+A geração Nano Banana usa o contrato actualizado da Interactions API e não envia o campo de entrega `inline` que provocava HTTP 400. A geração de thumbnails continua separada da geração de títulos: **Gerar Thumbnail com IA** preserva o título já existente, e lotes do mesmo canal recebem uma variante de thumbnail por vídeo. A imagem final passa pelo **Pool Imagem**, mas a edição de lettering mantém a referência da imagem anterior quando o provider escolhido a suporta.
+
+### 4.3 Navegação da UI
 
 Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline Vídeos**, **Pipeline Música**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Pipeline Música** contém **Criação de Músicas** e **Upload Música**, cuja página tem as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. O menu expansível **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu **Pipeline Música** contém **Criação de Músicas** e **Upload Música**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** contém as subabas **Geral** e **Telegram**. A subaba Geral mantém o histórico e as preferências dos eventos locais; a subaba Telegram envia esses mesmos eventos para o Chat ID configurado. A página **Pipeline Música > Upload Música** contém as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
@@ -372,6 +402,11 @@ Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**,
 | OpenAI/ NVIDIA NIM API key | Credencial do OpenAI ou NVIDIA Build/NIM, guardada apenas no storage local |
 | OpenAI/ NVIDIA NIM Base URL | Endpoint OpenAI-compatible; por padrão `https://integrate.api.nvidia.com/v1` |
 | OpenAI/ NVIDIA NIM modelo | Selector carregado de `/models` ou campo manual de fallback; guardado como `openai_model_name` |
+| Limite LLM NVIDIA NIM | **Activar limitador NVIDIA NIM — 40 RPM**, desligado por defeito e persistido por cartão/chave |
+| Pool LLM textual | Cartões LLM activos, com failover limitado a quota, timeout, transporte e erros transitórios |
+| Pool Imagem | Nano Banana, Pollinations.ai, Agnes AI, Hugging Face, Cloudflare, InferencePort, Alibaba Cloud, KIE AI e FAL AI marcados para imagem |
+| Pool Vídeo | Pollinations.ai, Agnes AI, InferencePort, Alibaba Cloud, KIE AI e FAL AI marcados para vídeo; requer activação explícita do pool externo |
+| Testar Chamada API | Verificação read-only do cartão; não inicia geração de imagem ou vídeo |
 | YouTube upload principal | Lógica do `youtube-automation-agent` adaptada e executada dentro do Thunderbolt |
 | OAuth directo de redundância | Caminho alternativo accionado automaticamente se o agente falhar |
 | TikTok Client ID/Secret | Credenciais da aplicação; Redirect URI, scopes e autorização ficam no TikTok for Developers Playground |
@@ -487,7 +522,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.42 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.43 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
