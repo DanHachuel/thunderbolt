@@ -38,7 +38,7 @@ from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips,
 from hermes_ui.mcp import detect_local_service, install_skill_locally, load_integrations, load_server_config, read_packaged_skill, save_server_config, update_integration
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
-from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
+from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.media_providers import MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
@@ -5040,11 +5040,14 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             with status_cols[0]:
                 enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"llm_card_{card_id}_enabled")
             with status_cols[1]:
-                primary_llm = st.checkbox(
-                    "LLM principal",
-                    value=str(settings.get(LLM_ACTIVE_CARD_KEY) or "") == card_id,
-                    help="Usar este cartão como provider principal para geração de temas, roteiros, títulos e keywords.",
-                    key=f"llm_card_{card_id}_primary",
+                priority = st.number_input(
+                    "Prioridade",
+                    min_value=1,
+                    max_value=999,
+                    value=max(1, int(card.get("priority", index + 1))),
+                    step=1,
+                    help="Ordem de tentativa do pool LLM: 1 é o primeiro; em falha elegível, segue para 2, 3 e assim por diante.",
+                    key=f"llm_card_{card_id}_priority",
                 )
             with status_cols[2]:
                 telegram_llm = st.checkbox(
@@ -5060,29 +5063,28 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                 remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True, key=f"llm_card_{card_id}_remove")
 
         edited = dict(card)
-        edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "telegram_llm": bool(telegram_llm), **extra_values})
+        edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "priority": max(1, int(priority)), "telegram_llm": bool(telegram_llm), **extra_values})
         cards[index] = edited
         if test_clicked:
             test_result = test_llm_provider_card(edited)
             edited["test_result"] = stamp_test_result(test_result)
-            _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or card_id))
+            _persist_llm_cards(settings, cards)
         elif refresh_clicked:
             try:
                 from integrations.openai_model_discovery import fetch_openai_compatible_models
                 discovered = fetch_openai_compatible_models(edited.get("api_key", ""), edited.get("base_url", ""))
                 st.session_state[f"llm_model_catalog_{card_id}"] = discovered
-                _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or card_id))
+                _persist_llm_cards(settings, cards)
                 st.success(f"{len(discovered)} modelo(s) disponíveis neste endpoint.")
             except Exception:
                 st.error("Não foi possível consultar os modelos deste endpoint.")
         elif save_clicked:
-            active_id = card_id if primary_llm and enabled else str(settings.get(LLM_ACTIVE_CARD_KEY) or "")
-            _persist_llm_cards(settings, cards, active_id)
+            _persist_llm_cards(settings, cards)
             st.success("Cartão LLM guardado.")
             st.rerun()
         elif remove_clicked:
             remaining = [item for item in cards if str(item.get("id")) != card_id]
-            _persist_llm_cards(settings, remaining, str(settings.get(LLM_ACTIVE_CARD_KEY) or ""))
+            _persist_llm_cards(settings, remaining)
             st.success("Cartão LLM removido.")
             st.rerun()
 
@@ -5102,7 +5104,7 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
         settings.update(migrated)
         write_json("settings.json", settings)
     with st.expander("LLM — providers e modelos", expanded=False):
-        st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; o cartão activo é usado pela geração de conteúdo.")
+        st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; a prioridade 1 é tentada primeiro e o router segue para as prioridades seguintes em falhas elegíveis.")
         for index in range(len(cards)):
             _render_llm_card(settings, cards, index, embedded=embedded)
         st.divider()
@@ -5121,8 +5123,9 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
         )
         if add_provider_clicked:
             new_card = new_llm_card(provider_to_add, card_id=f"llm-{provider_to_add}-{uuid.uuid4().hex[:8]}")
+            new_card["priority"] = max((int(item.get("priority", index + 1)) for index, item in enumerate(cards)), default=0) + 1
             cards.append(new_card)
-            _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or DEFAULT_LLM_CARD_ID))
+            _persist_llm_cards(settings, cards)
             st.rerun()
 
 

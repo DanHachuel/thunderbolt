@@ -20,6 +20,7 @@ class LlmProviderCardTests(TestCase):
         self.assertTrue(changed)
         self.assertEqual(settings[LLM_CARDS_KEY][0]["id"], DEFAULT_LLM_CARD_ID)
         self.assertEqual(settings[LLM_CARDS_KEY][0]["provider"], "openai")
+        self.assertEqual(settings[LLM_CARDS_KEY][0]["priority"], 1)
         self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], DEFAULT_LLM_CARD_ID)
         self.assertEqual(settings["llm_provider"], "openai")
 
@@ -32,10 +33,12 @@ class LlmProviderCardTests(TestCase):
             }
         )
         cards = settings[LLM_CARDS_KEY]
-        self.assertEqual(cards[0]["provider"], "openai")
-        self.assertEqual(cards[1]["provider"], "gemini")
-        self.assertEqual(cards[1]["api_key"], "gem-key")
-        self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], cards[1]["id"])
+        self.assertEqual(cards[0]["provider"], "gemini")
+        self.assertEqual(cards[1]["provider"], "openai")
+        self.assertEqual(cards[0]["api_key"], "gem-key")
+        self.assertEqual(cards[0]["priority"], 1)
+        self.assertEqual(cards[1]["priority"], 2)
+        self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], cards[0]["id"])
 
     def test_fixed_endpoints_hide_base_url_but_local_and_openai_show_it(self) -> None:
         self.assertTrue(provider_definition("openai").show_base_url)
@@ -50,9 +53,25 @@ class LlmProviderCardTests(TestCase):
         ]
         settings = apply_llm_cards_to_settings({}, cards, "two")
         self.assertEqual(len(settings[LLM_CARDS_KEY]), 2)
+        self.assertEqual(settings[LLM_CARDS_KEY][0]["priority"], 2)
+        self.assertEqual(settings[LLM_CARDS_KEY][1]["priority"], 1)
         self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], "two")
         self.assertEqual(settings["openai_api_key"], "b")
         self.assertEqual(settings["openai_base_url"], "https://two/v1")
+
+    def test_explicit_priorities_order_cards_and_ignore_legacy_active_id(self) -> None:
+        settings = {
+            LLM_CARDS_KEY: [
+                {"id": "third", "provider": "groq", "priority": 3, "model": "m"},
+                {"id": "first", "provider": "openai", "priority": 1, "model": "m"},
+                {"id": "second", "provider": "deepseek", "priority": 2, "model": "m"},
+            ],
+            LLM_ACTIVE_CARD_KEY: "third",
+        }
+        migrated, _ = ensure_llm_provider_cards(settings)
+        self.assertEqual([card["id"] for card in migrated[LLM_CARDS_KEY]], ["first", "second", "third"])
+        self.assertEqual(migrated[LLM_ACTIVE_CARD_KEY], "first")
+        self.assertEqual(migrated["llm_provider"], "openai")
 
     def test_telegram_card_is_exclusive_and_routed_by_id(self) -> None:
         cards = [

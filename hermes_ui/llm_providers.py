@@ -22,6 +22,7 @@ LLM_ACTIVE_CARD_KEY = "llm_active_card_id"
 LLM_TELEGRAM_CARD_KEY = "llm_telegram_card_id"
 DEFAULT_LLM_PROVIDER = "openai"
 DEFAULT_LLM_CARD_ID = "llm-openai-default"
+DEFAULT_LLM_PRIORITY = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +161,7 @@ def _legacy_value(settings: Mapping[str, Any], provider: str, suffix: str) -> st
     return str(settings.get(f"{prefix}_{suffix}") or "").strip()
 
 
-def _legacy_card(settings: Mapping[str, Any], provider: str, card_id: str) -> dict[str, Any]:
+def _legacy_card(settings: Mapping[str, Any], provider: str, card_id: str, *, priority: int = DEFAULT_LLM_PRIORITY) -> dict[str, Any]:
     definition = provider_definition(provider)
     code = normalize_provider_code(provider)
     base_url = _legacy_value(settings, code, "base_url") or definition.default_base_url
@@ -179,6 +180,7 @@ def _legacy_card(settings: Mapping[str, Any], provider: str, card_id: str) -> di
         "model": model,
         "base_url": base_url,
         "enabled": True,
+        "priority": max(1, int(priority)),
         "telegram_llm": False,
         **extra,
     }
@@ -194,6 +196,7 @@ def new_llm_card(provider: Any, *, card_id: str | None = None) -> dict[str, Any]
         "model": "",
         "base_url": definition.default_base_url,
         "enabled": True,
+        "priority": DEFAULT_LLM_PRIORITY,
         "telegram_llm": False,
         **{field: "" for field in definition.extra_fields},
     }
@@ -212,6 +215,13 @@ def _clean_test_result(value: Any) -> dict[str, Any]:
     }
 
 
+def _normalise_priority(value: Any, fallback: int = DEFAULT_LLM_PRIORITY) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return max(1, int(fallback or DEFAULT_LLM_PRIORITY))
+
+
 def normalize_llm_card(card: Any, index: int = 0) -> dict[str, Any]:
     source = dict(card) if isinstance(card, Mapping) else {}
     code = normalize_provider_code(source.get("provider") or source.get("provider_code"))
@@ -225,6 +235,7 @@ def normalize_llm_card(card: Any, index: int = 0) -> dict[str, Any]:
         "model": str(source.get("model") or source.get("model_name") or "").strip(),
         "base_url": str(source.get("base_url") or "").strip() or definition.default_base_url,
         "enabled": bool(source.get("enabled", True)),
+        "priority": _normalise_priority(source.get("priority", index + 1), index + 1),
         "telegram_llm": bool(source.get("telegram_llm", source.get("llm_telegram", False))),
     }
     for field in definition.extra_fields:
@@ -251,9 +262,15 @@ def ensure_llm_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, An
     cards = [normalize_llm_card(item, index) for index, item in enumerate(raw_cards)] if isinstance(raw_cards, list) else []
     changed = not isinstance(raw_cards, list)
 
+    selected_provider = normalize_provider_code(result.get("llm_provider") or DEFAULT_LLM_PROVIDER)
+    legacy_selected_provider = selected_provider != DEFAULT_LLM_PROVIDER and _card_has_legacy_configuration(result, selected_provider)
+    active_id = str(result.get(LLM_ACTIVE_CARD_KEY) or "").strip()
+
     # O primeiro card OpenAI/NVIDIA NIM é estrutural e nunca é removido pela migração.
+    # Quando uma configuração legada apontava para outro provider, esse provider
+    # recebe prioridade 1 e o cartão estrutural fica logo a seguir.
     if not any(card.get("provider") == DEFAULT_LLM_PROVIDER for card in cards):
-        cards.insert(0, _legacy_card(result, DEFAULT_LLM_PROVIDER, DEFAULT_LLM_CARD_ID))
+        cards.insert(0, _legacy_card(result, DEFAULT_LLM_PROVIDER, DEFAULT_LLM_CARD_ID, priority=2 if legacy_selected_provider else 1))
         changed = True
     elif cards[0].get("provider") != DEFAULT_LLM_PROVIDER:
         openai_card = next(card for card in cards if card.get("provider") == DEFAULT_LLM_PROVIDER)
@@ -261,26 +278,36 @@ def ensure_llm_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, An
         cards.insert(0, openai_card)
         changed = True
 
-    selected_provider = normalize_provider_code(result.get("llm_provider") or DEFAULT_LLM_PROVIDER)
     if not str(result.get("llm_provider") or "").strip():
         result["llm_provider"] = DEFAULT_LLM_PROVIDER
         changed = True
     # A migração preserva uma configuração explícita antiga que ainda não tinha card.
-    if selected_provider != DEFAULT_LLM_PROVIDER and _card_has_legacy_configuration(result, selected_provider):
+    if legacy_selected_provider:
         if not any(card.get("provider") == selected_provider for card in cards):
-            cards.append(_legacy_card(result, selected_provider, f"llm-{selected_provider}-legacy"))
+            cards.append(_legacy_card(result, selected_provider, f"llm-{selected_provider}-legacy", priority=1))
             changed = True
 
+    # Instalações anteriores só tinham um cartão activo. Transformamos essa
+    # escolha na prioridade 1 uma única vez, sem apagar a preferência do utilizador.
+    if isinstance(raw_cards, list) and not any(isinstance(item, Mapping) and "priority" in item for item in raw_cards):
+        preferred_id = active_id or next((str(card.get("id")) for card in cards if card.get("provider") == selected_provider), "")
+        if preferred_id:
+            for card in cards:
+                old_priority = int(card.get("priority", DEFAULT_LLM_PRIORITY))
+                card["priority"] = 1 if str(card.get("id")) == preferred_id else max(2, old_priority)
+            changed = True
+
+    cards = _ordered_cards(cards)
     serialized_before = raw_cards if isinstance(raw_cards, list) else None
     if serialized_before != cards:
         changed = True
     result[LLM_CARDS_KEY] = cards
 
-    active_id = str(result.get(LLM_ACTIVE_CARD_KEY) or "").strip()
     ids = {str(card.get("id")) for card in cards}
-    if active_id not in ids:
-        matching = next((card for card in cards if card.get("provider") == selected_provider), cards[0])
-        result[LLM_ACTIVE_CARD_KEY] = str(matching["id"])
+    ordered = _ordered_cards(cards)
+    first_enabled = next((card for card in ordered if card.get("enabled", True)), ordered[0])
+    if active_id != str(first_enabled["id"]):
+        result[LLM_ACTIVE_CARD_KEY] = str(first_enabled["id"])
         changed = True
     if not any(card.get("telegram_llm") for card in cards):
         if result.get(LLM_TELEGRAM_CARD_KEY):
@@ -294,19 +321,23 @@ def ensure_llm_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, An
     return result, changed
 
 
+def _ordered_cards(cards: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    indexed = [(index, normalize_llm_card(card, index)) for index, card in enumerate(cards)]
+    indexed.sort(key=lambda pair: (pair[1].get("priority", pair[0] + 1), pair[0]))
+    return [card for _index, card in indexed]
+
+
 def llm_cards(settings: Mapping[str, Any]) -> list[dict[str, Any]]:
     migrated, _ = ensure_llm_provider_cards(settings)
-    return [dict(card) for card in migrated.get(LLM_CARDS_KEY, [])]
+    cards = migrated.get(LLM_CARDS_KEY, [])
+    return _ordered_cards(cards) if isinstance(cards, list) else []
 
 
 def active_llm_card(settings: Mapping[str, Any]) -> dict[str, Any]:
     migrated, _ = ensure_llm_provider_cards(settings)
     cards = migrated.get(LLM_CARDS_KEY, [])
-    active_id = str(migrated.get(LLM_ACTIVE_CARD_KEY) or "")
-    for card in cards:
-        if str(card.get("id")) == active_id and card.get("enabled", True):
-            return dict(card)
-    for card in cards:
+    ordered = _ordered_cards(cards) if isinstance(cards, list) else []
+    for card in ordered:
         if card.get("enabled", True):
             return dict(card)
     return new_llm_card(DEFAULT_LLM_PROVIDER, card_id=DEFAULT_LLM_CARD_ID)
@@ -322,7 +353,7 @@ def telegram_llm_card(settings: Mapping[str, Any]) -> dict[str, Any] | None:
 def apply_llm_cards_to_settings(
     settings: Mapping[str, Any], cards: list[Mapping[str, Any]], active_card_id: str = ""
 ) -> dict[str, Any]:
-    """Persist cards and mirror the active card to the legacy runtime contract."""
+    """Persist priority-ordered cards and mirror priority 1 to the legacy runtime contract."""
     result = dict(settings)
     normalized = [normalize_llm_card(item, index) for index, item in enumerate(cards)]
     if not normalized or not any(card.get("provider") == DEFAULT_LLM_PROVIDER for card in normalized):
@@ -334,10 +365,12 @@ def apply_llm_cards_to_settings(
     for card in normalized:
         card["telegram_llm"] = bool(telegram and card["id"] == telegram["id"])
 
-    wanted_id = str(active_card_id or result.get(LLM_ACTIVE_CARD_KEY) or "").strip()
-    active = next((card for card in normalized if card["id"] == wanted_id), None)
-    if active is None or not active.get("enabled", True):
-        active = next((card for card in normalized if card.get("enabled", True)), normalized[0])
+    if active_card_id and not any(isinstance(item, Mapping) and "priority" in item for item in cards):
+        for card in normalized:
+            old_priority = int(card.get("priority", DEFAULT_LLM_PRIORITY))
+            card["priority"] = 1 if str(card.get("id")) == str(active_card_id) else max(2, old_priority)
+    ordered = _ordered_cards(normalized)
+    active = next((card for card in ordered if card.get("enabled", True)), ordered[0])
     result[LLM_CARDS_KEY] = normalized
     result[LLM_ACTIVE_CARD_KEY] = active["id"]
     result[LLM_TELEGRAM_CARD_KEY] = telegram["id"] if telegram else ""

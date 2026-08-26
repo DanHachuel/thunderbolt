@@ -57,6 +57,36 @@ class ProviderRoutingTests(unittest.TestCase):
         clock[0] += 60.1
         self.assertEqual(provider_routing.acquire_nvidia_rpm_slot(settings, card, sleep=False, now=now), 0.0)
 
+    def test_llm_enabled_cards_are_sorted_by_priority(self):
+        settings = {
+            "llm_provider_cards": [
+                {"id": "third", "provider": "groq", "priority": 3, "model": "m"},
+                {"id": "first", "provider": "openai", "priority": 1, "model": "m"},
+                {"id": "second", "provider": "deepseek", "priority": 2, "model": "m"},
+            ],
+            "llm_active_card_id": "third",
+        }
+        ordered = provider_routing.enabled_cards(settings, provider_routing.POOL_LLM)
+        self.assertEqual([card["id"] for card in ordered], ["first", "second", "third"])
+
+    def test_llm_failover_tries_all_priorities_by_default(self):
+        settings = {"provider_max_attempts": 3, "provider_cooldown_seconds": 0}
+        cards = [
+            {"id": "one", "provider": "openai", "priority": 1, "model": "m"},
+            {"id": "two", "provider": "openai", "priority": 2, "model": "m"},
+            {"id": "three", "provider": "openai", "priority": 3, "model": "m"},
+            {"id": "four", "provider": "openai", "priority": 4, "model": "m"},
+        ]
+        used = []
+
+        def request(card):
+            used.append(card["id"])
+            return FakeResponse(503, text="temporary") if card["id"] != "four" else FakeResponse(200, {"ok": True})
+
+        routed = provider_routing.route_json_request(settings, pool=provider_routing.POOL_LLM, cards=cards, request=request, cooldown_seconds=0)
+        self.assertEqual(routed.card["id"], "four")
+        self.assertEqual(used, ["one", "two", "three", "four"])
+
     def test_route_fails_over_on_timeout_and_returns_second_card(self):
         settings = {"provider_max_attempts": 2, "provider_cooldown_seconds": 0}
         cards = [

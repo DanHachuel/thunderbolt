@@ -46,6 +46,14 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertNotIn('aspect_ratio', media_renderer)
         self.assertNotIn('image_size', media_renderer)
 
+    def test_llm_card_uses_priority_instead_of_primary_checkbox(self):
+        llm_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_llm_card('):MAIN_SOURCE.index('def render_llm_provider_cards(')]
+        self.assertIn('st.number_input(', llm_renderer)
+        self.assertIn('"Prioridade"', llm_renderer)
+        self.assertNotIn('LLM principal', llm_renderer)
+        self.assertNotIn('primary_llm', llm_renderer)
+        self.assertNotIn('llm_card_{card_id}_primary', llm_renderer)
+
     def test_llm_card_matches_reference_layout_structure(self):
         self.assertIn('endpoint_col, action_col = st.columns([1.65, 1.05])', MAIN_SOURCE)
         self.assertIn('action_buttons = st.columns(2)', MAIN_SOURCE)

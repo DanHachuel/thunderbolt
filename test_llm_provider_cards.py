@@ -32,10 +32,12 @@ class LlmProviderCardTests(TestCase):
             }
         )
         cards = settings[LLM_CARDS_KEY]
-        self.assertEqual(cards[0]["provider"], "openai")
-        self.assertEqual(cards[1]["provider"], "gemini")
-        self.assertEqual(cards[1]["api_key"], "gem-key")
-        self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], cards[1]["id"])
+        self.assertEqual(cards[0]["provider"], "gemini")
+        self.assertEqual(cards[1]["provider"], "openai")
+        self.assertEqual(cards[0]["api_key"], "gem-key")
+        self.assertEqual(cards[0]["priority"], 1)
+        self.assertEqual(cards[1]["priority"], 2)
+        self.assertEqual(settings[LLM_ACTIVE_CARD_KEY], cards[0]["id"])
 
     def test_fixed_endpoints_hide_base_url_but_local_and_openai_show_it(self) -> None:
         self.assertTrue(provider_definition("openai").show_base_url)
@@ -69,18 +71,19 @@ class LlmProviderCardTests(TestCase):
         self.assertFalse(missing["ok"])
         self.assertIn("Missing key", missing["message"])
         secret = "sk-super-secret"
-        with patch("hermes_ui.llm_providers.fetch_openai_compatible_models", return_value=["model-a"]):
+        with patch("hermes_ui.llm_providers.validate_openai_compatible_api_key") as validate_key:
             success = test_llm_provider_card(
                 {"provider": "groq", "api_key": secret, "model": "model-a"}
             )
         self.assertTrue(success["ok"])
         self.assertNotIn(secret, success["message"])
-        self.assertIn("API OK", success["message"])
+        self.assertEqual(success["message"], "API Key OK")
+        validate_key.assert_called_once_with(secret, "https://api.groq.com/openai/v1", "model-a")
 
     def test_provider_error_does_not_expose_api_key(self) -> None:
         secret = "sk-do-not-leak"
         with patch(
-            "hermes_ui.llm_providers.fetch_openai_compatible_models",
+            "hermes_ui.llm_providers.validate_openai_compatible_api_key",
             side_effect=ValueError(f"bad response containing {secret}"),
         ):
             result = test_llm_provider_card(
