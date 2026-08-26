@@ -44,6 +44,20 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('channel_state_key = f"{prefix}_voice_channel_id"', MAIN_SOURCE)
         self.assertIn('channel=selected_one', MAIN_SOURCE)
 
+    def test_channel_language_is_synchronised_before_script_language_selectbox(self):
+        self.assertIn('def normalize_video_language(value: Any, default: str = "pt") -> str:', MAIN_SOURCE)
+        self.assertIn('def channel_video_language(channel: dict[str, Any] | None, fallback: str = "pt") -> str:', MAIN_SOURCE)
+        self.assertIn('channel_language_state_key = f"{prefix}_language_channel_id"', MAIN_SOURCE)
+        self.assertIn('channel_language = channel_video_language(channel, fallback=normalized_current_language)', MAIN_SOURCE)
+        self.assertIn('st.session_state[f"{prefix}_script_language"] = channel_language', MAIN_SOURCE)
+        self.assertIn('settings["script_language"] = st.selectbox(', MAIN_SOURCE)
+
+    def test_selected_channel_summary_includes_configured_video_language(self):
+        self.assertIn('video_language = language_label(channel_video_language(channel))', MAIN_SOURCE)
+        self.assertIn('**Blueprint utilizado pelo canal:**', MAIN_SOURCE)
+        self.assertIn('**Voz:** {voice} · **Idioma:** {video_language}', MAIN_SOURCE)
+        self.assertIn('"language": language', MAIN_SOURCE)
+
     def test_pipeline_uses_reviewed_script_and_keywords_when_present(self):
         self.assertIn('provided_script = str(generation_settings.get("video_script") or "").strip()', PIPELINE_SOURCE)
         self.assertIn('provided_keywords = generation_settings.get("video_keywords")', PIPELINE_SOURCE)
