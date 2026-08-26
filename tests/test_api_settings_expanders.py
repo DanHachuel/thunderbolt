@@ -84,6 +84,13 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertNotIn('primary_llm', llm_renderer)
         self.assertNotIn('llm_card_{card_id}_primary', llm_renderer)
 
+    def test_telegram_llm_card_disables_and_explains_priority(self):
+        llm_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_llm_card('):MAIN_SOURCE.index('def render_llm_provider_cards(')]
+        self.assertIn('disabled=bool(telegram_llm)', llm_renderer)
+        self.assertIn('Exclusivo para Notificações de Telegram — prioridade ignorada no pool LLM.', llm_renderer)
+        routing_source = (ROOT / 'hermes_ui' / 'provider_routing.py').read_text(encoding='utf-8')
+        self.assertIn('not bool(card.get("telegram_llm", False))', routing_source)
+
     def test_llm_card_matches_reference_layout_structure(self):
         self.assertIn('endpoint_col, action_col = st.columns([1.65, 1.05])', MAIN_SOURCE)
         self.assertIn('action_buttons = st.columns(2)', MAIN_SOURCE)

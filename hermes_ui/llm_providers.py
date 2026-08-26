@@ -305,9 +305,13 @@ def ensure_llm_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, An
 
     ids = {str(card.get("id")) for card in cards}
     ordered = _ordered_cards(cards)
-    first_enabled = next((card for card in ordered if card.get("enabled", True)), ordered[0])
-    if active_id != str(first_enabled["id"]):
-        result[LLM_ACTIVE_CARD_KEY] = str(first_enabled["id"])
+    first_enabled = next(
+        (card for card in ordered if card.get("enabled", True) and not card.get("telegram_llm", False)),
+        None,
+    )
+    desired_active_id = str(first_enabled["id"]) if first_enabled else ""
+    if active_id != desired_active_id:
+        result[LLM_ACTIVE_CARD_KEY] = desired_active_id
         changed = True
     if not any(card.get("telegram_llm") for card in cards):
         if result.get(LLM_TELEGRAM_CARD_KEY):
@@ -338,7 +342,7 @@ def active_llm_card(settings: Mapping[str, Any]) -> dict[str, Any]:
     cards = migrated.get(LLM_CARDS_KEY, [])
     ordered = _ordered_cards(cards) if isinstance(cards, list) else []
     for card in ordered:
-        if card.get("enabled", True):
+        if card.get("enabled", True) and not card.get("telegram_llm", False):
             return dict(card)
     return new_llm_card(DEFAULT_LLM_PROVIDER, card_id=DEFAULT_LLM_CARD_ID)
 
@@ -370,22 +374,24 @@ def apply_llm_cards_to_settings(
             old_priority = int(card.get("priority", DEFAULT_LLM_PRIORITY))
             card["priority"] = 1 if str(card.get("id")) == str(active_card_id) else max(2, old_priority)
     ordered = _ordered_cards(normalized)
-    active = next((card for card in ordered if card.get("enabled", True)), ordered[0])
+    normal_enabled = [card for card in ordered if card.get("enabled", True) and not card.get("telegram_llm", False)]
+    active = normal_enabled[0] if normal_enabled else None
     result[LLM_CARDS_KEY] = normalized
-    result[LLM_ACTIVE_CARD_KEY] = active["id"]
+    result[LLM_ACTIVE_CARD_KEY] = active["id"] if active else ""
     result[LLM_TELEGRAM_CARD_KEY] = telegram["id"] if telegram else ""
-    result["llm_provider"] = active["provider"]
+    result["llm_provider"] = active["provider"] if active else DEFAULT_LLM_PROVIDER
 
-    prefix = _legacy_prefix(str(active["provider"]))
-    result[f"{prefix}_api_key"] = str(active.get("api_key") or "").strip()
-    result[f"{prefix}_model_name"] = str(active.get("model") or "").strip()
-    result[f"{prefix}_base_url"] = str(active.get("base_url") or "").strip()
-    definition = provider_definition(active["provider"])
-    for field in definition.extra_fields:
-        result[f"{prefix}_{field}"] = str(active.get(field) or "").strip()
-    if active.get("provider") == "cloudflare":
-        result["cloudflare_account_id"] = str(active.get("account_id") or "").strip()
-        result["cloudflare_gateway_id"] = str(active.get("gateway_id") or "").strip()
+    if active:
+        prefix = _legacy_prefix(str(active["provider"]))
+        result[f"{prefix}_api_key"] = str(active.get("api_key") or "").strip()
+        result[f"{prefix}_model_name"] = str(active.get("model") or "").strip()
+        result[f"{prefix}_base_url"] = str(active.get("base_url") or "").strip()
+        definition = provider_definition(active["provider"])
+        for field in definition.extra_fields:
+            result[f"{prefix}_{field}"] = str(active.get(field) or "").strip()
+        if active.get("provider") == "cloudflare":
+            result["cloudflare_account_id"] = str(active.get("account_id") or "").strip()
+            result["cloudflare_gateway_id"] = str(active.get("gateway_id") or "").strip()
     return result
 
 

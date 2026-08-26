@@ -5040,22 +5040,25 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             with status_cols[0]:
                 enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"llm_card_{card_id}_enabled")
             with status_cols[1]:
-                priority = st.number_input(
-                    "Prioridade",
-                    min_value=1,
-                    max_value=999,
-                    value=max(1, int(card.get("priority", index + 1))),
-                    step=1,
-                    help="Ordem de tentativa do pool LLM: 1 é o primeiro; em falha elegível, segue para 2, 3 e assim por diante.",
-                    key=f"llm_card_{card_id}_priority",
-                )
-            with status_cols[2]:
                 telegram_llm = st.checkbox(
                     "LLM Telegram",
                     value=bool(card.get("telegram_llm", False)),
                     help="Usar este cartão exclusivamente para o roteamento de notificações Telegram. Apenas um cartão pode ficar seleccionado.",
                     key=f"llm_card_{card_id}_telegram",
                 )
+            with status_cols[2]:
+                priority = st.number_input(
+                    "Prioridade",
+                    min_value=1,
+                    max_value=999,
+                    value=max(1, int(card.get("priority", index + 1))),
+                    step=1,
+                    disabled=bool(telegram_llm),
+                    help="Não se aplica a cartões LLM Telegram. Nos restantes cartões, 1 é o primeiro; em falha elegível, segue para 2, 3 e assim por diante.",
+                    key=f"llm_card_{card_id}_priority",
+                )
+                if telegram_llm:
+                    st.caption("Exclusivo para Notificações de Telegram — prioridade ignorada no pool LLM.")
 
             save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")
             remove_clicked = False
@@ -5104,7 +5107,7 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
         settings.update(migrated)
         write_json("settings.json", settings)
     with st.expander("LLM — providers e modelos", expanded=False):
-        st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; a prioridade 1 é tentada primeiro e o router segue para as prioridades seguintes em falhas elegíveis.")
+        st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; a prioridade 1 é tentada primeiro. Cartões marcados como LLM Telegram ficam excluídos do pool textual e são usados apenas pelas notificações Telegram.")
         with st.container(border=True):
             st.markdown("### Limite LLM NVIDIA NIM")
             st.caption("Quando ligado, limita apenas cartões cujo endpoint é integrate.api.nvidia.com a 40 pedidos por janela de 60 segundos, partilhados entre UI, pipeline e automações.")

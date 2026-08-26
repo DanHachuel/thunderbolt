@@ -281,7 +281,11 @@ def enabled_cards(settings: Mapping[str, Any], pool: str) -> list[dict[str, Any]
         migrated, _ = ensure_llm_provider_cards(settings)
         raw_cards = migrated.get("llm_provider_cards", [])
         cards = [normalize_llm_card(item, index) for index, item in enumerate(raw_cards)] if isinstance(raw_cards, list) else []
-        enabled = [(index, card) for index, card in enumerate(cards) if bool(card.get("enabled", True))]
+        enabled = [
+            (index, card)
+            for index, card in enumerate(cards)
+            if bool(card.get("enabled", True)) and not bool(card.get("telegram_llm", False))
+        ]
         enabled.sort(key=lambda pair: (int(pair[1].get("priority", 1)), pair[0]))
         return [card for _index, card in enabled]
     raw_cards = settings.get("media_provider_cards", [])
@@ -369,6 +373,7 @@ def route_json_request(
         raise ProviderRoutingError(f"Pool de providers inválido: {pool}")
     candidates = [dict(item) for item in (cards if cards is not None else enabled_cards(settings, pool))]
     if pool == POOL_LLM:
+        candidates = [card for card in candidates if not bool(card.get("telegram_llm", False))]
         candidates = [
             card
             for _index, card in sorted(
