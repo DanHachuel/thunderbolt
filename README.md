@@ -69,7 +69,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.39
+## Navegação da UI 0.3.40
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Notificações**, **Logs** e **Configuração API**, nessa ordem. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -88,6 +88,12 @@ A subaba **Serviços e modelos** mantém as credenciais de providers e serviços
 A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** mantém um histórico persistente de conclusões e falhas, reconcilia estados escritos por componentes locais e disponibiliza um checkbox independente para cada operação mapeada. A subaba **Geral** mantém esse centro local; a subaba **Telegram** permite configurar Bot Token, Chat ID e proxy opcional e envia as mesmas notificações pela Bot API oficial, sem polling ou mensagens recebidas. A página **Configurações > Logs**, colocada imediatamente abaixo de Notificações e acima de Configuração API, apresenta o histórico unificado de tarefas e notificações, com filtro livre por operação, filtros adicionais por operação e estado, e as colunas Operação, Estado, Data, Hora, Registo, Origem, Progresso e Detalhes.
 
 A página **Edição > Download Mídia** utiliza a API Python do [yt-dlp](https://github.com/yt-dlp/yt-dlp) para descarregar vídeos e áudio de URLs públicas, com qualidade, contentor, formato de áudio, legendas, metadados, playlists, progresso e histórico local em `storage/downloads/` e `storage/state/media_downloads.json`. Conversão e combinação de streams podem exigir FFmpeg.
+
+## Catálogo comum do Backlog e da Automação
+
+**Backlog Vídeos** e **Automação Youtube > Vídeos cadastrados** usam o mesmo catálogo completo persistido em `storage/state/tasks.json`. Assim, todas as tarefas criadas manualmente ou pela automação diária aparecem nos dois fluxos, sem duplicação nem filtros implícitos por origem. O filtro de estado do Backlog mantém os estados conhecidos e acrescenta estados novos encontrados no storage.
+
+Os dois cards mostram de forma consistente o estado técnico, o rótulo legível, a barra de progresso, a etapa e o formato do vídeo. São suportados estados como `to_do`, `doing`, `blocked`, `done`, `failed` e `cancelled`; formatos ausentes usam `format`, `style_wide` ou `wide` como fallback.
 
 ## Canais Youtube — edição por cartão e vídeos recentes
 

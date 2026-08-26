@@ -3293,16 +3293,60 @@ def _render_pipeline_progress_panel() -> None:
         _render_pipeline_progress_live()
 
 
+VIDEO_TASK_STATE_LABELS = {
+    "to_do": "Pendente",
+    "doing": "Em execução",
+    "blocked": "Bloqueado",
+    "done": "Concluído",
+    "failed": "Falha",
+    "cancelled": "Cancelado",
+}
+
+
+def load_video_tasks_for_catalog() -> list[dict[str, Any]]:
+    """Return the complete persisted task catalog shared by Backlog and Automation."""
+    saved = read_json("tasks.json", [])
+    if not isinstance(saved, list):
+        return []
+    return [task for task in saved if isinstance(task, dict) and str(task.get("id") or "").strip()]
+
+
+def _video_task_format(task: dict[str, Any]) -> str:
+    value = task.get("format") or task.get("style_wide") or task.get("style") or "wide"
+    return str(value).strip() or "wide"
+
+
+def _video_task_progress(task: dict[str, Any]) -> int:
+    try:
+        return max(0, min(100, int(task.get("progress") or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _render_video_task_state(task: dict[str, Any]) -> None:
+    """Show the raw state, readable label and progress consistently in both views."""
+    state = str(task.get("state") or "unknown").strip().lower()
+    progress = _video_task_progress(task)
+    st.caption("Estado")
+    st.write(state or "—")
+    st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
+    st.progress(progress, text=f"{progress}%")
+    if task.get("error"):
+        st.caption(str(task.get("error"))[:240])
+
+
 def render_videos():
     st.subheader("Backlog Videos")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
     _render_pipeline_progress_panel()
-    tasks = read_json("tasks.json", [])
+    tasks = load_video_tasks_for_catalog()
     if not tasks:
         st.info("Nenhum vídeo criado.")
         return
-    state_filter = st.selectbox("Filtrar por estado", ["Todos", "to_do", "doing", "blocked", "done", "failed", "cancelled"], key="videos_state_filter")
+    known_states = ["to_do", "doing", "blocked", "done", "failed", "cancelled"]
+    extra_states = sorted({str(task.get("state") or "unknown") for task in tasks if str(task.get("state") or "unknown") not in known_states})
+    state_filter = st.selectbox("Filtrar por estado", ["Todos", *known_states, *extra_states], key="videos_state_filter")
     for task in tasks:
         if state_filter != "Todos" and task.get("state") != state_filter:
             continue
@@ -3319,16 +3363,13 @@ def render_videos():
                     status = task.get('thumbnail_status', 'not_generated')
                     prompt_note = ' · prompt pronto' if task.get('thumbnail_prompt') else ''
                     st.caption(f"Thumbnail: {status}{prompt_note}")
-            with cols[1]: st.write(task.get("format", "wide"))
+            with cols[1]:
+                st.caption("Formato")
+                st.write(_video_task_format(task))
             with cols[2]:
                 st.write(_pipeline_stage_label(task))
-                if str(task.get("state") or "") in {"to_do", "doing", "blocked"}:
-                    progress = _pipeline_progress_value(task)
-                    st.progress(progress, text=f"{progress}%")
             with cols[3]:
-                st.write(task.get("state", "—"))
-                if task.get("error"):
-                    st.caption(str(task.get("error"))[:240])
+                _render_video_task_state(task)
 
             with cols[4]:
                 state = str(task.get("state") or "")
@@ -3615,21 +3656,20 @@ def render_automation():
 
     st.divider()
     st.subheader("Vídeos cadastrados")
-    tasks = read_json("tasks.json", [])
+    tasks = load_video_tasks_for_catalog()
     if not tasks:
         st.info("Ainda não existem vídeos cadastrados.")
     for task in tasks:
         with st.container(border=True):
-            task_cols = st.columns([2.45, 1.15, 1.15, 1.85])
+            task_cols = st.columns([2.25, 1.65, 1.15, 1.85])
             with task_cols[0]:
                 st.write(f"**{task.get('topic', 'Sem tópico')}**")
                 st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
             with task_cols[1]:
-                st.caption("Estado")
-                st.write(task.get("state", "—"))
+                _render_video_task_state(task)
             with task_cols[2]:
-                st.caption("Estilo")
-                st.write(task.get("style_wide", "—"))
+                st.caption("Formato")
+                st.write(_video_task_format(task))
             with task_cols[3]:
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
