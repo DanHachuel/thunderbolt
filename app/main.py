@@ -5096,8 +5096,8 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                 st.error(f"Último teste: {saved_test['message']}")
 
 
-def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = False) -> None:
-    """Renderizar cartões LLM fora da form global para permitir acções por cartão."""
+def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = False) -> dict[str, Any]:
+    """Renderizar cartões LLM e o limitador NIM dentro do mesmo expander."""
     migrated, changed = ensure_llm_provider_cards(settings)
     cards = [dict(item) for item in migrated.get(LLM_CARDS_KEY, [])]
     if changed:
@@ -5105,6 +5105,16 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
         write_json("settings.json", settings)
     with st.expander("LLM — providers e modelos", expanded=False):
         st.caption("Configure cada provider num cartão independente. Pode repetir o mesmo provider para manter várias API keys; a prioridade 1 é tentada primeiro e o router segue para as prioridades seguintes em falhas elegíveis.")
+        with st.container(border=True):
+            st.markdown("### Limite LLM NVIDIA NIM")
+            st.caption("Quando ligado, limita apenas cartões cujo endpoint é integrate.api.nvidia.com a 40 pedidos por janela de 60 segundos, partilhados entre UI, pipeline e automações.")
+            rpm_cols = st.columns(3)
+            with rpm_cols[0]:
+                llm_rpm_limit_enabled = st.checkbox("Activar limitador NVIDIA NIM — 40 RPM", value=bool(settings.get("llm_rpm_limit_enabled", False)), key="settings_llm_rpm_limit_enabled")
+            with rpm_cols[1]:
+                llm_rpm_limit = st.number_input("Pedidos por janela", min_value=1, max_value=1000, value=int(settings.get("llm_rpm_limit", 40)), step=1, key="settings_llm_rpm_limit")
+            with rpm_cols[2]:
+                llm_rpm_window_seconds = st.number_input("Janela (segundos)", min_value=1, max_value=3600, value=int(settings.get("llm_rpm_window_seconds", 60)), step=1, key="settings_llm_rpm_window_seconds")
         for index in range(len(cards)):
             _render_llm_card(settings, cards, index, embedded=embedded)
         st.divider()
@@ -5127,6 +5137,11 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
             cards.append(new_card)
             _persist_llm_cards(settings, cards)
             st.rerun()
+    return {
+        "llm_rpm_limit_enabled": bool(llm_rpm_limit_enabled),
+        "llm_rpm_limit": int(llm_rpm_limit),
+        "llm_rpm_window_seconds": int(llm_rpm_window_seconds),
+    }
 
 
 def _media_card_config_status(card: dict[str, Any]) -> tuple[str, str]:
@@ -5320,18 +5335,10 @@ def render_settings():
                         widget_key="api_test_apify",
                     )
 
-                render_llm_provider_cards(settings, embedded=True)
-
-                with st.container(border=True):
-                    st.markdown("### Limite LLM NVIDIA NIM")
-                    st.caption("Quando ligado, limita apenas cartões cujo endpoint é integrate.api.nvidia.com a 40 pedidos por janela de 60 segundos, partilhados entre UI, pipeline e automações.")
-                    rpm_cols = st.columns(3)
-                    with rpm_cols[0]:
-                        llm_rpm_limit_enabled = st.checkbox("Activar limitador NVIDIA NIM — 40 RPM", value=bool(settings.get("llm_rpm_limit_enabled", False)), key="settings_llm_rpm_limit_enabled")
-                    with rpm_cols[1]:
-                        llm_rpm_limit = st.number_input("Pedidos por janela", min_value=1, max_value=1000, value=int(settings.get("llm_rpm_limit", 40)), step=1, key="settings_llm_rpm_limit")
-                    with rpm_cols[2]:
-                        llm_rpm_window_seconds = st.number_input("Janela (segundos)", min_value=1, max_value=3600, value=int(settings.get("llm_rpm_window_seconds", 60)), step=1, key="settings_llm_rpm_window_seconds")
+                llm_rpm_settings = render_llm_provider_cards(settings, embedded=True)
+                llm_rpm_limit_enabled = bool(llm_rpm_settings["llm_rpm_limit_enabled"])
+                llm_rpm_limit = int(llm_rpm_settings["llm_rpm_limit"])
+                llm_rpm_window_seconds = int(llm_rpm_settings["llm_rpm_window_seconds"])
 
                 render_media_provider_cards(settings, embedded=True)
 

@@ -45,6 +45,18 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('with st.form("settings_form"):', MAIN_SOURCE)
         self.assertIn('st.form_submit_button("Guardar configurações do Thunderbolt"', MAIN_SOURCE)
 
+    def test_nvidia_nim_limit_card_is_inside_llm_expander_before_provider_cards(self):
+        start = MAIN_SOURCE.index('def render_llm_provider_cards(')
+        end = MAIN_SOURCE.index('def _media_card_config_status(', start)
+        llm_block = MAIN_SOURCE[start:end]
+        self.assertIn('with st.expander("LLM — providers e modelos", expanded=False):', llm_block)
+        limit_position = llm_block.index('st.markdown("### Limite LLM NVIDIA NIM")')
+        first_provider_position = llm_block.index('for index in range(len(cards)):')
+        self.assertLess(limit_position, first_provider_position)
+        settings_start = MAIN_SOURCE.index('def render_settings():')
+        settings_block = MAIN_SOURCE[settings_start:]
+        self.assertNotIn('st.markdown("### Limite LLM NVIDIA NIM")', settings_block)
+
     def test_llm_and_media_sections_are_in_main_list_after_apify(self):
         llm_position = MAIN_SOURCE.index('render_llm_provider_cards(settings, embedded=True)')
         apify_position = MAIN_SOURCE.index('with st.expander("Niche Finder — Apify", expanded=False)')
