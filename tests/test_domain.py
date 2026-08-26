@@ -175,6 +175,45 @@ def test_general_batch_uses_independent_channel_payloads(tmp_path, monkeypatch):
     assert all(task["creation_mode"] == "general" for task in tasks)
 
 
+def test_same_channel_batch_assigns_thumbnail_variant_per_video(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import create_batch, create_channel, create_tasks_for_batch
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    channel = create_channel("Canal de thumbnails")
+    variants = [
+        {"concept": "Variante 1", "image_prompt": "cena 1", "overlay_text": "UM"},
+        {"concept": "Variante 2", "image_prompt": "cena 2", "overlay_text": "DOIS"},
+        {"concept": "Variante 3", "image_prompt": "cena 3", "overlay_text": "TRES"},
+    ]
+    batch = create_batch(
+        "same_channel",
+        [channel["id"]],
+        "Tema em lote",
+        3,
+        {
+            "channel_payloads": {
+                channel["id"]: {
+                    "topic": "Tema em lote",
+                    "title": "Título já existente",
+                    "thumbnail_variant": variants[0],
+                    "thumbnail_variants": variants,
+                    "thumbnail_status": "prompt_ready",
+                }
+            }
+        },
+    )
+
+    tasks = create_tasks_for_batch(batch)
+
+    assert [task["thumbnail_variant"]["concept"] for task in tasks] == ["Variante 1", "Variante 2", "Variante 3"]
+    assert [task["thumbnail_prompt"] for task in tasks] == ["cena 1", "cena 2", "cena 3"]
+    assert [task["thumbnail_text"] for task in tasks] == ["UM", "DOIS", "TRES"]
+
+
 def test_general_batch_always_creates_one_task_per_channel(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage

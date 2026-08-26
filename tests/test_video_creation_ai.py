@@ -25,6 +25,10 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('"Salvar rascunho"', MAIN_SOURCE)
         self.assertIn('if save_draft_callback is not None:', MAIN_SOURCE)
         self.assertIn('render_new_video(page_title="Criação de Músicas", prefix="new_music")', MAIN_SOURCE)
+        self.assertIn('def generate_thumbnail_for_ui(', MAIN_SOURCE)
+        self.assertIn('def generate_thumbnail_variants_for_ui(', MAIN_SOURCE)
+        self.assertIn('generate_thumbnail_prompt(', MAIN_SOURCE)
+        self.assertNotIn('Gerar títulos e thumbnails com IA', MAIN_SOURCE)
 
     def test_scripts_page_reuses_combined_ai_generation_with_selected_blueprint(self):
         self.assertIn('"pipeline_scripts",', MAIN_SOURCE)
@@ -57,6 +61,12 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('**Blueprint utilizado pelo canal:**', MAIN_SOURCE)
         self.assertIn('**Voz:** {voice} · **Idioma:** {video_language}', MAIN_SOURCE)
         self.assertIn('"language": language', MAIN_SOURCE)
+
+    def test_pipeline_uses_prepared_title_and_thumbnail_without_regenerating_creative_package(self):
+        self.assertIn('prepared_thumbnail = bool(str(existing_variant.get("image_prompt") or "").strip())', PIPELINE_SOURCE)
+        self.assertIn('if provided_title and prepared_thumbnail:', PIPELINE_SOURCE)
+        self.assertIn('Do not call', PIPELINE_SOURCE)
+        self.assertIn('creative = generate_creative_package(', PIPELINE_SOURCE)
 
     def test_pipeline_uses_reviewed_script_and_keywords_when_present(self):
         self.assertIn('provided_script = str(generation_settings.get("video_script") or "").strip()', PIPELINE_SOURCE)

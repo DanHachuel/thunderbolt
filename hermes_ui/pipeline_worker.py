@@ -470,8 +470,26 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     _update(task_id, artifacts=artifacts, progress=30)
 
     _update(task_id, stage="title", state="doing", progress=35)
-    creative = generate_creative_package(settings, channel, topic, blueprint, language=str(task.get("language") or channel.get("language") or "Português"))
-    title = str(creative.get("title") or topic).strip()
+    provided_title = str(task.get("title") or "").strip()
+    existing_variant = task.get("thumbnail_variant") if isinstance(task.get("thumbnail_variant"), dict) else {}
+    existing_variant = dict(existing_variant)
+    if not str(existing_variant.get("image_prompt") or "").strip() and str(task.get("thumbnail_prompt") or "").strip():
+        existing_variant["image_prompt"] = str(task.get("thumbnail_prompt") or "").strip()
+    if not str(existing_variant.get("overlay_text") or "").strip() and str(task.get("thumbnail_text") or "").strip():
+        existing_variant["overlay_text"] = str(task.get("thumbnail_text") or "").strip()
+    prepared_thumbnail = bool(str(existing_variant.get("image_prompt") or "").strip())
+    if provided_title and prepared_thumbnail:
+        # The creation UI already generated the title/thumbnail brief. Do not call
+        # the complete creative-package generator a second time for this task.
+        creative = {
+            "title": provided_title,
+            "keywords": [],
+            "thumbnail_variant": existing_variant,
+            "title_candidates": task.get("title_candidates") if isinstance(task.get("title_candidates"), list) else [],
+        }
+    else:
+        creative = generate_creative_package(settings, channel, topic, blueprint, language=str(task.get("language") or channel.get("language") or "Português"))
+    title = str(creative.get("title") or provided_title or topic).strip()
     provided_keywords = generation_settings.get("video_keywords")
     if isinstance(provided_keywords, str):
         provided_keywords = re.split(r"[,\n;|]+", provided_keywords)
@@ -482,6 +500,8 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
     _update(task_id, stage="keywords", state="doing", progress=48)
     variant = creative.get("thumbnail_variant") if isinstance(creative.get("thumbnail_variant"), dict) else {}
+    if not variant and prepared_thumbnail:
+        variant = existing_variant
     prompt_payload = {
         "topic": topic,
         "title": title,

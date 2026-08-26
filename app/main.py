@@ -717,6 +717,75 @@ def generate_creative_for_ui(settings: dict[str, Any], channel: dict, topic: str
     return payload
 
 
+def generate_thumbnail_for_ui(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    *,
+    title: str = "",
+    topic_source: str = "manual",
+) -> dict[str, Any]:
+    """Generate exactly one thumbnail brief for an existing video topic/title."""
+    topic = str(topic or "").strip()
+    if not topic:
+        raise CreativeGenerationError("É necessário um tópico antes de gerar a thumbnail.")
+    variant = generate_thumbnail_prompt(
+        settings,
+        channel,
+        topic,
+        blueprint=blueprint_for_channel(channel),
+        language=str(channel.get("language") or "Português"),
+    )
+    return {
+        "topic": topic,
+        "title": str(title or topic).strip(),
+        "topic_source": topic_source or "manual",
+        "thumbnail_variant": variant,
+        "thumbnail_variants": [variant],
+        "thumbnail_prompt": variant.get("image_prompt", ""),
+        "thumbnail_text": variant.get("overlay_text", ""),
+        "thumbnail_status": "prompt_ready",
+        "title_candidates": [],
+        "ai_generation": {"thumbnail": variant},
+    }
+
+
+def generate_thumbnail_variants_for_ui(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    count: int,
+    *,
+    title: str = "",
+    topic_source: str = "manual",
+) -> dict[str, Any]:
+    """Generate one independent thumbnail brief for each video in a batch."""
+    count = max(1, min(int(count or 1), 100))
+    variants: list[dict[str, Any]] = []
+    for _index in range(count):
+        generated = generate_thumbnail_for_ui(
+            settings,
+            channel,
+            topic,
+            title=title,
+            topic_source=topic_source,
+        )
+        variants.append(dict(generated["thumbnail_variant"]))
+    first = variants[0]
+    return {
+        "topic": topic,
+        "title": str(title or topic).strip(),
+        "topic_source": topic_source or "manual",
+        "thumbnail_variant": first,
+        "thumbnail_variants": variants,
+        "thumbnail_prompt": first.get("image_prompt", ""),
+        "thumbnail_text": first.get("overlay_text", ""),
+        "thumbnail_status": "prompt_ready",
+        "title_candidates": [],
+        "ai_generation": {"thumbnail_variants": variants},
+    }
+
+
 def valid_hhmm(value: str) -> bool:
     return bool(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(value or "").strip()))
 
@@ -776,14 +845,14 @@ def render_video_generation_settings(
                 key=f"{prefix}_script_language",
             )
         with subject_cols[1]:
-            with st.expander("Advanced Script Settings", expanded=False):
-                settings["script_structure_notes"] = st.text_area(
-                    "Estrutura e notas opcionais",
-                    value=str(st.session_state.get(f"{prefix}_script_structure_notes", "")),
-                    key=f"{prefix}_script_structure_notes",
-                    height=100,
-                    placeholder="Ex.: gancho forte, 6 cenas, narração documental…",
-                )
+            st.markdown("**Advanced Script Settings**")
+            settings["script_structure_notes"] = st.text_area(
+                "Estrutura e notas opcionais",
+                value=str(st.session_state.get(f"{prefix}_script_structure_notes", "")),
+                key=f"{prefix}_script_structure_notes",
+                height=100,
+                placeholder="Ex.: gancho forte, 6 cenas, narração documental…",
+            )
             settings["generate_script_with_ai"] = st.checkbox("Generate Script & Keywords with AI", value=True, key=f"{prefix}_generate_script_with_ai")
         settings["video_script"] = st.text_area(
             "Video Script (Optional)",
@@ -825,66 +894,69 @@ def render_video_generation_settings(
                 st.error(st.session_state[f"{prefix}_save_draft_error"])
 
     if "Configurações de vídeo" in visible_sections:
-        st.markdown("### Video Settings")
-        video_cols = st.columns(2)
-        with video_cols[0]:
-            settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
-            if settings["video_source"] == "full_ia":
-                settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
-            else:
-                settings["style_ia"] = ""
-            settings["video_format"] = st.selectbox("Formato", VIDEO_FORMAT_OPTIONS, key=f"{prefix}_video_format")
-            settings["video_concatenation_mode"] = st.selectbox("Video Concatenation Mode", VIDEO_CONCATENATION_OPTIONS, key=f"{prefix}_video_concatenation")
-            settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
-            settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
-        with video_cols[1]:
-            settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
-            settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
-            settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
-            settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
+        with st.expander("Configurações de vídeo", expanded=False):
+            st.markdown("### Video Settings")
+            video_cols = st.columns(2)
+            with video_cols[0]:
+                settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
+                if settings["video_source"] == "full_ia":
+                    settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
+                else:
+                    settings["style_ia"] = ""
+                settings["video_format"] = st.selectbox("Formato", VIDEO_FORMAT_OPTIONS, key=f"{prefix}_video_format")
+                settings["video_concatenation_mode"] = st.selectbox("Video Concatenation Mode", VIDEO_CONCATENATION_OPTIONS, key=f"{prefix}_video_concatenation")
+                settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
+                settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
+            with video_cols[1]:
+                settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
+                settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
+                settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
+                settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
 
     if "Configurações de áudio" in visible_sections:
-        st.markdown("### Audio Settings")
-        audio_cols = st.columns(2)
-        with audio_cols[0]:
-            settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
-            settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
-            if channel is not None:
-                channel_id = str(channel.get("id") or channel.get("name") or "")
-                channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()
-                channel_state_key = f"{prefix}_voice_channel_id"
-                if st.session_state.get(channel_state_key) != channel_id:
-                    st.session_state[f"{prefix}_voice"] = channel_voice
-                    st.session_state[channel_state_key] = channel_id
-            current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
-            voice_options = voice_catalog(current_voice)
-            settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
-            volume_speed_cols = st.columns(2)
-            with volume_speed_cols[0]:
-                settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
-            with volume_speed_cols[1]:
-                settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
-            st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
-        with audio_cols[1]:
-            settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
-            settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
+        with st.expander("Configurações de áudio", expanded=False):
+            st.markdown("### Audio Settings")
+            audio_cols = st.columns(2)
+            with audio_cols[0]:
+                settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
+                settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
+                if channel is not None:
+                    channel_id = str(channel.get("id") or channel.get("name") or "")
+                    channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()
+                    channel_state_key = f"{prefix}_voice_channel_id"
+                    if st.session_state.get(channel_state_key) != channel_id:
+                        st.session_state[f"{prefix}_voice"] = channel_voice
+                        st.session_state[channel_state_key] = channel_id
+                current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
+                voice_options = voice_catalog(current_voice)
+                settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
+                volume_speed_cols = st.columns(2)
+                with volume_speed_cols[0]:
+                    settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
+                with volume_speed_cols[1]:
+                    settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
+                st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
+            with audio_cols[1]:
+                settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
+                settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
 
     if "Configurações de legendas" in visible_sections:
-        st.markdown("### Subtitle Settings")
-        subtitle_cols = st.columns(2)
-        with subtitle_cols[0]:
-            settings["enable_subtitles"] = st.checkbox("Enable Subtitles", value=True, key=f"{prefix}_enable_subtitles")
-            settings["subtitle_font"] = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, key=f"{prefix}_subtitle_font")
-            settings["subtitle_position"] = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, key=f"{prefix}_subtitle_position")
-            settings["subtitle_color"] = st.color_picker("Color", "#FFFFFF", key=f"{prefix}_subtitle_color")
-            settings["subtitle_background"] = st.checkbox("Background", value=True, key=f"{prefix}_subtitle_background")
-            settings["subtitle_background_color"] = st.color_picker("Background Color", "#000000", key=f"{prefix}_subtitle_background_color")
-            settings["subtitle_rounded_background"] = st.checkbox("Rounded Background", value=False, key=f"{prefix}_subtitle_rounded_background")
-        with subtitle_cols[1]:
-            settings["subtitle_font_size"] = st.slider("Font Size", min_value=12, max_value=96, value=60, key=f"{prefix}_subtitle_font_size")
-            settings["subtitle_outline"] = st.color_picker("Outline", "#000000", key=f"{prefix}_subtitle_outline")
-            settings["subtitle_outline_width"] = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=1.5, step=0.25, key=f"{prefix}_subtitle_outline_width")
-            st.button("Restore Subtitle Defaults", key=f"{prefix}_restore_subtitle_defaults", disabled=True, help="Os valores predefinidos já estão activos nesta configuração.")
+        with st.expander("Configurações de legendas", expanded=False):
+            st.markdown("### Subtitle Settings")
+            subtitle_cols = st.columns(2)
+            with subtitle_cols[0]:
+                settings["enable_subtitles"] = st.checkbox("Enable Subtitles", value=True, key=f"{prefix}_enable_subtitles")
+                settings["subtitle_font"] = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, key=f"{prefix}_subtitle_font")
+                settings["subtitle_position"] = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, key=f"{prefix}_subtitle_position")
+                settings["subtitle_color"] = st.color_picker("Color", "#FFFFFF", key=f"{prefix}_subtitle_color")
+                settings["subtitle_background"] = st.checkbox("Background", value=True, key=f"{prefix}_subtitle_background")
+                settings["subtitle_background_color"] = st.color_picker("Background Color", "#000000", key=f"{prefix}_subtitle_background_color")
+                settings["subtitle_rounded_background"] = st.checkbox("Rounded Background", value=False, key=f"{prefix}_subtitle_rounded_background")
+            with subtitle_cols[1]:
+                settings["subtitle_font_size"] = st.slider("Font Size", min_value=12, max_value=96, value=60, key=f"{prefix}_subtitle_font_size")
+                settings["subtitle_outline"] = st.color_picker("Outline", "#000000", key=f"{prefix}_subtitle_outline")
+                settings["subtitle_outline_width"] = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=1.5, step=0.25, key=f"{prefix}_subtitle_outline_width")
+                st.button("Restore Subtitle Defaults", key=f"{prefix}_restore_subtitle_defaults", disabled=True, help="Os valores predefinidos já estão activos nesta configuração.")
     return settings
 
 
@@ -2120,43 +2192,42 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 st.warning(f"Pedido criado, mas não foi possível descarregar o áudio: {exc}")
                     music_path = st.session_state.get(f"{prefix}_music_path", "")
 
+            quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel", key=f"{prefix}_quantity")
             payloads: dict[str, dict[str, Any]] = {}
             if mode == "general":
                 existing_topics = st.session_state.get(f"{prefix}_general_topics", {})
                 payloads = dict(st.session_state.get(f"{prefix}_general_payloads", {}))
-                if st.button("Gerar títulos e thumbnails para todos os canais", key=f"{prefix}_generate_general_creative", use_container_width=True):
-                    settings = read_json("settings.json", {})
-                    new_payloads: dict[str, dict[str, Any]] = {}
-                    errors: list[str] = []
-                    with st.spinner("A gerar títulos e thumbnails independentes por canal…"):
-                        for channel in all_channels:
-                            try:
-                                topic_result = existing_topics.get(channel["id"])
-                                if not topic_result:
-                                    topic_result = generate_topic_for_ui(settings, channel, general_context)
-                                generated = generate_creative_for_ui(settings, channel, topic_result["topic"], topic_source="llm")
-                                generated["ai_generation"]["topic"] = topic_result
-                                new_payloads[channel["id"]] = generated
-                            except CreativeGenerationError as exc:
-                                errors.append(f"{channel.get('name', 'Canal')}: {exc}")
-                    if errors:
-                        for error in errors:
-                            st.error(error)
-                    else:
-                        st.session_state[f"{prefix}_general_topics"] = {cid: {"topic": item["topic"], "topic_source": "llm"} for cid, item in new_payloads.items()}
-                        st.session_state[f"{prefix}_general_payloads"] = new_payloads
-                        payloads = new_payloads
-                        st.success(f"Pacote criativo pronto para {len(new_payloads)} canais.")
+                with st.expander("Gerar Thumbnail com IA", expanded=False):
+                    if st.button("Gerar Thumbnail com IA para todos os vídeos", key=f"{prefix}_generate_general_creative", use_container_width=True):
+                        settings = read_json("settings.json", {})
+                        new_payloads: dict[str, dict[str, Any]] = {}
+                        errors: list[str] = []
+                        with st.spinner("A gerar uma thumbnail independente por vídeo…"):
+                            for channel in all_channels:
+                                try:
+                                    topic_result = existing_topics.get(channel["id"])
+                                    topic = str((topic_result or {}).get("topic") or "").strip()
+                                    if not topic:
+                                        errors.append(f"{channel.get('name', 'Canal')}: gere primeiro o tópico individual do canal.")
+                                        continue
+                                    generated = generate_thumbnail_for_ui(settings, channel, topic, title=topic, topic_source=str((topic_result or {}).get("topic_source") or "llm"))
+                                    generated["ai_generation"]["topic"] = topic_result
+                                    new_payloads[channel["id"]] = generated
+                                except CreativeGenerationError as exc:
+                                    errors.append(f"{channel.get('name', 'Canal')}: {exc}")
+                        if errors:
+                            for error in errors:
+                                st.error(error)
+                        else:
+                            st.session_state[f"{prefix}_general_payloads"] = new_payloads
+                            payloads = new_payloads
+                            st.success(f"Thumbnail pronta para {len(new_payloads)} vídeo(s).")
                 payloads = st.session_state.get(f"{prefix}_general_payloads", payloads)
                 for channel in all_channels:
                     payload = payloads.get(channel["id"])
                     if not payload:
                         continue
-                    with st.expander(f"{channel.get('name', 'Canal')} — título e thumbnail", expanded=False):
-                        title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
-                        if title_options:
-                            selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_general_title_{channel['id']}")
-                            payload["title"] = selected_title
+                    with st.expander(f"{channel.get('name', 'Canal')} — thumbnail", expanded=False):
                         variants = payload.get("thumbnail_variants", [])
                         if variants:
                             labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
@@ -2197,83 +2268,87 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 st.caption("A imagem ainda não foi gerada. Configure a API key em Configuração API > API Keys.")
                         st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
             else:
-                topic_for_creative = str(generation_settings.get("video_subject") or "").strip()
-                if st.button("Gerar títulos e thumbnails com IA", key=f"{prefix}_generate_creative", use_container_width=True):
-                    if selected_one is None:
-                        st.error("Seleccione primeiro um canal.")
-                    else:
-                        try:
-                            if not topic_for_creative:
-                                topic_result = generate_topic_for_ui(read_json("settings.json", {}), selected_one)
-                                topic_for_creative = str(topic_result["topic"]).strip()
-                                st.session_state[f"{prefix}_topic"] = topic_for_creative
-                                st.session_state[f"{prefix}_topic_meta"] = topic_result
-                            generated = generate_creative_for_ui(
-                                read_json("settings.json", {}),
-                                selected_one,
-                                topic_for_creative,
-                                topic_source=_video_topic_source(topic_for_creative, prefix),
-                            )
-
-                            st.session_state[f"{prefix}_creative_payload"] = generated
-                            st.success("Tema, título e thumbnails gerados; escolha a variante antes de criar as tarefas.")
-                            st.rerun()
-                        except CreativeGenerationError as exc:
-                            st.error(str(exc))
-                payload = st.session_state.get(f"{prefix}_creative_payload")
-                if payload:
-                    st.subheader("Título e Thumbnail automáticos")
-                    title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
-                    if title_options:
-                        selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_title_choice")
-                        payload["title"] = selected_title
-                        with st.expander(f"Ver {len(title_options)} candidatos de título"):
-                            st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
-                    variants = payload.get("thumbnail_variants", [])
-                    if variants:
-                        labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
-                        selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"{prefix}_thumbnail_choice")
-                        variant_index = labels.index(selected_variant_label)
-                        variant = variants[variant_index]
-                        payload["thumbnail_variant"] = variant
-                        payload["thumbnail_prompt"] = variant.get("image_prompt", "")
-                        payload["thumbnail_text"] = variant.get("overlay_text", "")
-                        st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
-                        st.code(variant.get("image_prompt", ""), language="text")
-                        thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                        if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", use_container_width=True):
+                with st.expander("Gerar Thumbnail com IA", expanded=False):
+                    topic_for_thumbnail = str(generation_settings.get("video_subject") or "").strip()
+                    if st.button("Gerar Thumbnail com IA", key=f"{prefix}_generate_creative", use_container_width=True):
+                        if selected_one is None:
+                            st.error("Seleccione primeiro um canal.")
+                        elif not topic_for_thumbnail:
+                            st.error("Preencha o Video Subject antes de gerar a thumbnail.")
+                        else:
                             try:
-                                thumbnail_path = str(
-                                    generate_thumbnail_image(
-                                        read_json("settings.json", {}),
-                                        variant.get("image_prompt", ""),
-                                        topic=str(payload.get("topic") or ""),
-                                        variant_index=variant_index,
-                                        lettering_text=str(variant.get("overlay_text") or payload.get("thumbnail_text") or ""),
-                                        lettering_prompt=str(variant.get("lettering_prompt") or ""),
-                                    )
+                                existing_payload = dict(st.session_state.get(f"{prefix}_creative_payload") or {})
+                                existing_title = str(existing_payload.get("title") or topic_for_thumbnail).strip()
+                                generated = generate_thumbnail_variants_for_ui(
+                                    read_json("settings.json", {}),
+                                    selected_one,
+                                    topic_for_thumbnail,
+                                    int(quantity if mode == "same_channel" else 1),
+                                    title=existing_title,
+                                    topic_source=_video_topic_source(topic_for_thumbnail, prefix),
                                 )
-                                variant["image_path"] = thumbnail_path
+                                generated = {**existing_payload, **generated}
+                                generated["topic"] = topic_for_thumbnail
+                                generated["title"] = existing_title
+                                generated["title_candidates"] = existing_payload.get("title_candidates", [])
+                                st.session_state[f"{prefix}_creative_payload"] = generated
+                                st.success(f"Thumbnail pronta para {int(quantity if mode == 'same_channel' else 1)} vídeo(s); o título existente foi preservado.")
+                                st.rerun()
+                            except CreativeGenerationError as exc:
+                                st.error(str(exc))
+                    payload = st.session_state.get(f"{prefix}_creative_payload")
+                    if payload:
+                        st.subheader("Thumbnail automática")
+                        st.caption(f"Título preservado: {payload.get('title') or payload.get('topic') or 'Sem título'}")
+                        title_options = [item.get("title", "") for item in payload.get("title_candidates", []) if item.get("title")]
+                        if title_options:
+                            selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_title_choice")
+                            payload["title"] = selected_title
+                            with st.expander(f"Ver {len(title_options)} candidatos de título"):
+                                st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
+                        variants = payload.get("thumbnail_variants", [])
+                        if variants:
+                            labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
+                            selected_variant_label = st.selectbox("Thumbnail escolhida", labels, key=f"{prefix}_thumbnail_choice")
+                            variant_index = labels.index(selected_variant_label)
+                            variant = variants[variant_index]
+                            payload["thumbnail_variant"] = variant
+                            payload["thumbnail_prompt"] = variant.get("image_prompt", "")
+                            payload["thumbnail_text"] = variant.get("overlay_text", "")
+                            st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
+                            st.code(variant.get("image_prompt", ""), language="text")
+                            thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
+                            if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", use_container_width=True):
+                                try:
+                                    thumbnail_path = str(
+                                        generate_thumbnail_image(
+                                            read_json("settings.json", {}),
+                                            variant.get("image_prompt", ""),
+                                            topic=str(payload.get("topic") or ""),
+                                            variant_index=variant_index,
+                                            lettering_text=str(variant.get("overlay_text") or payload.get("thumbnail_text") or ""),
+                                            lettering_prompt=str(variant.get("lettering_prompt") or ""),
+                                        )
+                                    )
+                                    variant["image_path"] = thumbnail_path
+                                    payload["thumbnail_path"] = thumbnail_path
+                                    payload["thumbnail_status"] = "generated"
+                                    st.session_state[f"{prefix}_creative_payload"] = payload
+                                    record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": selected_one.get("name") if selected_one else "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
+                                    st.success("Thumbnail gerada com Nano Banana.")
+                                    st.rerun()
+                                except ThumbnailGenerationError as exc:
+                                    st.error(str(exc))
+                            if thumbnail_path and Path(thumbnail_path).is_file():
+                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
-                                st.session_state[f"{prefix}_creative_payload"] = payload
-                                record_notification("thumbnail_generation_completed", f"Thumbnail gerada: {payload.get('title') or payload.get('topic') or 'Vídeo'}", "A thumbnail foi gerada com sucesso pelo Nano Banana.", metadata={"channel_name": selected_one.get("name") if selected_one else "", "image_path": Path(thumbnail_path).name}, dedupe_key=f"thumbnail:{thumbnail_path}")
-                                st.success("Thumbnail gerada com Nano Banana.")
-                                st.rerun()
-                            except ThumbnailGenerationError as exc:
-                                st.error(str(exc))
-                        if thumbnail_path and Path(thumbnail_path).is_file():
-                            st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
-                            payload["thumbnail_path"] = thumbnail_path
-                            payload["thumbnail_status"] = "generated"
-                        else:
-                            st.info("Escolha a variante e clique em **Gerar imagem da thumbnail com Nano Banana**. A API key é configurada em Configuração API > API Keys.")
-                    st.session_state[f"{prefix}_creative_payload"] = payload
+                            else:
+                                st.info("Escolha a variante e clique em **Gerar imagem da thumbnail com Nano Banana**. A API key é configurada em Configuração API > API Keys.")
+                        st.session_state[f"{prefix}_creative_payload"] = payload
 
             st.session_state[f"{prefix}_generation_settings"] = dict(generation_settings)
             with st.form(f"{prefix}_form"):
-
-                quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel")
                 language = generation_settings["script_language"]
                 fmt = generation_settings["video_format"]
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
@@ -3625,21 +3700,28 @@ def render_automation():
     for channel in channels:
         channel_id = channel["id"]
         with st.container(border=True):
-            cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
-            with cols[0]:
+            header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
+            with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=48)
                 else:
                     st.markdown("### YT")
-            with cols[1]:
+            with header_cols[1]:
                 st.write(f"**{channel.get('name', 'Sem nome')}**")
                 st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+            with header_cols[2]:
+                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
+            with header_cols[3]:
+                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
             blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            default_cols = st.columns(4, gap="small")
+            default_cols = st.columns([1.15, 1.15, 1.5, 1.7, 1.35], gap="small")
             with default_cols[0]:
                 st.markdown("**Idioma Padrão**")
                 st.caption(language_label(channel.get("language") or "pt"))
             with default_cols[1]:
+                st.markdown("**Nicho Padrão**")
+                st.caption(channel_niche_label(channel))
+            with default_cols[2]:
                 automation_blueprint = st.selectbox(
                     "Blueprint Padrão",
                     blueprint_ids,
@@ -3647,9 +3729,6 @@ def render_automation():
                     format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
                     key=f"automation_blueprint_{channel_id}",
                 )
-            with default_cols[2]:
-                st.markdown("**Nicho Padrão**")
-                st.caption(channel_niche_label(channel))
             with default_cols[3]:
                 automation_voice = st.selectbox(
                     "Narrador/Voz Padrão",
@@ -3658,11 +3737,7 @@ def render_automation():
                     format_func=lambda item: item or "Sem voz padrão",
                     key=f"automation_voice_{channel_id}",
                 )
-            with cols[2]:
-                enabled = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
-            with cols[3]:
-                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
-            with cols[4]:
+            with default_cols[4]:
                 if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
