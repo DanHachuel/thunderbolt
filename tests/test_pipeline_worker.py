@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -56,6 +57,52 @@ def test_recover_stale_task_marks_it_failed(tmp_path, monkeypatch):
     assert task["state"] == "failed"
     assert task["failed_stage"] == "video"
     assert "heartbeat" in task["error"]
+
+
+def test_run_task_reuses_prepared_title_and_thumbnail_without_full_creative_generation(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    video_path = tmp_path / "prepared.mp4"
+    video_path.write_bytes(b"mp4")
+    task = {
+        "id": "video_prepared",
+        "state": "to_do",
+        "stage": "script",
+        "progress": 0,
+        "topic": "Tema preparado",
+        "topic_source": "manual",
+        "title": "Título preparado",
+        "thumbnail_variant": {
+            "concept": "Conceito preparado",
+            "image_prompt": "prompt preparado",
+            "overlay_text": "TEMA REAL",
+            "lettering_prompt": "texto grande",
+        },
+        "thumbnail_variants": [{"concept": "Conceito preparado", "image_prompt": "prompt preparado", "overlay_text": "TEMA REAL", "lettering_prompt": "texto grande"}],
+        "generation_settings": {"video_script": "Roteiro preparado", "video_keywords": "alpha, beta"},
+        "channel_id": "channel-1",
+        "language": "pt-BR",
+    }
+    channel = {"id": "channel-1", "name": "Canal teste", "language": "pt-BR", "niche": "Teste"}
+    blueprint = {"id": "blueprint-1", "name": "Blueprint teste"}
+    updates = []
+
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {"youtube_batch_accounts": []})
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: blueprint)
+    monkeypatch.setattr(pipeline_worker, "_update", lambda task_id, **changes: updates.append(changes) or {**task, **changes})
+    monkeypatch.setattr(pipeline_worker, "save_script_document", lambda script: {"path": "prepared-script.md"})
+    monkeypatch.setattr(pipeline_worker, "_save_json_artifact", lambda task_id, name, payload: f"{name}.json")
+    monkeypatch.setattr(pipeline_worker, "generate_thumbnail_image", lambda *args, **kwargs: tmp_path / "prepared.jpg")
+    monkeypatch.setattr(pipeline_worker, "_run_video_helper", lambda value: video_path)
+    monkeypatch.setattr(pipeline_worker, "upload_with_default_route", lambda *args, **kwargs: SimpleNamespace(ok=True, message="", data={"uploaded": True}))
+    monkeypatch.setattr(pipeline_worker, "generate_creative_package", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("não deve regenerar o pacote criativo")))
+
+    result = pipeline_worker._run_task(task)
+
+    assert result["state"] == "done"
+    assert result["title"] == "Título preparado"
+    assert any(update.get("thumbnail_prompt") == "prompt preparado" and update.get("thumbnail_text") == "TEMA REAL" for update in updates)
+    assert any(update.get("stage") == "upload" and update.get("state") == "done" for update in updates)
 
 
 def test_run_once_marks_unexpected_pipeline_error_terminal(tmp_path, monkeypatch):

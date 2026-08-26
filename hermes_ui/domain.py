@@ -135,7 +135,16 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 topic = f"Vídeo para {channel.get('name', 'Canal')}"
             title = str(payload.get("title") or topic).strip()
             artifacts = dict(payload.get("artifacts") or {})
-            thumbnail_path = str(payload.get("thumbnail_path") or "").strip()
+            thumbnail_variants = payload.get("thumbnail_variants") if isinstance(payload.get("thumbnail_variants"), list) else []
+            thumbnail_variant = payload.get("thumbnail_variant") if isinstance(payload.get("thumbnail_variant"), dict) else {}
+            if count > 1 and thumbnail_variants:
+                candidate = thumbnail_variants[index % len(thumbnail_variants)]
+                if isinstance(candidate, dict):
+                    thumbnail_variant = candidate
+            thumbnail_path = str(thumbnail_variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
+            thumbnail_prompt = str(thumbnail_variant.get("image_prompt") or payload.get("thumbnail_prompt") or "").strip()
+            thumbnail_text = str(thumbnail_variant.get("overlay_text") or payload.get("thumbnail_text") or "").strip()
+            thumbnail_status = str(payload.get("thumbnail_status") or ("generated" if thumbnail_path else "not_generated"))
             if thumbnail_path:
                 artifacts.setdefault("thumbnail", thumbnail_path)
             task = {
@@ -161,11 +170,11 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "voice": payload.get("voice") or channel.get("default_voice") or channel.get("voice", ""),
                 "automation_on": bool(channel.get("automation_on", False)),
                 "automation_time": channel.get("automation_time", "00:00"),
-                "thumbnail_variant": payload.get("thumbnail_variant", {}),
-                "thumbnail_variants": payload.get("thumbnail_variants", []),
-                "thumbnail_prompt": payload.get("thumbnail_prompt", ""),
-                "thumbnail_text": payload.get("thumbnail_text", ""),
-                "thumbnail_status": payload.get("thumbnail_status", "not_generated"),
+                "thumbnail_variant": thumbnail_variant,
+                "thumbnail_variants": thumbnail_variants,
+                "thumbnail_prompt": thumbnail_prompt,
+                "thumbnail_text": thumbnail_text,
+                "thumbnail_status": thumbnail_status,
                 "title_candidates": payload.get("title_candidates", []),
                 "ai_generation": payload.get("ai_generation", {}),
                 "stage": "script",
