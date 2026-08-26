@@ -48,6 +48,8 @@ def test_worker_uses_local_clock_and_creates_daily_batch(tmp_path, monkeypatch):
     assert all(task["automation_time"] == "08:30" for task in tasks)
     assert all(task["topic_source"] == "llm" for task in tasks)
     assert all(task["title"] == "Título específico" for task in tasks)
+    assert all(task["thumbnail_variant"] == {} for task in tasks)
+    assert all(task["thumbnail_prompt"] == "" for task in tasks)
 
 
 def test_worker_does_not_duplicate_same_channel_on_same_day(tmp_path, monkeypatch):

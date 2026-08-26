@@ -7,7 +7,8 @@ from typing import Any
 from .notifications import record_notification
 from .storage import append_json, now, read_json, write_json
 
-STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "thumbnail_prompt", "thumbnail", "video", "edit", "upload"]
+STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload"]
+LEGACY_STAGES = {"edit"}
 VALID_STATES = {"to_do", "doing", "blocked", "done", "failed", "cancelled"}
 
 
@@ -176,10 +177,12 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "thumbnail_text": thumbnail_text,
                 "thumbnail_status": thumbnail_status,
                 "title_candidates": payload.get("title_candidates", []),
+                "keywords": payload.get("keywords", options.get("keywords", [])),
                 "ai_generation": payload.get("ai_generation", {}),
                 "stage": "script",
                 "state": "to_do",
                 "progress": 0,
+                "video_ready": bool(artifacts.get("video")),
                 "artifacts": artifacts,
                 "error": None,
                 "created_at": now(),
@@ -266,7 +269,7 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
             if state:
                 task["state"] = state
             if stage:
-                if stage not in STAGES:
+                if stage not in STAGES and stage not in LEGACY_STAGES:
                     raise ValueError(f"Etapa inválida: {stage}")
                 task["stage"] = stage
             if error is not None:

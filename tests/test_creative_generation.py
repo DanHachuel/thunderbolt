@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_topic_for_channel
 
 
 class _Response:
@@ -38,6 +38,23 @@ def test_generate_topic_uses_structured_json(monkeypatch):
     assert result["topic_source"] == "llm"
     assert captured["url"].endswith("/chat/completions")
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
+
+
+def test_generate_title_and_keywords_excludes_thumbnail_fields(monkeypatch):
+    from hermes_ui import creative_generation
+
+    titles = [{"title": f"Título {index}", "formula": "list", "curiosity_score": 2, "specificity_score": 2, "emotional_score": 2} for index in range(20)]
+    response = {"choices": [{"message": {"content": json.dumps({"selected_title": "Título 3", "title_candidates": titles, "keywords": ["história", "civilização"]})}}]}
+    captured = {}
+    monkeypatch.setattr(creative_generation.requests, "post", lambda url, **kwargs: captured.update({"url": url, "kwargs": kwargs}) or _Response(response))
+
+    result = generate_title_and_keywords(_settings(), _channel(), "A cidade que desapareceu", {"id": "bp-history", "name": "História"})
+
+    assert result["title"] == "Título 3"
+    assert len(result["title_candidates"]) == 20
+    assert result["keywords"] == ["história", "civilização"]
+    assert "thumbnail_variants" not in result
+    assert captured["url"].endswith("/chat/completions")
 
 
 def test_generate_creative_requires_twenty_titles_and_three_variants(monkeypatch):

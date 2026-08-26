@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.44
+> **Versão deste manual:** 0.3.45
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.44 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.45 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.44 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.45 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -114,7 +114,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.44 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.45 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -425,9 +425,9 @@ Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**,
 
 Ao clicar em **Start** no **Backlog Vídeos**, a tarefa passa para `doing` e é processada pelo worker de pipeline iniciado pelo launcher normal. O worker grava o estado em `storage/state/pipeline_worker.json` e actualiza `updated_at`, a etapa e a percentagem em `storage/state/tasks.json`. O painel do Backlog consulta esse estado automaticamente a cada cinco segundos e mostra o worker, a etapa corrente, a percentagem, a idade da actualização e a mensagem de erro quando existe.
 
-A percentagem representa o avanço conhecido do pipeline: tema, roteiro, título/keywords, thumbnail, vídeo e upload. Durante a chamada longa ao MoneyPrinterTurbo, a UI mantém um heartbeat a cada cinco segundos e avança apenas dentro da faixa reservada à geração do vídeo; não apresenta 100% antes de existir um MP4 válido. O worker passa explicitamente a **Pasta do motor de vídeo** configurada na UI ao helper, por isso o clone usado, os logs e o manifesto pertencem à instalação seleccionada pelo utilizador.
+A percentagem representa o avanço conhecido do pipeline: tema, roteiro, título/keywords, vídeo, prompt da thumbnail, thumbnail e upload. Durante a chamada longa ao MoneyPrinterTurbo, a UI mantém um heartbeat a cada cinco segundos e avança apenas dentro da faixa reservada à geração do vídeo; quando o MP4 é devolvido, o artefacto é persistido antes da geração de imagem. O worker passa explicitamente a **Pasta do motor de vídeo** configurada na UI ao helper, por isso o clone usado, os logs e o manifesto pertencem à instalação seleccionada pelo utilizador.
 
-Uma execução da etapa Vídeo tem limite de 20 minutos. Se o processo externo terminar com erro, exceder o limite, devolver um resultado inválido ou ocorrer uma excepção inesperada, a tarefa é marcada como `failed`, com a etapa em `failed_stage`. As últimas linhas devolvidas pelo helper, sem as credenciais configuradas, são guardadas num artefacto `video-diagnostics` e as referências `video_log`/`video_result` ficam associadas à tarefa. Se o utilizador clicar em **Stop**, a tarefa passa para `blocked`, o subprocesso é terminado cooperativamente e o worker não substitui esse estado por `failed`.
+Uma execução da etapa Vídeo tem limite de 20 minutos. Depois de um MP4 válido, a tarefa fica marcada com `video_ready` e o artefacto é guardado antes da chamada de imagem. Se a quota do provider de thumbnail for excedida, a tarefa pode ser marcada como `failed` na etapa `thumbnail`, mas o vídeo mantém-se disponível em `artifacts.video` para descarga no Backlog, utilização no Upload ou publicação directa depois de carregar uma thumbnail manual. Se o processo externo de vídeo terminar com erro, exceder o limite, devolver um resultado inválido ou ocorrer uma excepção inesperada, a tarefa é marcada como `failed`, com a etapa em `failed_stage`. As últimas linhas devolvidas pelo helper, sem as credenciais configuradas, são guardadas num artefacto `video-diagnostics` e as referências `video_log`/`video_result` ficam associadas à tarefa. Se o utilizador clicar em **Stop**, a tarefa passa para `blocked`, o subprocesso é terminado cooperativamente e o worker não substitui esse estado por `failed`.
 
 Se o launcher ou o worker for encerrado abruptamente, uma tarefa `doing` sem actualização durante 25 minutos é recuperada e marcada como `failed`, evitando estados indefinidos eternos. Para processar novas tarefas, deixe a aplicação iniciada com o comando normal; o painel avisa quando não existe heartbeat recente do worker.
 
@@ -473,8 +473,8 @@ Após iniciar a aplicação, valide o seguinte percurso:
 4. **Canais:** em **Importar do YouTube**, use o método **Página pública — sem API Key** com um URL `/channel/UC...`, um handle ou uma subpágina `/videos`; o parser resolve o ID, consulta a página pública e tenta o RSS quando necessário. Confirme que o resultado abre o formulário de revisão sem Data API Key. Se o canal não existir ou não fornecer metadados, confirme a mensagem clara e que o formulário de uma pesquisa anterior desaparece. A Data API é opcional e fica separada; em **Cadastro manual**, preencha os dados sem qualquer consulta externa.
 5. **Niche Finder Kaggle:** abra o menu expansível **Niche Finder**, seleccione **Niche Finder Kaggle**, defina os parâmetros dentro do conteúdo principal e confirme que não há preparação automática. Antes do clique, não deve existir download de dataset nem análise. Clique em **Analisar Nichos** para iniciar a preparação dos dados e a análise; depois altere país, engagement, datas e tags e clique novamente para aplicar os novos parâmetros. Em seguida, abra a alternativa independente **Niche Finder Apify**, configure as palavras-chave e filtros na própria aba e confirme que nada é executado antes de clicar em **Pesquisar no Apify**.
 6. **Pipeline > Criação de Vídeos:** teste primeiro o modo **Canal específico** e depois os modos de lote. O campo **Tópico ou briefing** pode ser escrito manualmente ou preenchido pelo botão **Gerar tópico/briefing com IA**; a geração só ocorre após o clique e usa o provider configurado em **Configuração API > API Keys > Serviços e modelos**.
-7. **Criação de Vídeos:** depois de seleccionar o canal, confirme que o painel entre **Canal** e **Estilo wide** mostra o Blueprint, a voz e o idioma, ou **SEM BLUEPRINT CONFIGURADO**. Confirme as quatro áreas fechadas por defeito: **Configurações de vídeo**, **Configurações de áudio**, **Configurações de legendas** e **Gerar Thumbnail com IA**. Depois de existir um tópico e um título inicial, clique em **Gerar Thumbnail com IA**, confirme que apenas o prompt/briefing de thumbnail é criado e que o título permanece igual. Em lote no mesmo canal, confirme uma variante independente para cada vídeo; escolha uma variante, gere a imagem se houver provider configurado e verifique o prompt guardado. Na subaba **Vídeos**, verifique o estado `to_do`, o título escolhido, o estado da thumbnail e os botões **Iniciar** e **Parar**. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
-8. **Lote geral:** confirme que não existe **Canais incluídos** nem selector parcial. A UI deve listar todos os canais cadastrados e criar exactamente uma tarefa por canal, com briefing, título, thumbnail e Blueprint próprios. Use **Gerar tópicos individuais para todos os canais** e depois **Gerar Thumbnail com IA para todos os vídeos**; confirme que a segunda acção não regenera títulos.
+7. **Criação de Vídeos:** depois de seleccionar o canal, confirme que o painel entre **Canal** e **Estilo wide** mostra o Blueprint, a voz e o idioma, ou **SEM BLUEPRINT CONFIGURADO**. Confirme as quatro áreas fechadas por defeito: **Configurações de vídeo**, **Configurações de áudio**, **Configurações de legendas** e **Gerar Thumbnail com IA**. A execução do worker deve seguir **Tema → Roteiro → Título → Keywords → Vídeo → Prompt da thumbnail em JSON → Thumbnail → Upload**. Inicie a tarefa e confirme no Backlog que o MP4 é guardado e descarregável antes da etapa de imagem; se a quota da thumbnail falhar, a tarefa deve conservar `artifacts.video` e `video_ready`. Depois, carregue manualmente a imagem em **Thumbnails** ou gere-a quando houver provider disponível. Em lote no mesmo canal, confirme uma variante independente por vídeo. Confirme também que **Criação de Músicas** mostra o mesmo fluxo com título próprio.
+8. **Lote geral:** confirme que não existe **Canais incluídos** nem selector parcial. A UI deve listar todos os canais cadastrados e criar exactamente uma tarefa por canal, com briefing, título e Blueprint próprios; o prompt e a imagem da thumbnail podem ser preparados depois de o vídeo existir. Use **Gerar tópicos individuais para todos os canais** e, quando desejado, **Gerar Thumbnail com IA para todos os vídeos**; confirme que a segunda acção não regenera títulos.
 9. **Upload:** configure o OAuth Client ID e Secret, autorize primeiro o **youtube-automation-agent** na própria aba, confirme o estado **pronto para publicar**, preencha título/descrição/tags e publique um MP4 real. O botão **Autorizar fallback OAuth** existe apenas para redundância; a Data API Key, se configurada, é exclusivamente para consultas oficiais públicas e nunca substitui OAuth.
 10. **Edição > Limpador de Metadados:** suba um vídeo de terceiro, preencha título, preview, links, timestamps e tags, aplique a limpeza e descarregue a cópia limpa e o manifesto JSON. O original fica preservado e vídeos das páginas de criação não são aceites nesta área.
 11. **Configurações > Configuração API:** confirme que as credenciais ficam locais e não aparecem no Git. Em **API Keys > Fontes de materiais**, seleccione Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou Ficheiros locais. Para uma fonte com API, preencha a primeira chave e use **Adicionar outra chave** para criar quantas linhas forem necessárias; clique em **Guardar fonte e chaves**. Cada fonte mantém a sua própria lista, com deduplicação e rotação interna. Não são pedidos endpoint, proxy, qualidade, codec, FFmpeg, Whisper, directório ou filtros nesta subaba. Na secção **Contas Google/YouTube — canais em lote**, adicione cada conta com o seu e-mail/Gmail, OAuth Client ID, OAuth Client Secret e `sessionInfo` próprios; use **Repetir campos para nova conta** para preparar contas adicionais e o ícone **Apagar conta** para eliminar individualmente a conta, tokens, documento JSON e associações de canais.
@@ -522,7 +522,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.44 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.45 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

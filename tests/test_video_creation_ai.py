@@ -62,11 +62,18 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('**Voz:** {voice} · **Idioma:** {video_language}', MAIN_SOURCE)
         self.assertIn('"language": language', MAIN_SOURCE)
 
-    def test_pipeline_uses_prepared_title_and_thumbnail_without_regenerating_creative_package(self):
-        self.assertIn('prepared_thumbnail = bool(str(existing_variant.get("image_prompt") or "").strip())', PIPELINE_SOURCE)
-        self.assertIn('if provided_title and prepared_thumbnail:', PIPELINE_SOURCE)
-        self.assertIn('Do not call', PIPELINE_SOURCE)
-        self.assertIn('creative = generate_creative_package(', PIPELINE_SOURCE)
+    def test_pipeline_generates_video_before_thumbnail_prompt_and_image(self):
+        video_position = PIPELINE_SOURCE.index('_update(task_id, stage="video", state="doing", progress=52')
+        prompt_position = PIPELINE_SOURCE.index('_update(task_id, stage="thumbnail_prompt", state="doing", progress=82')
+        thumbnail_position = PIPELINE_SOURCE.index('_update(task_id, stage="thumbnail", state="doing", progress=86')
+        upload_position = PIPELINE_SOURCE.index('_update(task_id, stage="upload", state="doing", progress=94')
+        video_artifact_position = PIPELINE_SOURCE.index('artifacts["video"] = str(video_path)')
+        self.assertLess(video_position, prompt_position)
+        self.assertLess(prompt_position, thumbnail_position)
+        self.assertLess(thumbnail_position, upload_position)
+        self.assertLess(video_position, video_artifact_position)
+        self.assertIn('video_ready=True', PIPELINE_SOURCE)
+        self.assertIn('o vídeo já está disponível em {video_path}', PIPELINE_SOURCE)
 
     def test_pipeline_uses_reviewed_script_and_keywords_when_present(self):
         self.assertIn('provided_script = str(generation_settings.get("video_script") or "").strip()', PIPELINE_SOURCE)
