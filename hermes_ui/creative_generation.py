@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import re
 from functools import lru_cache
+
+import requests
 from pathlib import Path
 from typing import Any
 
-import requests
-
 from .llm_providers import active_llm_card, provider_definition
+from .provider_routing import ProviderRoutingError, route_llm_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,31 +87,22 @@ def _json_content(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _chat_json(settings: dict[str, Any], system_prompt: str, user_prompt: str) -> dict[str, Any]:
-    _provider, api_key, base_url, model = _provider_config(settings)
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "response_format": {"type": "json_object"},
-    }
-    endpoint = f"{base_url}/chat/completions"
+    # Keep the actionable legacy validation for an entirely unconfigured setup;
+    # the router still skips incomplete cards when a configured fallback exists.
+    cards = settings.get("llm_provider_cards") if isinstance(settings, dict) else None
+    if not isinstance(cards, list) or not any(
+        isinstance(card, dict)
+        and bool(card.get("enabled", True))
+        and str(card.get("api_key") or "").strip()
+        and str(card.get("model") or card.get("model_name") or "").strip()
+        for card in cards
+    ):
+        _provider_config(settings)
     try:
-        response = requests.post(endpoint, headers=headers, json=body, timeout=120)
-    except requests.RequestException as exc:
-        raise CreativeGenerationError(f"Não foi possível contactar o provider LLM: {exc}") from exc
-    if response.status_code >= 400:
-        detail = response.text[:500].replace(api_key, "[REDACTED]") if api_key else response.text[:500]
-        raise CreativeGenerationError(f"O provider LLM devolveu HTTP {response.status_code}: {detail}")
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise CreativeGenerationError("O provider LLM devolveu uma resposta que não é JSON.") from exc
-    return _json_content(payload)
+        routed = route_llm_json(settings, system_prompt, user_prompt)
+    except ProviderRoutingError as exc:
+        raise CreativeGenerationError(str(exc)) from exc
+    return _json_content(routed.payload)
 
 
 def channel_context(channel: dict[str, Any], blueprint: dict[str, Any] | None = None) -> dict[str, Any]:

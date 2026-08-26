@@ -17,6 +17,8 @@ from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
+from hermes_ui.media_generation import MediaGenerationError, generate_image_from_pool, generate_video_from_pool
+from hermes_ui.media_providers import media_cards_for_pool
 from hermes_ui.thumbnail_generation import generate_thumbnail_image
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
@@ -41,6 +43,36 @@ def _now() -> str:
 def _settings() -> dict[str, Any]:
     value = read_json("settings.json", {})
     return value if isinstance(value, dict) else {}
+
+
+def _generate_pipeline_thumbnail(
+    settings: dict[str, Any],
+    prompt: str,
+    *,
+    topic: str,
+    variant_index: int = 0,
+    lettering_text: str = "",
+    lettering_prompt: str = "",
+) -> Path:
+    """Use the image pool while keeping the legacy single-Nano call seam."""
+    cards = media_cards_for_pool(settings, "image")
+    if len(cards) == 1 and str(cards[0].get("provider") or "") == "nano_banana":
+        return generate_thumbnail_image(
+            settings,
+            prompt,
+            topic=topic,
+            variant_index=variant_index,
+            lettering_text=lettering_text,
+            lettering_prompt=lettering_prompt,
+        )
+    return generate_image_from_pool(
+        settings,
+        prompt,
+        topic=topic,
+        variant_index=variant_index,
+        lettering_text=lettering_text,
+        lettering_prompt=lettering_prompt,
+    )
 
 
 def _lock_path() -> Path:
@@ -521,7 +553,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     artifacts = {**artifacts, "thumbnail_prompt_json": prompt_artifact}
     _update(task_id, stage="thumbnail_prompt", state="doing", progress=52, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
     _update(task_id, stage="thumbnail", state="doing", progress=56, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
-    thumbnail_path = generate_thumbnail_image(
+    thumbnail_path = _generate_pipeline_thumbnail(
         settings,
         str(variant.get("image_prompt") or ""),
         topic=topic,
@@ -533,7 +565,15 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=62)
 
     _update(task_id, stage="video", state="doing", progress=68)
-    video_path = _run_video_helper({**task, "topic": topic})
+    video_cards = media_cards_for_pool(settings, "video")
+    if bool(settings.get("media_video_pool_enabled")) and video_cards:
+        try:
+            video_prompt = f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}"
+            video_path = generate_video_from_pool(settings, video_prompt)
+        except MediaGenerationError as exc:
+            raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
+    else:
+        video_path = _run_video_helper({**task, "topic": topic})
     artifacts["video"] = str(video_path)
     _update(task_id, artifacts=artifacts, progress=80)
 

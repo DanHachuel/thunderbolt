@@ -39,12 +39,13 @@ from hermes_ui.mcp import detect_local_service, install_skill_locally, load_inte
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
+from hermes_ui.media_providers import MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
-from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
+from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
@@ -5083,6 +5084,139 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
             st.rerun()
 
 
+def _media_card_config_status(card: dict[str, Any]) -> tuple[str, str]:
+    definition = media_provider_definition(card.get("provider"))
+    if definition.local:
+        if not str(card.get("base_url") or "").strip():
+            return "missing", "Endpoint local em falta"
+        return "local", "Local / sem API key"
+    if definition.requires_api_key and not str(card.get("api_key") or "").strip():
+        return "missing", "Missing key"
+    if not str(card.get("base_url") or "").strip():
+        return "missing", "Missing Base URL"
+    if not str(card.get("model") or "").strip() and card.get("supports_image") and card.get("provider") not in {"cloudflare_workers_ai"}:
+        return "missing", "Missing model"
+    return "ready", "Configured"
+
+
+def _persist_media_cards(settings: dict[str, Any], cards: list[dict[str, Any]], image_active_id: str = "", video_active_id: str = "") -> dict[str, Any]:
+    updated = apply_media_provider_cards_to_settings(settings, cards, image_active_id, video_active_id)
+    write_json("settings.json", updated)
+    settings.update(updated)
+    return updated
+
+
+def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int, *, embedded: bool = False) -> None:
+    card = normalize_media_card(cards[index], index)
+    cards[index] = card
+    card_id = str(card["id"])
+    definition = media_provider_definition(card.get("provider"))
+    with st.container(border=True):
+        header_cols = st.columns([3.2, 1.2])
+        with header_cols[0]:
+            st.subheader(definition.label)
+            if definition.description:
+                st.caption(definition.description)
+        with header_cols[1]:
+            status_kind, status_label = _media_card_config_status(card)
+            _api_status_badge(status_label, status_kind)
+        card_form = nullcontext() if embedded else st.form(f"media_card_form_{card_id}")
+        with card_form:
+            key_col, model_col = st.columns(2)
+            with key_col:
+                api_key = str(card.get("api_key") or "")
+                if definition.requires_api_key:
+                    api_key = st.text_input("API key", value=api_key, type="password", key=f"media_card_{card_id}_api_key")
+                else:
+                    st.caption("Este provider não exige API key.")
+                    api_key = ""
+            with model_col:
+                model = st.text_input("Modelo", value=str(card.get("model") or ""), help="ID do modelo ou rota usada pelo provider.", key=f"media_card_{card_id}_model")
+            base_url = st.text_input("Base URL", value=str(card.get("base_url") or definition.default_base_url), key=f"media_card_{card_id}_base_url")
+            extra_values: dict[str, str] = {}
+            if definition.extra_fields:
+                extra_cols = st.columns(len(definition.extra_fields))
+                for extra_col, field_name in zip(extra_cols, definition.extra_fields):
+                    with extra_col:
+                        extra_values[field_name] = st.text_input(field_name.replace("_", " ").title(), value=str(card.get(field_name) or ""), key=f"media_card_{card_id}_{field_name}")
+            status_cols = st.columns(4)
+            with status_cols[0]:
+                enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"media_card_{card_id}_enabled")
+            with status_cols[1]:
+                supports_image = st.checkbox("Pool Imagem", value=bool(card.get("supports_image", definition.supports_image)), key=f"media_card_{card_id}_image")
+            with status_cols[2]:
+                supports_video = st.checkbox("Pool Vídeo", value=bool(card.get("supports_video", definition.supports_video)), key=f"media_card_{card_id}_video")
+            with status_cols[3]:
+                priority = st.number_input("Prioridade", min_value=0, max_value=999, value=int(card.get("priority", index)), step=1, key=f"media_card_{card_id}_priority")
+            action_cols = st.columns(3)
+            with action_cols[0]:
+                test_clicked = st.form_submit_button("Testar Chamada API", use_container_width=True, key=f"media_card_{card_id}_test")
+            with action_cols[1]:
+                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"media_card_{card_id}_save")
+            with action_cols[2]:
+                remove_clicked = st.form_submit_button("Remover provider", use_container_width=True, key=f"media_card_{card_id}_remove")
+        edited = dict(card)
+        edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "supports_image": bool(supports_image), "supports_video": bool(supports_video), "priority": int(priority), **extra_values})
+        cards[index] = edited
+        if test_clicked:
+            result = test_media_provider_card(edited)
+            edited["test_result"] = stamp_test_result(result)
+            _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
+        elif save_clicked:
+            _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
+            st.success("Cartão de imagem/vídeo guardado.")
+            st.rerun()
+        elif remove_clicked:
+            remaining = [item for item in cards if str(item.get("id")) != card_id]
+            _persist_media_cards(settings, remaining, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
+            st.success("Provider de imagem/vídeo removido.")
+            st.rerun()
+        saved_test = edited.get("test_result") or card.get("test_result")
+        if isinstance(saved_test, dict) and saved_test.get("message"):
+            if saved_test.get("status") == "success":
+                st.success("Último teste: API Key OK")
+            else:
+                st.error(f"Último teste: {saved_test['message']}")
+
+
+def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = False) -> None:
+    migrated, changed = ensure_media_provider_cards(settings)
+    cards = [dict(item) for item in migrated.get(MEDIA_CARDS_KEY, [])]
+    if changed:
+        settings.update(migrated)
+        write_json("settings.json", settings)
+    with st.expander("Imagem e Video", expanded=False):
+        st.caption("Configure providers de imagem e vídeo em cartões independentes. O router usa apenas o pool correspondente e faz failover entre providers activos.")
+        image_cards = [card for card in cards if card.get("supports_image")]
+        video_cards = [card for card in cards if card.get("supports_video")]
+        selector_cols = st.columns(3)
+        image_options = [""] + [str(card.get("id")) for card in image_cards]
+        video_options = [""] + [str(card.get("id")) for card in video_cards]
+        with selector_cols[0]:
+            image_active_id = st.selectbox("Provider principal de imagem", image_options, index=image_options.index(str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or "")) if str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or "") in image_options else 0, format_func=lambda value: "Automático / primeiro activo" if not value else next((media_provider_definition(card.get("provider")).label for card in image_cards if str(card.get("id")) == value), value), key="media_image_active_selector")
+        with selector_cols[1]:
+            video_active_id = st.selectbox("Provider principal de vídeo", video_options, index=video_options.index(str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "")) if str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "") in video_options else 0, format_func=lambda value: "Não usar pool externo" if not value else next((media_provider_definition(card.get("provider")).label for card in video_cards if str(card.get("id")) == value), value), key="media_video_active_selector")
+        with selector_cols[2]:
+            video_pool_enabled = st.checkbox("Usar pool de vídeo externo", value=bool(settings.get("media_video_pool_enabled", False)), key="media_video_pool_enabled_ui")
+        if st.button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection") if not embedded else st.form_submit_button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection"):
+            settings["media_video_pool_enabled"] = bool(video_pool_enabled)
+            _persist_media_cards(settings, cards, image_active_id, video_active_id)
+            st.success("Selecção dos pools guardada.")
+            st.rerun()
+        for index in range(len(cards)):
+            _render_media_provider_card(settings, cards, index, embedded=embedded)
+        st.divider()
+        st.markdown("**Adicionar provider de imagem/vídeo**")
+        provider_codes = [item["code"] for item in media_provider_catalog()]
+        provider_to_add = st.selectbox("Provider de media", provider_codes, format_func=lambda value: media_provider_definition(value).label, key="media_new_provider_choice")
+        add_clicked = st.form_submit_button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card") if embedded else st.button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card")
+        if add_clicked:
+            cards.append(new_media_card(provider_to_add, card_id=f"media-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
+            _persist_media_cards(settings, cards, image_active_id, video_active_id)
+            st.success("Novo provider de imagem/vídeo adicionado.")
+            st.rerun()
+
+
 def render_settings():
     st.title("Configuração API")
     st.caption("Configuração das APIs, providers, serviços e ferramentas técnicas usados pelo Thunderbolt. As credenciais ficam no storage local e não são enviadas para o GitHub.")
@@ -5143,23 +5277,18 @@ def render_settings():
 
                 render_llm_provider_cards(settings, embedded=True)
 
-                with st.expander("Nano Banana — geração de thumbnails", expanded=False):
-                    st.caption("A Nano Banana gera a imagem final das thumbnails a partir da variante escolhida. A chave é guardada apenas no storage local e é distinta da chave do Gemini usado como LLM textual.")
-                    nano_cols = st.columns(2)
-                    with nano_cols[0]:
-                        gemini_image_api_key = text_setting("Nano Banana API key", "gemini_image_api_key", secret=True, help_text="Chave criada no Google AI Studio para a API Gemini. Nunca é incluída no código, logs ou pacote.")
-                        gemini_image_model = st.selectbox("Modelo Nano Banana", ["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"], index=["gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"].index(str(settings.get("gemini_image_model") or "gemini-3.1-flash-image")) if str(settings.get("gemini_image_model") or "gemini-3.1-flash-image") in {"gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"} else 0)
-                    with nano_cols[1]:
-                        gemini_image_aspect_ratio = st.selectbox("Proporção da thumbnail", ["16:9", "9:16", "1:1", "4:5"], index=["16:9", "9:16", "1:1", "4:5"].index(str(settings.get("gemini_image_aspect_ratio") or "16:9")) if str(settings.get("gemini_image_aspect_ratio") or "16:9") in {"16:9", "9:16", "1:1", "4:5"} else 0)
-                        gemini_image_size = st.selectbox("Tamanho da imagem", ["1K", "2K", "4K"], index=["1K", "2K", "4K"].index(str(settings.get("gemini_image_size") or "1K")) if str(settings.get("gemini_image_size") or "1K") in {"1K", "2K", "4K"} else 0)
-                    _render_credential_status(gemini_image_api_key)
-                    _render_api_test_control(
-                        settings,
-                        "nano_banana",
-                        lambda: test_nano_banana_credentials(gemini_image_api_key, gemini_image_model),
-                        widget_key="api_test_nano_banana",
-                    )
+                with st.container(border=True):
+                    st.markdown("### Limite LLM NVIDIA NIM")
+                    st.caption("Quando ligado, limita apenas cartões cujo endpoint é integrate.api.nvidia.com a 40 pedidos por janela de 60 segundos, partilhados entre UI, pipeline e automações.")
+                    rpm_cols = st.columns(3)
+                    with rpm_cols[0]:
+                        llm_rpm_limit_enabled = st.checkbox("Activar limitador NVIDIA NIM — 40 RPM", value=bool(settings.get("llm_rpm_limit_enabled", False)), key="settings_llm_rpm_limit_enabled")
+                    with rpm_cols[1]:
+                        llm_rpm_limit = st.number_input("Pedidos por janela", min_value=1, max_value=1000, value=int(settings.get("llm_rpm_limit", 40)), step=1, key="settings_llm_rpm_limit")
+                    with rpm_cols[2]:
+                        llm_rpm_window_seconds = st.number_input("Janela (segundos)", min_value=1, max_value=3600, value=int(settings.get("llm_rpm_window_seconds", 60)), step=1, key="settings_llm_rpm_window_seconds")
 
+                render_media_provider_cards(settings, embedded=True)
 
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
                     cols = st.columns(2)
@@ -5292,7 +5421,7 @@ def render_settings():
                         "moneyprinter_path": moneyprinter_path,
                         "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
                         "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
-                        "gemini_image_api_key": gemini_image_api_key, "gemini_image_model": gemini_image_model, "gemini_image_aspect_ratio": gemini_image_aspect_ratio, "gemini_image_size": gemini_image_size,
+                        "llm_rpm_limit_enabled": bool(llm_rpm_limit_enabled), "llm_rpm_limit": int(llm_rpm_limit), "llm_rpm_window_seconds": int(llm_rpm_window_seconds),
                         "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
                         "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
                         "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,

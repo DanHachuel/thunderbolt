@@ -13,7 +13,7 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         labels = [
             "Niche Finder — Kaggle",
             "Niche Finder — Apify",
-            "Nano Banana — geração de thumbnails",
+            "Imagem e Video",
             "LLM — providers e modelos",
             "Voz, TTS e música — Azure Speech, restantes serviços e Suno",
             "TikTok for Developers — Client ID e Client Secret",
@@ -27,12 +27,15 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('with st.form("settings_form"):', MAIN_SOURCE)
         self.assertIn('st.form_submit_button("Guardar configurações do Thunderbolt"', MAIN_SOURCE)
 
-    def test_llm_section_is_in_main_list_between_apify_and_nano_banana(self):
+    def test_llm_and_media_sections_are_in_main_list_after_apify(self):
         llm_position = MAIN_SOURCE.index('render_llm_provider_cards(settings, embedded=True)')
         apify_position = MAIN_SOURCE.index('with st.expander("Niche Finder — Apify", expanded=False)')
-        nano_position = MAIN_SOURCE.index('with st.expander("Nano Banana — geração de thumbnails", expanded=False)')
+        settings_position = MAIN_SOURCE.index('def render_settings():')
+        media_position = MAIN_SOURCE.index('render_media_provider_cards(settings, embedded=True)', settings_position)
         self.assertLess(apify_position, llm_position)
-        self.assertLess(llm_position, nano_position)
+        self.assertLess(llm_position, media_position)
+        self.assertIn('with st.expander("Imagem e Video", expanded=False)', MAIN_SOURCE)
+        self.assertNotIn('Nano Banana — geração de thumbnails', MAIN_SOURCE)
         self.assertNotIn('Niche Finder — execução remota no Kaggle', MAIN_SOURCE)
         self.assertNotIn('Niche Finder — execução através da Apify', MAIN_SOURCE)
 
@@ -78,7 +81,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         expected_controls = (
             'widget_key="api_test_kaggle"',
             'widget_key="api_test_apify"',
-            'widget_key="api_test_nano_banana"',
+            'def render_media_provider_cards(',
+            'test_media_provider_card(edited)',
             'widget_key="api_test_voice_azure"',
             'widget_key="api_test_voice_siliconflow"',
             'widget_key="api_test_voice_minimax"',
@@ -93,6 +97,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         for control in expected_controls:
             self.assertIn(control, MAIN_SOURCE)
         self.assertIn('if st.form_submit_button("Testar chamada API"', MAIN_SOURCE)
+        self.assertIn('st.form_submit_button("Testar Chamada API"', MAIN_SOURCE)
+        self.assertIn('test_media_provider_card(edited)', MAIN_SOURCE)
         self.assertIn('settings["api_test_results"] = stored', MAIN_SOURCE)
         self.assertNotIn('widget_key="api_test_llm"', MAIN_SOURCE)
 
@@ -124,6 +130,7 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         for language in LANGUAGE_CODES:
             self.assertIn("Niche Finder — Kaggle", UI_TRANSLATIONS[language])
             self.assertIn("Niche Finder — Apify", UI_TRANSLATIONS[language])
+            self.assertIn("Imagem e Video", UI_TRANSLATIONS[language])
 
     def test_api_test_feedback_has_all_language_translations(self):
         labels = (

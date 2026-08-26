@@ -94,6 +94,39 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result["status"], "unsupported")
         get.assert_not_called()
 
+    def test_media_provider_diagnostics_are_read_only_and_provider_aware(self):
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "huggingface",
+                "api_key": "hf-secret",
+                "model": "black-forest-labs/FLUX.1-dev",
+                "base_url": "https://router.huggingface.co/v1",
+            })
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "https://router.huggingface.co/v1/models")
+        self.assertEqual(get.call_args.kwargs["headers"], {"Authorization": "Bearer hf-secret"})
+        self.assertNotIn("hf-secret", str(result))
+
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "inferenceport",
+                "base_url": "http://localhost:8080/v1",
+                "model": "flux",
+            })
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "http://localhost:8080/v1/models")
+
+    def test_cloudflare_media_diagnostic_requires_account_id_without_network(self):
+        with patch.object(api_key_tests.requests, "get") as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "cloudflare_workers_ai",
+                "api_key": "token",
+                "base_url": "https://api.cloudflare.com/client/v4",
+                "model": "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+            })
+        self.assertEqual(result["status"], "missing")
+        get.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
