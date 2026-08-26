@@ -9,7 +9,7 @@ THEME_CONFIG = (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
 
 def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semantics():
     assert "[theme]" in THEME_CONFIG
-    assert 'base = "dark"' in THEME_CONFIG
+    assert "[theme.dark]" in THEME_CONFIG
     assert 'primaryColor = "#35A7FF"' in THEME_CONFIG
     assert 'backgroundColor = "#0B1118"' in THEME_CONFIG
     assert 'secondaryBackgroundColor = "#121B26"' in THEME_CONFIG
@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.3.36"' in PACKAGE_SOURCE
+    assert '"version": "0.3.37"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 

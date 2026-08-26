@@ -12,6 +12,7 @@ A primeira versão implementa a camada UI independente com:
 |---|---|
 | Início | Resumo de canais, tarefas, backlog, execução e falhas, com as filas do Pipeline inline |
 | Pipeline Vídeos | Menu expansível com Criação de Vídeos, Backlog Vídeos, Roteiros, Thumbnails e Upload |
+| Worker de vídeo | Heartbeat persistido, barra de progresso por etapas, timeout de 20 minutos, recuperação de tarefas abandonadas e diagnóstico bounded do helper MoneyPrinterTurbo |
 | Pipeline Música | Menu expansível com Criação de Músicas e Upload Música |
 | Blueprints Youtube | Leitura da pasta `storage/blueprints/`, upload/validação de JSON e criação a partir de link YouTube |
 | Brandings | Subaba própria dentro de Blueprints, upload/listagem de Brandings e criação conjunta com Blueprint |
@@ -66,9 +67,9 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 ## Temas claro e escuro
 
-A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` define **Dark** como base inicial e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
+A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.36
+## Navegação da UI 0.3.37
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
