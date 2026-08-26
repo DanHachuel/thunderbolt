@@ -96,6 +96,11 @@ DEFAULTS: dict[str, Any] = {
         "youtube_client_secret": "",
         "youtube_batch_accounts": [],
         "youtube_batch_selected_account_id": "",
+        "telegram_enabled": False,
+        "telegram_bot_token": "",
+        "telegram_chat_id": "",
+        "telegram_proxy_url": "",
+        "telegram_timeout_seconds": 15,
         "notification_preferences": {
             "video_completed": True,
             "music_completed": True,

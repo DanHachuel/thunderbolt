@@ -42,7 +42,7 @@ from hermes_ui.music import list_music_files, materialize_suno_audio, request_su
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
-from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
+from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
@@ -4955,93 +4955,166 @@ def render_settings():
             st.warning("A amostra de voz anterior não é um ficheiro de áudio legível e foi removida do estado local. Teste a voz novamente.")
 
 
+def _render_telegram_notification_settings() -> None:
+    """Render Telegram outbound notification settings and a safe diagnostics action."""
+    settings = read_json("settings.json", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    st.subheader("Telegram Gateway")
+    st.caption("Envie para o Telegram as mesmas notificações que aparecem na subaba Geral. A integração usa a Bot API oficial e não recebe mensagens nem inicia polling.")
+    with st.form("telegram_notifications_form"):
+        telegram_enabled = st.checkbox(
+            "Activar notificações Telegram",
+            value=bool(settings.get("telegram_enabled", False)),
+            help="Quando activo, cada nova notificação permitida em Geral é enviada para o Chat ID configurado.",
+        )
+        telegram_cols = st.columns(2)
+        with telegram_cols[0]:
+            telegram_bot_token = st.text_input(
+                "Telegram Bot Token",
+                value=str(settings.get("telegram_bot_token") or ""),
+                type="password",
+                help="Token criado pelo BotFather. Fica guardado apenas no storage local.",
+            )
+            _render_credential_status(telegram_bot_token)
+        with telegram_cols[1]:
+            telegram_chat_id = st.text_input(
+                "Telegram Chat ID",
+                value=str(settings.get("telegram_chat_id") or ""),
+                help="ID do utilizador, grupo ou canal que receberá as notificações; também pode ser um username aceite pelo Telegram.",
+            )
+        telegram_proxy_url = st.text_input(
+            "Proxy Telegram (opcional)",
+            value=str(settings.get("telegram_proxy_url") or ""),
+            help="Proxy HTTP/HTTPS/SOCKS suportado pelo ambiente, quando o acesso directo ao Telegram não estiver disponível.",
+        )
+        telegram_timeout_seconds = st.number_input(
+            "Timeout de envio (segundos)",
+            min_value=5,
+            max_value=120,
+            value=int(settings.get("telegram_timeout_seconds", 15) or 15),
+            step=5,
+        )
+        st.caption("O teste consulta getMe para validar o Bot Token e não envia uma mensagem de teste.")
+        _render_api_test_control(
+            settings,
+            "telegram",
+            lambda: test_telegram_credentials(telegram_bot_token, telegram_chat_id),
+            widget_key="api_test_telegram",
+        )
+        if st.form_submit_button("Guardar configuração Telegram", type="primary", use_container_width=True):
+            settings.update({
+                "telegram_enabled": bool(telegram_enabled),
+                "telegram_bot_token": telegram_bot_token.strip(),
+                "telegram_chat_id": telegram_chat_id.strip(),
+                "telegram_proxy_url": telegram_proxy_url.strip(),
+                "telegram_timeout_seconds": int(telegram_timeout_seconds),
+            })
+            write_json("settings.json", settings)
+            st.success("Configuração Telegram guardada no storage local.")
+            st.rerun()
+
+    if telegram_enabled and telegram_bot_token.strip() and telegram_chat_id.strip():
+        st.success("Telegram está preparado para receber novas notificações.")
+    elif telegram_enabled:
+        st.warning("Telegram está activo, mas ainda falta configurar o Bot Token e o Chat ID.")
+    else:
+        st.info("Telegram está desactivado. As notificações continuam disponíveis na subaba Geral.")
+
+
 def render_notifications():
     st.title("Notificações")
     st.caption("Centro de notificações internas persistentes do Thunderbolt. As conclusões são guardadas no storage local e aparecem quando a aplicação é actualizada.")
-    reconcile_persisted_notifications()
-    preferences = notification_preferences()
-    catalog = notification_event_catalog()
-    notifications = list_notifications(limit=500)
-    unread_count = unread_notification_count()
-    summary_cols = st.columns(3)
-    with summary_cols[0]:
-        st.metric("Não lidas", unread_count)
-    with summary_cols[1]:
-        st.metric("Total guardado", len(notifications))
-    with summary_cols[2]:
-        st.metric("Operações mapeadas", len(catalog))
+    general_tab, telegram_tab = render_localized_tabs(["Geral", "Telegram"])
 
-    action_cols = st.columns([1.4, 1.4, 2.2])
-    with action_cols[0]:
-        if st.button("Marcar todas como lidas", use_container_width=True, disabled=unread_count == 0):
-            mark_all_notifications_read()
-            st.rerun()
-    with action_cols[1]:
-        if st.button("Actualizar notificações", use_container_width=True):
-            reconcile_persisted_notifications()
-            st.rerun()
-    with action_cols[2]:
-        confirm_clear = st.checkbox("Confirmar limpeza do histórico", key="confirm_clear_notifications")
-        if st.button("Limpar histórico", use_container_width=True, disabled=not confirm_clear):
-            clear_notifications()
-            st.session_state.pop("confirm_clear_notifications", None)
-            st.rerun()
+    with general_tab:
+        reconcile_persisted_notifications()
+        preferences = notification_preferences()
+        catalog = notification_event_catalog()
+        notifications = list_notifications(limit=500)
+        unread_count = unread_notification_count()
+        summary_cols = st.columns(3)
+        with summary_cols[0]:
+            st.metric("Não lidas", unread_count)
+        with summary_cols[1]:
+            st.metric("Total guardado", len(notifications))
+        with summary_cols[2]:
+            st.metric("Operações mapeadas", len(catalog))
 
-    st.divider()
-    st.subheader("Operações notificadas")
-    st.caption("Ligue ou desligue cada tipo de notificação. As preferências ficam guardadas no storage local e aplicam-se às próximas conclusões.")
-    grouped: dict[str, list[dict[str, str]]] = {}
-    for event in catalog:
-        grouped.setdefault(event["category"], []).append(event)
-    with st.form("notification_preferences_form"):
-        pending_preferences: dict[str, bool] = {}
-        for category, events in grouped.items():
-            st.markdown(f"**{category}**")
-            for event in events:
-                pending_preferences[event["code"]] = st.checkbox(
-                    event["label"],
-                    value=bool(preferences.get(event["code"], True)),
-                    help=event["description"],
-                    key=f"notification_preference_{event['code']}",
-                )
-        if st.form_submit_button("Guardar preferências", type="primary", use_container_width=True):
-            save_notification_preferences(pending_preferences)
-            st.success("Preferências de notificação guardadas.")
-            st.rerun()
+        action_cols = st.columns([1.4, 1.4, 2.2])
+        with action_cols[0]:
+            if st.button("Marcar todas como lidas", use_container_width=True, disabled=unread_count == 0):
+                mark_all_notifications_read()
+                st.rerun()
+        with action_cols[1]:
+            if st.button("Actualizar notificações", use_container_width=True):
+                reconcile_persisted_notifications()
+                st.rerun()
+        with action_cols[2]:
+            confirm_clear = st.checkbox("Confirmar limpeza do histórico", key="confirm_clear_notifications")
+            if st.button("Limpar histórico", use_container_width=True, disabled=not confirm_clear):
+                clear_notifications()
+                st.session_state.pop("confirm_clear_notifications", None)
+                st.rerun()
 
-    st.divider()
-    st.subheader("Histórico de notificações")
-    filter_cols = st.columns([1, 1.4])
-    category_options = ["Todas"] + sorted({event["category"] for event in catalog})
-    with filter_cols[0]:
-        selected_category = st.selectbox("Categoria", category_options, key="notifications_category_filter")
-    with filter_cols[1]:
-        selected_state = st.selectbox("Estado", ["Todas", "Não lidas", "Lidas"], key="notifications_state_filter")
-    category_filter = "" if selected_category == "Todas" else selected_category
-    unread_filter = selected_state == "Não lidas"
-    filtered = list_notifications(limit=500, category=category_filter, unread_only=unread_filter)
-    if selected_state == "Lidas":
-        filtered = [item for item in filtered if item.get("read")]
-    if not filtered:
-        st.info("Ainda não existem notificações para os filtros seleccionados.")
-    for item in filtered:
-        with st.container(border=True):
-            notification_cols = st.columns([3.3, 1.4, 1])
-            with notification_cols[0]:
-                st.write(f"**{item.get('title') or item.get('label') or 'Notificação'}**")
-                st.caption(item.get("message") or "")
-                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-                if metadata:
-                    public_details = " · ".join(f"{key}: {value}" for key, value in metadata.items() if value not in (None, ""))
-                    if public_details:
-                        st.caption(public_details)
-            with notification_cols[1]:
-                st.caption(f"{item.get('category', 'Sistema')} · {item.get('created_at', '—')}")
-                st.write("Lida" if item.get("read") else "Não lida")
-            with notification_cols[2]:
-                if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", use_container_width=True):
-                    mark_notification_read(str(item.get("id")))
-                    st.rerun()
+        st.divider()
+        st.subheader("Operações notificadas")
+        st.caption("Ligue ou desligue cada tipo de notificação. As preferências ficam guardadas no storage local e aplicam-se às próximas conclusões.")
+        grouped: dict[str, list[dict[str, str]]] = {}
+        for event in catalog:
+            grouped.setdefault(event["category"], []).append(event)
+        with st.form("notification_preferences_form"):
+            pending_preferences: dict[str, bool] = {}
+            for category, events in grouped.items():
+                st.markdown(f"**{category}**")
+                for event in events:
+                    pending_preferences[event["code"]] = st.checkbox(
+                        event["label"],
+                        value=bool(preferences.get(event["code"], True)),
+                        help=event["description"],
+                        key=f"notification_preference_{event['code']}",
+                    )
+            if st.form_submit_button("Guardar preferências", type="primary", use_container_width=True):
+                save_notification_preferences(pending_preferences)
+                st.success("Preferências de notificação guardadas.")
+                st.rerun()
+
+        st.divider()
+        st.subheader("Histórico de notificações")
+        filter_cols = st.columns([1, 1.4])
+        category_options = ["Todas"] + sorted({event["category"] for event in catalog})
+        with filter_cols[0]:
+            selected_category = st.selectbox("Categoria", category_options, key="notifications_category_filter")
+        with filter_cols[1]:
+            selected_state = st.selectbox("Estado", ["Todas", "Não lidas", "Lidas"], key="notifications_state_filter")
+        category_filter = "" if selected_category == "Todas" else selected_category
+        unread_filter = selected_state == "Não lidas"
+        filtered = list_notifications(limit=500, category=category_filter, unread_only=unread_filter)
+        if selected_state == "Lidas":
+            filtered = [item for item in filtered if item.get("read")]
+        if not filtered:
+            st.info("Ainda não existem notificações para os filtros seleccionados.")
+        for item in filtered:
+            with st.container(border=True):
+                notification_cols = st.columns([3.3, 1.4, 1])
+                with notification_cols[0]:
+                    st.write(f"**{item.get('title') or item.get('label') or 'Notificação'}**")
+                    st.caption(item.get("message") or "")
+                    metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                    if metadata:
+                        public_details = " · ".join(f"{key}: {value}" for key, value in metadata.items() if value not in (None, ""))
+                        if public_details:
+                            st.caption(public_details)
+                with notification_cols[1]:
+                    st.caption(f"{item.get('category', 'Sistema')} · {item.get('created_at', '—')}")
+                    st.write("Lida" if item.get("read") else "Não lida")
+                with notification_cols[2]:
+                    if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", use_container_width=True):
+                        mark_notification_read(str(item.get("id")))
+                        st.rerun()
+
+    with telegram_tab:
+        _render_telegram_notification_settings()
 
 
 def render_models_ai_tutorial():

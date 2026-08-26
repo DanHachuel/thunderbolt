@@ -22,7 +22,7 @@ A primeira versão implementa a camada UI independente com:
 | Edição | Menu expansível abaixo de Automação com Limpador de Metadados, Clip Generator local em Cortes e Editor Python inspirado no PYEdit para vídeos e scripts locais |
 | Upload | YouTube via `youtube-automation-agent` adaptado internamente, fallback ordenado API Oficial → Upload directo → Postiz, upload de MP4 para Postiz via API key/MCP configurável, TikTok, Instagram e Facebook Pages no front end |
 | MCP | Catálogo local opcional de Short Video Maker, AutoVio, OpenMontage e OpenCut, com portas editáveis e activação |
-| Configurações | **Contas Google**, **Configuração API** e **Notificações**; API Keys divididas entre **Serviços e modelos** e **Fontes de materiais**, com várias chaves independentes por fonte, além de contas Google/YouTube por cartão, `INNERTUBE_API_KEY` global para todas as contas, providers, TTS, Nano Banana, Postiz, TikTok e Upload-Post |
+| Configurações | **Contas Google**, **Configuração API** e **Notificações**; Notificações contém as subabas **Geral** e **Telegram Gateway**, com envio das mesmas operações locais para um Chat ID; API Keys divididas entre **Serviços e modelos** e **Fontes de materiais**, com várias chaves independentes por fonte, além de contas Google/YouTube por cartão, `INNERTUBE_API_KEY` global para todas as contas, providers, TTS, Nano Banana, Postiz, TikTok e Upload-Post |
 | Launcher | Execução via `npx`, instalação assistida, diagnóstico e preparação para distribuição |
 
 ## Upload-Post — publicação para múltiplas plataformas
@@ -56,7 +56,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` define **Dark** como base inicial e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.2.89
+## Navegação da UI 0.3.35
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline** é expansível e contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
 
@@ -64,7 +64,7 @@ A subaba **Tutorial Supabase** apresenta o guia de criação das tabelas `plans`
 
 O conteúdo interno das páginas também é localizado, não apenas a navegação: títulos, subtítulos, descrições, labels de campos, placeholders, opções de selectores, botões, avisos, mensagens de sucesso/erro, estados vazios, métricas, expanderes e blocos Markdown/HTML são traduzidos no idioma seleccionado através da camada global de conteúdo. Valores técnicos, chaves de estado, IDs de formulários, nomes de ficheiros, URLs e dados introduzidos pelo utilizador permanecem inalterados.
 
-Todas as subabas internas também são localizadas pelo helper nativo de tabs: **Blueprints/Brandings**, **Pesquisa pública/Cadastro manual/Contas cadastradas**, **Upload/Biblioteca**, **Importar do YouTube/Canais em lote gmail/Cadastro manual**, **Criar vídeo/Vídeos**, **Novo roteiro/letra/Histórico guardado**, as três abas de análise de clusters, as quatro abas de cortes, **Vídeos/Código Python**, as quatro opções de Upload, **API Keys/Teste de vozes**, **Serviços e modelos/Fontes de materiais** e **Client MCP/Servidor MCP/Skill**. As chaves técnicas e a ordem funcional permanecem inalteradas.
+Todas as subabas internas também são localizadas pelo helper nativo de tabs: **Blueprints/Brandings**, **Pesquisa pública/Cadastro manual/Contas cadastradas**, **Upload/Biblioteca**, **Importar do YouTube/Canais em lote gmail/Cadastro manual**, **Criar vídeo/Vídeos**, **Novo roteiro/letra/Histórico guardado**, as três abas de análise de clusters, as quatro abas de cortes, **Vídeos/Código Python**, as quatro opções de Upload, **API Keys/Teste de vozes**, **Serviços e modelos/Fontes de materiais**, **Client MCP/Servidor MCP/Skill** e **Notificações/Geral/Telegram**. As chaves técnicas e a ordem funcional permanecem inalteradas.
 
 Dentro de **Configurações > Contas Google**, a UI contém os cartões expansíveis de contas Google/YouTube, `sessionInfo` por conta, documentos de Upload directo, o formulário **Adicionar outra conta Gmail**, o bloco global de `INNERTUBE_API_KEY` e a configuração global do YouTube (OAuth Client ID, OAuth Client Secret e YouTube Data API Key). A página **Configuração API** contém as restantes credenciais, providers, modelos, serviços, Nano Banana, TikTok e Postiz.
 
@@ -72,7 +72,7 @@ Em **Configuração API > API Keys**, a subaba **Fontes de materiais** segue o p
 
 A subaba **Serviços e modelos** mantém as credenciais de providers e serviços que não são fontes de materiais. A chave `gemini_image_api_key` da Nano Banana continua separada de `gemini_api_key` do LLM textual. `INNERTUBE_API_KEY` permanece exclusivamente em **Configurações > Contas Google**, no bloco de configuração global fora dos cartões, e não é duplicada em API Keys.
 
-A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** mantém um histórico persistente de conclusões e falhas, reconcilia estados escritos por componentes locais e disponibiliza um checkbox independente para cada operação mapeada.
+A página **AI Influencers > Tutorial Meta** apresenta o guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n, distribuído localmente em `seed/references/guide-instagram.md` e com ligação para a [fonte original no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md). A página **Configurações > Notificações** mantém um histórico persistente de conclusões e falhas, reconcilia estados escritos por componentes locais e disponibiliza um checkbox independente para cada operação mapeada. A subaba **Geral** mantém esse centro local; a subaba **Telegram** permite configurar Bot Token, Chat ID e proxy opcional e envia as mesmas notificações pela Bot API oficial, sem polling ou mensagens recebidas.
 
 A página **Edição > Download Mídia** utiliza a API Python do [yt-dlp](https://github.com/yt-dlp/yt-dlp) para descarregar vídeos e áudio de URLs públicas, com qualidade, contentor, formato de áudio, legendas, metadados, playlists, progresso e histórico local em `storage/downloads/` e `storage/state/media_downloads.json`. Conversão e combinação de streams podem exigir FFmpeg.
 
@@ -193,9 +193,9 @@ thunderbolt
 No Windows PowerShell, se `npx` for bloqueado por `npx.ps1`, use directamente `npx.cmd`:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install
-npx.cmd --yes @danhachuel/thunderbolt@0.2.77 doctor
-npx.cmd --yes @danhachuel/thunderbolt@0.2.77
+npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install
+npx.cmd --yes @danhachuel/thunderbolt@0.3.35 doctor
+npx.cmd --yes @danhachuel/thunderbolt@0.3.35
 ```
 
 Como alternativa, pode permitir scripts para o seu utilizador:
@@ -219,7 +219,7 @@ O menu expansível **Niche Finder** contém duas alternativas independentes. **N
 
 A interface apresenta dentro da aba os parâmetros da busca: número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, categoria de engagement, intervalo de datas e tags. A página permanece sem resultados até o primeiro clique em **Analisar Nichos**; depois, se os parâmetros forem alterados, mostra os resultados anteriores e pede novo clique para aplicar os filtros actuais. O núcleo aplica normalização, filtros, `log1p`, `StandardScaler`, K-Means e FP-Growth. Os resultados aparecem em DataFrames para clusters, itemsets frequentes, regras de associação e dados analisados, acompanhados por uma visualização Plotly nativa e pesquisa de palavras nos clusters.
 
-**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em **Configuração API > API Keys > Serviços e modelos**. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.2.77 install`; o instalador detecta e reutiliza componentes já válidos.
+**Niche Finder Apify** é a segunda alternativa e não usa o dataset, filtros, execução ou resultados Kaggle. Define três palavras-chave, período, limite de resultados, Shorts, duração, idioma de legendas e ordenação; depois de clicar em **Pesquisar no Apify**, inicia o actor `streamers~youtube-scraper`, acompanha o run, carrega o dataset, normaliza vídeos, limpa SRT, calcula VSC Ratio e tenta resumir as transcrições com o provider LLM configurado. Os resultados ficam na sessão própria `niche_apify_results`, o histórico pequeno fica em `storage/state/niche_apify_runs.json` e existem exportações JSON/CSV. Configure o **Apify API Token** em **Configuração API > API Keys > Serviços e modelos**. As dependências adicionais são instaladas pelo fluxo normal do pacote: `requests`, `pandas` e os componentes já existentes da análise. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install`; o instalador detecta e reutiliza componentes já válidos.
 
 ## Editor Python baseado no PYEdit
 
