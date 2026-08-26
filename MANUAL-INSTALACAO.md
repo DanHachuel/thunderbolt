@@ -396,6 +396,10 @@ Uma execução da etapa Vídeo tem limite de 20 minutos. Se o processo externo t
 
 Se o launcher ou o worker for encerrado abruptamente, uma tarefa `doing` sem actualização durante 25 minutos é recuperada e marcada como `failed`, evitando estados indefinidos eternos. Para processar novas tarefas, deixe a aplicação iniciada com o comando normal; o painel avisa quando não existe heartbeat recente do worker.
 
+O **Backlog Vídeos** e a lista **Automação > Automação Youtube > Vídeos cadastrados** usam o mesmo catálogo completo de `storage/state/tasks.json`. Por isso, tarefas criadas manualmente e tarefas criadas pelo worker diário aparecem nos dois locais, sem filtragem implícita por origem. O filtro do Backlog mostra os estados conhecidos e inclui automaticamente estados adicionais encontrados nos dados.
+
+Nos dois cards, o bloco de estado apresenta o valor técnico, o rótulo legível, a barra de progresso e a mensagem de erro quando existir. O bloco **Formato** resolve nesta ordem `format`, `style_wide`, `style` e, por fim, `wide`, mantendo a apresentação de formatos como `wide`, `shorts`, `music` ou `full_ia` mesmo em tarefas antigas.
+
 ### Upload Música — JewelMusic, Pushtunes e ytmusicapi
 
 A área **Pipeline Música > Upload Música** separa três métodos com contratos diferentes. Em **JewelMusic**, active a integração, introduza a API Key fornecida pelo dashboard da JewelMusic e confirme a Base URL oficial `https://api.jewelmusic.com` e, se necessário, configure proxy e timeout. Carregue ou seleccione um ficheiro de música, indique artista e título e clique em **Enviar música para JewelMusic**. O teste de ligação consulta `/v1/ping`; o upload envia `multipart/form-data` para `/v1/tracks/upload` com os metadados preenchidos.
