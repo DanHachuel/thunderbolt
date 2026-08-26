@@ -42,6 +42,7 @@ from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_ACTIVE_CARD_KEY, LLM_PROV
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
+from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
@@ -5286,6 +5287,65 @@ def _render_telegram_notification_settings() -> None:
         st.info("Telegram está desactivado. As notificações continuam disponíveis na subaba Geral.")
 
 
+def render_logs():
+    """Render the unified local activity log before the API configuration page."""
+    st.title("Logs")
+    st.caption("Histórico unificado das operações do Thunderbolt. Os registos são reconstruídos a partir das tarefas e notificações persistidas no storage local.")
+    try:
+        reconcile_persisted_notifications()
+    except Exception:
+        pass
+
+    initial_records = list_logs(limit=500)
+    catalog_operations = {str(item.get("label") or "Operação") for item in notification_event_catalog()}
+    logged_operations = {str(item.get("operation") or "Operação") for item in initial_records}
+    operation_options = ["Todas"] + sorted(catalog_operations | logged_operations)
+    status_options = ["Todos"] + sorted({str(item.get("status") or "Desconhecido") for item in initial_records})
+    filter_cols = st.columns([2.2, 1.25, 1.1])
+    with filter_cols[0]:
+        query = st.text_input(
+            "Filtrar operações",
+            placeholder="Pesquisar por operação, registo, canal ou detalhes",
+            key="logs_query_filter",
+        )
+    with filter_cols[1]:
+        selected_operation = st.selectbox("Operação", operation_options, key="logs_operation_filter")
+    with filter_cols[2]:
+        selected_status = st.selectbox("Estado", status_options, key="logs_status_filter")
+
+    action_cols = st.columns([1, 1, 3])
+    with action_cols[0]:
+        if st.button("Actualizar logs", use_container_width=True):
+            st.rerun()
+    with action_cols[1]:
+        st.metric("Registos", len(initial_records))
+    with action_cols[2]:
+        st.caption("São incluídos estados pendentes, em execução, concluídos, publicados, falhados, cancelados e bloqueados quando existirem.")
+
+    operation_filter = "" if selected_operation == "Todas" else selected_operation
+    status_filter = "" if selected_status == "Todos" else selected_status
+    records = list_logs(operation=operation_filter, query=query, status=status_filter, limit=500)
+    if not records:
+        st.info("Ainda não existem logs para os filtros seleccionados.")
+        return
+    rows = logs_to_rows(records)
+    st.dataframe(
+        rows,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Operação": st.column_config.TextColumn("Operação", width="medium"),
+            "Estado": st.column_config.TextColumn("Estado", width="small"),
+            "Data": st.column_config.TextColumn("Data", width="small"),
+            "Hora": st.column_config.TextColumn("Hora", width="small"),
+            "Registo": st.column_config.TextColumn("Registo", width="medium"),
+            "Origem": st.column_config.TextColumn("Origem", width="small"),
+            "Progresso": st.column_config.TextColumn("Progresso", width="small"),
+            "Detalhes": st.column_config.TextColumn("Detalhes", width="large"),
+        },
+    )
+
+
 def render_notifications():
     st.title("Notificações")
     st.caption("Centro de notificações internas persistentes do Thunderbolt. As conclusões são guardadas no storage local e aparecem quando a aplicação é actualizada.")
@@ -5729,6 +5789,7 @@ def main():
     settings_items = [
         ("MCP", ":material/hub:", "MCP"),
         ("Notificações", ":material/notifications:", "Notificações"),
+        ("Logs", ":material/description:", "Logs"),
         ("Configuração API", ":material/settings:", "Configuração API"),
     ]
     niche_finder_items = [
@@ -5861,6 +5922,7 @@ def main():
         "Contas Google": render_google_accounts,
         "Configuração API": render_settings,
         "Notificações": render_notifications,
+        "Logs": render_logs,
     }
     try:
         reconcile_persisted_notifications()
