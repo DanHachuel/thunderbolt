@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.35
+> **Versão deste manual:** 0.3.36
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -100,13 +100,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install
+npx.cmd --yes @danhachuel/thunderbolt@0.3.36 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes @danhachuel/thunderbolt@0.3.35 install
+npx --yes @danhachuel/thunderbolt@0.3.36 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -357,12 +357,15 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ## 8. Configuração inicial da UI
 
-Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline** contém **Criação de Vídeos**, **Criação de Músicas**, **Roteiros** e **Upload**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** contém as subabas **Geral** e **Telegram**. A subaba Geral mantém o histórico e as preferências dos eventos locais; a subaba Telegram envia esses mesmos eventos para o Chat ID configurado. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
+Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline Vídeos**, **Pipeline Música**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Pipeline Música** contém **Criação de Músicas** e **Upload Música**, cuja página tem as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. O menu expansível **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu **Pipeline Música** contém **Criação de Músicas** e **Upload Música**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** contém as subabas **Geral** e **Telegram**. A subaba Geral mantém o histórico e as preferências dos eventos locais; a subaba Telegram envia esses mesmos eventos para o Chat ID configurado. A página **Pipeline Música > Upload Música** contém as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
 
 | Configuração | Finalidade |
 |---|---|
 | Porta Streamlit | Definir a porta local da UI |
 | Pasta MoneyPrinterTurbo | Indicar o clone local que será sincronizado com `config.toml` |
+| JewelMusic API Key/Base URL | Configurar o upload de tracks e os metadados de título, artista, álbum, ano e género |
+| Pushtunes | Escolher fonte, destino, operação, perfil/CSV, browser.json, playlist e credenciais Spotify para sincronização de biblioteca |
+| ytmusicapi browser.json | Autenticar uploads directos para YouTube Music através de uma sessão local de browser |
 | YouTube Data API Key (opcional) | Em **Configurações > Contas Google**, permitir o método oficial Data API para métricas públicas; não é necessária para a página pública nem para OAuth |
 | YouTube OAuth Client ID | Em **Configurações > Contas Google**, identificar a aplicação OAuth 2.0 do Google para autorizar operações autenticadas, como upload |
 | YouTube OAuth Client Secret | Secret do mesmo cliente OAuth 2.0; não é uma Data API Key nem um token de acesso |
@@ -382,6 +385,16 @@ Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**,
 | Telegram Chat ID | Utilizador, grupo ou canal que receberá as notificações |
 | Telegram Proxy | Proxy HTTP/HTTPS/SOCKS opcional para ambientes sem acesso directo |
 | Telegram timeout | Limite de espera de cada envio, entre 5 e 120 segundos |
+
+### Upload Música — JewelMusic, Pushtunes e ytmusicapi
+
+A área **Pipeline Música > Upload Música** separa três métodos com contratos diferentes. Em **JewelMusic**, active a integração, introduza a API Key fornecida pelo dashboard da JewelMusic e confirme a Base URL oficial `https://api.jewelmusic.com` e, se necessário, configure proxy e timeout. Carregue ou seleccione um ficheiro de música, indique artista e título e clique em **Enviar música para JewelMusic**. O teste de ligação consulta `/v1/ping`; o upload envia `multipart/form-data` para `/v1/tracks/upload` com os metadados preenchidos.
+
+Em **Pushtunes**, active a integração e seleccione uma fonte, um destino e uma operação (`tracks`, `albums` ou `playlist`). Para uma fonte CSV, carregue o ficheiro na própria subaba; para YouTube Music, indique o `browser.json`; para Spotify, preencha Client ID, Client Secret e Redirect URI ou use a configuração que o Pushtunes espera; para playlists, preencha o nome. Perfis `.toml` podem fornecer parâmetros adicionais. O botão de validação não sincroniza nada. O botão de execução chama o CLI do Pushtunes sem shell, com argumentos separados, e grava o resultado no histórico local. Pushtunes é uma sincronização de biblioteca, não um upload de bytes de um MP3 isolado.
+
+Em **ytmusicapi**, carregue um `browser.json` ou indique o caminho de um ficheiro existente, active a integração e seleccione uma música local. O teste consulta a biblioteca de uploads sem escrever; o envio usa `upload_song` e aceita MP3, M4A, WMA, FLAC e OGG com menos de 300 MB. O ficheiro de autenticação fica em `storage/ytmusicapi/browser.json` quando é carregado pela UI e não é enviado para o GitHub. Todas as operações ficam registadas em `uploads.json`, enquanto as credenciais permanecem apenas no storage local.
+
+As dependências `ytmusicapi>=1.12,<2` e `pushtunes>=2.15,<3` são instaladas pelo procedimento normal. O adaptador JewelMusic usa directamente o contrato HTTP documentado porque o SDK Python upstream não estava publicado no PyPI no momento da implementação. Consulte `THIRD-PARTY-NOTICES.md`, sobretudo a licença AGPL do Pushtunes, antes de redistribuir o runtime.
 
 ### Telegram Gateway
 
@@ -458,7 +471,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.35 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes @danhachuel/thunderbolt@0.3.36 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

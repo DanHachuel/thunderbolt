@@ -12,5 +12,7 @@ mlxtend>=0.23,<1
 plotly>=5.18,<7
 seaborn>=0.13,<1
 yt-dlp>=2025.1.15,<2027
+ytmusicapi>=1.12,<2
+pushtunes>=2.15,<3
 matplotlib>=3.7,<4
 kagglehub>=0.3,<1
