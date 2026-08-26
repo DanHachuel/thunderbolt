@@ -16,7 +16,14 @@ from urllib.parse import urljoin
 
 import requests
 
-from .media_providers import media_cards_for_pool, media_provider_definition
+from .media_providers import (
+    INTERNAL_IMAGE_ASPECT_RATIO,
+    INTERNAL_IMAGE_SIZE,
+    INTERNAL_VIDEO_ASPECT_RATIO,
+    INTERNAL_VIDEO_SIZE,
+    media_cards_for_pool,
+    media_provider_definition,
+)
 from .provider_routing import (
     POOL_IMAGE,
     POOL_VIDEO,
@@ -50,6 +57,28 @@ def _headers(card: Mapping[str, Any], *, fal: bool = False) -> dict[str, str]:
     if key:
         headers["Authorization"] = f"Key {key}" if fal else f"Bearer {key}"
     return headers
+
+
+def _append_generation_constraints(
+    prompt: str,
+    *,
+    kind: str,
+    aspect_ratio: str = "",
+    size: str = "",
+) -> str:
+    """Append controlled rendering constraints without exposing editable UI fields."""
+    clean = str(prompt or "").strip()
+    if kind == "image":
+        ratio = str(aspect_ratio or INTERNAL_IMAGE_ASPECT_RATIO).strip()
+        resolution = str(size or INTERNAL_IMAGE_SIZE).strip()
+        constraints = f"Target image composition: {ratio} aspect ratio, {resolution} resolution."
+    else:
+        ratio = str(aspect_ratio or INTERNAL_VIDEO_ASPECT_RATIO).strip()
+        resolution = str(size or INTERNAL_VIDEO_SIZE).strip()
+        constraints = f"Target video composition: {ratio} aspect ratio, {resolution} resolution."
+    if not clean:
+        return constraints
+    return f"{clean}\n\n{constraints}"
 
 
 def _decode_data(value: Any) -> bytes | None:
@@ -142,14 +171,20 @@ def _image_request(card: dict[str, Any], prompt: str) -> Any:
     provider = str(card.get("provider") or "").strip().lower()
     style = str(card.get("api_style") or media_provider_definition(provider).api_style)
     endpoint = _image_endpoint(card)
+    constrained_prompt = _append_generation_constraints(
+        prompt,
+        kind="image",
+        aspect_ratio=str(card.get("aspect_ratio") or ""),
+        size=str(card.get("image_size") or ""),
+    )
     if style == "cloudflare":
-        return requests.post(endpoint, headers=_headers(card), json={"prompt": prompt}, timeout=180)
+        return requests.post(endpoint, headers=_headers(card), json={"prompt": constrained_prompt}, timeout=180)
     if style == "fal_queue":
-        return requests.post(endpoint, headers=_headers(card, fal=True), json={"prompt": prompt, "num_images": 1}, timeout=180)
+        return requests.post(endpoint, headers=_headers(card, fal=True), json={"prompt": constrained_prompt, "num_images": 1}, timeout=180)
     if style == "dashscope":
-        body = {"model": _model(card), "input": {"prompt": prompt}, "parameters": {"size": "1024*1024", "n": 1}}
+        body = {"model": _model(card), "input": {"prompt": constrained_prompt}, "parameters": {"n": 1}}
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
-    body = {"model": _model(card), "prompt": prompt, "n": 1, "response_format": "b64_json"}
+    body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
 
 
@@ -171,10 +206,17 @@ def generate_image_for_card(
         merged = dict(settings)
         merged["gemini_image_api_key"] = _api_key(card)
         merged["gemini_image_model"] = _model(card) or merged.get("gemini_image_model") or "gemini-3.1-flash-image"
+        merged["gemini_image_aspect_ratio"] = str(card.get("aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO)
+        merged["gemini_image_size"] = str(card.get("image_size") or INTERNAL_IMAGE_SIZE)
         try:
             return generate_thumbnail_image(
                 merged,
-                prompt,
+                _append_generation_constraints(
+                    prompt,
+                    kind="image",
+                    aspect_ratio=str(card.get("aspect_ratio") or ""),
+                    size=str(card.get("image_size") or ""),
+                ),
                 topic=topic,
                 variant_index=variant_index,
                 lettering_text=lettering_text,
@@ -260,7 +302,15 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
 def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> Any:
     style = str(card.get("api_style") or media_provider_definition(card.get("provider")).api_style)
     endpoint = _video_endpoint(card)
-    body: dict[str, Any] = {"model": _model(card), "prompt": prompt}
+    body: dict[str, Any] = {
+        "model": _model(card),
+        "prompt": _append_generation_constraints(
+            prompt,
+            kind="video",
+            aspect_ratio=str(card.get("aspect_ratio") or ""),
+            size=str(card.get("video_size") or ""),
+        ),
+    }
     if image_url:
         body["image_url"] = image_url
     if style == "fal_queue":

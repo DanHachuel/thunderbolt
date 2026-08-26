@@ -39,6 +39,13 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertNotIn('Niche Finder — execução remota no Kaggle', MAIN_SOURCE)
         self.assertNotIn('Niche Finder — execução através da Apify', MAIN_SOURCE)
 
+    def test_media_cards_keep_rendering_constraints_out_of_provider_forms(self):
+        media_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_media_provider_card('):MAIN_SOURCE.index('def render_media_provider_cards(')]
+        self.assertNotIn('Aspect Ratio', media_renderer)
+        self.assertNotIn('Image Size', media_renderer)
+        self.assertNotIn('aspect_ratio', media_renderer)
+        self.assertNotIn('image_size', media_renderer)
+
     def test_llm_card_matches_reference_layout_structure(self):
         self.assertIn('endpoint_col, action_col = st.columns([1.65, 1.05])', MAIN_SOURCE)
         self.assertIn('action_buttons = st.columns(2)', MAIN_SOURCE)

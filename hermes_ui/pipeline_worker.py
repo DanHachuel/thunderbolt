@@ -17,7 +17,7 @@ from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
-from hermes_ui.media_generation import MediaGenerationError, generate_image_from_pool, generate_video_from_pool
+from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import media_cards_for_pool
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
@@ -554,7 +554,10 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     video_cards = media_cards_for_pool(settings, "video")
     if bool(settings.get("media_video_pool_enabled")) and video_cards:
         try:
-            video_prompt = f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}"
+            video_prompt = _append_generation_constraints(
+                f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}",
+                kind="video",
+            )
             video_path = generate_video_from_pool(settings, video_prompt)
         except MediaGenerationError as exc:
             raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
