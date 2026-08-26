@@ -62,7 +62,7 @@ from hermes_ui.thumbnails import (
     upload_thumbnail_image,
 )
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_topic_for_channel, generate_video_keywords
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
@@ -530,6 +530,7 @@ def creative_payload_from_result(channel: dict, topic: str, creative: dict, topi
         "topic_source": topic_source,
         "title": str(creative.get("title") or topic).strip(),
         "title_candidates": creative.get("title_candidates") or [],
+        "keywords": creative.get("keywords") or [],
         "thumbnail_variant": variant,
         "thumbnail_variants": creative.get("thumbnail_variants") or [],
         "thumbnail_prompt": str(variant.get("image_prompt") or ""),
@@ -716,6 +717,32 @@ def generate_creative_for_ui(settings: dict[str, Any], channel: dict, topic: str
         dedupe_key=f"titles:{creative_key}",
     )
     return payload
+
+
+def generate_editorial_for_ui(settings: dict[str, Any], channel: dict, topic: str, topic_source: str = "manual") -> dict[str, Any]:
+    """Generate title and keywords only; thumbnail prompt/image stay in the later pipeline stages."""
+    editorial = generate_title_and_keywords(
+        settings,
+        channel,
+        topic,
+        blueprint_for_channel(channel),
+        language=str(channel.get("language") or "Português"),
+    )
+    keywords = [str(item).strip() for item in editorial.get("keywords", []) if str(item).strip()]
+    return {
+        "topic": topic.strip(),
+        "topic_source": topic_source or "manual",
+        "title": str(editorial.get("title") or topic).strip(),
+        "title_candidates": editorial.get("title_candidates") or [],
+        "keywords": keywords[:15],
+        "thumbnail_variant": {},
+        "thumbnail_variants": [],
+        "thumbnail_prompt": "",
+        "thumbnail_text": "",
+        "thumbnail_status": "pending_prompt",
+        "generation_settings": {"video_keywords": keywords[:15]},
+        "ai_generation": {"editorial": editorial},
+    }
 
 
 def generate_thumbnail_for_ui(
@@ -2383,7 +2410,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                         edited_topic = topic_result["topic"]
                                     else:
                                         topic_result = {**topic_result, "topic": edited_topic, "topic_source": topic_result.get("topic_source", "manual")}
-                                    generated = generate_creative_for_ui(settings, channel, edited_topic, topic_source=topic_result.get("topic_source", "llm"))
+                                    generated = generate_editorial_for_ui(settings, channel, edited_topic, topic_source=topic_result.get("topic_source", "llm"))
                                     generated["ai_generation"]["topic"] = topic_result
                                     generated_payloads[channel_id] = generated
                                 except CreativeGenerationError as exc:
@@ -2414,14 +2441,14 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         payload = dict(st.session_state.get(f"{prefix}_creative_payload") or {})
                         if not payload.get("title") or not payload.get("thumbnail_variants"):
                             try:
-                                payload = generate_creative_for_ui(
+                                payload = generate_editorial_for_ui(
                                     read_json("settings.json", {}),
                                     selected_one or {},
                                     topic_value,
                                     topic_source=_video_topic_source(topic_value, prefix),
                                 )
                             except CreativeGenerationError as exc:
-                                st.warning(f"Título/thumbnail automáticos pendentes: {exc} A tarefa será criada com o tópico como título e sem ficheiro de thumbnail.")
+                                st.warning(f"Título/keywords automáticos pendentes: {exc} A tarefa será criada com o tópico como título; o prompt e a imagem da thumbnail serão gerados depois do vídeo.")
                                 payload = {"topic": topic_value, "title": topic_value, "topic_source": "manual", "thumbnail_status": "pending_provider", "thumbnail_variants": [], "thumbnail_variant": {}, "thumbnail_prompt": "", "thumbnail_text": ""}
                         payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or _video_topic_source(topic_value), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
                         batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
@@ -3453,13 +3480,28 @@ def render_videos():
                 st.write(f"**{task.get('title') or task.get('topic', 'Sem título')}**")
                 st.caption(f"Tópico: {task.get('topic', 'Sem tópico')}")
                 st.caption(f"{task.get('channel_name')} · {task.get('id')}")
-                thumbnail_path = (task.get('artifacts') or {}).get('thumbnail', '')
+                artifacts = task.get('artifacts') or {}
+                thumbnail_path = artifacts.get('thumbnail', '')
                 if thumbnail_path and Path(thumbnail_path).is_file():
                     st.image(thumbnail_path, width=180)
                 else:
                     status = task.get('thumbnail_status', 'not_generated')
                     prompt_note = ' · prompt pronto' if task.get('thumbnail_prompt') else ''
                     st.caption(f"Thumbnail: {status}{prompt_note}")
+                video_path = str(artifacts.get('video') or '').strip()
+                if video_path and Path(video_path).is_file():
+                    video_file = Path(video_path)
+                    st.success('Vídeo pronto; a thumbnail pode ser criada ou carregada depois.')
+                    st.download_button(
+                        'Descarregar vídeo pronto',
+                        data=video_file.read_bytes(),
+                        file_name=video_file.name,
+                        mime='video/mp4',
+                        key=f"pipeline_video_download_{task['id']}",
+                        use_container_width=True,
+                    )
+                elif video_path:
+                    st.caption(f'Vídeo registado: {video_path}')
             with cols[1]:
                 st.caption("Formato")
                 st.write(_video_task_format(task))

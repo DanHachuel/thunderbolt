@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from hermes_ui.thumbnail_generation import ThumbnailGenerationError
+
 from hermes_ui import storage
 from hermes_ui import pipeline_worker
 
@@ -228,3 +230,58 @@ def test_run_once_preserves_blocked_state_when_pipeline_is_stopped(tmp_path, mon
     assert result["status"] == "stopped"
     assert storage.read_json("tasks.json")[0]["state"] == "blocked"
     assert storage.read_json(pipeline_worker.PIPELINE_LOG_FILENAME)["status"] == "stopped"
+
+
+def test_thumbnail_failure_keeps_video_artifact_ready_after_video_stage(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    video_path = tmp_path / "video-pronto.mp4"
+    video_path.write_bytes(b"mp4")
+    channel = {"id": "channel-1", "name": "Canal teste", "language": "pt-BR", "niche": "Teste"}
+    task = {
+        "id": "video_thumbnail_quota",
+        "state": "to_do",
+        "stage": "script",
+        "progress": 0,
+        "topic": "Tema com quota esgotada",
+        "topic_source": "manual",
+        "title": "Título pronto",
+        "thumbnail_variant": {},
+        "thumbnail_variants": [],
+        "generation_settings": {"video_script": "Roteiro pronto", "video_keywords": "video, teste"},
+        "channel_id": "channel-1",
+        "language": "pt-BR",
+        "artifacts": {},
+    }
+    storage.write_json("channels.json", [channel])
+    storage.write_json("tasks.json", [task])
+
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {"youtube_batch_accounts": []})
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "save_script_document", lambda script: {"path": "script.md"})
+    monkeypatch.setattr(pipeline_worker, "_run_video_helper", lambda value: video_path)
+    monkeypatch.setattr(pipeline_worker, "generate_thumbnail_prompt", lambda *args, **kwargs: {"image_prompt": "prompt depois do vídeo", "overlay_text": "THUMB DEPOIS"})
+    monkeypatch.setattr(
+        pipeline_worker,
+        "_generate_pipeline_thumbnail",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ThumbnailGenerationError("HTTP 429 quota")),
+    )
+    monkeypatch.setattr(pipeline_worker, "upload_with_default_route", lambda *args, **kwargs: pytest.fail("upload não deve ocorrer sem thumbnail"))
+
+    result = pipeline_worker.run_once()
+
+    assert result["ok"] is False
+    persisted = storage.read_json("tasks.json")[0]
+    assert persisted["state"] == "failed"
+    assert persisted["stage"] == "thumbnail"
+    assert persisted["progress"] == 86
+    assert persisted["video_ready"] is True
+    assert persisted["artifacts"]["video"] == str(video_path)
+    assert "vídeo já está disponível" in persisted["error"]
+    assert result["task_id"] == task["id"]
+
+
+def test_pipeline_stage_order_places_video_before_thumbnail_prompt():
+    from hermes_ui.domain import STAGES
+
+    assert STAGES.index("video") < STAGES.index("thumbnail_prompt") < STAGES.index("thumbnail") < STAGES.index("upload")

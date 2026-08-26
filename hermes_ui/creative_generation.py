@@ -299,6 +299,76 @@ def generate_thumbnail_prompt(
     }
 
 
+def generate_title_and_keywords(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    blueprint: dict[str, Any] | None = None,
+    language: str = "",
+) -> dict[str, Any]:
+    """Generate the editorial title and SEO keywords without generating thumbnail prompts."""
+    if not topic.strip():
+        raise CreativeGenerationError("É necessário um tópico ou briefing antes de gerar título e keywords.")
+    context = channel_context(channel, blueprint)
+    system = (
+        "És um director editorial para YouTube. Cria apenas o pacote editorial do vídeo: títulos candidatos e keywords SEO. "
+        "Não cries prompts, conceitos ou variantes de thumbnail. Gera exactamente pelo menos 20 títulos candidatos, "
+        "um título seleccionado e entre 8 e 15 keywords curtas. O título deve carregar keywords no início, ter curiosidade, "
+        "especificidade e emoção, sem clickbait falso. Responde apenas com JSON válido nas chaves selected_title, "
+        "title_candidates e keywords."
+    )
+    user = json.dumps(
+        {
+            "channel": context,
+            "language": language or context["language"],
+            "topic": topic.strip(),
+            "reference_rules": reference_bundle(),
+            "keywords_schema": ["lista de 8 a 15 keywords SEO curtas, sem hashtags"],
+            "title_candidates_schema": {
+                "title": "string",
+                "formula": "string",
+                "curiosity_score": "integer 0-3",
+                "specificity_score": "integer 0-3",
+                "emotional_score": "integer 0-3",
+            },
+        },
+        ensure_ascii=False,
+    )
+    result = _chat_json(settings, system, user)
+    raw_titles = result.get("title_candidates")
+    if not isinstance(raw_titles, list) or len(raw_titles) < 20:
+        raise CreativeGenerationError("O provider deve devolver pelo menos 20 títulos candidatos.")
+    titles: list[dict[str, Any]] = []
+    for item in raw_titles[:30]:
+        if not isinstance(item, dict) or not str(item.get("title") or "").strip():
+            continue
+        titles.append(
+            {
+                "title": str(item["title"]).strip(),
+                "formula": str(item.get("formula") or "custom").strip(),
+                "curiosity_score": _score(item.get("curiosity_score")),
+                "specificity_score": _score(item.get("specificity_score")),
+                "emotional_score": _score(item.get("emotional_score")),
+            }
+        )
+    if len(titles) < 20:
+        raise CreativeGenerationError("Os títulos devolvidos pelo provider não têm conteúdo suficiente.")
+    selected_title = str(result.get("selected_title") or titles[0]["title"]).strip()
+    if selected_title not in {item["title"] for item in titles}:
+        selected_title = titles[0]["title"]
+    raw_keywords = result.get("keywords")
+    keywords = [str(item).strip() for item in raw_keywords if str(item).strip()] if isinstance(raw_keywords, list) else []
+    if not keywords:
+        keywords = _keywords_from_text(topic, selected_title)
+    return {
+        "title": selected_title,
+        "title_candidates": titles,
+        "keywords": keywords[:15],
+        "topic_source": "llm",
+        "generated_by": "configured_llm",
+    }
+
+
 def generate_creative_package(
     settings: dict[str, Any],
     channel: dict[str, Any],

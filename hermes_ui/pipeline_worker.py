@@ -12,14 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from integrations.upload_routing import upload_with_default_route
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_thumbnail_prompt, generate_topic_for_channel
 from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import media_cards_for_pool
-from hermes_ui.thumbnail_generation import generate_thumbnail_image
+from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
@@ -401,7 +401,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 # O helper expõe o resultado final, mas não uma percentagem estável.
                 # Mantemos uma faixa reservada para a etapa de vídeo e avançamos-a
                 # lentamente enquanto o processo responde, sem fingir conclusão.
-                video_progress = min(79, 68 + int(elapsed // 15))
+                video_progress = min(79, 52 + int(elapsed // 15))
                 current_task = _task_by_id(task_id)
                 if current_task and str(current_task.get("state") or "") in {"blocked", "cancelled"}:
                     _stop_process(process)
@@ -503,37 +503,87 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
     _update(task_id, stage="title", state="doing", progress=35)
     provided_title = str(task.get("title") or "").strip()
+    provided_keywords = generation_settings.get("video_keywords") or task.get("keywords")
+    if isinstance(provided_keywords, str):
+        provided_keywords = re.split(r"[,\n;|]+", provided_keywords)
+    provided_keywords = [str(item).strip() for item in provided_keywords or [] if str(item).strip()]
+    title_candidates = task.get("title_candidates") if isinstance(task.get("title_candidates"), list) else []
+    editorial: dict[str, Any] = {
+        "title": provided_title or topic,
+        "title_candidates": title_candidates,
+        "keywords": provided_keywords,
+    }
+    if not provided_title:
+        try:
+            editorial = generate_title_and_keywords(
+                settings,
+                channel,
+                topic,
+                blueprint,
+                language=str(task.get("language") or channel.get("language") or "Português"),
+            )
+        except CreativeGenerationError:
+            # A falha editorial não deve impedir a geração do vídeo: usa o tema
+            # como título e keywords determinísticas, deixando o erro de imagem
+            # para a etapa posterior e independente da criação do MP4.
+            editorial = {"title": topic, "title_candidates": [], "keywords": []}
+    title = str(editorial.get("title") or provided_title or topic).strip()
+    keywords = provided_keywords[:15] or (
+        editorial.get("keywords") if isinstance(editorial.get("keywords"), list) else []
+    )
+    keywords = [str(item).strip() for item in keywords if str(item).strip()][:15] or _keywords(
+        topic,
+        title,
+        str(channel.get("niche") or ""),
+    )
+    title_candidates = editorial.get("title_candidates") if isinstance(editorial.get("title_candidates"), list) else title_candidates
+    title_artifact = _save_json_artifact(
+        task_id,
+        "title-keywords",
+        {"topic": topic, "title": title, "keywords": keywords, "title_candidates": title_candidates},
+    )
+    artifacts = {**artifacts, "title_keywords": title_artifact}
+    _update(task_id, title=title, tags=keywords, artifacts=artifacts, title_candidates=title_candidates, progress=45)
+
+    _update(task_id, stage="keywords", state="doing", progress=48)
+    _update(task_id, tags=keywords, progress=50)
+
+    # O vídeo é deliberadamente concluído antes de qualquer chamada ao provider
+    # de imagem. O artefacto fica persistido mesmo que a quota da thumbnail falhe.
+    _update(task_id, stage="video", state="doing", progress=52, error=None)
+    video_cards = media_cards_for_pool(settings, "video")
+    if bool(settings.get("media_video_pool_enabled")) and video_cards:
+        try:
+            video_prompt = f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}"
+            video_path = generate_video_from_pool(settings, video_prompt)
+        except MediaGenerationError as exc:
+            raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
+    else:
+        video_path = _run_video_helper({**task, "topic": topic, "title": title})
+    current_after_video = _task_by_id(task_id) or {}
+    artifacts = dict(current_after_video.get("artifacts") or artifacts)
+    artifacts["video"] = str(video_path)
+    _update(task_id, artifacts=artifacts, video_ready=True, progress=80)
+
+    _update(task_id, stage="thumbnail_prompt", state="doing", progress=82, error=None)
     existing_variant = task.get("thumbnail_variant") if isinstance(task.get("thumbnail_variant"), dict) else {}
     existing_variant = dict(existing_variant)
     if not str(existing_variant.get("image_prompt") or "").strip() and str(task.get("thumbnail_prompt") or "").strip():
         existing_variant["image_prompt"] = str(task.get("thumbnail_prompt") or "").strip()
     if not str(existing_variant.get("overlay_text") or "").strip() and str(task.get("thumbnail_text") or "").strip():
         existing_variant["overlay_text"] = str(task.get("thumbnail_text") or "").strip()
-    prepared_thumbnail = bool(str(existing_variant.get("image_prompt") or "").strip())
-    if provided_title and prepared_thumbnail:
-        # The creation UI already generated the title/thumbnail brief. Do not call
-        # the complete creative-package generator a second time for this task.
-        creative = {
-            "title": provided_title,
-            "keywords": [],
-            "thumbnail_variant": existing_variant,
-            "title_candidates": task.get("title_candidates") if isinstance(task.get("title_candidates"), list) else [],
-        }
-    else:
-        creative = generate_creative_package(settings, channel, topic, blueprint, language=str(task.get("language") or channel.get("language") or "Português"))
-    title = str(creative.get("title") or provided_title or topic).strip()
-    provided_keywords = generation_settings.get("video_keywords")
-    if isinstance(provided_keywords, str):
-        provided_keywords = re.split(r"[,\n;|]+", provided_keywords)
-    provided_keywords = [str(item).strip() for item in provided_keywords or [] if str(item).strip()]
-    keywords = provided_keywords[:15] or (creative.get("keywords") if isinstance(creative.get("keywords"), list) else _keywords(topic, title, str(channel.get("niche") or "")))
-    title_artifact = _save_json_artifact(task_id, "title-keywords", {"topic": topic, "title": title, "keywords": keywords, "title_candidates": creative.get("title_candidates", [])})
-    _update(task_id, title=title, tags=keywords, artifacts={**artifacts, "title_keywords": title_artifact}, title_candidates=creative.get("title_candidates", []), progress=45)
-
-    _update(task_id, stage="keywords", state="doing", progress=48)
-    variant = creative.get("thumbnail_variant") if isinstance(creative.get("thumbnail_variant"), dict) else {}
-    if not variant and prepared_thumbnail:
-        variant = existing_variant
+    variant = existing_variant
+    if not str(variant.get("image_prompt") or "").strip():
+        try:
+            variant = generate_thumbnail_prompt(
+                settings,
+                channel,
+                topic,
+                blueprint=blueprint,
+                language=str(task.get("language") or channel.get("language") or "Português"),
+            )
+        except CreativeGenerationError as exc:
+            raise PipelineError(f"Não foi possível gerar o prompt da thumbnail: {exc}") from exc
     prompt_payload = {
         "topic": topic,
         "title": title,
@@ -550,34 +600,41 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         },
     }
     prompt_artifact = _save_json_artifact(task_id, "thumbnail-prompt", prompt_payload)
-    artifacts = {**artifacts, "thumbnail_prompt_json": prompt_artifact}
-    _update(task_id, stage="thumbnail_prompt", state="doing", progress=52, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
-    _update(task_id, stage="thumbnail", state="doing", progress=56, thumbnail_prompt=str(variant.get("image_prompt") or ""), thumbnail_text=str(variant.get("overlay_text") or ""), thumbnail_status="prompt_ready", artifacts=artifacts)
-    thumbnail_path = _generate_pipeline_thumbnail(
-        settings,
-        str(variant.get("image_prompt") or ""),
-        topic=topic,
-        variant_index=0,
-        lettering_text=str(variant.get("overlay_text") or ""),
-        lettering_prompt=str(variant.get("lettering_prompt") or ""),
+    artifacts["thumbnail_prompt_json"] = prompt_artifact
+    _update(
+        task_id,
+        stage="thumbnail_prompt",
+        state="doing",
+        progress=84,
+        thumbnail_variant=variant,
+        thumbnail_prompt=str(variant.get("image_prompt") or ""),
+        thumbnail_text=str(variant.get("overlay_text") or ""),
+        thumbnail_status="prompt_ready",
+        artifacts=artifacts,
     )
-    artifacts["thumbnail"] = str(thumbnail_path)
-    _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=62)
 
-    _update(task_id, stage="video", state="doing", progress=68)
-    video_cards = media_cards_for_pool(settings, "video")
-    if bool(settings.get("media_video_pool_enabled")) and video_cards:
-        try:
-            video_prompt = f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}"
-            video_path = generate_video_from_pool(settings, video_prompt)
-        except MediaGenerationError as exc:
-            raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
+    _update(task_id, stage="thumbnail", state="doing", progress=86, error=None)
+    current_artifacts = dict((_task_by_id(task_id) or {}).get("artifacts") or artifacts)
+    existing_thumbnail = Path(str(current_artifacts.get("thumbnail") or variant.get("image_path") or "")).expanduser()
+    if existing_thumbnail.is_file() and existing_thumbnail.stat().st_size > 0:
+        thumbnail_path = existing_thumbnail
     else:
-        video_path = _run_video_helper({**task, "topic": topic})
-    artifacts["video"] = str(video_path)
-    _update(task_id, artifacts=artifacts, progress=80)
+        try:
+            thumbnail_path = _generate_pipeline_thumbnail(
+                settings,
+                str(variant.get("image_prompt") or ""),
+                topic=topic,
+                variant_index=0,
+                lettering_text=str(variant.get("overlay_text") or ""),
+                lettering_prompt=str(variant.get("lettering_prompt") or ""),
+            )
+        except (MediaGenerationError, ThumbnailGenerationError) as exc:
+            raise PipelineError(f"A thumbnail não foi gerada; o vídeo já está disponível em {video_path}: {exc}") from exc
+    artifacts = dict((_task_by_id(task_id) or {}).get("artifacts") or current_artifacts)
+    artifacts["thumbnail"] = str(thumbnail_path)
+    _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=90)
 
-    _update(task_id, stage="upload", state="doing", progress=86)
+    _update(task_id, stage="upload", state="doing", progress=94, error=None)
     result = upload_with_default_route(
         settings,
         storage_root=STORAGE,

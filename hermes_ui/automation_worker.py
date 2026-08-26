@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import storage
-from .creative_generation import generate_creative_package, generate_topic_for_channel
+from .creative_generation import generate_title_and_keywords, generate_topic_for_channel
 from .domain import create_batch, create_tasks_for_batch
 from .notifications import record_notification
 
@@ -149,28 +149,28 @@ def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     blueprint = _blueprint_for_channel(channel)
     user_context = str(channel.get("automation_topic") or "").strip()
     topic_package = generate_topic_for_channel(settings, channel, blueprint, user_context=user_context)
-    creative = generate_creative_package(
+    editorial = generate_title_and_keywords(
         settings,
         channel,
         topic_package["topic"],
         blueprint,
         language=str(channel.get("language") or "Português"),
     )
-    variant = creative["thumbnail_variant"]
     payload = {
         "topic": topic_package["topic"],
         "topic_source": "llm",
-        "title": creative["title"],
-        "title_candidates": creative["title_candidates"],
-        "thumbnail_variant": variant,
-        "thumbnail_variants": creative["thumbnail_variants"],
-        "thumbnail_prompt": variant.get("image_prompt", ""),
-        "thumbnail_text": variant.get("overlay_text", ""),
-        "thumbnail_status": creative.get("thumbnail_status", "prompt_ready"),
+        "title": editorial["title"],
+        "title_candidates": editorial["title_candidates"],
+        "thumbnail_variant": {},
+        "thumbnail_variants": [],
+        "thumbnail_prompt": "",
+        "thumbnail_text": "",
+        "thumbnail_status": "pending_prompt",
         "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
         "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
         "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
-        "ai_generation": {"topic": topic_package, "creative": creative},
+        "generation_settings": {"video_keywords": editorial.get("keywords", [])},
+        "ai_generation": {"topic": topic_package, "editorial": editorial},
     }
     return topic_package["topic"], payload
 
