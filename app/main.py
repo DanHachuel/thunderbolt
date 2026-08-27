@@ -6403,6 +6403,22 @@ def render_supabase_tutorial():
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
 
+def render_youtube_frontend_upload_tutorial():
+    """Render the safe operational guide for the YouTube direct-upload workflow."""
+    tutorial_path = ROOT / "seed" / "references" / "youtube-video-upload-frontend.md"
+    st.title("Tutorial YouTube Video-Upload Frontend")
+    st.caption("Guia prático e seguro para rever metadados, sessão e envio directo de vídeos concluídos.")
+    st.markdown("[Abrir referência técnica no GitHub](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api)")
+    try:
+        tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        tutorial_content = ""
+    if not tutorial_content:
+        st.error("O conteúdo local do tutorial não está disponível. Consulte a referência técnica no GitHub.")
+        return
+    st.markdown(tutorial_content, unsafe_allow_html=False)
+
+
 def render_mcp():
     st.title("MCP")
     st.caption("Clientes externos, servidor MCP do Thunderbolt e a skill local ficam separados para evitar confundir funções diferentes.")
@@ -6708,6 +6724,7 @@ def main():
         ("Tutorial Supabase", ":material/storage:", "Tutorial Supabase"),
         ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
         ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
+        ("Tutorial YouTube Video-Upload Frontend", ":material/video_library:", "Tutorial YouTube Video-Upload Frontend"),
     ]
     settings_items = [
         ("MCP", ":material/hub:", "MCP"),
@@ -6846,6 +6863,7 @@ def main():
         "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,
+        "Tutorial YouTube Video-Upload Frontend": render_youtube_frontend_upload_tutorial,
         "Configurações": lambda: render_edit_placeholder("Configurações", "Seleccione uma opção no menu expansível."),
         "MCP": render_mcp,
         "Contas Google": render_google_accounts,
