@@ -54,6 +54,16 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
         description="Gateway multimodal com endpoints compatíveis e catálogo próprio.",
     ),
     MediaProviderDefinition(
+        "replicate",
+        "Replicate",
+        default_base_url="https://api.replicate.com/v1",
+        supports_image=True,
+        supports_video=True,
+        supports_text=False,
+        api_style="replicate",
+        description="Predictions assíncronas; o campo Modelo aceita model ou model:version conforme a Replicate.",
+    ),
+    MediaProviderDefinition(
         "agnes",
         "Agnes AI",
         default_base_url="https://apihub.agnes-ai.com/v1",

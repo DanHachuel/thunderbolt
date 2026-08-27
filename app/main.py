@@ -31,6 +31,7 @@ from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_a
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
 from app.modules.niche_finder.summarizer import summarize_items
+from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencer_motion_control, render_ai_influencers_api_status
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
@@ -39,13 +40,14 @@ from hermes_ui.mcp import detect_local_service, install_skill_locally, load_inte
 from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
-from hermes_ui.media_providers import MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
+from hermes_ui.media_providers import MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_cards_for_pool, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
 from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file, store_voiceover_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
+from hermes_ui.influencers import BACKEND_OPTIONS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, backend_name, backend_status, get_repository, test_backend
 from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
-from hermes_ui.api_key_tests import test_apify_credentials, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
+from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
@@ -63,6 +65,7 @@ from hermes_ui.thumbnails import (
 )
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_keywords
+from hermes_ui.media_generation import MediaGenerationError, generate_image_for_card, generate_video_for_card
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
@@ -5383,7 +5386,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])
+    api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -5433,6 +5436,20 @@ def render_settings():
                 llm_rpm_window_seconds = int(llm_rpm_settings["llm_rpm_window_seconds"])
 
                 render_media_provider_cards(settings, embedded=True)
+
+                with st.expander("Banco de Dados Influencers", expanded=False):
+                    st.caption("Escolha um backend para personagens e conteúdos. Supabase é o padrão remoto; SQLite mantém tudo localmente. O teste é read-only e não cria nem elimina registos.")
+                    influencer_db_backend = st.selectbox("Backend da base de dados de AI Influencers", list(BACKEND_OPTIONS), index=0 if str(settings.get("influencer_db_backend") or "Supabase") == "Supabase" else 1, key="settings_influencer_db_backend")
+                    db_cols = st.columns(2)
+                    with db_cols[0]:
+                        influencer_supabase_url = text_setting("Supabase Project URL", "influencer_supabase_url", help_text="URL do projecto, por exemplo https://project-id.supabase.co")
+                        influencer_supabase_key = text_setting("Supabase API key", "influencer_supabase_key", secret=True, help_text="Use uma chave com as permissões RLS adequadas. Nunca é colocada no GitHub ou nos logs.")
+                        influencer_supabase_bucket = text_setting("Supabase Storage bucket", "influencer_supabase_bucket", help_text="Bucket usado para imagens e documentos, por defeito ai-influencers.")
+                    with db_cols[1]:
+                        influencer_sqlite_path = text_setting("SQLite ficheiro local", "influencer_sqlite_path", help_text="Caminho absoluto ou relativo ao projecto. Por defeito: storage/state/ai_influencers.db")
+                        st.caption("SQLite usa a biblioteca standard do Python e cria o schema automaticamente ao testar ou usar o backend.")
+                    db_test_clicked = st.form_submit_button("Testar ligação do backend", use_container_width=True, key="api_test_influencer_database")
+                    st.caption("Para Supabase, aplique primeiro seed/references/ai_influencers_schema.sql no SQL Editor e configure o bucket/políticas RLS.")
 
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
                     st.caption("Cada serviço está separado no seu próprio cartão. Os botões de teste ficam dentro do cartão correspondente e fazem apenas diagnóstico, sem gerar áudio ou música.")
@@ -5581,6 +5598,15 @@ def render_settings():
                         widget_key="api_test_postiz",
                     )
 
+                if db_test_clicked:
+                    test_settings = dict(settings)
+                    test_settings.update({"influencer_db_backend": influencer_db_backend, "influencer_supabase_url": influencer_supabase_url, "influencer_supabase_key": influencer_supabase_key, "influencer_supabase_bucket": influencer_supabase_bucket, "influencer_sqlite_path": influencer_sqlite_path})
+                    db_result = test_backend(test_settings)
+                    if db_result.get("ok"):
+                        st.success(db_result.get("message") or "Backend disponível.")
+                    else:
+                        st.error(db_result.get("message") or "O backend não está disponível.")
+
                 save_all_settings = st.form_submit_button("Guardar configurações do Thunderbolt", type="primary")
                 if save_all_settings:
                     settings.update({
@@ -5588,6 +5614,7 @@ def render_settings():
                         "kaggle_username": kaggle_username.strip(), "kaggle_api_key": kaggle_api_key.strip(), "kaggle_kernel_slug": kaggle_kernel_slug.strip() or "thunderbolt-niche-finder",
                         "apify_api_token": apify_api_token.strip(), "apify_actor_id": apify_actor_id.strip() or DEFAULT_ACTOR_ID, "apify_poll_interval_seconds": int(apify_poll_interval), "apify_run_timeout_seconds": int(apify_run_timeout),
                         "llm_rpm_limit_enabled": bool(llm_rpm_limit_enabled), "llm_rpm_limit": int(llm_rpm_limit), "llm_rpm_window_seconds": int(llm_rpm_window_seconds),
+                        "influencer_db_backend": influencer_db_backend, "influencer_supabase_url": influencer_supabase_url.strip(), "influencer_supabase_key": influencer_supabase_key.strip(), "influencer_supabase_bucket": influencer_supabase_bucket.strip() or "ai-influencers", "influencer_sqlite_path": influencer_sqlite_path.strip() or "storage/state/ai_influencers.db",
                         "azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region,
                         "siliconflow_tts_api_key": siliconflow_tts_api_key, "minimax_tts_api_key": minimax_tts_api_key,
                         "minimax_tts_base_url": minimax_tts_base_url, "minimax_tts_model_id": minimax_tts_model_id, "minimax_tts_voice_id": minimax_tts_voice_id,
@@ -5616,6 +5643,9 @@ def render_settings():
 
     with material_sources_tab:
         render_material_source_api_keys(settings)
+
+    with ai_influencers_tab:
+        render_ai_influencers_api_status(settings)
 
     with voice_test_tab:
         st.subheader("Teste de Voz")
@@ -6340,9 +6370,9 @@ def main():
         "Editor Python": render_python_editor,
         "Download Mídia": render_media_download,
         "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
-        "Personagens": lambda: render_edit_placeholder("Personagens", "Área reservada para a futura funcionalidade de personagens."),
-        "Geração de Conteúdo IA": lambda: render_edit_placeholder("Geração de Conteúdo IA", ""),
-        "Motion Control": lambda: render_edit_placeholder("Motion Control", ""),
+        "Personagens": lambda: render_ai_influencer_characters(read_json("settings.json", {})),
+        "Geração de Conteúdo IA": lambda: render_ai_influencer_content(read_json("settings.json", {})),
+        "Motion Control": render_ai_influencer_motion_control,
         "UGC Products": lambda: render_edit_placeholder("UGC Products", ""),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Analista Growth Youtube": lambda: render_edit_placeholder("Analista Growth Youtube", ""),

@@ -21,6 +21,8 @@ EVENT_CATALOG: tuple[dict[str, str], ...] = (
     {"code": "script_stage_completed", "category": "Pipeline", "label": "Etapa de roteiro concluída", "description": "Quando a etapa de roteiro de uma tarefa terminar."},
     {"code": "title_generation_completed", "category": "Pipeline", "label": "Títulos gerados", "description": "Quando o pacote de títulos terminar de ser gerado."},
     {"code": "thumbnail_generation_completed", "category": "Pipeline", "label": "Thumbnail gerada", "description": "Quando a imagem final da thumbnail for criada."},
+    {"code": "influencer_content_completed", "category": "AI Influencers", "label": "Conteúdo de Influencer concluído", "description": "Quando uma imagem ou vídeo de AI Influencers terminar de ser gerado."},
+    {"code": "influencer_content_failed", "category": "AI Influencers", "label": "Conteúdo de Influencer falhou", "description": "Quando uma imagem ou vídeo de AI Influencers terminar com erro."},
     {"code": "blueprint_completed", "category": "Pipeline", "label": "Blueprint criado ou importado", "description": "Quando um Blueprint for criado, importado ou guardado."},
     {"code": "branding_completed", "category": "Pipeline", "label": "Branding criado ou importado", "description": "Quando um Branding for criado, importado ou guardado."},
     {"code": "niche_analysis_completed", "category": "Pipeline", "label": "Análise de nicho concluída", "description": "Quando uma análise Kaggle ou Apify terminar com resultados."},

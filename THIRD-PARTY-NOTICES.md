@@ -25,3 +25,7 @@ Thunderbolt depends on [Psy-Q/pushtunes](https://pypi.org/project/pushtunes/) fo
 ## JewelMusic SDK
 
 The JewelMusic upload adapter follows the documented HTTP contract and API examples from [jewelmusic/sdk](https://github.com/jewelmusic/sdk), which is published under the MIT License. The Python package `jewelmusic-sdk` was not available on PyPI at implementation time, so Thunderbolt does not bundle that unavailable package; the adapter uses the documented `POST /v1/tracks/upload` request directly and retains attribution to the upstream SDK repository.
+
+## supabase-py
+
+Thunderbolt optionally depends on [supabase-py](https://github.com/supabase/supabase-py) for the AI Influencers Supabase backend. The package is distributed under the MIT License. The SQLite backend uses Python's standard library and does not require a remote service.

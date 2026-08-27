@@ -618,6 +618,11 @@ TAB_TRANSLATIONS: dict[str, dict[str, str]] = {
 
 for _language_code, _tab_translation in TAB_TRANSLATIONS.items():
     UI_TRANSLATIONS[_language_code].update(_tab_translation)
+for _language_code in LANGUAGE_CODES:
+    _tab_translation = TAB_TRANSLATIONS.setdefault(_language_code, {})
+    for _label in _TAB_LABELS:
+        _tab_translation.setdefault(_label, _label)
+    UI_TRANSLATIONS.setdefault(_language_code, {key: key for key in _CORE_UI_TEXT_KEYS}).update(_tab_translation)
 
 
 _NOTIFICATION_TAB_TRANSLATIONS: dict[str, dict[str, str]] = {

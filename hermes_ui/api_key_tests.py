@@ -272,6 +272,15 @@ def test_material_source_credentials(provider: str, api_key: str) -> dict[str, A
     return _unsupported("Este provider de materiais não expõe um endpoint de diagnóstico seguro no cartão actual.")
 
 
+def test_influencer_database(settings: Mapping[str, Any]) -> dict[str, Any]:
+    """Verify the configured AI Influencers backend without generating or deleting data."""
+    try:
+        from hermes_ui.influencers import test_backend
+        return test_backend(settings)
+    except Exception:
+        return _result("error", "Não foi possível verificar o backend AI Influencers.")
+
+
 def test_voice_provider(provider: str, settings: dict[str, Any]) -> dict[str, Any]:
     """Dispatch a non-generating check for one provider in the voice/music group."""
     provider = str(provider or "").strip().lower()
@@ -297,6 +306,7 @@ __all__ = [
     "test_azure_speech_credentials",
     "test_elevenlabs_credentials",
     "test_kaggle_credentials",
+    "test_influencer_database",
     "test_material_source_credentials",
     "test_minimax_credentials",
     "test_nano_banana_credentials",

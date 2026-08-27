@@ -200,7 +200,8 @@ def test_ai_influencers_navigation_has_characters_and_social_pages():
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in source
     assert '"Models AI": "AI Influencers"' in source
     assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in source
-    assert '"Personagens": lambda: render_edit_placeholder("Personagens"' in source
+    assert '"Personagens": lambda: render_ai_influencer_characters' in source
+    assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in source
     assert '"Redes Sociais": lambda: render_edit_placeholder("Redes Sociais"' in source
 
 
@@ -211,4 +212,4 @@ def test_niche_finder_menu_precedes_pipeline_in_top_navigation():
     top_pages_end = source.index("    aliases = {", top_pages_start)
     top_pages = source[top_pages_start:top_pages_end]
 
-    assert top_pages.index('(\"Niche Finder\", ":material/search:", \"Niche Finder\")') < top_pages.index('(\"Pipeline\", ":material/account_tree:", \"Pipeline\")')
+    assert top_pages.index('(\"Niche Finder\", ":material/search:", \"Niche Finder\")') < top_pages.index('(\"Pipeline Vídeos\", ":material/account_tree:", \"Pipeline Vídeos\")')
