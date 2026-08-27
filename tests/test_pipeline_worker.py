@@ -722,3 +722,19 @@ def test_azure_v2_chunking_failure_is_attributed_to_azure_v2_api():
     assert metadata["failure_api"] == "Azure Speech SDK V2 API"
     assert metadata["failure_provider"] == "azure_speech"
     assert metadata["failure_service"] == "Narração TTS — segmentação Azure"
+
+
+def test_terminal_helper_detail_prioritises_mpt_error_over_startup_output():
+    output = "\n".join(
+        [
+            "[MoneyPrinterTurbo] Pexels key validation completed: valid=1, rejected=0, unknown=0",
+            "[MoneyPrinterTurbo] installing or verifying project dependencies with uv",
+            "TASK_DIR=C:\\Users\\danha\\AppData\\Local\\THUNDERBOLT\\MoneyPrinterTurbo",
+            "MPT_ERROR=video generation failed with exit code 1; log: C:\\Users\\danha\\...\\run.log",
+        ]
+    )
+    detail = pipeline_worker._terminal_helper_detail(output)
+    assert "MPT_ERROR=video generation failed" in detail
+    assert "Pexels key validation" not in detail
+    assert "installing or verifying project dependencies" not in detail
+    assert "TASK_DIR=" not in detail

@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.77.
+Estado auditado para o release 0.3.78.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -75,3 +75,7 @@ Nenhum release será descrito como final enquanto os itens marcados como pendent
 ### Correcção prioritária 0.3.77 — Azure Speech V2 e diagnóstico MoneyPrinterTurbo
 
 O chunker Azure usa orçamento conservador ajustado à taxa, progresso seguro por segmento e validação obrigatória de `AZURE_CHUNK_COUNT`. `mpt_agent.py` não inicia a CLI upstream sem áudio customizado validado quando a voz V2 é seleccionada. O worker expõe actividade e tempo decorrido, filtra o prefixo de sincronização de configuração e preserva caminhos de log/manifesto em falhas. A sincronização TOML é atómica e mantém o ficheiro anterior em caso de erro.
+
+### Correcção residual 0.3.78 — diagnóstico do helper e sync do uv
+
+O card de vídeo deixou de truncar a mensagem em 240 caracteres. O worker agora prioriza a causa terminal e a UI oferece o diagnóstico completo e os caminhos `Log completo`/`Manifesto`. `uv sync --frozen` possui timeout de 15 minutos, detalhe seguro em falha e confirmação explícita em sucesso; o manifesto é marcado como failed quando a falha ocorre antes da CLI upstream.

@@ -317,12 +317,15 @@ def _redact_helper_output(text: str) -> str:
     return text
 
 def _terminal_helper_detail(output: str) -> str:
-    """Return the last actionable helper lines, not startup/configuration noise."""
-    lines = [_redact_helper_output(line).strip() for line in str(output or "").splitlines()]
-    lines = [line for line in lines if line]
-    noise_markers = ("using existing project:", "updated configuration fields:", "starting video generation, task id:")
-    actionable = [line for line in lines if not any(marker in line.casefold() for marker in noise_markers)]
-    return "\n".join((actionable or lines)[-12:]).strip()
+    """Return concise actionable failure lines, never startup or path markers."""
+    raw_lines = [_redact_helper_output(line).strip() for line in str(output or "").splitlines()]
+    lines = [line for line in raw_lines if line]
+    metadata_prefixes = ("TASK_DIR=", "LOG_FILE=", "RESULT_FILE=", "VIDEO_FILE=")
+    noise_markers = ("using existing project:", "updated configuration fields:", "starting video generation, task id:", "installing or verifying project dependencies with uv", "pexels key validation completed:")
+    useful = [line for line in lines if not line.startswith(metadata_prefixes) and not any(marker in line.casefold() for marker in noise_markers)]
+    failure_markers = ("mpt_error=", "traceback", "exception", "error", "failed", "falhou", "failure", "missing", "invalid", "timeout", "timed out", "not found", "exceeded", "excedeu")
+    failures = [line for line in useful if any(marker in line.casefold() for marker in failure_markers)]
+    return "\n".join((failures or useful)[-8:]).strip()
 
 
 def _helper_failure_markers(output: str) -> dict[str, Any]:
@@ -522,12 +525,13 @@ def _failure_message(message: str, metadata: dict[str, Any]) -> str:
 
 
 def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, str]:
-    """Persist only bounded helper diagnostics and return its declared file paths."""
+    """Persist bounded helper diagnostics and a safe terminal summary."""
     task_id = str(task.get("id") or "").strip()
     if not task_id:
         return {}
     log_file = _helper_output_value(output, "LOG_FILE")
     result_file = _helper_output_value(output, "RESULT_FILE")
+    terminal_detail = _terminal_helper_detail(output)
     try:
         markers = _helper_failure_markers(output)
         payload: dict[str, Any] = {
@@ -535,6 +539,7 @@ def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, s
             "log_file": log_file,
             "result_file": result_file,
             "output_tail": _redact_helper_output(output[-6000:]),
+            "terminal_detail": terminal_detail,
             "helper_provider": markers["helper_provider"],
             "missing_fields": markers["missing_fields"],
             "invalid_fields": markers["invalid_fields"],
@@ -543,7 +548,10 @@ def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, s
         current = _task_by_id(task_id) or task
         artifacts = dict(current.get("artifacts") or {})
         artifacts["video_diagnostics"] = artifact_path
-        updates: dict[str, Any] = {"artifacts": artifacts}
+        updates: dict[str, Any] = {
+            "artifacts": artifacts,
+            "video_diagnostic_summary": terminal_detail,
+        }
         if log_file:
             updates["video_log"] = log_file
             artifacts["video_log"] = log_file

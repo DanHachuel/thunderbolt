@@ -432,3 +432,9 @@ O campo **Modelo** em **Configuração API > API Keys > LLM — providers e mode
 No fluxo MoneyPrinterTurbo, a voz Azure Speech SDK V2 é preparada antes da CLI upstream. O Thunderbolt divide o roteiro em segmentos conservadores ajustados à velocidade, concatena o áudio localmente e só inicia o motor depois de confirmar o ficheiro e a contagem de segmentos. Se essa preparação falhar, a tarefa é interrompida e não existe fallback silencioso para uma chamada monolítica sujeita ao limite de 600000 ms.
 
 Durante a execução, o backlog mostra a actividade recente do helper e o tempo da etapa Vídeo. Em caso de falha, a mensagem terminal é extraída do output accionável, enquanto as linhas `using existing project` e `updated configuration fields` deixam de ser tratadas como causa. Os caminhos do log e do manifesto são preservados mesmo quando a falha ocorre antes da criação do MP4.
+
+## Correcção de diagnóstico da etapa Vídeo — 0.3.78
+
+A mensagem do card de vídeo deixou de mostrar apenas os primeiros 240 caracteres. A UI apresenta um resumo de erro com até 700 caracteres e disponibiliza um expander não editável com o diagnóstico completo, incluindo os caminhos do log e do manifesto quando existem. Linhas de sucesso de Pexels, sincronização do projecto, verificação do `uv` e marcadores de caminho são excluídas do resumo terminal.
+
+A verificação `uv sync --frozen` tem agora timeout controlado, detalhe seguro do resolver em caso de falha e confirmação explícita quando termina. O estado do manifesto é marcado como `failed` mesmo quando a falha acontece antes de a CLI do MoneyPrinterTurbo iniciar.

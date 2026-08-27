@@ -207,3 +207,21 @@ def test_generate_video_stops_before_upstream_when_chunked_audio_is_unavailable(
                 "en-US-BrianMultilingualNeural-V2-Male",
             ],
         )
+
+
+def test_run_checked_surfaces_uv_failure_detail_without_secret(tmp_path, monkeypatch):
+    secret = "uv-secret-api-key"
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout=f"error: resolver failed for package; token={secret}\n",
+        )
+
+    monkeypatch.setenv("MPT_LLM_API_KEY", secret)
+    monkeypatch.setattr(MPT_AGENT.subprocess, "run", fake_run)
+    with pytest.raises(MPT_AGENT.SkillError) as raised:
+        MPT_AGENT.run_checked(["uv", "sync", "--frozen"], cwd=tmp_path)
+    message = str(raised.value)
+    assert "resolver failed" in message
+    assert secret not in message

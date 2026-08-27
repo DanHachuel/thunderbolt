@@ -3592,7 +3592,15 @@ def _render_video_task_state(task: dict[str, Any]) -> None:
         except (TypeError, ValueError):
             pass
     if task.get("error"):
-        st.caption(str(task.get("error"))[:240])
+        error_text = str(task.get("error") or "").strip()
+        st.error(error_text[:700])
+        if len(error_text) > 700 or task.get("video_log") or task.get("video_result"):
+            with st.expander("Ver diagnóstico completo", expanded=False):
+                st.code(error_text[:6000])
+                if task.get("video_log"):
+                    st.caption(f"Log completo: {task.get('video_log')}")
+                if task.get("video_result"):
+                    st.caption(f"Manifesto: {task.get('video_result')}")
 
 
 def render_videos():

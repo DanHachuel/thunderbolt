@@ -25,6 +25,7 @@ PROJECT_ARCHIVE_URL = (
 )
 DEFAULT_ROOT = Path.home() / "MoneyPrinterTurbo"
 CHUNKED_SYNTHESIS_TIMEOUT_SECONDS = 15 * 60
+DEPENDENCY_SYNC_TIMEOUT_SECONDS = 15 * 60
 DEFAULT_VOICE_NAME = "zh-CN-XiaoxiaoNeural-Female"
 NEEDS_INPUT_EXIT_CODE = 10
 SUPPORTED_SOURCES = {"pexels", "pixabay", "coverr", "local"}
@@ -623,24 +624,37 @@ def write_result_manifest(root: Path, payload: dict[str, object]) -> Path:
     temp_path.replace(result_path)
     return result_path.resolve()
 
-
 def run_checked(command: list[str], *, cwd: Path) -> None:
-    """Run dependency sync quietly and show only the last 30 lines on failure."""
+    """Run dependency sync with a bounded wait and safe failure output."""
     log("installing or verifying project dependencies with uv")
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=DEPENDENCY_SYNC_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SkillError(
+            "A verificação das dependências com uv excedeu 15 minutos; "
+            "a execução foi interrompida."
+        ) from exc
+    output = result.stdout or ""
+    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY", "MPT_PIXABAY_API_KEY", "AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"):
+        secret = os.environ.get(key, "").strip()
+        if secret:
+            output = output.replace(secret, "[redacted]")
     if result.returncode != 0:
-        output_tail = (result.stdout or "").splitlines()[-30:]
-        if output_tail:
-            print("\n".join(output_tail), file=sys.stderr)
-        raise SkillError(f"dependency installation failed with exit code {result.returncode}")
+        output_tail = "\n".join(output.splitlines()[-30:]).strip()
+        raise SkillError(
+            f"dependency installation failed with exit code {result.returncode}. "
+            + (f"Detalhe do uv: {output_tail}" if output_tail else "O uv não devolveu detalhes.")
+        )
+    log("project dependencies verified with uv")
 
 
 def generate_video(
