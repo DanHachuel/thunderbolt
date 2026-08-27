@@ -5397,11 +5397,25 @@ def _render_api_test_feedback(settings: dict[str, Any], test_key: str, result: d
     st.error(ui_text("Último teste: chamada falhou", language) + suffix)
 
 
-def _render_api_test_control(settings: dict[str, Any], test_key: str, callback: Any, *, widget_key: str) -> None:
-    """Render a form-safe diagnostic button and persist its redacted result."""
+def _render_api_test_control(
+    settings: dict[str, Any],
+    test_key: str,
+    callback: Any,
+    *,
+    widget_key: str,
+    persist_callback: Any = None,
+) -> None:
+    """Render a form-safe diagnostic button and persist its redacted result.
+
+    ``persist_callback`` keeps a card whose fields live in the global form
+    consistent: testing it must not appear successful while its values remain
+    only in the browser session.
+    """
     if st.form_submit_button("Testar chamada API", use_container_width=True, key=widget_key):
         with st.spinner(ui_text("A testar chamada API…", current_ui_language())):
             try:
+                if persist_callback is not None:
+                    persist_callback()
                 result = callback()
             except Exception:
                 result = {"status": "error", "message": "A chamada de diagnóstico falhou."}
@@ -5832,11 +5846,23 @@ def render_settings():
                         azure_speech_key = text_setting("Azure Speech key", "azure_speech_key", secret=True)
                         _render_credential_status(azure_speech_key)
                         azure_speech_region = text_setting("Azure Speech region", "azure_speech_region")
+
+                        def save_azure_speech() -> None:
+                            settings.update({
+                                "azure_speech_key": azure_speech_key.strip(),
+                                "azure_speech_region": azure_speech_region.strip(),
+                            })
+                            write_json("settings.json", settings)
+
+                        if st.form_submit_button("Guardar Azure Speech", type="primary", use_container_width=True, key="save_azure_speech"):
+                            save_azure_speech()
+                            st.success("Azure Speech guardado.")
                         _render_api_test_control(
                             settings,
                             "voice:azure_speech",
                             lambda: test_voice_provider("azure_speech", {"azure_speech_key": azure_speech_key, "azure_speech_region": azure_speech_region}),
                             widget_key="api_test_voice_azure",
+                            persist_callback=save_azure_speech,
                         )
 
                     with st.container(border=True):

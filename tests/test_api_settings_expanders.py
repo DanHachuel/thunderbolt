@@ -45,6 +45,16 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('with st.form("settings_form"):', MAIN_SOURCE)
         self.assertIn('st.form_submit_button("Guardar configurações do Thunderbolt"', MAIN_SOURCE)
 
+    def test_azure_speech_card_persists_values_before_diagnostic(self):
+        self.assertIn('persist_callback: Any = None', MAIN_SOURCE)
+        self.assertIn('if persist_callback is not None:', MAIN_SOURCE)
+        self.assertIn('persist_callback()', MAIN_SOURCE)
+        self.assertIn('def save_azure_speech() -> None:', MAIN_SOURCE)
+        self.assertIn('"azure_speech_key": azure_speech_key.strip()', MAIN_SOURCE)
+        self.assertIn('"azure_speech_region": azure_speech_region.strip()', MAIN_SOURCE)
+        self.assertIn('key="save_azure_speech"', MAIN_SOURCE)
+        self.assertIn('persist_callback=save_azure_speech', MAIN_SOURCE)
+
     def test_nvidia_nim_limit_card_is_inside_llm_expander_before_provider_cards(self):
         start = MAIN_SOURCE.index('def render_llm_provider_cards(')
         end = MAIN_SOURCE.index('def _media_card_config_status(', start)
