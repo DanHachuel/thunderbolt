@@ -369,6 +369,74 @@ def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, m
     assert config["app"]["pixabay_api_keys"] == ["pixabay-test-key", "pixabay-second-key"]
 
 
+def test_legacy_azure_tts_v1_uses_sdk_v2_when_credentials_are_configured():
+    args = pipeline_worker._moneyprinter_cli_args(
+        {
+            "topic": "Tema",
+            "voice": "en-US-BrianMultilingualNeural-Male",
+            "generation_settings": {
+                "voiceover_service": "Azure TTS V1",
+                "voiceover_mode": "Auto",
+            },
+        },
+        "pexels",
+        settings={"azure_speech_key": "configured", "azure_speech_region": "eastus"},
+    )
+    assert args[args.index("--voice-name") + 1] == "en-US-BrianMultilingualNeural-V2-Male"
+
+
+def test_edge_tts_timeout_is_attributed_to_azure_speech_api():
+    metadata = pipeline_worker._failure_attribution(
+        {"style_wide": "pexels"},
+        {},
+        "video",
+        error="azure_tts_v1 - failed, error: edge_tts stream timed out after 30s",
+    )
+    assert metadata["failure_api"] == "Azure Speech / edge_tts API"
+    assert metadata["failure_provider"] == "azure_speech, edge_tts"
+    assert metadata["failure_service"] == "Narração TTS"
+
+
+def test_moneyprinter_cli_args_marks_voice_for_azure_speech_sdk_v2():
+    args = pipeline_worker._moneyprinter_cli_args(
+        {
+            "topic": "Tema",
+            "voice": "en-US-BrianMultilingualNeural-Male",
+            "generation_settings": {
+                "voiceover_service": "Azure Speech SDK V2",
+                "voiceover_mode": "Auto",
+            },
+        },
+        "pexels",
+    )
+    assert args[args.index("--voice-name") + 1] == "en-US-BrianMultilingualNeural-V2-Male"
+
+
+def test_video_helper_rejects_missing_azure_speech_sdk_v2_credentials(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    storage.write_json("settings.json", {"moneyprinter_path": str(root), "pexels_api_keys": ["pexels-test-key"]})
+    storage.write_json("tasks.json", [{"id": "video-no-azure", "state": "doing", "stage": "video", "topic": "Tema"}])
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("não deve iniciar MPT sem credenciais Azure"))
+
+    with pytest.raises(pipeline_worker.PipelineError, match="Azure Speech API") as raised:
+        pipeline_worker._run_video_helper({
+            "id": "video-no-azure",
+            "topic": "Tema",
+            "material_source": "pexels",
+            "generation_settings": {
+                "voiceover_service": "Azure Speech SDK V2",
+                "voiceover_mode": "Auto",
+                "voice": "en-US-BrianMultilingualNeural-Male",
+            },
+        })
+
+    assert raised.value.failure_metadata["failure_config_fields"] == "azure_speech_key, azure_speech_region"
+
+
 def test_video_helper_rejects_missing_selected_stock_key_with_actionable_message(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     with pytest.raises(pipeline_worker.PipelineError, match="API key de Pixabay"):

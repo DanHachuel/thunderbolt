@@ -324,6 +324,16 @@ def _failure_attribution(
     provider_code = str(markers["helper_provider"] or "").strip().casefold()
     combined = f"{output} {error}".casefold()
 
+    if stage == "video" and any(marker in combined for marker in ("edge_tts", "edge tts", "azure_tts_v1", "azure speech")):
+        return {
+            "failure_api": "Azure Speech / edge_tts API",
+            "failure_provider": "azure_speech, edge_tts",
+            "failure_service": "Narração TTS",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+
     if stage == "video" and missing:
         api_labels: list[str] = []
         provider_values: list[str] = []
@@ -567,7 +577,45 @@ def _mpt_video_language(value: Any) -> str:
     return raw if re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?", raw) else ""
 
 
-def _moneyprinter_cli_args(task: dict[str, Any], route: str) -> list[str]:
+def _uses_azure_speech_sdk_v2(
+    generation_settings: dict[str, Any],
+    settings: dict[str, Any] | None = None,
+) -> bool:
+    service = str(generation_settings.get("voiceover_service") or "").strip().casefold()
+    if service in {
+        "azure speech sdk v2",
+        "azure speech",
+        "azure tts v2",
+        "azure speech sdk",
+    }:
+        return True
+    if service in {"azure tts v1", "edge tts", "edge_tts"}:
+        configured = settings or {}
+        return bool(
+            str(configured.get("azure_speech_key") or "").strip()
+            and str(configured.get("azure_speech_region") or "").strip()
+        )
+    configured = settings or {}
+    return bool(
+        str(configured.get("azure_speech_key") or "").strip()
+        and str(configured.get("azure_speech_region") or "").strip()
+    )
+
+
+def _azure_speech_v2_voice_name(value: str) -> str:
+    """Mark a normal Azure voice for MPT's Azure Speech SDK V2 branch."""
+    voice = str(value or "").strip()
+    if not voice or ":" in voice or voice.casefold() == "no-voice":
+        return voice
+    if re.search(r"-v2(?:-|$)", voice, flags=re.IGNORECASE):
+        return voice
+    match = re.search(r"-(Female|Male)$", voice, flags=re.IGNORECASE)
+    if match:
+        return f"{voice[:match.start()]}-V2{voice[match.start():]}"
+    return f"{voice}-V2"
+
+
+def _moneyprinter_cli_args(task: dict[str, Any], route: str, settings: dict[str, Any] | None = None) -> list[str]:
     """Build the explicit MPT CLI contract for the stock Pexels/Pixabay route."""
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
     args: list[str] = ["--video-source", route]
@@ -606,6 +654,8 @@ def _moneyprinter_cli_args(task: dict[str, Any], route: str) -> list[str]:
     if voice_mode == "none" or voice_mode == "upload":
         args.extend(["--voice-name", "no-voice"])
     elif voice:
+        if _uses_azure_speech_sdk_v2(generation_settings, settings):
+            voice = _azure_speech_v2_voice_name(voice)
         args.extend(["--voice-name", voice])
     volume = generation_settings.get("voiceover_volume")
     speed = generation_settings.get("voiceover_speed")
@@ -680,7 +730,24 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
         command.extend(["--root", str(configured_root)])
     command.extend(["--subject", subject, "--"])
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
-    command.extend(_moneyprinter_cli_args(task, route))
+    if _uses_azure_speech_sdk_v2(generation_settings, settings) and str(generation_settings.get("voiceover_mode") or "").strip().casefold() not in {"none", "upload"}:
+        missing_voice_config = [
+            field for field, value in (
+                ("azure_speech_key", settings.get("azure_speech_key")),
+                ("azure_speech_region", settings.get("azure_speech_region")),
+            ) if not str(value or "").strip()
+        ]
+        if missing_voice_config:
+            message = "Azure Speech SDK V2 foi seleccionado, mas faltam credenciais de voz."
+            metadata = _failure_attribution(task, settings, "video", error=message)
+            metadata.update({
+                "failure_api": "Azure Speech API",
+                "failure_provider": "azure_speech",
+                "failure_service": "Azure Speech SDK V2",
+                "failure_config_fields": ", ".join(missing_voice_config),
+            })
+            raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+    command.extend(_moneyprinter_cli_args(task, route, settings=settings))
     if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
         voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
         if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
