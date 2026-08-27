@@ -30,6 +30,20 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
         )
         self.assertNotIn("SECRET-KEY-123", result["message"])
 
+    def test_innertube_uses_public_read_only_guide_request(self):
+        with patch.object(api_key_tests.requests, "post", return_value=self.response(200)) as post:
+            result = api_key_tests.test_innertube_api_key("SECRET-KEY-123")
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(post.call_args.args[0], "https://www.youtube.com/youtubei/v1/guide?key=SECRET-KEY-123")
+        self.assertEqual(post.call_args.kwargs["json"]["context"]["client"]["clientName"], "WEB")
+        self.assertNotIn("SECRET-KEY-123", str(result))
+
+    def test_innertube_missing_key_does_not_call_network(self):
+        with patch.object(api_key_tests.requests, "post") as post:
+            result = api_key_tests.test_innertube_api_key("")
+        self.assertEqual(result["status"], "missing")
+        post.assert_not_called()
+
     def test_provider_statuses_are_classified_without_raw_response_text(self):
         for status_code, expected in ((200, "success"), (204, "success"), (401, "error"), (403, "error"), (500, "error")):
             with self.subTest(status_code=status_code), patch.object(api_key_tests.requests, "get", return_value=self.response(status_code)):

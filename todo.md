@@ -11,3 +11,7 @@
 - [x] Adicionar o campo Data de Captura do sessionInfo token aos cartões Contas Google/YouTube — canais em lote.
 - [x] Integrar a Data de Captura no alerta de validade do sessionInfo sem expor o token.
 - [x] Testar, validar visualmente e publicar a correcção da Data de Captura.
+- [x] Adicionar Testar chamada API para a INNERTUBE_API_KEY global do YouTube.
+- [x] Adicionar Testar chamada API ao cartão Niche Finder — Kaggle.
+- [x] Adicionar Testar chamada API ao cartão Niche Finder — Apify.
+- [ ] Cobrir os três testes de credenciais com regressões e publicar a correcção.
