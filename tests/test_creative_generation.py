@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_topic_for_channel
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_topic_for_channel, generate_video_description
 
 
 class _Response:
@@ -55,6 +55,20 @@ def test_generate_title_and_keywords_excludes_thumbnail_fields(monkeypatch):
     assert result["keywords"] == ["história", "civilização"]
     assert "thumbnail_variants" not in result
     assert captured["url"].endswith("/chat/completions")
+
+
+def test_generate_video_description_uses_text_llm_and_requested_language(monkeypatch):
+    from hermes_ui import creative_generation
+
+    captured = {}
+    response = {"choices": [{"message": {"content": json.dumps({"description": "Descrição em dois parágrafos.\n\nConvite para acompanhar o canal."})}}]}
+    monkeypatch.setattr(creative_generation.requests, "post", lambda url, **kwargs: captured.update({"payload": kwargs["json"]}) or _Response(response))
+
+    description = generate_video_description(_settings(), _channel(), "A cidade que desapareceu", title="O mistério da cidade", tags=["história", "mistério"], language="en")
+
+    assert description.startswith("Descrição em dois parágrafos")
+    assert '"language": "en"' in captured["payload"]["messages"][1]["content"]
+    assert '"tags": ["história", "mistério"]' in captured["payload"]["messages"][1]["content"]
 
 
 def test_generate_creative_requires_twenty_titles_and_three_variants(monkeypatch):

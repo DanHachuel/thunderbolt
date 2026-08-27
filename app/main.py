@@ -64,7 +64,7 @@ from hermes_ui.thumbnails import (
     upload_thumbnail_image,
 )
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_keywords
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords
 from hermes_ui.media_generation import MediaGenerationError, generate_image_for_card, generate_video_for_card
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -4701,8 +4701,39 @@ def render_upload_conventional():
             channel = selected_youtube_channel or channel_map.get(str(task.get("channel_id")), {})
             account = direct_accounts.get(str(channel.get("google_account_id", "")))
             if "YouTube" in destination:
-                title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"yt_title_{task['id']}")
-                description = st.text_area("Descrição", value=task.get("description", ""), key=f"yt_description_{task['id']}", height=100)
+                detected_language = normalize_video_language(task.get("language") or channel.get("language") or "pt")
+                language_state_key = f"yt_language_{task['id']}"
+                language_source_key = f"yt_language_source_{task['id']}"
+                if st.session_state.get(language_source_key) != detected_language:
+                    st.session_state[language_state_key] = detected_language
+                    st.session_state[language_source_key] = detected_language
+                title_state_key = f"yt_title_{task['id']}"
+                title = st.text_input("Título", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=title_state_key)
+                description_state_key = f"yt_description_{task['id']}"
+                description_error_key = f"yt_description_ai_error_{task['id']}"
+
+                def generate_upload_description_callback() -> None:
+                    current_title = str(st.session_state.get(title_state_key) or title).strip()
+                    raw_tags = st.session_state.get(f"yt_tags_{task['id']}", task.get("tags", ""))
+                    current_tags = raw_tags if isinstance(raw_tags, list) else [item.strip() for item in str(raw_tags or "").split(",") if item.strip()]
+                    try:
+                        st.session_state[description_state_key] = generate_video_description(
+                            settings,
+                            channel,
+                            str(task.get("topic") or current_title),
+                            title=current_title,
+                            tags=current_tags,
+                            language=detected_language,
+                        )
+                    except CreativeGenerationError as exc:
+                        st.session_state[description_error_key] = str(exc)
+                    else:
+                        st.session_state.pop(description_error_key, None)
+
+                description = st.text_area("Descrição", value=task.get("description", ""), key=description_state_key, height=100)
+                st.button("Gerar descrição com IA", key=f"yt_description_ai_{task['id']}", use_container_width=False, on_click=generate_upload_description_callback)
+                if description_error := str(st.session_state.get(description_error_key) or "").strip():
+                    st.error(f"Não foi possível gerar a descrição: {description_error}")
                 tags_raw = st.text_input("Tags separadas por vírgula", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"yt_tags_{task['id']}")
                 yt_cols = st.columns(3)
                 with yt_cols[0]:
@@ -4711,7 +4742,13 @@ def render_upload_conventional():
                 with yt_cols[1]:
                     category_id = st.text_input("Category ID", value="22", key=f"yt_category_{task['id']}")
                 with yt_cols[2]:
-                    language = st.text_input("Idioma", value="pt-BR", key=f"yt_language_{task['id']}")
+                    language = st.selectbox(
+                        "Idioma",
+                        VIDEO_LANGUAGE_SELECTION_OPTIONS,
+                        index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(detected_language) if detected_language in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0,
+                        format_func=video_language_label,
+                        key=language_state_key,
+                    )
                 quota_count = official_upload_count(channel, account)
                 st.caption(f"API Oficial hoje: {quota_count}/{OFFICIAL_DAILY_LIMIT} envios nesta conta Gmail.")
                 if not selected_youtube_channel:
