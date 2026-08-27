@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.62
+> **Versão deste manual:** 0.3.63
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -53,7 +53,7 @@ A execução segue sempre **Tema → Script → Título → Keywords (opcional) 
 | Full IA | Pool de vídeo limitado a FAL AI, KIE AI e Agnes AI | MP4 gerado pelo provider activo |
 | Apenas Música | Áudio local/Suno já preparado | Ficheiro musical pronto para um upload de música; não gera MP4, thumbnail nem upload YouTube |
 
-Antes de iniciar a rota stock, confirme em **Configurações > Configuração API > Fontes de materiais** que existe pelo menos uma API key para a fonte efectiva. Sem uma key Pexels/Pixabay, o erro é apresentado como configuração da fonte, em vez de uma falha genérica de vídeo. **Google Lyria não é apresentado como implementado nesta release**; a rota Apenas Música aceita áudio local e a integração Suno existente.
+Antes de iniciar a rota stock, confirme em **Configurações > Configuração API > Fontes de materiais** que existe pelo menos uma API key para a fonte efectiva. Sem uma key Pexels/Pixabay, o erro é apresentado como configuração da fonte, em vez de uma falha genérica de vídeo. Se o MoneyPrinterTurbo devolver `MPT_NEEDS_INPUT`, o Thunderbolt lê `LLM_PROVIDER`, `MISSING` e `INVALID` e mostra no erro todas as APIs afectadas, como **OpenAI / NVIDIA NIM API + Pexels API**, incluindo os campos que faltam. **Google Lyria não é apresentado como implementado nesta release**; a rota Apenas Música aceita áudio local e a integração Suno existente.
 
 ## 2. Pré-requisitos
 
@@ -128,13 +128,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.63 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.63 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -142,7 +142,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.63 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -538,7 +538,7 @@ O cartão mostra o nicho imediatamente abaixo do nome. Os quatro blocos compacto
 
 A secção **Últimos 10 vídeos publicados** fica abaixo das configurações do canal, dentro de um expander fechado por defeito, e não dentro de Criação de Vídeos. Clique no expander e depois em **Actualizar últimos 10 vídeos** para consultar o feed RSS público do YouTube sem Data API Key. Os resultados são guardados em `storage/state/channel_videos.json`. A única vista disponível é **Lista**, que apresenta título, data, URL, estado e botão **Editar vídeo**. A edição local permite alterar título, estado, data, URL e notas. Essas alterações são overrides de gestão local e não publicam automaticamente no YouTube.
 
-A página **Configurações > Logs** aparece no menu entre **Notificações** e **Configuração API**. Mostra uma projecção unificada das tarefas e notificações persistentes, com filtro livre por operação, filtros por operação e estado e as colunas mínimas **Operação**, **Estado**, **Data** e **Hora**. A tabela também mostra **Registo**, **Origem**, **Progresso** e **Detalhes**; estados como pendente, em execução, concluído, publicado, falha, cancelado e bloqueado são apresentados quando existirem no storage local.
+A página **Configurações > Logs** aparece no menu entre **Notificações** e **Configuração API**. Mostra uma projecção unificada das tarefas e notificações persistentes, com filtro livre por operação, filtros por operação e estado e as colunas mínimas **Operação**, **Estado**, **Data** e **Hora**. A tabela também mostra **Registo**, **Origem**, **Progresso**, **API/Provider** e **Detalhes**; em qualquer falha nova, **API/Provider** identifica a API ou o pool responsável, o serviço, a rota e os campos de configuração em falta. Registos anteriores sem essa metadata aparecem explicitamente como falhas históricas cuja API não pôde ser identificada. Estados como pendente, em execução, concluído, publicado, falha, cancelado e bloqueado são apresentados quando existirem no storage local.
 
 ## Canais em lote por conta Google/YouTube
 
@@ -556,7 +556,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.63 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

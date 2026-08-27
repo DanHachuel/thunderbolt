@@ -45,8 +45,20 @@ def test_list_logs_projects_tasks_and_notifications_with_required_fields(tmp_pat
             "title": "Vídeo com falha",
             "channel_name": "Canal de teste",
             "error": "Timeout do Motor",
+            "failure_api": "Pexels API",
+            "failure_provider": "pexels",
+            "failure_service": "MoneyPrinterTurbo",
+            "failure_config_fields": "pexels_api_keys",
             "created_at": "2026-08-26T10:00:00+00:00",
             "updated_at": "2026-08-26T10:03:00+00:00",
+        },
+        {
+            "id": "video-legacy-failed",
+            "state": "failed",
+            "stage": "video",
+            "style_wide": "pixabay",
+            "title": "Vídeo antigo com falha",
+            "updated_at": "2026-08-26T10:04:00+00:00",
         },
     ])
     record_notification("music_completed", "Música guardada", "Faixa pronta", dedupe_key="music:one")
@@ -60,9 +72,15 @@ def test_list_logs_projects_tasks_and_notifications_with_required_fields(tmp_pat
     assert "Canal de teste" in running["details"]
     failed = next(item for item in records if item["task_id"] == "video-failed")
     assert "Timeout do Motor" in failed["details"]
+    assert failed["api_provider"] == "Pexels API"
+    assert "API/provider: Pexels API" in failed["details"]
+    assert "Configuração: pexels_api_keys" in failed["details"]
+    legacy_failed = next(item for item in records if item["task_id"] == "video-legacy-failed")
+    assert legacy_failed["api_provider"] == "Pixabay API"
+    assert "API/provider: Pixabay API" in legacy_failed["details"]
 
     rows = logs_to_rows(records)
-    assert {"Operação", "Estado", "Data", "Hora"} <= set(rows[0])
+    assert {"Operação", "Estado", "Data", "Hora", "API/Provider"} <= set(rows[0])
     assert all(row["Data"] != "—" and row["Hora"] != "—" for row in rows)
 
 
@@ -101,9 +119,10 @@ def test_logs_page_is_between_notifications_and_api_configuration():
     settings_block = source[settings_start:settings_end]
     assert settings_block.index('("Notificações"') < settings_block.index('("Logs"') < settings_block.index('("Configuração API"')
     assert '"Logs": render_logs' in source
-    for label in ("Filtrar operações", "Operação", "Estado", "Data", "Hora", "Registo", "Origem", "Detalhes"):
+    for label in ("Filtrar operações", "Operação", "Estado", "Data", "Hora", "Registo", "Origem", "API/Provider", "Detalhes"):
         assert label in source
     assert "list_logs(operation=operation_filter, query=query, status=status_filter, limit=500)" in source
     assert "height=520" in source
+    assert '"API/Provider": st.column_config.TextColumn("API/Provider", width=220)' in source
     assert '"Detalhes": st.column_config.TextColumn("Detalhes", width=760)' in source
     assert "barra de rolagem horizontal na parte inferior" in source

@@ -5862,10 +5862,11 @@ def render_logs():
             "Registo": st.column_config.TextColumn("Registo", width=280),
             "Origem": st.column_config.TextColumn("Origem", width=130),
             "Progresso": st.column_config.TextColumn("Progresso", width=100),
+            "API/Provider": st.column_config.TextColumn("API/Provider", width=220),
             "Detalhes": st.column_config.TextColumn("Detalhes", width=760),
         },
     )
-    st.caption("Quando a tabela exceder a largura disponível, utilize a barra de rolagem horizontal na parte inferior para consultar todo o conteúdo das células.")
+    st.caption("A coluna API/Provider identifica a API responsável por cada falha; quando o registo é anterior a esta correcção, o sistema assinala que a API não pôde ser identificada. Quando a tabela exceder a largura disponível, utilize a barra de rolagem horizontal na parte inferior para consultar todo o conteúdo das células.")
 
 
 def render_notifications():

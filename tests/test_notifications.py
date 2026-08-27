@@ -56,6 +56,35 @@ def test_transition_task_creates_final_notification_once(tmp_path):
     assert len(list_notifications()) == 1
 
 
+def test_failed_task_notification_includes_api_attribution(tmp_path):
+    storage = _isolated_storage(tmp_path / "failed-api")
+    from hermes_ui.domain import transition_task
+    from hermes_ui.notifications import list_notifications
+
+    storage.write_json("tasks.json", [{
+        "id": "video-api-failure",
+        "state": "doing",
+        "stage": "video",
+        "title": "Vídeo com erro de API",
+        "channel_name": "Canal",
+        "error": "Credencial rejeitada",
+        "failure_api": "Pixabay API",
+        "failure_provider": "pixabay",
+        "failure_service": "MoneyPrinterTurbo",
+        "failure_config_fields": "pixabay_api_keys",
+        "artifacts": {},
+    }])
+
+    transition_task("video-api-failure", "failed", error="Credencial rejeitada")
+
+    entry = list_notifications()[0]
+    assert entry["event_type"] == "activity_failed"
+    assert entry["metadata"]["failure_api"] == "Pixabay API"
+    assert "API/provider: Pixabay API" in entry["message"]
+    assert entry["metadata"]["failure_provider"] == "pixabay"
+    assert entry["metadata"]["failure_config_fields"] == "pixabay_api_keys"
+
+
 def test_music_and_script_reconciliation_are_separate(tmp_path):
     storage = _isolated_storage(tmp_path / "music-script")
     from hermes_ui.notifications import list_notifications, reconcile_persisted_notifications

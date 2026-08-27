@@ -184,8 +184,14 @@ def test_run_once_marks_unexpected_pipeline_error_terminal(tmp_path, monkeypatch
     assert result["ok"] is False
     task = storage.read_json("tasks.json")[0]
     assert task["state"] == "failed"
-    assert task["error"] == "falha simulada"
+    assert task["error"].startswith("falha simulada")
+    assert "API/provider:" in task["error"]
+    assert task["failure_api"] == "OpenAI / NVIDIA NIM API"
     assert storage.read_json(pipeline_worker.PIPELINE_LOG_FILENAME)["status"] == "failed"
+    from hermes_ui.logs import list_logs
+    from hermes_ui.notifications import list_notifications
+    assert list_notifications()[0]["metadata"]["failure_api"] == "OpenAI / NVIDIA NIM API"
+    assert next(item for item in list_logs() if item["task_id"] == "video_error")["api_provider"] == "OpenAI / NVIDIA NIM API"
 
 
 def test_run_once_persists_idle_heartbeat(tmp_path, monkeypatch):
@@ -271,6 +277,32 @@ def test_video_helper_uses_configured_root_and_persists_helper_diagnostics(tmp_p
     assert task["video_log"] == "/tmp/mpt-video.log"
     assert task["video_result"] == "/tmp/mpt-result.json"
     assert "VIDEO_FILE=" in diagnostics["output_tail"]
+
+
+def test_video_helper_reports_each_missing_moneyprinter_api(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    storage.write_json("settings.json", {"moneyprinter_path": str(root), "pexels_api_keys": ["pexels-test-key"]})
+    storage.write_json("tasks.json", [{"id": "video-missing-mpt-api", "state": "doing", "stage": "video", "topic": "Tema"}])
+
+    def fake_popen(command, **kwargs):
+        return _FakePopen([
+            "MPT_NEEDS_INPUT\n",
+            "LLM_PROVIDER=openai\n",
+            "MISSING=openai_api_key\n",
+            "MISSING=pexels_api_keys\n",
+        ], returncode=10)
+
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", fake_popen)
+
+    with pytest.raises(pipeline_worker.PipelineError, match="OpenAI / NVIDIA NIM API \\+ Pexels API") as raised:
+        pipeline_worker._run_video_helper({"id": "video-missing-mpt-api", "topic": "Tema"})
+
+    assert raised.value.failure_metadata["failure_provider"] == "openai, pexels"
+    assert raised.value.failure_metadata["failure_config_fields"] == "openai_api_key, pexels_api_keys"
 
 
 def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, monkeypatch):

@@ -221,11 +221,22 @@ def _notify_task_completion(task: dict[str, Any], previous_state: str = "") -> N
     title = str(task.get("title") or task.get("topic") or "Actividade")
     channel = str(task.get("channel_name") or "Canal")
     if current_state == "failed":
+        failure_api = str(task.get("failure_api") or "API não identificada (falha anterior)").strip()
         record_notification(
             "activity_failed",
             f"Actividade falhou: {title}",
-            f"A actividade de {channel} terminou com erro.",
-            metadata={"task_id": task_id, "channel_name": channel, "error": task.get("error") or ""},
+            f"A actividade de {channel} terminou com erro. API/provider: {failure_api}.",
+            metadata={
+                "task_id": task_id,
+                "channel_name": channel,
+                "error": task.get("error") or "",
+                "failure_api": task.get("failure_api") or "API não identificada (falha anterior)",
+                "failure_provider": task.get("failure_provider") or "unknown",
+                "failure_service": task.get("failure_service") or "Thunderbolt",
+                "failure_route": task.get("failure_route") or "",
+                "failure_config_fields": task.get("failure_config_fields") or "",
+                "failure_stage": task.get("failure_stage") or task.get("failed_stage") or task.get("stage") or "pipeline",
+            },
             dedupe_key=f"task:{task_id}:failed",
         )
         return

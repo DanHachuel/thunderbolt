@@ -76,6 +76,29 @@ def _operation_label(operation_code: str, fallback: str = "Operação") -> str:
     return str(event.get("label") if event else fallback or operation_code or "Operação")
 
 
+def _fallback_task_failure_api(task: dict[str, Any]) -> str:
+    """Infer a safe API label for legacy failed tasks without structured metadata."""
+    route = str(task.get("material_source") or task.get("style_wide") or "").strip().casefold()
+    if "pexels" in route and "pixabay" in route:
+        return "Pexels/Pixabay API (fonte efectiva não registada)"
+    if "pixabay" in route:
+        return "Pixabay API"
+    if "pexels" in route or "stock" in route:
+        return "Pexels/Pixabay API (fonte efectiva não registada)"
+    if route in {"full_ia", "full ia", "ia"}:
+        return "FAL AI / KIE AI / Agnes AI"
+    if route in {"music", "musica", "música"} or bool(task.get("music_mode")):
+        return "Suno / Ficheiro local"
+    stage = str(task.get("stage") or task.get("failed_stage") or "").strip().casefold()
+    if stage in {"topic", "script", "title", "keywords", "thumbnail_prompt"}:
+        return "LLM textual API (provider não registado)"
+    if stage == "thumbnail":
+        return "Pool de imagem API (provider não registado)"
+    if stage == "upload":
+        return "YouTube Upload API"
+    return "API não identificada (falha anterior)"
+
+
 def _task_log(task: dict[str, Any]) -> dict[str, Any] | None:
     task_id = str(task.get("id") or "").strip()
     if not task_id:
@@ -100,6 +123,20 @@ def _task_log(task: dict[str, Any]) -> dict[str, Any] | None:
     if progress_value is not None:
         details.append(f"Progresso: {progress_value}%")
     error = str(task.get("error") or "").strip()
+    failure_api = str(task.get("failure_api") or "").strip()
+    failure_provider = str(task.get("failure_provider") or "").strip()
+    failure_service = str(task.get("failure_service") or "").strip()
+    failure_fields = str(task.get("failure_config_fields") or "").strip()
+    api_provider = failure_api
+    if state in {"failed", "error"}:
+        api_provider = api_provider or _fallback_task_failure_api(task)
+        details.append(f"API/provider: {api_provider}")
+        if failure_provider:
+            details.append(f"Provider: {failure_provider}")
+        if failure_service:
+            details.append(f"Serviço: {failure_service}")
+        if failure_fields:
+            details.append(f"Configuração: {failure_fields}")
     if error:
         details.append(error[:500])
     return {
@@ -114,6 +151,7 @@ def _task_log(task: dict[str, Any]) -> dict[str, Any] | None:
         "source": "Tarefas",
         "record": title,
         "details": " · ".join(details),
+        "api_provider": api_provider or "",
         "progress": progress_value,
         "task_id": task_id,
     }
@@ -141,6 +179,9 @@ def _notification_log(entry: dict[str, Any]) -> dict[str, Any] | None:
     date, time = format_log_date_time(occurred_at)
     metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
     public_metadata = [f"{key}: {value}" for key, value in metadata.items() if value not in (None, "")]
+    api_provider = str(metadata.get("failure_api") or metadata.get("api_provider") or "").strip()
+    if status_code in {"failed", "error"}:
+        api_provider = api_provider or "API não identificada (falha anterior)"
     return {
         "id": f"notification:{entry_id}",
         "operation_code": event_type,
@@ -153,6 +194,7 @@ def _notification_log(entry: dict[str, Any]) -> dict[str, Any] | None:
         "source": "Notificações",
         "record": str(entry.get("title") or entry.get("label") or "Notificação"),
         "details": " · ".join([str(entry.get("message") or "").strip(), *public_metadata]).strip(" ·")[:1000],
+        "api_provider": api_provider,
         "progress": None,
         "task_id": str(metadata.get("task_id") or ""),
     }
@@ -227,6 +269,7 @@ def logs_to_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "Registo": item.get("record") or "—",
             "Origem": item.get("source") or "—",
             "Progresso": f"{item['progress']}%" if item.get("progress") is not None else "—",
+            "API/Provider": item.get("api_provider") or "—",
             "Detalhes": item.get("details") or "—",
         }
         for item in records
