@@ -6,5 +6,5 @@
 - [x] Adicionar botão de geração de descrição do vídeo por IA entre os campos Description e Tags no formulário de Upload.
 - [x] Detectar o idioma da tarefa/vídeo no formulário de Upload e apresentá-lo num selector suspenso com a lista padrão de idiomas.
 - [x] Testar, validar visualmente e publicar os ajustes do formulário de Upload.
-- [ ] Criar a aba Documentação > Tutorial YouTube Video-Upload Frontend com conteúdo orientado ao uso seguro do fluxo.
-- [ ] Testar, validar visualmente e publicar a nova aba de documentação.
+- [x] Criar a aba Documentação > Tutorial YouTube Video-Upload Frontend com conteúdo orientado ao uso seguro do fluxo.
+- [x] Testar, validar visualmente e publicar a nova aba de documentação.
