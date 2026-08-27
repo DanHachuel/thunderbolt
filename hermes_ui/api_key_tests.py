@@ -95,6 +95,24 @@ def test_apify_credentials(api_token: str) -> dict[str, Any]:
     return _get(f"{APIFY_API_BASE}/users/me", headers={"Authorization": f"Bearer {api_token}"})
 
 
+def test_innertube_api_key(api_key: str) -> dict[str, Any]:
+    """Validate a global InnerTube key with a public, read-only guide request."""
+    api_key = str(api_key or "").strip()
+    if not api_key:
+        return _missing("Introduza a INNERTUBE_API_KEY antes de testar.")
+    return _post(
+        f"https://www.youtube.com/youtubei/v1/guide?key={quote(api_key, safe='')}",
+        json={
+            "context": {
+                "client": {
+                    "clientName": "WEB",
+                    "clientVersion": "2.20250305.01.00",
+                }
+            }
+        },
+    )
+
+
 def test_nano_banana_credentials(api_key: str, model: str) -> dict[str, Any]:
     """Validate the configured Gemini image model metadata without generating an image."""
     api_key = str(api_key or "").strip()
@@ -307,6 +325,7 @@ __all__ = [
     "test_apify_credentials",
     "test_azure_speech_credentials",
     "test_elevenlabs_credentials",
+    "test_innertube_api_key",
     "test_kaggle_credentials",
     "test_influencer_database",
     "test_material_source_credentials",

@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+MAIN_SOURCE = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+
+
+def test_innertube_key_has_a_safe_api_test_control():
+    block = MAIN_SOURCE.split('with st.form("innertube_api_key_form"):', 1)[1].split('if save_innertube_api_key:', 1)[0]
+
+    assert 'test_innertube_api_key(innertube_api_key_value)' in block
+    assert 'widget_key="api_test_innertube"' in block
+    assert '_render_api_test_control(' in block
+
+
+def test_kaggle_and_apify_keep_api_test_controls_in_their_configuration_cards():
+    settings = MAIN_SOURCE.split("def render_settings():", 1)[1].split("def render_google_accounts():", 1)[0]
+    kaggle = settings.split('with st.expander("Niche Finder — Kaggle", expanded=False):', 1)[1].split('with st.expander("Niche Finder — Apify", expanded=False):', 1)[0]
+    apify = settings.split('with st.expander("Niche Finder — Apify", expanded=False):', 1)[1].split('llm_rpm_settings =', 1)[0]
+
+    assert 'test_kaggle_credentials(kaggle_username, kaggle_api_key)' in kaggle
+    assert 'widget_key="api_test_kaggle"' in kaggle
+    assert 'test_apify_credentials(apify_api_token)' in apify
+    assert 'widget_key="api_test_apify"' in apify

@@ -47,7 +47,7 @@ from hermes_ui.notifications import clear_notifications, list_notifications, mar
 from hermes_ui.influencers import BACKEND_OPTIONS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, backend_name, backend_status, get_repository, test_backend
 from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
-from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
+from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_innertube_api_key, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
@@ -5203,6 +5203,12 @@ def render_google_accounts():
             type="password",
             key="global_innertube_api_key",
             help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.",
+        )
+        _render_api_test_control(
+            settings,
+            "innertube",
+            lambda: test_innertube_api_key(innertube_api_key_value),
+            widget_key="api_test_innertube",
         )
         save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
     if save_innertube_api_key:
