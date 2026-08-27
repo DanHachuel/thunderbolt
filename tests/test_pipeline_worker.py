@@ -139,12 +139,12 @@ def test_run_task_resumes_from_persisted_artifacts_without_regenerating_previous
         "thumbnail_prompt": "prompt persistido",
         "thumbnail_text": "PRONTO",
     }
-    channel = {"id": "channel-resume", "name": "Canal retomado", "language": "pt-BR", "niche": "Teste"}
+    channel = {"id": "channel-resume", "name": "Canal retomado", "language": "pt-BR", "niche": "Teste", "google_account_id": "account-resume"}
     storage.write_json("channels.json", [channel])
     storage.write_json("tasks.json", [task])
     calls = {"upload": 0}
 
-    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {"youtube_batch_accounts": []})
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {"youtube_batch_accounts": [{"id": "account-resume"}]})
     monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
     monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
     monkeypatch.setattr(pipeline_worker, "save_script_document", lambda *args, **kwargs: pytest.fail("não deve guardar novamente o roteiro"))
@@ -172,6 +172,52 @@ def test_run_task_resumes_from_persisted_artifacts_without_regenerating_previous
     assert persisted["artifacts"]["video"] == str(video_path)
     assert persisted["artifacts"]["thumbnail"] == str(thumbnail_path)
     assert calls["upload"] == 1
+
+
+def test_run_task_completes_locally_when_no_upload_route_is_configured(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    script_path = tmp_path / "roteiro-pronto.md"
+    script_path.write_text("Roteiro persistido", encoding="utf-8")
+    video_path = tmp_path / "video-pronto.mp4"
+    video_path.write_bytes(b"mp4")
+    thumbnail_path = tmp_path / "thumbnail-pronta.jpg"
+    thumbnail_path.write_bytes(b"jpg")
+    prompt_path = tmp_path / "thumbnail-prompt.json"
+    prompt_path.write_text('{"thumbnail": {"image_prompt": "prompt persistido", "overlay_text": "PRONTO"}}', encoding="utf-8")
+    task = {
+        "id": "video_local_ready",
+        "state": "failed",
+        "stage": "upload",
+        "progress": 94,
+        "topic": "Tema pronto",
+        "title": "Título pronto",
+        "channel_id": "channel-local",
+        "thumbnail_variant": {"image_prompt": "prompt persistido", "overlay_text": "PRONTO"},
+        "artifacts": {
+            "script": str(script_path),
+            "video": str(video_path),
+            "thumbnail": str(thumbnail_path),
+            "thumbnail_prompt_json": str(prompt_path),
+        },
+    }
+    channel = {"id": "channel-local", "name": "Canal local", "language": "en"}
+    storage.write_json("tasks.json", [task])
+    monkeypatch.setattr(
+        pipeline_worker,
+        "_settings",
+        lambda: {"youtube_batch_accounts": [], "upload_post_enabled": False, "upload_post_auto_upload": False, "postiz_enabled": False, "postiz_auto_publish": False},
+    )
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "upload_with_default_route", lambda *args, **kwargs: pytest.fail("não deve tentar publicação sem rota configurada"))
+
+    result = pipeline_worker._run_task(task)
+
+    persisted = storage.read_json("tasks.json")[0]
+    assert result["state"] == "done"
+    assert persisted["stage"] == "upload"
+    assert persisted["artifacts"]["upload"]["route"] == "local"
+    assert persisted["artifacts"]["upload"]["status"] == "skipped"
 
 
 def test_run_once_marks_unexpected_pipeline_error_terminal(tmp_path, monkeypatch):
