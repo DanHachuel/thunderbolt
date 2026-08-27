@@ -116,10 +116,11 @@ def chunk_character_limit(rate: float) -> int:
 def _build_ssml(text: str, voice: str, rate: float) -> str:
     parts = voice.split("-", 2)
     locale = "-".join(parts[:2]) if len(parts) >= 2 else "en-US"
+    escaped_voice = escape(voice, {'"': "&quot;"})
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
         f'xml:lang="{escape(locale)}">'
-        f'<voice name="{escape(voice, {"\"": "&quot;"})}">'
+        f'<voice name="{escaped_voice}">'
         f'<prosody rate="{_normalise_rate(rate):g}">{escape(text)}</prosody>'
         "</voice></speak>"
     )
