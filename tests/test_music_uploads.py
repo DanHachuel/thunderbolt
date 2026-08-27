@@ -201,3 +201,13 @@ def test_pushtunes_requires_tidal_session_file(tmp_path):
 
     assert result.ok is False
     assert "tidal-session.json" in result.message
+
+
+def test_distrokid_adapter_is_exported_and_manual_submit_is_documented():
+    from integrations.distrokid_upload import DistroKidAdapter
+    from pathlib import Path
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    assert DistroKidAdapter
+    assert '"DistroKid"' in source
+    assert '_render_distrokid_upload_tab()' in source
+    assert 'submissão final fica sempre manual' in source

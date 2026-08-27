@@ -71,3 +71,11 @@ def test_upload_post_rejects_missing_video(tmp_path):
     result = UploadPostAdapter(_settings()).upload_video(tmp_path / "missing.mp4", title="Título")
     assert not result.ok
     assert "não encontrado" in result.message
+
+
+def test_upload_post_platforms_are_typed_in_api_settings_and_normalised_from_text():
+    from pathlib import Path
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    assert 'text_setting("Plataformas Upload-Post", "upload_post_platforms"' in source
+    assert 'upload_post_platforms_selector' in source
+    assert 'help_text="Escreva as plataformas separadas por vírgulas' in source

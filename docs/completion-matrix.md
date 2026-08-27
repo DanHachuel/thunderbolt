@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.71.
+Estado auditado para o release 0.3.72.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -24,7 +24,7 @@ Estado auditado para o release 0.3.71.
 | Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. Start retoma tarefas através dos artefactos persistidos, sem regenerar etapas prontas; Apagar remove a tarefa de `tasks.json` e das filas após confirmação, preservando os artefactos. |
 | Instagram e Facebook Pages no Upload | Concluído no Upload-Post e preparado no convencional | Os destinos continuam visíveis no Upload convencional; a publicação real para Instagram/Facebook pode ser feita pela subaba **Upload-Post** com plataformas ligadas ao perfil, enquanto os botões convencionais permanecem desactivados. |
 | Upload para Postiz por API key/MCP | Concluído como integração configurável | Aba **Postiz** em Upload, `PostizAdapter` com `GET /integrations`, `POST /upload` para MP4 e `POST /posts` para YouTube; campos de API key, Base URL, MCP URL e integração padrão em Configuração API. |
-| Upload-Post para múltiplas plataformas | Concluído como integração configurável | Quarta subaba **Upload-Post** em Upload; `UploadPostAdapter` usa `POST /upload` com `multipart/form-data`, `Authorization: Apikey`, username/perfil, plataformas repetidas em `platform[]`, suporte a `async_upload`, `request_id`, histórico local e notificação própria. |
+| Upload-Post para múltiplas plataformas | Concluído como integração configurável | Quarta subaba **Upload-Post** em Upload; `UploadPostAdapter` usa `POST /upload` com `multipart/form-data`, `Authorization: Apikey`, username/perfil, plataformas repetidas em `platform[]`, suporte a `async_upload`, `request_id`, histórico local e notificação própria. A lista de plataformas na configuração é um campo textual separado por vírgulas e é normalizada pelo adapter. |
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Rotas de vídeo por fonte e ordem da pipeline | Concluído | `pipeline_worker.py` encaminha por tarefa a fonte efectiva e os parâmetros para o helper MoneyPrinterTurbo; Pexels/Pixabay usam pesquisa, cache, download e composição MoviePy/FFmpeg, Full IA fica limitado a FAL AI/KIE AI/Agnes AI e Apenas Música termina no artefacto de áudio. A ordem é `topic → script → title → keywords opcional → video → thumbnail_prompt JSON → thumbnail → upload`; o teste estrutural garante que vídeo ocorre antes de prompt e imagem. O worker coloca `--` antes dessas flags para o parser `argparse.REMAINDER` do `mpt_agent.py` as encaminhar para a CLI filha. |
 | Attribution de API em falhas de vídeo e Logs | Concluído | O helper interpreta `LLM_PROVIDER`, `MISSING` e `INVALID` do MoneyPrinterTurbo; tarefas, notificações e Logs persistem `failure_api`, `failure_provider`, `failure_service`, `failure_route` e `failure_config_fields`. A tabela Logs expõe a coluna **API/Provider** e identifica explicitamente registos históricos sem attribution. Timeouts `azure_tts_v1`/`edge_tts` são atribuídos a **Azure Speech / edge_tts API**; o erro Azure `1007`/`600000ms` é atribuído à **Azure Speech SDK V2 API**. |
@@ -62,3 +62,5 @@ A publicação directa Instagram/Facebook continua deliberadamente desactivada: 
 
 
 Nenhum release será descrito como final enquanto os itens marcados como pendentes nesta matriz não estiverem implementados, testados ou explicitamente classificados como dependências externas pelo utilizador.
+
+| Upload Bilibili via bilibili-api e DistroKid | Concluído | `Upload` disponibiliza Bilibili com contas multi-card e upload via `bilibili-api-python`; `Configuração API > API Bilibili` permite testar, guardar e apagar cards. `Upload Música > DistroKid` adapta o upload do musikai com browser assistido, múltiplas faixas, capa, metadata local e submissão final manual. Cookies e credenciais não entram nos logs ou no histórico público. |

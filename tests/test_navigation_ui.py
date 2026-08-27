@@ -99,7 +99,7 @@ def test_api_keys_contains_material_sources_expander_with_multi_key_controls():
     settings_start = MAIN_SOURCE.index("def render_settings():")
     settings_page = MAIN_SOURCE[settings_start:]
     material_sources_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_material_source_api_keys("):]
-    tabs_literal = 'api_keys_tab, google_accounts_tab, tiktok_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "AI Influencers", "Teste de Voz"])'
+    tabs_literal = 'api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])'
     assert tabs_literal in settings_page
     assert 'with material_sources_tab:' not in settings_page
     assert 'render_material_source_api_keys(settings, embedded=True)' in settings_page

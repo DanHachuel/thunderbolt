@@ -70,6 +70,8 @@ from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdap
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.postiz import PostizAdapter
 from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPTIONS, normalize_upload_post_platforms
+from integrations.bilibili_upload import BilibiliApiAdapter, BILIBILI_DEFAULT_TID, BILIBILI_VIDEO_EXTENSIONS, normalise_bilibili_api_cards
+from integrations.distrokid_upload import DistroKidAdapter, DISTROKID_AUDIO_EXTENSIONS, DISTROKID_COVER_EXTENSIONS, close_distrokid_session
 from integrations.music_uploads import JewelMusicAdapter, PushtunesAdapter, YTMusicApiAdapter, MUSIC_UPLOAD_EXTENSIONS, PUSHTUNES_OPERATIONS, PUSHTUNES_SOURCES, PUSHTUNES_TARGETS, YT_MUSIC_UPLOAD_EXTENSIONS
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
@@ -4099,7 +4101,7 @@ def _render_music_upload_history() -> None:
         record
         for record in read_json("uploads.json", [])
         if isinstance(record, dict)
-        and any(name in str(record.get("destination") or "").lower() for name in ("jewelmusic", "pushtunes", "youtube music", "ytmusicapi"))
+        and any(name in str(record.get("destination") or "").lower() for name in ("jewelmusic", "pushtunes", "youtube music", "ytmusicapi", "distrokid"))
     ]
     st.divider()
     st.subheader("Histórico de uploads de música")
@@ -4283,16 +4285,104 @@ def _render_ytmusicapi_upload_tab() -> None:
         (st.success if result.ok else st.error)(result.message)
 
 
+def _store_distrokid_cover(uploaded: Any) -> str:
+    target_dir = STORAGE / "distrokid"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(uploaded.name).name).strip("._") or "cover.jpg"
+    target = target_dir / f"{uuid.uuid4().hex[:10]}_{safe_name}"
+    target.write_bytes(uploaded.getvalue())
+    return str(target)
+
+def _render_distrokid_upload_tab() -> None:
+    st.subheader("DistroKid")
+    st.caption("Upload assistido baseado no fluxo de publish do musikai. O browser preenche o novo lançamento e carrega as faixas; a submissão final fica sempre manual no DistroKid.")
+    settings = read_json("settings.json", {})
+    with st.form("distrokid_settings_form"):
+        enabled = st.checkbox("Activar DistroKid", value=bool(settings.get("distrokid_enabled", False)))
+        cookie = st.text_input("Cookie de sessão DistroKid", value=str(settings.get("distrokid_cookie") or ""), type="password", help="Cole o cabeçalho Cookie da sua sessão DistroKid. O valor é guardado apenas no storage local.")
+        account = st.text_input("Nome da conta DistroKid", value=str(settings.get("distrokid_account") or ""))
+        browser_path = st.text_input("Executável Chrome/Chromium (opcional)", value=str(settings.get("distrokid_browser_path") or ""), help="Deixe vazio para usar Google Chrome; também pode definir THUNDERBOLT_CHROME_PATH.")
+        settings_cols = st.columns(2)
+        with settings_cols[0]:
+            first_name = st.text_input("Primeiro nome", value=str(settings.get("distrokid_first_name") or ""))
+            artist = st.text_input("Artista", value=str(settings.get("distrokid_artist") or ""))
+            release_title = st.text_input("Título do lançamento", value=str(settings.get("distrokid_release_title") or ""))
+        with settings_cols[1]:
+            last_name = st.text_input("Apelido", value=str(settings.get("distrokid_last_name") or ""))
+            record_label = st.text_input("Record label", value=str(settings.get("distrokid_record_label") or ""))
+            genre = st.text_input("Género principal", value=str(settings.get("distrokid_genre") or ""), help="O género deve corresponder a uma opção aceite pelo formulário DistroKid.")
+        save = st.form_submit_button("Guardar configuração DistroKid", type="primary", use_container_width=True)
+    if save:
+        _persist_music_upload_settings({
+            "distrokid_enabled": bool(enabled), "distrokid_cookie": cookie.strip(), "distrokid_account": account.strip(),
+            "distrokid_browser_path": browser_path.strip(), "distrokid_first_name": first_name.strip(), "distrokid_last_name": last_name.strip(),
+            "distrokid_artist": artist.strip(), "distrokid_release_title": release_title.strip(), "distrokid_record_label": record_label.strip(), "distrokid_genre": genre.strip(),
+        })
+        st.success("Configuração DistroKid guardada no storage local.")
+    settings = read_json("settings.json", {})
+    adapter = DistroKidAdapter(settings)
+    status = adapter.status()
+    (st.success if status.ok else st.warning)(status.message)
+    if st.button("Testar sessão DistroKid", key="distrokid_test", use_container_width=True):
+        result = DistroKidAdapter(read_json("settings.json", {})).test_connection()
+        (st.success if result.ok else st.error)(result.message)
+    uploaded_tracks = st.file_uploader("Faixas para o lançamento", type=sorted(extension.lstrip(".") for extension in DISTROKID_AUDIO_EXTENSIONS), accept_multiple_files=True, key="distrokid_track_upload")
+    if uploaded_tracks and st.button("Guardar faixas no storage local", key="distrokid_store_tracks", use_container_width=True):
+        stored_paths: list[str] = []
+        for uploaded in uploaded_tracks:
+            try:
+                stored_paths.append(str(store_music_file(f"distrokid_{uuid.uuid4().hex[:8]}_{uploaded.name}", uploaded.getvalue())))
+            except (OSError, ValueError) as exc:
+                st.error(str(exc))
+        if stored_paths:
+            st.session_state["distrokid_track_paths"] = stored_paths
+            st.success(f"{len(stored_paths)} faixa(s) guardada(s) no storage local.")
+    selected_paths = [str(path) for path in st.session_state.get("distrokid_track_paths", []) if Path(str(path)).is_file()]
+    track_rows: list[dict[str, Any]] = []
+    if selected_paths:
+        st.markdown("**Faixas seleccionadas**")
+        for index, path in enumerate(selected_paths, start=1):
+            track_title = st.text_input(f"Título da faixa {index}", value=Path(path).stem, key=f"distrokid_track_title_{index}")
+            instrumental = st.checkbox("Instrumental", value=False, key=f"distrokid_track_instrumental_{index}")
+            track_rows.append({"path": path, "title": track_title.strip() or Path(path).stem, "instrumental": instrumental})
+    cover_upload = st.file_uploader("Capa do lançamento (opcional)", type=sorted(extension.lstrip(".") for extension in DISTROKID_COVER_EXTENSIONS), key="distrokid_cover_upload")
+    if cover_upload and st.button("Guardar capa no storage local", key="distrokid_store_cover", use_container_width=True):
+        try:
+            st.session_state["distrokid_cover_path"] = _store_distrokid_cover(cover_upload)
+            st.success("Capa guardada no storage local.")
+        except OSError as exc:
+            st.error(f"Não foi possível guardar a capa: {exc}")
+    cover_path = str(st.session_state.get("distrokid_cover_path") or "")
+    if cover_path and Path(cover_path).is_file():
+        st.caption(f"Capa seleccionada: `{cover_path}`")
+    session_id = str(st.session_state.get("distrokid_session_id") or "")
+    if session_id and st.button("Fechar browser DistroKid", key="distrokid_close_browser", use_container_width=True):
+        result = close_distrokid_session(session_id)
+        (st.success if result.ok else st.warning)(result.message)
+        st.session_state.pop("distrokid_session_id", None)
+    if st.button("Abrir formulário e carregar para DistroKid", type="primary", key="distrokid_prepare_upload", use_container_width=True, disabled=not status.ok or not track_rows):
+        current = read_json("settings.json", {})
+        result = DistroKidAdapter(current).prepare_upload(
+            track_rows, artist=str(current.get("distrokid_artist") or ""), release_title=str(current.get("distrokid_release_title") or ""),
+            record_label=str(current.get("distrokid_record_label") or ""), cover_path=cover_path or None, genre=str(current.get("distrokid_genre") or ""),
+        )
+        _record_music_upload("DistroKid", result, music_path=selected_paths[0] if selected_paths else "", target={"service": "DistroKid", "account": str(current.get("distrokid_account") or "")})
+        (st.success if result.ok else st.error)(result.message)
+        if result.ok and result.data.get("session_id"):
+            st.session_state["distrokid_session_id"] = result.data["session_id"]
+
 def render_music_upload() -> None:
     st.title("Upload Música")
-    st.caption("Carregue e encaminhe músicas por JewelMusic, sincronize bibliotecas com Pushtunes ou envie directamente para YouTube Music com ytmusicapi. As credenciais e o histórico permanecem locais.")
-    jewel_tab, pushtunes_tab, ytmusicapi_tab = render_localized_tabs(["JewelMusic", "Pushtunes", "ytmusicapi"])
+    st.caption("Carregue músicas por JewelMusic, sincronize bibliotecas com Pushtunes, envie para YouTube Music com ytmusicapi ou prepare um lançamento DistroKid. As credenciais, browser e histórico permanecem locais.")
+    jewel_tab, pushtunes_tab, ytmusicapi_tab, distrokid_tab = render_localized_tabs(["JewelMusic", "Pushtunes", "ytmusicapi", "DistroKid"])
     with jewel_tab:
         _render_jewelmusic_upload_tab()
     with pushtunes_tab:
         _render_pushtunes_upload_tab()
     with ytmusicapi_tab:
         _render_ytmusicapi_upload_tab()
+    with distrokid_tab:
+        _render_distrokid_upload_tab()
     _render_music_upload_history()
 
 
@@ -4460,6 +4550,7 @@ def render_upload_post():
 
 UPLOAD_DESTINATION_TARGET_KEYS = {
     "TikTok": "tiktok_accounts",
+    "Bilibili": "bilibili_api_cards",
     "Instagram": "instagram_profiles",
     "Facebook Pages": "facebook_pages",
 }
@@ -4491,6 +4582,8 @@ def upload_targets_for_destination(destination: str, channels: list[dict[str, An
     configured_targets = settings.get(setting_key, [])
     if destination == "TikTok" and (not isinstance(configured_targets, list) or not configured_targets):
         configured_targets = settings.get("tiktok_profiles", [])
+    if destination == "Bilibili" and isinstance(configured_targets, list):
+        configured_targets = [item for item in configured_targets if isinstance(item, dict) and bool(item.get("active", True))]
     if not isinstance(configured_targets, list):
         return []
     targets: list[Any] = []
@@ -4505,14 +4598,16 @@ def upload_targets_for_destination(destination: str, channels: list[dict[str, An
 def render_upload_destination_target(destination: str, channels: list[dict[str, Any]], settings: dict[str, Any]) -> Any | None:
     options = upload_targets_for_destination(destination, channels, settings)
     destination_key = re.sub(r"[^a-z0-9]+", "_", destination.lower()).strip("_")
-    select_label = "Canal" if destination == "YouTube" else ("Conta TikTok" if destination == "TikTok" else "Perfil / página")
-    empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else ("Nenhuma conta TikTok cadastrada" if destination == "TikTok" else f"Nenhum {destination} configurado")
+    select_label = "Canal" if destination == "YouTube" else ("Conta TikTok" if destination == "TikTok" else ("Conta Bilibili" if destination == "Bilibili" else "Perfil / página"))
+    empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else ("Nenhuma conta TikTok cadastrada" if destination == "TikTok" else ("Nenhuma conta Bilibili activa" if destination == "Bilibili" else f"Nenhum {destination} configurado"))
     if not options:
         st.selectbox(select_label, [empty_label], disabled=True, key=f"upload_target_{destination_key}")
         if destination == "YouTube":
             st.caption("Cadastre ou liste pelo menos um canal YouTube antes de escolher o destino de envio.")
         elif destination == "TikTok":
             st.caption("Cadastre uma conta em Pipeline TikTok > Contas TikTok antes de escolher o destino de envio.")
+        elif destination == "Bilibili":
+            st.caption("Configure e active uma conta em Configuração API > API Bilibili antes de escolher o destino de envio.")
         else:
             st.caption(f"A lista de {destination} será ligada numa etapa própria de credenciais/API.")
         return None
@@ -4533,7 +4628,7 @@ def render_upload_conventional():
     direct_accounts = {str(account.get("id")): account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")}
     postiz = PostizAdapter(settings)
     tasks = [t for t in read_json("tasks.json", []) if t.get("state") == "done" or t.get("artifacts", {}).get("video")]
-    destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Instagram", "Facebook Pages"], default=["YouTube"], key="upload_destinations", placeholder="Seleccione os destinos")
+    destination = st.multiselect("Destinos", ["YouTube", "TikTok", "Bilibili", "Instagram", "Facebook Pages"], default=["YouTube"], key="upload_destinations", placeholder="Seleccione os destinos")
     upload_targets: dict[str, Any | None] = {}
     if destination:
         st.markdown("**Onde enviar**")
@@ -4654,6 +4749,31 @@ def render_upload_conventional():
                 write_json("uploads.json", uploads)
                 reconcile_persisted_notifications()
                 (st.success if result.ok else st.warning)(result.message)
+            bilibili_target = upload_targets.get("Bilibili") if "Bilibili" in destination else None
+            if "Bilibili" in destination:
+                bilibili_title = st.text_input("Título Bilibili", value=task.get("title") or task.get("topic", "Vídeo Thunderbolt"), key=f"bilibili_title_{task['id']}")
+                bilibili_description = st.text_area("Descrição Bilibili", value=task.get("description", ""), key=f"bilibili_description_{task['id']}", height=90)
+                bilibili_tags = st.text_input("Tags Bilibili separadas por vírgulas", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"bilibili_tags_{task['id']}")
+                bilibili_tid = st.number_input("ID da secção Bilibili", min_value=1, max_value=9999, value=BILIBILI_DEFAULT_TID, step=1, key=f"bilibili_tid_{task['id']}")
+                if st.button("Enviar via bilibili-api (Python)", type="primary", key=f"upload_bilibili_{task['id']}", disabled=not bilibili_target, help="Configure e active uma conta Bilibili em Configuração API > API Bilibili." if not bilibili_target else None):
+                    result = BilibiliApiAdapter(bilibili_target, settings).upload_video(
+                        video_path, title=bilibili_title, description=bilibili_description, tags=bilibili_tags, tid=int(bilibili_tid),
+                        cover_path=thumbnail_path or None,
+                    )
+                    record = {
+                        "task_id": task.get("id"),
+                        "destination": "Bilibili",
+                        "target": upload_target_reference(bilibili_target),
+                        "status": "published" if result.ok else "failed",
+                        "message": result.message,
+                        "data": result.data,
+                        "created_at": now(),
+                    }
+                    uploads = read_json("uploads.json", [])
+                    uploads.append(record)
+                    write_json("uploads.json", uploads)
+                    reconcile_persisted_notifications()
+                    (st.success if result.ok else st.error)(result.message)
             if "Instagram" in destination:
                 st.button("Preparar Instagram", key=f"upload_instagram_{task['id']}", disabled=True, help="UI preparada; publicação Instagram ainda não está activa.")
             if "Facebook Pages" in destination:
@@ -4756,6 +4876,78 @@ def render_tiktok_api_cards(settings: dict[str, Any]) -> None:
         st.success("Novo card TikTok criado.")
         st.rerun()
 
+
+def _persist_bilibili_api_cards(settings: dict[str, Any], cards: list[dict[str, Any]]) -> None:
+    clean_cards: list[dict[str, Any]] = []
+    for item in cards:
+        normalised, _ = normalise_bilibili_api_cards({"bilibili_api_cards": [item]})
+        if normalised:
+            clean_cards.append(normalised[0])
+    settings["bilibili_api_cards"] = clean_cards
+    first = next((card for card in clean_cards if card.get("active") and card.get("sessdata") and card.get("bili_jct") and card.get("buvid3")), clean_cards[0] if clean_cards else {})
+    for field in ("sessdata", "bili_jct", "buvid3", "buvid4", "dedeuserid", "ac_time_value", "proxy"):
+        settings[f"bilibili_{field}"] = str(first.get(field) or "")
+    write_json("settings.json", settings)
+
+def render_bilibili_api_cards(settings: dict[str, Any]) -> None:
+    st.title("API Bilibili")
+    st.caption("Configure várias contas Bilibili em cards separados. O upload usa bilibili-api-python; os cookies permanecem locais e nunca são mostrados em logs, históricos ou metadados.")
+    st.warning("O pacote bilibili-api-python é uma integração opcional e depende da sessão do browser Bilibili. Use apenas contas e conteúdos que tenha autorização para operar.")
+    cards, changed = normalise_bilibili_api_cards(settings)
+    if changed and cards:
+        _persist_bilibili_api_cards(settings, cards)
+    if not cards:
+        st.info("Ainda não existe nenhuma conta Bilibili configurada. Use o botão abaixo para criar o primeiro card.")
+    for index, card in enumerate(cards):
+        card_id = str(card["id"])
+        with st.container(border=True):
+            header_cols = st.columns([3.2, 1.2])
+            with header_cols[0]:
+                st.subheader(str(card.get("label") or f"Conta Bilibili {index + 1}"))
+            with header_cols[1]:
+                configured = bool(card.get("active", True) and card.get("sessdata") and card.get("bili_jct") and card.get("buvid3"))
+                _api_status_badge("Configured" if configured else "Missing configuration", "ready" if configured else "missing")
+            with st.form(f"bilibili_api_card_form_{card_id}"):
+                label = st.text_input("Nome da conta", value=str(card.get("label") or f"Conta Bilibili {index + 1}"), key=f"bilibili_api_{card_id}_label")
+                active = st.checkbox("Conta activa no Upload", value=bool(card.get("active", True)), key=f"bilibili_api_{card_id}_active")
+                credential_cols = st.columns(2)
+                with credential_cols[0]:
+                    sessdata = st.text_input("SESSDATA", value=str(card.get("sessdata") or ""), type="password", key=f"bilibili_api_{card_id}_sessdata")
+                    bili_jct = st.text_input("bili_jct", value=str(card.get("bili_jct") or ""), type="password", key=f"bilibili_api_{card_id}_bili_jct")
+                    buvid3 = st.text_input("BUVID3", value=str(card.get("buvid3") or ""), type="password", key=f"bilibili_api_{card_id}_buvid3")
+                    buvid4 = st.text_input("BUVID4 (opcional)", value=str(card.get("buvid4") or ""), type="password", key=f"bilibili_api_{card_id}_buvid4")
+                with credential_cols[1]:
+                    dedeuserid = st.text_input("DedeUserID (opcional)", value=str(card.get("dedeuserid") or ""), type="password", key=f"bilibili_api_{card_id}_dedeuserid")
+                    ac_time_value = st.text_input("ac_time_value (opcional)", value=str(card.get("ac_time_value") or ""), type="password", key=f"bilibili_api_{card_id}_ac_time_value")
+                    proxy = st.text_input("Proxy opcional", value=str(card.get("proxy") or ""), key=f"bilibili_api_{card_id}_proxy", placeholder="http://127.0.0.1:8080")
+                action_cols = st.columns(3)
+                with action_cols[0]:
+                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                with action_cols[1]:
+                    save_clicked = st.form_submit_button("Guardar card", type="primary", use_container_width=True)
+                with action_cols[2]:
+                    delete_clicked = st.form_submit_button("Apagar card", use_container_width=True)
+            edited = {"id": card_id, "label": label.strip() or f"Conta Bilibili {index + 1}", "active": bool(active), "sessdata": sessdata.strip(), "bili_jct": bili_jct.strip(), "buvid3": buvid3.strip(), "buvid4": buvid4.strip(), "dedeuserid": dedeuserid.strip(), "ac_time_value": ac_time_value.strip(), "proxy": proxy.strip()}
+            if test_clicked:
+                cards[index] = edited
+                _persist_bilibili_api_cards(settings, cards)
+                result = BilibiliApiAdapter(edited, settings).test_connection()
+                (st.success if result.ok else st.error)(result.message)
+            elif save_clicked:
+                cards[index] = edited
+                _persist_bilibili_api_cards(settings, cards)
+                st.success("Card Bilibili guardado.")
+                st.rerun()
+            elif delete_clicked:
+                cards = [item for item in cards if str(item.get("id")) != card_id]
+                _persist_bilibili_api_cards(settings, cards)
+                st.success("Card Bilibili apagado.")
+                st.rerun()
+    if st.button("Adicionar nova API", type="primary", use_container_width=True, key="add_bilibili_api_card"):
+        cards.append({"id": f"bilibili-api-{uuid.uuid4().hex[:10]}", "label": f"Conta Bilibili {len(cards) + 1}", "active": True, "sessdata": "", "bili_jct": "", "buvid3": "", "buvid4": "", "dedeuserid": "", "ac_time_value": "", "proxy": ""})
+        _persist_bilibili_api_cards(settings, cards)
+        st.success("Novo card Bilibili criado.")
+        st.rerun()
 
 def render_google_accounts():
     st.title("Contas Google")
@@ -5539,7 +5731,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, google_accounts_tab, tiktok_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "AI Influencers", "Teste de Voz"])
+    api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -5697,7 +5889,7 @@ def render_settings():
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
                     _render_credential_status(upload_post_api_key)
                     upload_post_username = text_setting("Upload-Post username", "upload_post_username")
-                    upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms")
+                    upload_post_platforms = text_setting("Plataformas Upload-Post", "upload_post_platforms", help_text="Escreva as plataformas separadas por vírgulas, como em Pipeline Vídeos > Upload > Destino. Ex.: youtube,tiktok")
                     upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)))
                     _render_api_test_control(
                         settings,
@@ -5762,6 +5954,8 @@ def render_settings():
     with tiktok_api_tab:
         render_tiktok_api_cards(settings)
 
+    with bilibili_api_tab:
+        render_bilibili_api_cards(settings)
     with ai_influencers_tab:
         st.subheader("AI Influencers")
         st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")

@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.71
+> **Versão deste manual:** 0.3.72
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -132,13 +132,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.72 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.72 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -146,7 +146,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.72 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -485,7 +485,7 @@ O **Backlog Vídeos** e a lista **Automação > Automação Youtube > Vídeos ca
 
 Nos dois cards, o bloco de estado apresenta o valor técnico, o rótulo legível, a barra de progresso e a mensagem de erro quando existir. O bloco **Formato** resolve nesta ordem `format`, `style_wide`, `style` e, por fim, `wide`, mantendo a apresentação de formatos como `wide`, `shorts`, `music` ou `full_ia` mesmo em tarefas antigas. Em **Automação Youtube > Vídeos cadastrados**, o botão **Start** retoma a partir dos artefactos persistidos: reutiliza roteiro, título/keywords, vídeo, prompt e thumbnail prontos e só executa novamente uma etapa cujo resultado não exista. O botão **Apagar** remove o card da fila depois de confirmação e preserva os ficheiros de artefactos; uma tarefa em execução deve ser parada antes da remoção.
 
-### Upload Música — JewelMusic, Pushtunes e ytmusicapi
+### Upload Música — JewelMusic, Pushtunes, ytmusicapi e DistroKid
 
 A área **Pipeline Música > Upload Música** separa três métodos com contratos diferentes. Em **JewelMusic**, active a integração, introduza a API Key fornecida pelo dashboard da JewelMusic e confirme a Base URL oficial `https://api.jewelmusic.com` e, se necessário, configure proxy e timeout. Carregue ou seleccione um ficheiro de música, indique artista e título e clique em **Enviar música para JewelMusic**. O teste de ligação consulta `/v1/ping`; o upload envia `multipart/form-data` para `/v1/tracks/upload` com os metadados preenchidos.
 
@@ -574,7 +574,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.72 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -626,9 +626,14 @@ Em **Configurações > Contas Google**, cada conta aparece como um expander iden
 
 Em **Canais Youtube > Canais cadastrados**, a secção **Upload directo — documento da conta deste canal** mostra apenas a conta Google associada e confirma se o documento contém o ID delegado desse canal. O `DELEGATED_SESSION_ID` permanece exclusivamente no mapa do documento; o upload bloqueia a operação se faltar qualquer elemento técnico.
 
+### API Bilibili — várias contas
+A subaba **Configuração API > API Bilibili** fica entre **API Tiktok** e **AI Influencers**. Use **Adicionar nova API** para criar cards separados. Em cada card, preencha um nome, marque **Conta activa no Upload** quando a conta puder ser usada, introduza `SESSDATA`, `bili_jct` e `BUVID3`, e adicione `BUVID4`, `DedeUserID`, `ac_time_value` ou proxy apenas quando necessário. **Testar chamada API** valida a sessão sem criar upload; **Guardar card** persiste a conta e **Apagar card** remove-a. Os cookies são campos protegidos e não aparecem em mensagens, logs ou `uploads.json`.
+
+Em **Upload > Upload convencional**, seleccione **Bilibili** em **Destinos**, escolha a conta activa e preencha os campos apresentados no card do vídeo. O botão **Enviar via bilibili-api (Python)** executa o upload do MP4/MOV/MKV/WEBM, gera uma capa de primeiro frame quando a thumbnail não existe e guarda o resultado localmente. O pacote Python é opcional no import, mas é instalado pelo requirements normal; se a dependência ou a sessão estiverem indisponíveis, o erro identifica a API sem bloquear as restantes redes.
+
 ### Upload-Post
 
-A subaba **Upload-Post** usa a API oficial do [Upload-Post](https://docs.upload-post.com/) para publicar vídeos prontos em uma ou mais plataformas ligadas ao perfil configurado. Em **Configuração API > API Keys > Serviços e modelos > Publicação através do Upload-Post**, active a integração, guarde a API key, o username/perfil e as plataformas padrão. Depois abra **Upload > Upload-Post**, confirme ou altere as plataformas, escreva o título e a descrição e clique em **Enviar vídeo pelo Upload-Post**.
+A subaba **Upload-Post** usa a API oficial do [Upload-Post](https://docs.upload-post.com/) para publicar vídeos prontos em uma ou mais plataformas ligadas ao perfil configurado. Em **Configuração API > API Keys > Serviços e modelos > Publicação através do Upload-Post**, active a integração, guarde a API key, o username/perfil e as plataformas padrão. **Plataformas Upload-Post** é um campo textual; escreva os slugs separados por vírgulas, por exemplo `youtube,tiktok`, exactamente como os destinos seleccionáveis em **Upload > Upload convencional**. Depois abra **Upload > Upload-Post**, confirme ou altere as plataformas, escreva o título e a descrição e clique em **Enviar vídeo pelo Upload-Post**.
 
 A credencial não é duplicada na página de Upload. A integração envia o ficheiro local como `video` em `multipart/form-data`, usa `platform[]` repetido para cada destino e autentica com `Authorization: Apikey ...`. **Processar em segundo plano** envia `async_upload=true`; quando a API devolver `request_id`, este fica visível e é guardado em `uploads.json`. O histórico local também alimenta a notificação **Upload-Post concluído**. O Upload-Post é distinto do Postiz: não usa os endpoints nem a selecção de integrações do Postiz.
 
