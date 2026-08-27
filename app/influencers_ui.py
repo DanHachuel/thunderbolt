@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -13,14 +14,26 @@ import streamlit as st
 from hermes_ui.influencers import (
     BACKEND_OPTIONS,
     InfluencerBackendError,
+    STANDALONE_CONTENT_INFLUENCER_ID,
     backend_name,
     backend_status,
+    ensure_standalone_content_owner,
     get_repository,
     test_backend,
 )
-from hermes_ui.media_generation import MediaGenerationError, generate_image_for_card, generate_video_for_card
+from hermes_ui.media_generation import (
+    MediaGenerationError,
+    generate_image_for_card,
+    generate_motion_control_video,
+    generate_ugc_product_video,
+    generate_video_for_card,
+    upload_kie_file,
+    validate_motion_control_file,
+)
+from hermes_ui.creative_generation import generate_ugc_segment_prompts
 from hermes_ui.media_providers import media_cards_for_pool, media_provider_definition
 from hermes_ui.notifications import record_notification
+from hermes_ui.storage import STORAGE, ensure_storage
 
 
 CONTENT_STATES = {
@@ -195,7 +208,7 @@ def render_ai_influencer_characters(
 
     with created_characters_tab:
         try:
-            influencers = repository.list_influencers()
+            influencers = [item for item in repository.list_influencers() if str(item.get("id") or "") != STANDALONE_CONTENT_INFLUENCER_ID]
         except Exception:
             st.error("Não foi possível consultar os personagens no backend seleccionado.")
             return
@@ -301,6 +314,170 @@ def _render_content_history(repository: Any, influencer_id: str = "") -> None:
             st.video(str(artifact))
 
 
+def _store_uploaded_file(uploaded: Any, folder: str) -> Path:
+    """Persist an uploaded Streamlit file under storage without trusting its filename."""
+    ensure_storage()
+    original = Path(str(getattr(uploaded, "name", "upload.bin") or "upload.bin")).name
+    safe_name = "".join(char if char.isalnum() or char in ".-_" else "_" for char in original).strip("._") or "upload.bin"
+    content = uploaded.getvalue()
+    if not content:
+        raise MediaGenerationError(f"O ficheiro {safe_name} está vazio.")
+    digest = hashlib.sha256(content).hexdigest()[:16]
+    destination = STORAGE / "influencer_workflows" / folder / f"{digest}-{safe_name}"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.exists():
+        destination.write_bytes(content)
+    return destination
+
+
+def _workflow_owner(repository: Any) -> str:
+    return ensure_standalone_content_owner(repository)
+
+
+def _workflow_provider_cards(settings: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return [card for card in media_cards_for_pool(settings, "video") if str(card.get("provider") or "").strip().lower() == "kie_ai"]
+
+
+def render_motion_control(settings: dict[str, Any]) -> None:
+    """Render Kling 2.6 Motion Control creation only; no social delivery is exposed."""
+    st.title("Motion Control")
+    st.caption("Crie um vídeo Kling 2.6 a partir de um vídeo de movimento e de uma imagem de referência. O resultado é descarregado para o storage local; não há Telegram, Postiz, Drive ou publicação social.")
+    repository = _repository(settings)
+    if repository is None:
+        return
+    cards = _workflow_provider_cards(settings)
+    if not cards:
+        st.warning("Active e configure pelo menos um cartão KIE AI no pool de vídeo em Configuração API > API Keys > Imagem e Video IA.")
+        return
+    card_options = [str(card.get("id") or "") for card in cards]
+    with st.form("influencer_motion_control_form"):
+        video_upload = st.file_uploader("Vídeo original de movimento", type=["mp4", "mov"], key="motion_control_video")
+        image_upload = st.file_uploader("Imagem de referência", type=["jpg", "jpeg", "png"], key="motion_control_image")
+        prompt = st.text_area("Prompt (opcional)", height=120, max_chars=2500, placeholder="Descreva como preservar a identidade da imagem e aplicar o movimento…", key="motion_control_prompt")
+        provider_id = st.selectbox("Provider / modelo", card_options, format_func=lambda value: _provider_label(next(card for card in cards if str(card.get("id")) == value)), key="motion_control_provider")
+        generate = st.form_submit_button("Gerar Motion Control", type="primary", use_container_width=True)
+    if generate:
+        if video_upload is None or image_upload is None:
+            st.error("Seleccione o vídeo original e a imagem de referência.")
+            return
+        card = next(card for card in cards if str(card.get("id")) == provider_id)
+        try:
+            video_path = _store_uploaded_file(video_upload, "motion-control-inputs")
+            image_path = _store_uploaded_file(image_upload, "motion-control-inputs")
+            video_info = validate_motion_control_file(video_path, kind="vídeo")
+            image_info = validate_motion_control_file(image_path, kind="imagem")
+            owner_id = _workflow_owner(repository)
+            record = repository.create_content(
+                {
+                    "influencer_id": owner_id,
+                    "content_type": "video",
+                    "prompt": prompt,
+                    "caption": "",
+                    "provider": card.get("provider"),
+                    "model": "kling-2.6/motion-control",
+                    "platform": "",
+                    "state": "running",
+                    "metadata": {
+                        "workflow": "motion_control",
+                        "input_video_path": str(video_path),
+                        "reference_image_path": str(image_path),
+                        "input_video_duration_seconds": video_info.get("duration_seconds"),
+                        "input_video_size_bytes": video_info.get("size_bytes"),
+                        "reference_image_size_bytes": image_info.get("size_bytes"),
+                    },
+                }
+            )
+            with st.spinner("A enviar os inputs para KIE e a aguardar o Kling Motion Control…"):
+                try:
+                    image_url = upload_kie_file(image_path, card, upload_path="thunderbolt/motion-control")
+                    video_url = upload_kie_file(video_path, card, upload_path="thunderbolt/motion-control")
+                    output, task_id = generate_motion_control_video(settings, card, image_url=image_url, video_url=video_url, prompt=prompt)
+                    metadata = {"workflow": "motion_control", "input_video_path": str(video_path), "reference_image_path": str(image_path), "kie_input_urls_temporary": True}
+                    repository.update_content(record["id"], {"state": "completed", "artifact_path": str(output), "provider_request_id": task_id, "metadata": metadata})
+                    record_notification("influencer_content_completed", "Motion Control concluído", "O vídeo Motion Control foi gerado e guardado localmente.", metadata={"content_id": record["id"], "workflow": "motion_control", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:completed")
+                    st.success("Motion Control concluído. O vídeo está disponível no histórico local abaixo.")
+                except Exception as exc:
+                    repository.update_content(record["id"], {"state": "failed", "error": str(exc)[:1000]})
+                    record_notification("influencer_content_failed", "Motion Control falhou", f"A criação Motion Control falhou: {str(exc)[:240]}", metadata={"content_id": record["id"], "workflow": "motion_control", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:failed")
+                    st.error(f"Não foi possível gerar o Motion Control: {exc}")
+        except (MediaGenerationError, ValueError, OSError) as exc:
+            st.error(str(exc))
+    _render_content_history(repository, STANDALONE_CONTENT_INFLUENCER_ID)
+
+
+def render_ugc_products(settings: dict[str, Any]) -> None:
+    """Render the local product-image to VEO3 workflow without Telegram or social publishing."""
+    st.title("UGC Products")
+    st.caption("Crie um anúncio UGC a partir de uma imagem de produto e de um roteiro local. O workflow gera dois clips VEO3 de 8 segundos e junta-os com FFmpeg no storage local.")
+    repository = _repository(settings)
+    if repository is None:
+        return
+    video_cards = [card for card in _workflow_provider_cards(settings) if str(card.get("model") or "").strip().lower() in {"", "veo3", "veo3_fast", "veo3_lite"}]
+    if not video_cards:
+        st.warning("Active e configure um cartão KIE AI com modelo VEO3 compatível no pool de vídeo em Configuração API > API Keys > Imagem e Video IA.")
+        return
+    image_cards, _ = _provider_options(settings, "image")
+    image_cards = [card for card in image_cards if str(card.get("provider") or "").strip().lower() == "nano_banana"]
+    with st.form("influencer_ugc_products_form"):
+        product_upload = st.file_uploader("Imagem do produto", type=["jpg", "jpeg", "png", "webp"], key="ugc_products_image")
+        script = st.text_area("Roteiro de vídeo", height=180, placeholder="Escreva a demonstração, falas e acções. Para controlar os dois clips manualmente, separe-os com uma linha contendo ---.", key="ugc_products_script")
+        improve_image = st.checkbox("Melhorar a imagem com o provider de imagem activo (opcional)", value=False, key="ugc_products_improve_image")
+        image_provider_id = ""
+        if improve_image and image_cards:
+            image_provider_options = [str(card.get("id") or "") for card in image_cards]
+            image_provider_id = st.selectbox("Provider de melhoria da imagem", image_provider_options, format_func=lambda value: _provider_label(next(card for card in image_cards if str(card.get("id")) == value)), key="ugc_products_image_provider")
+        elif improve_image:
+            st.info("Não existe um provider activo no pool de imagem; será usada a imagem original.")
+        card_options = [str(card.get("id") or "") for card in video_cards]
+        provider_id = st.selectbox("Provider VEO3", card_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider")
+        generate = st.form_submit_button("Gerar UGC Product", type="primary", use_container_width=True)
+    if generate:
+        if product_upload is None:
+            st.error("Seleccione a imagem do produto.")
+            return
+        card = next(card for card in video_cards if str(card.get("id")) == provider_id)
+        try:
+            product_path = _store_uploaded_file(product_upload, "ugc-products-inputs")
+            image_path = product_path
+            if improve_image and image_provider_id:
+                image_card = next(card for card in image_cards if str(card.get("id")) == image_provider_id)
+                with st.spinner("A melhorar a imagem do produto…"):
+                    image_path = generate_image_for_card(settings, image_card, "Melhorar a apresentação fotográfica do mesmo produto sem alterar a embalagem, logótipo, cores, forma ou objectos visíveis. Fundo comercial limpo e luz natural.", topic="UGC Product", reference_image=product_path)
+            prompts = generate_ugc_segment_prompts(settings, script)
+            owner_id = _workflow_owner(repository)
+            record = repository.create_content(
+                {
+                    "influencer_id": owner_id,
+                    "content_type": "video",
+                    "prompt": script,
+                    "caption": "",
+                    "provider": card.get("provider"),
+                    "model": str(card.get("model") or "veo3_fast"),
+                    "platform": "",
+                    "state": "running",
+                    "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "telegram": False, "social_publish": False},
+                }
+            )
+            with st.spinner("A enviar a imagem para KIE, a gerar os dois clips VEO3 e a juntá-los localmente…"):
+                try:
+                    image_url = upload_kie_file(image_path, card, upload_path="thunderbolt/ugc-products")
+                    output, task_ids = generate_ugc_product_video(settings, card, image_url=image_url, prompts=prompts)
+                    repository.update_content(record["id"], {"state": "completed", "artifact_path": str(output), "provider_request_id": ",".join(task_ids), "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "task_ids": task_ids, "telegram": False, "social_publish": False}})
+                    record_notification("influencer_content_completed", "UGC Products concluído", "O vídeo UGC Product foi gerado, unido e guardado localmente.", metadata={"content_id": record["id"], "workflow": "ugc_products", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:completed")
+                    st.success("UGC Product concluído. O vídeo final está disponível no histórico local abaixo.")
+                    with st.expander("Prompts dos dois segmentos", expanded=False):
+                        for index, prompt_item in enumerate(prompts, start=1):
+                            st.markdown(f"**Segmento {index}**")
+                            st.code(prompt_item)
+                except Exception as exc:
+                    repository.update_content(record["id"], {"state": "failed", "error": str(exc)[:1000]})
+                    record_notification("influencer_content_failed", "UGC Products falhou", f"A criação UGC Products falhou: {str(exc)[:240]}", metadata={"content_id": record["id"], "workflow": "ugc_products", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:failed")
+                    st.error(f"Não foi possível gerar o UGC Product: {exc}")
+        except (MediaGenerationError, ValueError, OSError) as exc:
+            st.error(str(exc))
+    _render_content_history(repository, STANDALONE_CONTENT_INFLUENCER_ID)
+
+
 def render_ai_influencer_content(settings: dict[str, Any]) -> None:
     st.title("Geração de Conteúdo IA")
     st.caption("Gere conteúdos para redes sociais a partir de um personagem e dos seus assets. A publicação permanece separada e exige uma acção explícita.")
@@ -308,11 +485,11 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
     if repository is None:
         return
     try:
-        influencers = repository.list_influencers()
+        influencers = [item for item in repository.list_influencers() if str(item.get("id") or "") != STANDALONE_CONTENT_INFLUENCER_ID]
     except Exception:
         st.error("Não foi possível consultar os personagens.")
         return
-    images_tab, videos_tab, motion_tab = st.tabs(["Imagens", "Vídeos", "Motion Control"])
+    images_tab, videos_tab = st.tabs(["Imagens", "Vídeos"])
 
     with images_tab:
         st.subheader("Gerar imagem para redes sociais")
@@ -415,13 +592,11 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
                 selected_id = str(st.session_state.get("content_video_influencer") or options[0])
                 _render_content_history(repository, selected_id)
 
-    with motion_tab:
-        st.subheader("Motion Control")
-        st.info("A subaba Motion Control foi preparada para a próxima evolução. Nenhuma operação é executada nesta versão.")
-
 
 __all__ = [
     "render_ai_influencer_characters",
     "render_ai_influencer_content",
+    "render_motion_control",
+    "render_ugc_products",
     "render_ai_influencers_api_status",
 ]

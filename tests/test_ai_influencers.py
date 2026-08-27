@@ -45,6 +45,21 @@ class AIInfluencerRepositoryTests(unittest.TestCase):
                 self.assertEqual(updated["state"], "completed")
                 self.assertEqual(repository.list_content(character["id"])[0]["artifact_path"], str(root / "video.mp4"))
 
+    def test_standalone_workflow_owner_keeps_motion_and_ugc_content_in_history(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            with patch.object(influencers, "STORAGE", root / "storage"):
+                repository = influencers.SQLiteInfluencerRepository(root / "ai.db")
+                owner_id = influencers.ensure_standalone_content_owner(repository)
+                self.assertEqual(owner_id, influencers.STANDALONE_CONTENT_INFLUENCER_ID)
+                self.assertEqual(len(repository.list_influencers()), 1)
+                motion = repository.create_content({"influencer_id": owner_id, "content_type": "video", "provider": "kie_ai", "model": "kling-2.6/motion-control", "state": "running", "metadata": {"workflow": "motion_control"}})
+                ugc = repository.create_content({"influencer_id": owner_id, "content_type": "video", "provider": "kie_ai", "model": "veo3_fast", "state": "completed", "metadata": {"workflow": "ugc_products", "task_ids": ["one", "two"]}})
+                rows = repository.list_content(owner_id)
+                self.assertEqual({row["id"] for row in rows}, {motion["id"], ugc["id"]})
+                self.assertIn("motion_control", rows[1]["metadata_json"] + rows[0]["metadata_json"])
+                self.assertIn("ugc_products", rows[1]["metadata_json"] + rows[0]["metadata_json"])
+
     def test_supabase_repository_uses_expected_tables_with_mock_client(self):
         class Query:
             def __init__(self, table: str, client: "FakeClient"):

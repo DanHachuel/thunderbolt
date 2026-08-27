@@ -481,3 +481,42 @@ def generate_creative_package(
         "topic_source": "llm",
         "generated_by": "configured_llm",
     }
+
+
+UGC_SEGMENT_SYSTEM_PROMPT = (
+    "És um realizador de anúncios UGC de produto. Responde apenas com JSON válido no formato "
+    "{\"segments\":[{\"prompt\":\"...\"},{\"prompt\":\"...\"}]}. "
+    "Cria exactamente dois prompts para clips consecutivos de 8 segundos cada. "
+    "Preserva exactamente o produto, embalagem, cores, logótipo e objectos visíveis na imagem; não inventes, removas ou alteres características. "
+    "Descreve apenas acções fisicamente possíveis, continuidade visual entre segmentos, diálogo natural quando solicitado e nenhuma legenda, texto incorporado, watermark ou interface."
+)
+
+
+def _ugc_fallback_prompts(instructions: str) -> list[str]:
+    base = str(instructions or "Apresentar o produto de forma clara, natural e convincente.").strip()
+    return [
+        f"Clip UGC 1 de 8 segundos. {base} Mostrar o produto exactamente como aparece na imagem, com enquadramento estável, luz natural e uma demonstração inicial fisicamente possível. Sem texto no vídeo, sem legendas e sem watermark.",
+        f"Clip UGC 2 de 8 segundos, continuidade directa do clip anterior. {base} Completar a demonstração com uma reacção humana natural e uma apresentação final do produto, sem alterar os objectos visíveis. Sem texto no vídeo, sem legendas e sem watermark.",
+    ]
+
+
+def generate_ugc_segment_prompts(settings: dict[str, Any], instructions: str) -> list[str]:
+    """Return exactly two safe VEO prompts, accepting an explicit `---` split without LLM."""
+    clean = str(instructions or "").strip()
+    explicit = [part.strip() for part in re.split(r"\n\s*(?:---|===|SEGMENTO\s*2)\s*\n", clean, flags=re.IGNORECASE) if part.strip()]
+    if len(explicit) == 2:
+        return [
+            f"Clip UGC 1 de 8 segundos. {explicit[0]} Preserve a imagem do produto. Sem texto, legendas ou watermark.",
+            f"Clip UGC 2 de 8 segundos, em continuidade. {explicit[1]} Preserve a imagem do produto. Sem texto, legendas ou watermark.",
+        ]
+    try:
+        result = _chat_json(settings, UGC_SEGMENT_SYSTEM_PROMPT, clean or "Cria uma demonstração UGC curta e natural do produto.")
+        raw_segments = result.get("segments")
+        if isinstance(raw_segments, list):
+            prompts = [str(item.get("prompt") or "").strip() for item in raw_segments if isinstance(item, dict)]
+            prompts = [item for item in prompts if item]
+            if len(prompts) >= 2:
+                return [f"{item} Sem texto incorporado, sem legendas e sem watermark." for item in prompts[:2]]
+    except CreativeGenerationError:
+        pass
+    return _ugc_fallback_prompts(clean)

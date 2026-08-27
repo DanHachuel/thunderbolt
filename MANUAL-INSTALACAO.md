@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.70
+> **Versão deste manual:** 0.3.71
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -35,9 +35,13 @@ O backend local predefinido é **SQLite**, pelo que Personagens e Geração de C
 
 Se pretender trabalhar sem serviço externo, seleccione **SQLite** no selector da aba **Configuração API > AI Influencers**. O caminho `storage/state/ai_influencers.db` e a pasta `storage/influencers/` são geridos internamente, sem campos editáveis para o utilizador. Apenas um backend é usado de cada vez. A base fica na pasta persistente do Thunderbolt, fora da instalação temporária do pacote npm; numa actualização normal, personagens, assets e configurações são preservados. O instalador também procura uma base `ai_influencers.db` válida em instalações anteriores do cache npm e recupera-a sem substituir uma base persistente já existente.
 
-Em **AI Influencers > Geração de Conteúdo IA**, utilize as subabas **Imagens**, **Vídeos** e **Motion Control**. Seleccione um personagem, prompt e destinos sociais. A subaba **Imagens** usa o pool de imagem configurado em **Imagem e Video**. A subaba **Vídeos** requer uma imagem inicial e usa o pool de vídeo; escolha o provider/modelo no cartão configurado, sem dependência obrigatória do Veo 3.1. KIE AI, Replicate e FAL AI podem usar tarefas assíncronas; o Thunderbolt consulta o estado e guarda o resultado local antes da revisão. Na Replicate, o campo Modelo deve ser o identificador do modelo ou da versão, e os inputs específicos dependem do modelo configurado.
+Em **AI Influencers > Geração de Conteúdo IA**, utilize as subabas **Imagens** e **Vídeos**. Seleccione um personagem, prompt e provider/modelo configurado no pool correspondente. A subaba **Imagens** usa o pool de imagem configurado em **Imagem e Video IA**. A subaba **Vídeos** requer uma imagem inicial e usa o pool de vídeo; KIE AI, Replicate e FAL AI podem usar tarefas assíncronas. O Thunderbolt consulta o estado e guarda o resultado local antes da revisão. Na Replicate, o campo Modelo deve ser o identificador do modelo ou da versão, e os inputs específicos dependem do modelo configurado.
 
-A geração guarda prompt, caption, provider, modelo, plataforma, estado e caminho do artefacto no backend. **Instagram**, **TikTok**, **YouTube Shorts** e **Facebook** são destinos de revisão; não existe publicação automática nesta primeira adaptação. A publicação só deve ser executada depois de configurar e confirmar a integração social correspondente numa acção separada.
+Em **AI Influencers > Motion Control**, carregue um vídeo original `.mp4` ou `.mov` entre 3 e 30 segundos e uma imagem de referência `.jpg`, `.jpeg` ou `.png` até 10 MB. O prompt é opcional e limitado a 2500 caracteres. O Thunderbolt valida os limites, guarda os originais no storage local, envia-os ao upload temporário oficial KIE, cria `kling-2.6/motion-control`, consulta `/api/v1/jobs/recordInfo` e descarrega o MP4 final localmente. É necessário um cartão KIE AI activo no pool de vídeo. O workflow não utiliza callback público, Telegram, Postiz, Google Drive ou publicação social.
+
+Em **AI Influencers > UGC Products**, carregue a imagem do produto e preencha **Roteiro de vídeo**. Se o roteiro contiver dois blocos separados por `---`, os blocos são usados directamente; nos restantes casos, o pool LLM cria dois prompts de oito segundos, mantendo o produto e proibindo alterações físicas, texto incorporado, legendas e watermark. O Thunderbolt usa o endpoint KIE VEO3.1 `/api/v1/veo/generate` com `veo3_fast`, uma `imageUrls`, `duration: 8` e `resolution: 720p`, consulta `/api/v1/veo/record-info`, descarrega os dois clips e junta-os localmente com FFmpeg. O resultado final e os IDs das tarefas são persistidos no backend AI Influencers; não há Telegram, Postiz, Drive, upload ou publicação social.
+
+A geração standalone guarda prompt, provider, modelo, estado, IDs das tarefas, inputs e caminho do artefacto em conteúdos internos do backend. O proprietário técnico desses registos fica oculto da lista de personagens. Os destinos sociais não são apresentados nestes dois formulários e a publicação permanece fora do workflow.
 
 O runtime do Thunderbolt adapta o comportamento dos workflows do episódio 35, mas não instala nem executa n8n. Formulários, Data Tables, Switch, Wait e subworkflows são substituídos por páginas Streamlit, repository Supabase/SQLite, adapters multimédia, worker, logs e notificações. Nunca coloque API keys nos JSONs dos workflows, em ficheiros versionados ou em mensagens de diagnóstico.
 
@@ -50,7 +54,7 @@ A execução segue sempre **Tema → Script → Título → Keywords (opcional) 
 | Opção visível | Rota executada | Resultado esperado |
 |---|---|---|
 | Pexels/Pixabay | MoneyPrinterTurbo stock com a fonte efectiva e as chaves correspondentes | MP4 composto localmente |
-| Full IA | Pool de vídeo limitado a FAL AI, KIE AI e Agnes AI | MP4 gerado pelo provider activo |
+| Full IA | Pool de vídeo limitado pelos cartões activos que declaram capacidade | MP4 gerado pelo provider activo |
 | Apenas Música | Áudio local/Suno já preparado | Ficheiro musical pronto para um upload de música; não gera MP4, thumbnail nem upload YouTube |
 
 Antes de iniciar a rota stock, confirme em **Configurações > Configuração API > Fontes de materiais** que existe pelo menos uma API key para a fonte efectiva. Sem uma key Pexels/Pixabay, o erro é apresentado como configuração da fonte, em vez de uma falha genérica de vídeo. Se o MoneyPrinterTurbo devolver `MPT_NEEDS_INPUT`, o Thunderbolt lê `LLM_PROVIDER`, `MISSING` e `INVALID` e mostra no erro todas as APIs afectadas, como **OpenAI / NVIDIA NIM API + Pexels API**, incluindo os campos que faltam. **Google Lyria não é apresentado como implementado nesta release**; a rota Apenas Música aceita áudio local e a integração Suno existente.

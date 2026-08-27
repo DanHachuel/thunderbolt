@@ -43,14 +43,15 @@ def test_ai_influencers_selector_is_immediately_below_backend_state_caption():
     assert block.index('st.subheader("Supabase")') > selector_position
 
 
-def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
+def test_ai_influencers_routes_are_real_and_workflows_are_standalone():
     assert '"Personagens": lambda: render_ai_influencer_characters' in MAIN
     assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in MAIN
     assert 'language_options=VIDEO_LANGUAGE_SELECTION_OPTIONS' in MAIN
     assert 'language_formatter=video_language_label' in MAIN
     assert 'language_normalizer=normalize_video_language' in MAIN
-    assert '"Motion Control": render_ai_influencer_motion_control' not in MAIN
-    assert '("Motion Control", ":material/motion_mode:", "Motion Control")' not in MAIN
+    assert '"Motion Control": lambda: render_motion_control' in MAIN
+    assert '"UGC Products": lambda: render_ugc_products' in MAIN
+    assert '("Motion Control", ":material/motion_photos_on:", "Motion Control")' in MAIN
     assert 'st.tabs(["Novo personagem", "Personagens criados"])' in UI
     assert 'with new_character_tab:' in UI
     assert 'with created_characters_tab:' in UI
@@ -59,7 +60,17 @@ def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
     card_position = UI.index('with st.expander(f"Card do personagem · {selected.get(\'name\') or selected_id}", expanded=False):')
     assets_position = UI.index('st.subheader(f"Assets de referência · {selected.get(\'name\') or selected_id}")')
     assert created_position < card_position < assets_position
-    assert 'st.tabs(["Imagens", "Vídeos", "Motion Control"])' in UI
+    assert 'st.tabs(["Imagens", "Vídeos"])' in UI
+    assert 'def render_motion_control(settings: dict[str, Any])' in UI
+    assert 'def render_ugc_products(settings: dict[str, Any])' in UI
+    assert 'Vídeo original de movimento' in UI
+    assert 'Imagem de referência' in UI
+    assert 'Prompt (opcional)' in UI
+    assert 'Imagem do produto' in UI
+    assert 'Roteiro de vídeo' in UI
+    assert 'upload_kie_file' in UI
+    assert 'telegram": False' in UI
+    assert 'social_publish": False' in UI
     assert 'language_options: list[str] | None = None' in UI
     assert 'language = st.selectbox(' in UI
     assert 'edit_language = st.selectbox(' in UI
