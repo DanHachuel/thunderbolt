@@ -10,6 +10,9 @@ class AutomationCardsTests(unittest.TestCase):
     def test_automation_video_cards_have_start_and_stop_controls(self):
         self.assertIn('key=f"automation_start_{task[\'id\']}"', MAIN_SOURCE)
         self.assertIn('key=f"automation_stop_{task[\'id\']}"', MAIN_SOURCE)
+        self.assertIn('key=f"automation_delete_{task[\'id\']}"', MAIN_SOURCE)
+        self.assertIn('delete_task(task["id"])', MAIN_SOURCE)
+        self.assertIn('st.button("Apagar"', MAIN_SOURCE)
         self.assertIn('transition_task(task["id"], "doing")', MAIN_SOURCE)
         self.assertIn('transition_task(task["id"], "blocked")', MAIN_SOURCE)
 

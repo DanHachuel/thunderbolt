@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.56
+> **Versão deste manual:** 0.3.57
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -114,13 +114,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.56 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.57 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.56 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.57 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -128,7 +128,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.56 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.57 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -453,7 +453,7 @@ Se o launcher ou o worker for encerrado abruptamente, uma tarefa `doing` sem act
 
 O **Backlog Vídeos** e a lista **Automação > Automação Youtube > Vídeos cadastrados** usam o mesmo catálogo completo de `storage/state/tasks.json`. Por isso, tarefas criadas manualmente e tarefas criadas pelo worker diário aparecem nos dois locais, sem filtragem implícita por origem. O filtro do Backlog mostra os estados conhecidos e inclui automaticamente estados adicionais encontrados nos dados.
 
-Nos dois cards, o bloco de estado apresenta o valor técnico, o rótulo legível, a barra de progresso e a mensagem de erro quando existir. O bloco **Formato** resolve nesta ordem `format`, `style_wide`, `style` e, por fim, `wide`, mantendo a apresentação de formatos como `wide`, `shorts`, `music` ou `full_ia` mesmo em tarefas antigas.
+Nos dois cards, o bloco de estado apresenta o valor técnico, o rótulo legível, a barra de progresso e a mensagem de erro quando existir. O bloco **Formato** resolve nesta ordem `format`, `style_wide`, `style` e, por fim, `wide`, mantendo a apresentação de formatos como `wide`, `shorts`, `music` ou `full_ia` mesmo em tarefas antigas. Em **Automação Youtube > Vídeos cadastrados**, o botão **Start** retoma a partir dos artefactos persistidos: reutiliza roteiro, título/keywords, vídeo, prompt e thumbnail prontos e só executa novamente uma etapa cujo resultado não exista. O botão **Apagar** remove o card da fila depois de confirmação e preserva os ficheiros de artefactos; uma tarefa em execução deve ser parada antes da remoção.
 
 ### Upload Música — JewelMusic, Pushtunes e ytmusicapi
 
@@ -542,7 +542,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.56 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.57 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -580,7 +580,7 @@ O modo `Pexels/Pixabay` representa materiais de stock. Ao seleccionar `full_ia`,
 
 A aba **Roteiros**, colocada entre **Criação de Músicas** e **Upload**, permite seleccionar um canal opcional, um Blueprint, **Roteiro de vídeo** ou **Letra de música**, idioma, tema e estrutura. O botão **Gerar com IA a partir do Blueprint** usa o provider LLM configurado e devolve um rascunho Markdown editável; o utilizador deve rever e clicar em **Guardar documento no storage**. Os ficheiros são guardados em `storage/scripts/` e o índice em `storage/state/scripts.json`; o caminho absoluto aparece no topo da página. Na subaba **Vídeos** de **Criação de Vídeos**, a aplicação mostra a frase `Os vídeos são guardados em <storage>/videos`, que identifica a pasta local dos vídeos.
 
-A aba **Automação Youtube**, dentro do menu expansível **Automação**, apresenta os cartões no layout compacto de duas linhas: na primeira ficam avatar, nome, handle, toggle **Automação ligada** e horário; na segunda ficam **Idioma Padrão**, **Nicho Padrão**, **Blueprint Padrão**, **Narrador/Voz Padrão** e o botão **Guardar**. Blueprint e Narrador/Voz continuam editáveis no card; Idioma e Nicho são mostrados a partir da configuração guardada no canal. A aba também guarda **Automação ligada** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais Youtube** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, gera um briefing, título e pacote de thumbnail específicos com o provider LLM configurado, cria o lote agendado na fila e evita duplicar o mesmo canal no mesmo dia. Se a geração não puder ser executada, o erro fica registado e o placeholder antigo não é usado.
+A aba **Automação Youtube**, dentro do menu expansível **Automação**, apresenta os cartões no layout compacto de duas linhas: na primeira ficam avatar, nome, handle, toggle **Automação ligada** e horário; na segunda ficam **Idioma Padrão**, **Nicho Padrão**, **Blueprint Padrão**, **Narrador/Voz Padrão** e o botão **Guardar**. Blueprint e Narrador/Voz continuam editáveis no card; Idioma e Nicho são mostrados a partir da configuração guardada no canal. A aba também guarda **Automação ligada** e valida horários diários no formato `HH:MM`. Os valores ficam sincronizados com o editor existente no cartão da aba **Canais Youtube** e são copiados para novas tarefas. O launcher inicia o worker local, que consulta o relógio do computador, gera um briefing, título e pacote de thumbnail específicos com o provider LLM configurado, cria o lote agendado na fila e evita duplicar o mesmo canal no mesmo dia. Se a geração não puder ser executada, o erro fica registado e o placeholder antigo não é usado. Ao iniciar um vídeo cadastrado, o worker retoma o ponto persistido sem regenerar as etapas concluídas; se um roteiro não estiver guardado, ele é criado antes de continuar. O card inclui **Start**, **Stop** e **Apagar**, sendo a remoção protegida por confirmação.
 
 A área **Teste de vozes**, dentro de **Configurações > Configuração API**, é isolada da pipeline. O preview pode ser reproduzido e descarregado de `storage/voice_previews/`. Caminhos vazios, directórios, ficheiros vazios e previews sem permissões de leitura são ignorados com uma mensagem clara, sem traceback. Se uma instalação antiga mostrar que `edge-tts` está em falta, execute `npx.cmd --yes @danhachuel/thunderbolt install`; o detector reinstala apenas a dependência ausente.
 
