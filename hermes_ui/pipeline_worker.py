@@ -33,6 +33,10 @@ WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
 class PipelineError(RuntimeError):
     """Raised when a pipeline stage cannot complete with an actionable error."""
 
+    def __init__(self, message: str, *, failure_metadata: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.failure_metadata = dict(failure_metadata or {})
+
 
 class PipelineStopped(PipelineError):
     """Raised when the user stops a task while the worker is processing it."""
@@ -187,7 +191,9 @@ def _recover_stale_tasks() -> list[str]:
             f"A tarefa ficou sem heartbeat durante mais de {STALE_TASK_SECONDS // 60} minutos. "
             "Foi marcada como falhada para evitar execução eterna; reveja o log do worker."
         )
-        update_task(task_id, {"state": "failed", "error": message, "failed_stage": task.get("stage") or "pipeline"})
+        failed_stage = str(task.get("stage") or "pipeline")
+        metadata = _failure_attribution(task, _settings(), failed_stage, error=message)
+        update_task(task_id, {"state": "failed", "error": _failure_message(message, metadata), "failed_stage": failed_stage, **metadata})
         recovered.append(task_id)
     return recovered
 
@@ -276,11 +282,158 @@ def _helper_output_value(output: str, key: str) -> str:
 
 
 def _redact_helper_output(text: str) -> str:
-    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY"):
+    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY", "MPT_PIXABAY_API_KEY"):
         secret = os.environ.get(key, "").strip()
         if secret:
             text = text.replace(secret, "[redacted]")
     return text
+
+
+def _helper_failure_markers(output: str) -> dict[str, Any]:
+    missing = [item.strip() for item in re.findall(r"(?m)^MISSING=(.+)$", output) if item.strip()]
+    invalid = [item.strip() for item in re.findall(r"(?m)^INVALID=(.+)$", output) if item.strip()]
+    return {
+        "helper_provider": _helper_output_value(output, "LLM_PROVIDER"),
+        "missing_fields": list(dict.fromkeys(missing)),
+        "invalid_fields": list(dict.fromkeys(invalid)),
+    }
+
+
+def _provider_api_label(provider: str) -> str:
+    code = str(provider or "").strip().casefold()
+    if code in {"pexels", "pixabay"}:
+        return f"{code.capitalize()} API"
+    if code in {"local", "local_storage"}:
+        return "Ficheiro local"
+    return f"{provider_definition(code).label} API"
+
+
+def _failure_attribution(
+    task: dict[str, Any],
+    settings: dict[str, Any],
+    stage: str,
+    *,
+    error: str = "",
+    output: str = "",
+) -> dict[str, Any]:
+    """Return safe, human-readable API attribution for every pipeline failure."""
+    route = _normalise_video_route(task, settings)
+    markers = _helper_failure_markers(output)
+    missing = list(markers["missing_fields"])
+    invalid = list(markers["invalid_fields"])
+    provider_code = str(markers["helper_provider"] or "").strip().casefold()
+    combined = f"{output} {error}".casefold()
+
+    if stage == "video" and missing:
+        api_labels: list[str] = []
+        provider_values: list[str] = []
+        for field in [*missing, *invalid]:
+            if field.endswith("_api_keys"):
+                source = field.removesuffix("_api_keys")
+                label = _provider_api_label(source)
+                provider_values.append(source)
+            elif field.endswith("_api_key"):
+                source = field.removesuffix("_api_key")
+                label = _provider_api_label(source)
+                provider_values.append(source)
+            else:
+                label = field
+            if label not in api_labels:
+                api_labels.append(label)
+        return {
+            "failure_api": " + ".join(api_labels) or _provider_api_label(route),
+            "failure_provider": ", ".join(dict.fromkeys(provider_values or ([provider_code] if provider_code else [route]))),
+            "failure_service": "MoneyPrinterTurbo",
+            "failure_route": route,
+            "failure_config_fields": ", ".join(dict.fromkeys([*missing, *invalid])),
+            "failure_stage": stage,
+        }
+
+    if stage == "video" and route in {"pexels", "pixabay"}:
+        return {
+            "failure_api": _provider_api_label(route),
+            "failure_provider": route,
+            "failure_service": "MoneyPrinterTurbo",
+            "failure_route": route,
+            "failure_config_fields": f"{route}_api_keys",
+            "failure_stage": stage,
+        }
+    if stage == "video" and route == "full_ia":
+        providers = [("fal_ai", "FAL AI"), ("kie_ai", "KIE AI"), ("agnes", "Agnes AI")]
+        found = [label for code, label in providers if code in combined or label.casefold() in combined]
+        labels = found or [label for _, label in providers]
+        codes = [code for code, label in providers if label in labels] or [code for code, _ in providers]
+        return {
+            "failure_api": " / ".join(f"{label} API" for label in labels),
+            "failure_provider": ", ".join(codes),
+            "failure_service": "Pool de vídeo Full IA",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+    if stage in {"topic", "script", "title", "keywords", "thumbnail_prompt"}:
+        card = active_llm_card(settings)
+        provider = str(card.get("provider") or provider_code or "openai").strip()
+        return {
+            "failure_api": _provider_api_label(provider),
+            "failure_provider": provider,
+            "failure_service": "LLM textual",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+    if stage == "thumbnail":
+        cards = media_cards_for_pool(settings, "image")
+        labels = []
+        codes = []
+        for card in cards:
+            code = str(card.get("provider") or "").strip().casefold()
+            if not code:
+                continue
+            label = _provider_api_label(code)
+            if code in combined or label.casefold() in combined or len(cards) == 1:
+                labels.append(label)
+                codes.append(code)
+        if not labels:
+            labels = [_provider_api_label(str(card.get("provider") or "imagem")) for card in cards] or ["Pool Imagem API"]
+            codes = [str(card.get("provider") or "").strip() for card in cards if card.get("provider")] or ["image_pool"]
+        return {
+            "failure_api": " / ".join(labels),
+            "failure_provider": ", ".join(codes),
+            "failure_service": "Pool de imagem",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+    if stage == "upload":
+        return {
+            "failure_api": "YouTube Upload API",
+            "failure_provider": "youtube_upload",
+            "failure_service": "Upload",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+    return {
+        "failure_api": "API não identificada (falha anterior)",
+        "failure_provider": provider_code or "unknown",
+        "failure_service": "Thunderbolt",
+        "failure_route": route,
+        "failure_config_fields": ", ".join(dict.fromkeys([*missing, *invalid])),
+        "failure_stage": stage or "pipeline",
+    }
+
+
+def _failure_message(message: str, metadata: dict[str, Any]) -> str:
+    api = str(metadata.get("failure_api") or "API não identificada").strip()
+    provider = str(metadata.get("failure_provider") or "").strip()
+    fields = str(metadata.get("failure_config_fields") or "").strip()
+    suffix = f" API/provider: {api}"
+    if provider and provider.casefold() not in api.casefold():
+        suffix += f" (provider: {provider})"
+    if fields:
+        suffix += f"; configuração: {fields}"
+    return f"{message.rstrip('.')} —{suffix}."
 
 
 def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, str]:
@@ -291,11 +444,15 @@ def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, s
     log_file = _helper_output_value(output, "LOG_FILE")
     result_file = _helper_output_value(output, "RESULT_FILE")
     try:
+        markers = _helper_failure_markers(output)
         payload: dict[str, Any] = {
             "captured_at": _now(),
             "log_file": log_file,
             "result_file": result_file,
             "output_tail": _redact_helper_output(output[-6000:]),
+            "helper_provider": markers["helper_provider"],
+            "missing_fields": markers["missing_fields"],
+            "invalid_fields": markers["invalid_fields"],
         }
         artifact_path = _save_json_artifact(task_id, "video-diagnostics", payload)
         current = _task_by_id(task_id) or task
@@ -497,9 +654,9 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     source_keys = material_api_keys(settings, route) if route in {"pexels", "pixabay"} else []
     if route in {"pexels", "pixabay"} and not source_keys:
         source_label = "Pexels" if route == "pexels" else "Pixabay"
-        raise PipelineError(
-            f"Configure pelo menos uma API key de {source_label} em Configurações > Configuração API > Fontes de materiais."
-        )
+        message = f"Configure pelo menos uma API key de {source_label} em Configurações > Configuração API > Fontes de materiais."
+        metadata = _failure_attribution(task, settings, "video", error=message)
+        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     if configured_root:
         try:
             sync_moneyprinter_config(settings, str(configured_root))
@@ -527,7 +684,10 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
         voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
         if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
-            raise PipelineError("O modo Upload foi seleccionado, mas não existe um ficheiro de narração válido. Carregue o áudio em Configurações de áudio.")
+            message = "O modo Upload foi seleccionado, mas não existe um ficheiro de narração válido. Carregue o áudio em Configurações de áudio."
+            metadata = _failure_attribution(task, settings, "video", error=message)
+            metadata.update({"failure_api": "Ficheiro local", "failure_provider": "local_storage", "failure_service": "Áudio de narração", "failure_config_fields": "voiceover_file"})
+            raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
         command.extend(["--custom-audio-file", str(voiceover_file.resolve())])
     output_lines: list[str] = []
     line_queue: queue.Queue[str | None] = queue.Queue()
@@ -554,7 +714,10 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
             bufsize=1,
         )
     except FileNotFoundError as exc:
-        raise PipelineError("O comando uv não está instalado; não foi possível iniciar a geração de vídeo.") from exc
+        message = "O comando uv não está instalado; não foi possível iniciar a geração de vídeo."
+        metadata = _failure_attribution(task, settings, "video", error=message)
+        metadata.update({"failure_service": "Runtime MoneyPrinterTurbo"})
+        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata) from exc
 
     reader = threading.Thread(target=_read_output, name=f"mpt-output-{task.get('id', 'video')}", daemon=True)
     reader.start()
@@ -597,7 +760,9 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 break
             if elapsed >= VIDEO_TIMEOUT_SECONDS:
                 _stop_process(process)
-                raise PipelineError(f"A etapa Vídeo excedeu o limite de {VIDEO_TIMEOUT_SECONDS // 60} minutos e foi encerrada.")
+                message = f"A etapa Vídeo excedeu o limite de {VIDEO_TIMEOUT_SECONDS // 60} minutos e foi encerrada."
+                metadata = _failure_attribution(task, settings, "video", error=message)
+                raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     finally:
         reader.join(timeout=2)
         _persist_video_diagnostics(task, "\n".join(output_lines))
@@ -607,10 +772,14 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     output = "\n".join(output_lines)
     _persist_video_diagnostics(task, output)
     if result_code == 10:
-        raise PipelineError("A geração de vídeo precisa de credenciais adicionais do MoneyPrinterTurbo.")
+        metadata = _failure_attribution(task, settings, "video", output=output)
+        message = "A geração de vídeo precisa de credenciais adicionais do MoneyPrinterTurbo"
+        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     if result_code != 0:
         detail = _redact_helper_output(output[-1200:]).strip() or "erro sem detalhes devolvidos pelo helper"
-        raise PipelineError(f"MoneyPrinterTurbo falhou na etapa Vídeo: {detail}")
+        metadata = _failure_attribution(task, settings, "video", error=detail, output=output)
+        message = f"MoneyPrinterTurbo falhou na etapa Vídeo: {detail}"
+        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     match = re.search(r"(?m)^VIDEO_FILE=(.+)$", output)
     video_path = Path(match.group(1).strip()).expanduser() if match else None
     if not video_path or not video_path.is_file() or video_path.stat().st_size <= 0:
@@ -623,7 +792,9 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
             except (OSError, json.JSONDecodeError):
                 video_path = None
     if not video_path or not video_path.is_file() or video_path.stat().st_size <= 0:
-        raise PipelineError("MoneyPrinterTurbo terminou sem devolver um MP4 válido.")
+        message = "MoneyPrinterTurbo terminou sem devolver um MP4 válido."
+        metadata = _failure_attribution(task, settings, "video", error=message, output=output)
+        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     return video_path
 
 
@@ -835,8 +1006,11 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
                 })
         except MediaGenerationError as exc:
             if route == "full_ia":
-                raise PipelineError(f"Pool Full IA (FAL/KIE AI/Agnes AI): {exc}") from exc
-            raise PipelineError(f"Pipeline MoneyPrinterTurbo ({route}): {exc}") from exc
+                message = f"Pool Full IA (FAL/KIE AI/Agnes AI): {exc}"
+            else:
+                message = f"Pipeline MoneyPrinterTurbo ({route}): {exc}"
+            metadata = _failure_attribution(task, settings, "video", error=str(exc))
+            raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata) from exc
         current_after_video = _task_by_id(task_id) or {}
         artifacts = dict(current_after_video.get("artifacts") or artifacts)
         artifacts["video"] = str(video_path)
@@ -972,9 +1146,22 @@ def run_once() -> dict[str, Any]:
             message = str(exc)[:2000]
             from hermes_ui.domain import update_task
             current_task = _task_by_id(task_id) or candidate
-            update_task(task_id, {"state": "failed", "error": message, "failed_stage": current_task.get("stage") or "pipeline"})
-            _worker_heartbeat(status="failed", last_error=message, stage=str(current_task.get("stage") or "pipeline"), progress=int(current_task.get("progress") or 0), task_id=task_id)
-            return {"ok": False, "task_id": task_id, "error": message, "recovered_task_ids": recovered}
+            failed_stage = str(current_task.get("stage") or "pipeline")
+            settings = _settings()
+            failure_metadata = dict(getattr(exc, "failure_metadata", {}) or {})
+            if not failure_metadata:
+                failure_metadata = _failure_attribution(current_task, settings, failed_stage, error=message)
+            if "API/provider:" not in message:
+                message = _failure_message(message, failure_metadata)[:2000]
+            failure_updates = {
+                "state": "failed",
+                "error": message,
+                "failed_stage": failed_stage,
+                **failure_metadata,
+            }
+            update_task(task_id, failure_updates)
+            _worker_heartbeat(status="failed", last_error=message, stage=failed_stage, progress=int(current_task.get("progress") or 0), task_id=task_id)
+            return {"ok": False, "task_id": task_id, "error": message, "failure_metadata": failure_metadata, "recovered_task_ids": recovered}
     finally:
         try:
             lock.unlink()
