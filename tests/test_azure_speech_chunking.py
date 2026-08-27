@@ -38,6 +38,13 @@ def test_split_text_handles_newlines_and_long_unbroken_tokens():
     assert chunks[-1] == "x" * 500
 
 
+def test_build_ssml_escapes_voice_and_text_without_invalid_f_string():
+    ssml = CHUNKED._build_ssml('Capital & <cashflow>', 'en-US-Test "Voice"', 1.0)
+
+    assert 'name="en-US-Test &quot;Voice&quot;"' in ssml
+    assert 'Capital &amp; &lt;cashflow&gt;' in ssml
+
+
 def test_mpt_agent_applies_azure_environment_to_azure_toml_section(tmp_path, monkeypatch):
     config_path = tmp_path / "config.toml"
     config_path.write_text('[app]\npexels_api_keys = []\n\n[azure]\nspeech_key = ""\nspeech_region = ""\n', encoding="utf-8")
