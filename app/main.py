@@ -5458,8 +5458,6 @@ def render_settings():
 
                 render_media_provider_cards(settings, embedded=True)
 
-                st.info("A configuração do backend AI Influencers, incluindo o selector entre SQLite e Supabase e as credenciais, está na aba AI Influencers.")
-
                 with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):
                     st.caption("Cada serviço está separado no seu próprio cartão. Os botões de teste ficam dentro do cartão correspondente e fazem apenas diagnóstico, sem gerar áudio ou música.")
 
