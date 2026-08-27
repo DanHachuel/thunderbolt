@@ -149,7 +149,9 @@ def _synthesise_chunk(
     try:
         result = synthesizer.speak_ssml_async(_build_ssml(text, voice, rate)).get()
     finally:
-        synthesizer.close()
+        close = getattr(synthesizer, "close", None)
+        if callable(close):
+            close()
     if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
         details = getattr(
             getattr(result, "cancellation_details", None), "error_details", ""

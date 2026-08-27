@@ -100,6 +100,50 @@ def test_mpt_agent_prepares_azure_audio_without_logging_credentials(tmp_path, mo
     assert "azure-secret" not in str(captured["command"])
 
 
+def test_synthesise_chunk_supports_speech_sdk_without_close_method(tmp_path, monkeypatch):
+    target = tmp_path / "segment.mp3"
+    monkeypatch.setenv("AZURE_SPEECH_KEY", "azure-test-key")
+    monkeypatch.setenv("AZURE_SPEECH_REGION", "eastus")
+
+    class Result:
+        reason = "completed"
+
+    class AsyncResult:
+        def get(self):
+            target.write_bytes(b"audio")
+            return Result()
+
+    class SpeechConfig:
+        def __init__(self, **_kwargs):
+            self.speech_synthesis_voice_name = ""
+
+        def set_speech_synthesis_output_format(self, _format):
+            return None
+
+    class AudioOutputConfig:
+        def __init__(self, **_kwargs):
+            return None
+
+    class SpeechSynthesizer:
+        def __init__(self, **_kwargs):
+            return None
+
+        def speak_ssml_async(self, _ssml):
+            return AsyncResult()
+
+    fake_speech_sdk = SimpleNamespace(
+        ResultReason=SimpleNamespace(SynthesizingAudioCompleted="completed"),
+        SpeechSynthesisOutputFormat=SimpleNamespace(Audio48Khz192KBitRateMonoMp3="mp3"),
+        SpeechConfig=SpeechConfig,
+        SpeechSynthesizer=SpeechSynthesizer,
+        audio=SimpleNamespace(AudioOutputConfig=AudioOutputConfig),
+    )
+
+    CHUNKED._synthesise_chunk(fake_speech_sdk, "Texto", "en-US-TestNeural", 1.0, target)
+
+    assert target.read_bytes() == b"audio"
+
+
 def test_mpt_agent_does_not_prepare_audio_without_azure_v2_voice(tmp_path, monkeypatch):
     config_path = tmp_path / "config.toml"
     config_path.write_text('[azure]\nspeech_key = "secret"\nspeech_region = "eastus"\n', encoding="utf-8")
