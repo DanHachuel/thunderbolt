@@ -73,10 +73,10 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('"language": language', MAIN_SOURCE)
 
     def test_pipeline_generates_video_before_thumbnail_prompt_and_image(self):
-        video_position = PIPELINE_SOURCE.index('_update(task_id, stage="video", state="doing", progress=52')
-        prompt_position = PIPELINE_SOURCE.index('_update(task_id, stage="thumbnail_prompt", state="doing", progress=82')
-        thumbnail_position = PIPELINE_SOURCE.index('_update(task_id, stage="thumbnail", state="doing", progress=86')
-        upload_position = PIPELINE_SOURCE.index('_update(task_id, stage="upload", state="doing", progress=94')
+        video_position = PIPELINE_SOURCE.index('_update(task_id, stage="video", state="doing", progress=max(52')
+        prompt_position = PIPELINE_SOURCE.index('_update(\n        task_id,\n        stage="thumbnail_prompt",\n        state="doing",\n        progress=max(84')
+        thumbnail_position = PIPELINE_SOURCE.index('_update(task_id, stage="thumbnail", state="doing", progress=max(86')
+        upload_position = PIPELINE_SOURCE.index('_update(task_id, stage="upload", state="doing", progress=max(94')
         video_artifact_position = PIPELINE_SOURCE.index('artifacts["video"] = str(video_path)')
         self.assertLess(video_position, prompt_position)
         self.assertLess(prompt_position, thumbnail_position)

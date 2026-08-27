@@ -206,7 +206,14 @@ def apply_environment_config(config_path: Path) -> None:
     base_url = os.environ.get("MPT_LLM_BASE_URL", "").strip()
     model_name = os.environ.get("MPT_LLM_MODEL_NAME", "").strip()
     pexels_key = os.environ.get("MPT_PEXELS_API_KEY", "").strip()
-    if not any((provider, llm_key, base_url, model_name, pexels_key)):
+    pixabay_key = os.environ.get("MPT_PIXABAY_API_KEY", "").strip()
+    pexels_keys = _parse_string_list(os.environ.get("MPT_PEXELS_API_KEYS", ""))
+    pixabay_keys = _parse_string_list(os.environ.get("MPT_PIXABAY_API_KEYS", ""))
+    if not pexels_keys and pexels_key:
+        pexels_keys = [pexels_key]
+    if not pixabay_keys and pixabay_key:
+        pixabay_keys = [pixabay_key]
+    if not any((provider, llm_key, base_url, model_name, pexels_keys, pixabay_keys)):
         return
 
     text = config_path.read_text(encoding="utf-8")
@@ -225,9 +232,12 @@ def apply_environment_config(config_path: Path) -> None:
     if model_name:
         text = _replace_config_value(text, f"{provider}_model_name", model_name)
         changes.append(f"{provider}_model_name")
-    if pexels_key:
-        text = _replace_config_value(text, "pexels_api_keys", [pexels_key])
+    if pexels_keys:
+        text = _replace_config_value(text, "pexels_api_keys", pexels_keys)
         changes.append("pexels_api_keys")
+    if pixabay_keys:
+        text = _replace_config_value(text, "pixabay_api_keys", pixabay_keys)
+        changes.append("pixabay_api_keys")
     config_path.write_text(text, encoding="utf-8")
     log("updated configuration fields: " + ", ".join(changes))
 

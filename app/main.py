@@ -97,6 +97,7 @@ AI_STYLE_OPTIONS = [
 ]
 
 WIDE_STYLE_OPTIONS = ["Pexels/Pixabay", "full_ia", "Apenas Música"]
+MATERIAL_SOURCE_OPTIONS = ["Pexels", "Pixabay"]
 
 VIDEO_LANGUAGE_OPTIONS = [
     "00 – Apenas Música de Fundo (Sem Falas)",
@@ -993,6 +994,18 @@ def render_video_generation_settings(
             video_cols = st.columns(2)
             with video_cols[0]:
                 settings["video_source"] = st.selectbox("Video Source", WIDE_STYLE_OPTIONS, key=f"{prefix}_video_source")
+                if settings["video_source"] == "Pexels/Pixabay":
+                    configured_material_source = selected_material_source(read_json("settings.json", {}))
+                    material_source_labels = {"pexels": "Pexels", "pixabay": "Pixabay"}
+                    configured_material_label = material_source_labels.get(configured_material_source, "Pexels")
+                    settings["material_source"] = st.selectbox(
+                        "Stock Material Source",
+                        MATERIAL_SOURCE_OPTIONS,
+                        index=MATERIAL_SOURCE_OPTIONS.index(configured_material_label),
+                        key=f"{prefix}_material_source",
+                    )
+                else:
+                    settings["material_source"] = ""
                 if settings["video_source"] == "full_ia":
                     settings["style_ia"] = st.selectbox("Estilo IA", AI_STYLE_OPTIONS, key=f"{prefix}_style_ia")
                 else:
@@ -2037,6 +2050,7 @@ def _create_video_task_from_saved_script(record: dict[str, Any], channel: dict[s
         "format": settings.get("video_format", "wide"),
         "style_wide": style,
         "style_ia": settings.get("style_ia", ""),
+        "material_source": settings.get("material_source", "") if style == "pexels" else "",
         "music_mode": style == "music",
         "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"),
         "voice": str(settings.get("voice") or channel.get("default_voice") or channel.get("voice") or ""),
@@ -2266,6 +2280,12 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                     ),
                 )
             wide_style_label = generation_settings["video_source"]
+            style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
+            material_source = (
+                {"Pexels": "pexels", "Pixabay": "pixabay"}.get(str(generation_settings.get("material_source") or ""), "")
+                if style == "pexels"
+                else ""
+            )
             style_ia = generation_settings.get("style_ia", "")
             music_path = ""
             music_source = ""
@@ -2469,7 +2489,6 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 submitted = st.form_submit_button("Criar tarefas", type="primary")
             if submitted:
                 save_video_language(language)
-                style = {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}[wide_style_label]
                 if style == "music" and not music_path:
                     st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
                     st.stop()
@@ -2517,8 +2536,8 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             st.session_state[f"{prefix}_general_topics"] = {cid: {"topic": payload["topic"], "topic_source": payload.get("topic_source", "llm")} for cid, payload in payloads.items()}
                     if len(payloads) == len(selected):
                         batch_topic = "Lote geral — um vídeo independente por canal"
-                        channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings} for cid, payload in payloads.items()}
-                        batch = create_batch("general", selected, batch_topic, 1, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": "llm", "channel_payloads": channel_payloads})
+                        channel_payloads = {cid: {**payload, "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "material_source": material_source, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings} for cid, payload in payloads.items()}
+                        batch = create_batch("general", selected, batch_topic, 1, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "material_source": material_source, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": "llm", "channel_payloads": channel_payloads})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote geral {batch['id']} criado com {len(tasks)} tarefas independentes, uma por canal.")
                 else:
@@ -2542,8 +2561,8 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             except CreativeGenerationError as exc:
                                 st.warning(f"Título/keywords automáticos pendentes: {exc} A tarefa será criada com o tópico como título; o prompt e a imagem da thumbnail serão gerados depois do vídeo.")
                                 payload = {"topic": topic_value, "title": topic_value, "topic_source": "manual", "thumbnail_status": "pending_provider", "thumbnail_variants": [], "thumbnail_variant": {}, "thumbnail_prompt": "", "thumbnail_text": ""}
-                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or _video_topic_source(topic_value), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
-                        batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
+                        payload.update({"topic": topic_value, "topic_source": payload.get("topic_source") or _video_topic_source(topic_value), "language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "material_source": material_source, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings})
+                        batch = create_batch(mode, selected, topic_value, quantity_value, {"language": language, "format": fmt, "style_wide": style, "style_ia": style_ia, "material_source": material_source, "music_mode": style == "music", "background_mode": "none" if style == "music" else ("ai" if style == "full_ia" else "stock"), "music_path": music_path, "music_source": music_source, "generation_settings": generation_settings, "topic_source": payload.get("topic_source", "manual"), "channel_payloads": {selected[0]: payload}})
                         tasks = create_tasks_for_batch(batch)
                         st.success(f"Lote {batch['id']} criado com {len(tasks)} tarefa(s). Abra {ui_text('Backlog Vídeos', current_ui_language())} para acompanhar.")
 
