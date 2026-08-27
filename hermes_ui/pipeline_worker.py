@@ -310,11 +310,19 @@ def _helper_output_value(output: str, key: str) -> str:
 
 
 def _redact_helper_output(text: str) -> str:
-    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY", "MPT_PIXABAY_API_KEY"):
+    for key in ("MPT_LLM_API_KEY", "MPT_PEXELS_API_KEY", "MPT_PIXABAY_API_KEY", "AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"):
         secret = os.environ.get(key, "").strip()
         if secret:
             text = text.replace(secret, "[redacted]")
     return text
+
+def _terminal_helper_detail(output: str) -> str:
+    """Return the last actionable helper lines, not startup/configuration noise."""
+    lines = [_redact_helper_output(line).strip() for line in str(output or "").splitlines()]
+    lines = [line for line in lines if line]
+    noise_markers = ("using existing project:", "updated configuration fields:", "starting video generation, task id:")
+    actionable = [line for line in lines if not any(marker in line.casefold() for marker in noise_markers)]
+    return "\n".join((actionable or lines)[-12:]).strip()
 
 
 def _helper_failure_markers(output: str) -> dict[str, Any]:
@@ -373,6 +381,16 @@ def _failure_attribution(
             "failure_api": "Azure Speech SDK V2 API",
             "failure_provider": "azure_speech",
             "failure_service": "Narração TTS — limite de 600000 ms",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
+
+    if stage == "video" and any(marker in combined for marker in ("azure speech sdk v2", "azure speech v2", "azure_tts_v2")):
+        return {
+            "failure_api": "Azure Speech SDK V2 API",
+            "failure_provider": "azure_speech",
+            "failure_service": "Narração TTS — segmentação Azure",
             "failure_route": route,
             "failure_config_fields": "",
             "failure_stage": stage,
@@ -707,10 +725,13 @@ def _moneyprinter_cli_args(task: dict[str, Any], route: str, settings: dict[str,
         args.append("--match-materials-to-script")
 
     voice_mode = str(generation_settings.get("voiceover_mode") or "").strip().casefold()
+    azure_service = str(generation_settings.get("voiceover_service") or "").strip().casefold()
     voice = str(task.get("voice") or generation_settings.get("voice") or "").strip()
     if voice_mode == "none" or voice_mode == "upload":
         args.extend(["--voice-name", "no-voice"])
-    elif voice:
+    elif voice or azure_service in {"azure speech sdk v2", "azure speech", "azure tts v2", "azure speech sdk"}:
+        if not voice:
+            voice = "en-US-JennyNeural"
         if _uses_azure_speech_sdk_v2(generation_settings, settings):
             voice = _azure_speech_v2_voice_name(voice)
         args.extend(["--voice-name", voice])
@@ -847,6 +868,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     reader.start()
     output_finished = False
     last_heartbeat = 0.0
+    last_output_line = ""
     try:
         while True:
             try:
@@ -854,6 +876,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 if line is None:
                     output_finished = True
                 elif line:
+                    last_output_line = _redact_helper_output(line).strip()
                     output_lines.append(line)
             except queue.Empty:
                 pass
@@ -870,6 +893,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 _update(
                     task_id,
                     progress=video_progress,
+                    video_helper_status=last_output_line[-500:] if last_output_line else "",
                     video_elapsed_seconds=int(elapsed),
                 )
                 _worker_heartbeat(
@@ -877,6 +901,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                     status="running",
                     stage="video",
                     progress=video_progress,
+                    video_helper_status=last_output_line[-500:] if last_output_line else "",
                     video_elapsed_seconds=int(elapsed),
                 )
                 last_heartbeat = elapsed
@@ -897,10 +922,13 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     _persist_video_diagnostics(task, output)
     if result_code == 10:
         metadata = _failure_attribution(task, settings, "video", output=output)
+        detail = _terminal_helper_detail(output)
         message = "A geração de vídeo precisa de credenciais adicionais do MoneyPrinterTurbo"
+        if detail:
+            message += f". Detalhe do helper: {detail}"
         raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     if result_code != 0:
-        detail = _redact_helper_output(output[-1200:]).strip() or "erro sem detalhes devolvidos pelo helper"
+        detail = _terminal_helper_detail(output) or "erro sem detalhes devolvidos pelo helper"
         metadata = _failure_attribution(task, settings, "video", error=detail, output=output)
         message = f"MoneyPrinterTurbo falhou na etapa Vídeo: {detail}"
         raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)

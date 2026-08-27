@@ -1,3 +1,5 @@
+import pytest
+from integrations import moneyprinter_config as mpt_config
 from integrations.moneyprinter_config import build_moneyprinter_config
 
 
@@ -56,3 +58,20 @@ def test_moneyprinter_config_accepts_local_source_and_legacy_fallback():
     payload = build_moneyprinter_config({"video_source": "local", "pixabay_api_keys": "legacy-a, legacy-b"})
     assert payload["app"]["video_source"] == "local"
     assert payload["app"]["pixabay_api_keys"] == ["legacy-a", "legacy-b"]
+
+
+def test_sync_moneyprinter_config_preserves_previous_toml_when_replace_fails(tmp_path, monkeypatch):
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    target = root / "config.toml"
+    target.write_text('[app]\nllm_provider = "old"\n', encoding="utf-8")
+    previous = target.read_text(encoding="utf-8")
+
+    def fail_replace(_source, _destination):
+        raise OSError("simulated Windows replace failure")
+
+    monkeypatch.setattr(mpt_config.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="simulated Windows replace failure"):
+        mpt_config.sync_moneyprinter_config({"llm_provider": "openai"}, str(root))
+    assert target.read_text(encoding="utf-8") == previous
+    assert not list(root.glob(".config.toml.*.tmp"))

@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.76.
+Estado auditado para o release 0.3.77.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -71,3 +71,7 @@ Nenhum release será descrito como final enquanto os itens marcados como pendent
 | Orquestrador local em cascata | Concluído | `create_tasks_for_batch` inicializa `local-cascade`; `pipeline_worker` persiste ordem, etapa actual, etapas concluídas e transições, retomando artefactos válidos sem regeneração. |
 
 | Selector LLM OpenAI/NVIDIA NIM como lista suspensa | Concluído | O card usa `st.selectbox` mesmo antes da descoberta de modelos, preserva o modelo guardado e mantém fallback manual explícito. |
+
+### Correcção prioritária 0.3.77 — Azure Speech V2 e diagnóstico MoneyPrinterTurbo
+
+O chunker Azure usa orçamento conservador ajustado à taxa, progresso seguro por segmento e validação obrigatória de `AZURE_CHUNK_COUNT`. `mpt_agent.py` não inicia a CLI upstream sem áudio customizado validado quando a voz V2 é seleccionada. O worker expõe actividade e tempo decorrido, filtra o prefixo de sincronização de configuração e preserva caminhos de log/manifesto em falhas. A sincronização TOML é atómica e mantém o ficheiro anterior em caso de erro.

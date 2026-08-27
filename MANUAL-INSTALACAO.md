@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.76
+> **Versão deste manual:** 0.3.77
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -132,13 +132,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.77 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.77 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -146,7 +146,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.77 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -574,7 +574,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.77 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
@@ -811,3 +811,9 @@ O worker local guarda a etapa actual e os artefactos de cada tarefa. Ao reinicia
 
 ### Selector de modelos LLM
 No card **OpenAI / NVIDIA NIM**, o campo **Modelo** é uma lista suspensa. Use **Consultar modelos** para actualizar as opções do endpoint; se o identificador não estiver disponível, escolha **Escrever modelo manualmente**.
+
+## 16. Diagnóstico prioritário do Azure Speech V2
+
+Quando Azure Speech SDK V2 estiver seleccionado, o Thunderbolt prepara a narração em segmentos antes de iniciar o MoneyPrinterTurbo. O tamanho interno dos segmentos é reduzido automaticamente para velocidades de fala lentas, o áudio final é validado e a CLI recebe `--custom-audio-file`. A geração é bloqueada se não houver confirmação dos segmentos; isto evita regressar à chamada monolítica do Azure que pode falhar com `maximum media duration of 600000ms`.
+
+Na interface, uma tarefa em execução mostra a última actividade do helper e o tempo decorrido da etapa Vídeo. Se ocorrer uma falha, consulte o caminho `LOG_FILE` ou `RESULT_FILE` apresentado no erro. A linha `updated configuration fields` é apenas sincronização inicial de configuração e não é a causa terminal. Nunca copie chaves, cookies, tokens ou o conteúdo integral do roteiro para pedidos de suporte.

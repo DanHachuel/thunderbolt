@@ -678,3 +678,47 @@ def test_azure_v2_long_audio_error_is_attributed_to_specific_api():
     assert metadata["failure_api"] == "Azure Speech SDK V2 API"
     assert metadata["failure_provider"] == "azure_speech"
     assert metadata["failure_service"] == "Narração TTS — limite de 600000 ms"
+
+
+def test_terminal_helper_detail_ignores_configuration_prefix():
+    detail = pipeline_worker._terminal_helper_detail(
+        "\n".join(
+            [
+                "[MoneyPrinterTurbo] using existing project: C:\\Users\\danha\\AppData\\Local\\THUNDERBOLT\\MoneyPrinterTurbo",
+                "[MoneyPrinterTurbo] updated configuration fields: llm_provider, openai_api_key, openai_base_url",
+                "[MoneyPrinterTurbo] synthesizing Azure Speech V2 in safe chunks before MoneyPrinterTurbo",
+                "AZURE_CHUNK_PROGRESS=1/3",
+                "MPT_ERROR=Azure Speech SDK V2 falhou no segmento 2/3",
+            ]
+        )
+    )
+    assert "MPT_ERROR=Azure Speech SDK V2 falhou no segmento 2/3" in detail
+    assert "updated configuration fields" not in detail
+    assert "using existing project" not in detail
+
+
+def test_moneyprinter_cli_args_marks_default_voice_for_azure_v2_when_voice_is_empty():
+    args = pipeline_worker._moneyprinter_cli_args(
+        {
+            "topic": "Tema",
+            "generation_settings": {
+                "voiceover_service": "Azure Speech SDK V2",
+                "voiceover_mode": "Auto",
+            },
+        },
+        "pexels",
+    )
+    voice = args[args.index("--voice-name") + 1]
+    assert voice.casefold().startswith("en-us-jennyneural-v2")
+
+
+def test_azure_v2_chunking_failure_is_attributed_to_azure_v2_api():
+    metadata = pipeline_worker._failure_attribution(
+        {"style_wide": "pexels"},
+        {},
+        "video",
+        error="Azure Speech SDK V2 falhou na síntese segmentada no segmento 2/4",
+    )
+    assert metadata["failure_api"] == "Azure Speech SDK V2 API"
+    assert metadata["failure_provider"] == "azure_speech"
+    assert metadata["failure_service"] == "Narração TTS — segmentação Azure"
