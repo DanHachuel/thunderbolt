@@ -5762,34 +5762,36 @@ def render_settings():
         render_material_source_api_keys(settings)
 
     with ai_influencers_tab:
-        render_ai_influencers_api_status(settings)
-        st.divider()
-        st.subheader("Banco de Dados Influencers")
-        st.caption("Escolha o backend usado por Personagens e Geração de Conteúdo IA. SQLite local funciona sem credenciais externas; Supabase é opcional. Se Supabase estiver seleccionado mas ainda incompleto, o sistema mantém SQLite como fallback operacional.")
-        with st.form("influencer_database_settings_form"):
-            saved_backend = str(settings.get("influencer_db_backend") or "SQLite").strip()
-            backend_index = list(BACKEND_OPTIONS).index(saved_backend) if saved_backend in BACKEND_OPTIONS else list(BACKEND_OPTIONS).index("SQLite")
-            influencer_db_backend = st.selectbox(
-                "Backend da base de dados de AI Influencers",
-                list(BACKEND_OPTIONS),
-                index=backend_index,
-                key="settings_influencer_db_backend",
-                help="Seleccione Supabase para usar a base remota ou SQLite para guardar tudo localmente.",
-            )
-            db_cols = st.columns(2)
-            with db_cols[0]:
-                influencer_supabase_url = text_setting("Supabase Project URL", "influencer_supabase_url", help_text="URL do projecto, por exemplo https://project-id.supabase.co")
-                influencer_supabase_key = text_setting("Supabase API key", "influencer_supabase_key", secret=True, help_text="Use uma chave com as permissões RLS adequadas. Nunca é colocada no GitHub ou nos logs.")
-                influencer_supabase_bucket = text_setting("Supabase Storage bucket", "influencer_supabase_bucket", help_text="Bucket usado para imagens e documentos, por defeito ai-influencers.")
-            with db_cols[1]:
-                influencer_sqlite_path = text_setting("SQLite ficheiro local", "influencer_sqlite_path", help_text="Caminho absoluto ou relativo ao projecto. Por defeito: storage/state/ai_influencers.db")
-                st.caption("SQLite usa a biblioteca standard do Python e cria o schema automaticamente ao testar ou usar o backend.")
-            test_backend_clicked = st.form_submit_button("Testar ligação do backend", use_container_width=True)
-            save_backend_clicked = st.form_submit_button("Guardar configuração do backend", type="primary", use_container_width=True)
+        st.subheader("AI Influencers")
+        st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")
+        saved_backend = str(settings.get("influencer_db_backend") or "SQLite").strip()
+        backend_index = list(BACKEND_OPTIONS).index(saved_backend) if saved_backend in BACKEND_OPTIONS else list(BACKEND_OPTIONS).index("SQLite")
+        influencer_db_backend = st.selectbox(
+            "Backend da base de dados de AI Influencers",
+            list(BACKEND_OPTIONS),
+            index=backend_index,
+            key="settings_influencer_db_backend",
+            help="Seleccione Supabase para usar a base remota ou SQLite para guardar tudo localmente.",
+        )
+        with st.container(border=True):
+            st.subheader("Supabase")
+            st.caption("Configure apenas os dados da ligação Supabase. Se o selector estiver em Supabase mas faltar qualquer credencial, o backend activo permanece SQLite.")
+            with st.form("influencer_database_settings_form"):
+                db_cols = st.columns(2)
+                with db_cols[0]:
+                    influencer_supabase_url = text_setting("Supabase Project URL", "influencer_supabase_url", help_text="URL do projecto, por exemplo https://project-id.supabase.co")
+                with db_cols[1]:
+                    influencer_supabase_key = text_setting("Supabase API key", "influencer_supabase_key", secret=True, help_text="Use uma chave com as permissões RLS adequadas. Nunca é colocada no GitHub ou nos logs.")
+                test_backend_clicked = st.form_submit_button("Testar ligação do backend", use_container_width=True)
+                save_backend_clicked = st.form_submit_button("Guardar configuração do backend", type="primary", use_container_width=True)
+        effective_settings = dict(settings)
+        effective_settings.update({
+            "influencer_db_backend": influencer_db_backend,
+            "influencer_supabase_url": influencer_supabase_url,
+            "influencer_supabase_key": influencer_supabase_key,
+        })
         if test_backend_clicked:
-            test_settings = dict(settings)
-            test_settings.update({"influencer_db_backend": influencer_db_backend, "influencer_supabase_url": influencer_supabase_url, "influencer_supabase_key": influencer_supabase_key, "influencer_supabase_bucket": influencer_supabase_bucket, "influencer_sqlite_path": influencer_sqlite_path})
-            db_result = test_backend(test_settings)
+            db_result = test_backend(effective_settings)
             if db_result.get("ok"):
                 st.success(db_result.get("message") or "Backend disponível.")
             else:
@@ -5799,12 +5801,11 @@ def render_settings():
                 "influencer_db_backend": influencer_db_backend,
                 "influencer_supabase_url": influencer_supabase_url.strip(),
                 "influencer_supabase_key": influencer_supabase_key.strip(),
-                "influencer_supabase_bucket": influencer_supabase_bucket.strip() or "ai-influencers",
-                "influencer_sqlite_path": influencer_sqlite_path.strip() or "storage/state/ai_influencers.db",
             })
             write_json("settings.json", settings)
             st.success("Configuração do backend AI Influencers guardada.")
             st.rerun()
+        render_ai_influencers_api_status(effective_settings)
 
     with voice_test_tab:
         st.subheader("Teste de Voz")

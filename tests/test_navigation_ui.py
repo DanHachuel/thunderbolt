@@ -99,7 +99,7 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     assert 'with material_sources_tab:' in settings_page
     assert 'render_material_source_api_keys(settings)' in settings_page
     assert 'with ai_influencers_tab:' in settings_page
-    assert 'render_ai_influencers_api_status(settings)' in settings_page
+    assert 'render_ai_influencers_api_status(effective_settings)' in settings_page
     assert 'with tiktok_api_tab:' in settings_page
     assert 'render_tiktok_api_cards(settings)' in settings_page
     tiktok_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_tiktok_api_cards("):]

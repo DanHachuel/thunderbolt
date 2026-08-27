@@ -9,22 +9,38 @@ UI = (ROOT / "app" / "influencers_ui.py").read_text(encoding="utf-8")
 SCHEMA = (ROOT / "seed" / "references" / "ai_influencers_schema.sql").read_text(encoding="utf-8")
 
 
-def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
+def test_api_configuration_adds_ai_influencers_tab_and_supabase_card():
     assert 'render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in MAIN
-    assert 'st.subheader("Banco de Dados Influencers")' in MAIN
-    assert 'with st.form("influencer_database_settings_form"):' in MAIN
+    assert 'st.subheader("AI Influencers")' in MAIN
+    assert 'Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.' in MAIN
     assert 'key="settings_influencer_db_backend"' in MAIN
+    assert 'st.subheader("Supabase")' in MAIN
+    assert 'with st.form("influencer_database_settings_form"):' in MAIN
     assert 'Supabase Project URL' in MAIN
     assert 'Supabase API key' in MAIN
-    assert 'Supabase Storage bucket' in MAIN
-    assert 'SQLite ficheiro local' in MAIN
-    assert "SQLite local funciona sem credenciais externas" in MAIN
+    assert 'Supabase Storage bucket' not in MAIN
+    assert 'SQLite ficheiro local' not in MAIN
+    assert 'SQLite local funciona sem credenciais externas' not in MAIN
+    assert 'Se o selector estiver em Supabase mas faltar qualquer credencial, o backend activo permanece SQLite.' in MAIN
     assert '"influencer_db_backend": influencer_db_backend' in MAIN
     assert '"influencer_supabase_url": influencer_supabase_url.strip()' in MAIN
-    assert '"influencer_sqlite_path": influencer_sqlite_path.strip()' in MAIN
+    assert '"influencer_supabase_key": influencer_supabase_key.strip()' in MAIN
+    assert '"influencer_sqlite_path": influencer_sqlite_path.strip()' not in MAIN
     assert 'test_backend_clicked = st.form_submit_button("Testar ligação do backend"' in MAIN
     assert 'save_backend_clicked = st.form_submit_button("Guardar configuração do backend"' in MAIN
+    assert 'render_ai_influencers_api_status(effective_settings)' in MAIN
     assert 'A configuração do backend AI Influencers, incluindo o selector entre SQLite e Supabase e as credenciais, está na aba AI Influencers.' not in MAIN
+
+
+def test_ai_influencers_selector_is_immediately_below_backend_state_caption():
+    block_start = MAIN.index('    with ai_influencers_tab:')
+    block_end = MAIN.index('    with voice_test_tab:', block_start)
+    block = MAIN[block_start:block_end]
+    caption_position = block.index('st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA.')
+    selector_position = block.index('st.selectbox(\n            "Backend da base de dados de AI Influencers"')
+    assert caption_position < selector_position
+    assert 'st.subheader("Supabase")' in block
+    assert block.index('st.subheader("Supabase")') > selector_position
 
 
 def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
