@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.75
+> **Versão deste manual:** 0.3.76
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -132,13 +132,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.75 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.75 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -146,7 +146,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.75 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -437,7 +437,7 @@ A geração Nano Banana usa o contrato actualizado da Interactions API e não en
 
 ### 4.3 Navegação da UI
 
-Na primeira execução, a barra lateral apresenta **Início**, **Niche Finder**, **Pipeline Vídeos**, **Pipeline Música**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. O menu expansível **Pipeline Música** contém **Criação de Músicas** e **Upload Música**, cuja página tem as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. O menu expansível **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes** e **Editor Python**. O menu expansível **AI Influencers** contém **Personagens**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. O **Tutorial Meta** apresenta o guia de configuração de Instagram e credenciais Meta para automações com n8n. O **Tutorial Supabase** apresenta o guia para criar as tabelas `plans` e `posts` e o bucket `instagram-images`, incluindo a ligação para a fonte original no GitHub; as duas frases promocionais da comunidade foram omitidas. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. A aba **Niche Finder Kaggle** mantém a análise do dataset Kaggle; **Niche Finder Apify** é uma segunda alternativa independente, com actor, dataset, parâmetros, credencial, execução e resultados próprios. O menu **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu **Pipeline Música** contém **Criação de Músicas** e **Upload Música**. O menu **Configurações** contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Configuração API** e **Notificações**. Abra **Configurações > Contas Google** para gerir contas Google/YouTube, cartões, documentos de Upload directo, `sessionInfo` por conta, a `INNERTUBE_API_KEY` global, contas adicionais e a configuração global do YouTube. Abra **Configurações > Configuração API** para configurar as restantes API Keys, providers, modelos, serviços e o **Teste de vozes**. A página **Configurações > Notificações** contém as subabas **Geral** e **Telegram**. A subaba Geral mantém o histórico e as preferências dos eventos locais; a subaba Telegram envia esses mesmos eventos para o Chat ID configurado. A página **Pipeline Música > Upload Música** contém as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. Para YouTube, preencha primeiro o par **OAuth Client ID + OAuth Client Secret** em **Contas Google** se pretende autorizar uploads. A **YouTube Data API Key** é uma credencial Google Cloud diferente e fica em **Contas Google**, apenas para o método oficial de métricas; Client ID + Client Secret não formam uma API Key.
+Na primeira execução, a barra lateral apresenta **Início**, **Automação**, **Niche Finder**, **Canais/Perfis (Vídeos)**, **Pipeline Vídeos**, **Pipeline Música**, **AI Influencers**, **Edição**, **Growth**, **Documentação** e **Configurações**, nessa ordem. O menu expansível **Canais/Perfis (Vídeos)** contém **Canais YouTube**, **Blueprints Youtube**, **Contas TikTok**, **Prompt Masters** e **Facebook Pages**, nessa ordem. **Arquivos Base** foi removido por ficar vazio. O menu expansível **Pipeline Música** contém **Criação de Músicas** e **Upload Música**, cuja página tem as subabas **JewelMusic**, **Pushtunes** e **ytmusicapi**. O menu expansível **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. O menu expansível **Automação** contém a subaba **Automação Youtube**. O menu expansível **Edição** contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**. O menu expansível **AI Influencers** contém **Personagens**, **Geração de Conteúdo IA**, **Motion Control**, **UGC Products** e **Redes Sociais**. O menu expansível **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Growth** contém os analistas de YouTube, TikTok, Instagram, Facebook Pages e Bilibili. **Documentação** contém os tutoriais disponíveis. **Configurações** contém **MCP**, **Notificações**, **Logs** e **Configuração API**.
 
 | Configuração | Finalidade |
 |---|---|
@@ -574,7 +574,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.75 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.76 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

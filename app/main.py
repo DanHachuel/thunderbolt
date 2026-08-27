@@ -6597,13 +6597,11 @@ def main():
         ("Thumbnails", ":material/image:", "Thumbnails"),
         ("Upload", ":material/cloud_upload:", "Upload"),
     ]
-    base_files_items = [
-        ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
-        ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
-    ]
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
+        ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
         ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
+        ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
         ("Facebook Pages", ":material/public:", "Facebook Pages"),
     ]
     music_items = [
@@ -6653,13 +6651,12 @@ def main():
         ("Início", ":material/home:", "Início"),
         ("Automação", ":material/schedule:", "Automação"),
         ("Niche Finder", ":material/search:", "Niche Finder"),
-        ("Arquivos Base", ":material/folder:", "Arquivos Base"),
-        ("Canais e Perfis de Vídeos", ":material/video_library:", "Canais e Perfis de Vídeos"),
-        ("Growth", ":material/analytics:", "Growth"),
+        ("Canais/Perfis (Vídeos)", ":material/video_library:", "Canais/Perfis (Vídeos)"),
         ("Pipeline Vídeos", ":material/account_tree:", "Pipeline Vídeos"),
         ("Pipeline Música", ":material/music_note:", "Pipeline Música"),
         ("AI Influencers", ":material/smart_toy:", "AI Influencers"),
         ("Edição", ":material/edit:", "Edição"),
+        ("Growth", ":material/analytics:", "Growth"),
         ("Documentação", ":material/menu_book:", "Documentação"),
         ("Configurações", ":material/settings:", "Configurações"),
     ]
@@ -6668,8 +6665,7 @@ def main():
         "Niche Finder": niche_finder_items,
         "Pipeline Vídeos": pipeline_video_items,
         "AI Influencers": models_ai_items,
-        "Arquivos Base": base_files_items,
-        "Canais e Perfis de Vídeos": channel_profile_items,
+        "Canais/Perfis (Vídeos)": channel_profile_items,
         "Pipeline Música": music_items,
         "Edição": edition_items,
         "Growth": growth_items,
@@ -6683,7 +6679,8 @@ def main():
         "Limpador de metadado": "Limpador de Metadados",
         "Pipeline": "Pipeline Vídeos",
         "Música": "Pipeline Música",
-        "Pipeline TikTok": "Canais e Perfis de Vídeos",
+        "Pipeline TikTok": "Canais/Perfis (Vídeos)",
+        "Canais e Perfis de Vídeos": "Canais/Perfis (Vídeos)",
         "Prompts Master": "Prompt Masters",
         "Canais": "Canais YouTube",
         "Canais Youtube": "Canais YouTube",

@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.75.
+Estado auditado para o release 0.3.76.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -48,7 +48,7 @@ Estado auditado para o release 0.3.75.
 | Cortes inspirado no Clip Generator do OpenShorts | Concluído como Clip Generator local | Upload, URL directa, vídeos gerados e pasta local; formatos 9:16/1:1/16:9; modo manual e automático por segmentos locais; confirmação de direitos; FFmpeg, preview, downloads individuais/ZIP, manifesto JSON e histórico em `storage/cuts/`. |
 | Download Mídia baseado no yt-dlp | Concluído como downloader local | API Python embutida do yt-dlp, URLs públicas, vídeo/áudio, qualidade, contentor, playlists controladas, legendas, metadados, progresso, histórico persistente em `storage/state/media_downloads.json`, ficheiros em `storage/downloads/` e notificações de sucesso/falha; sem cookies, tokens ou opções CLI do utilizador. |
 | Canais em lote por conta Google/YouTube | Concluído como integração OAuth configurável | Contas múltiplas em cartões expansíveis com e-mail, Client ID, Client Secret e sessionInfo próprios; formulário externo para adicionar contas, credentials.json padrão automático, merge de uploads parciais, eliminação individual com limpeza de tokens/documentos/associações, tokens separados, `channels.list(mine=true)` com paginação, selecção, deduplicação por `youtube_channel_id` e importação incremental; não lê Gmail. A associação de canais não depende da completude do documento. |
-| Navegação com Automação expansível e nomes Youtube | Concluído | **Automação** é um menu expansível com **Automação Youtube**; em **Configurações**, as páginas foram renomeadas para **Canais Youtube** e **Blueprints Youtube**, com aliases legados para preservar estados existentes. |
+| Navegação reorganizada e Canais/Perfis (Vídeos) | Concluído | A barra lateral segue a ordem solicitada; **Blueprints Youtube** e **Prompt Masters** estão em **Canais/Perfis (Vídeos)**, e **Arquivos Base** foi removido por ficar vazio. Aliases preservam estados legados. |
 | Configurações separadas por responsabilidade | Concluído | **Configurações** contém as páginas **Contas Google**, **Configuração API** e **Notificações**. `Contas Google` concentra contas Google/YouTube, documentos, sessionInfo, INNERTUBE_API_KEY e credenciais globais do YouTube; `Configuração API` reúne as restantes APIs, providers, serviços, a subaba de fontes de materiais e o preview de vozes; `Notificações` é o centro local com histórico persistente, reconciliação de conclusões e checkboxes individuais por operação. |
 | Cartões expansíveis de contas Google e formulário externo | Concluído | Cada conta é apresentada recolhida como `nome — e-mail` em **Configurações > Contas Google**; **Adicionar outra conta Gmail** fica fora dos cartões, após uma divisória. A criação gera `credentials.json`; o uploader faz merge parcial e mantém o alerta de campos em falta. |
 | Associação de canais independente da completude das credenciais | Concluído | A associação `google_account_id` é permitida mesmo sem cookies/sessionInfo/INNERTUBE_API_KEY completos; apenas o Upload directo valida e bloqueia a operação. |
