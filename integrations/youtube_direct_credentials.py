@@ -242,8 +242,14 @@ def save_credentials_document(storage_root: Path, account: dict[str, Any], docum
     return destination
 
 
-def update_credentials_document_session_info(storage_root: Path, account: dict[str, Any], session_info: str) -> Path | None:
-    """Save sessionInfo and its UTC capture time without exposing the token."""
+def update_credentials_document_session_info(
+    storage_root: Path,
+    account: dict[str, Any],
+    session_info: str,
+    *,
+    captured_at: str | None = None,
+) -> Path | None:
+    """Save sessionInfo and an optional user-confirmed capture date without exposing the token."""
     path = credentials_document_path(storage_root, account)
     if path.exists():
         raw = _read_json_document(path) or {}
@@ -251,7 +257,12 @@ def update_credentials_document_session_info(storage_root: Path, account: dict[s
         raw = load_credentials_document(storage_root, {**account, "sessionInfo": session_info}, create=True)
     document = _normalise_document(raw, {**account, "sessionInfo": session_info})
     document["sessionInfo"] = str(session_info or "").strip()
-    document["sessionInfoCapturedAt"] = _session_info_now() if document["sessionInfo"] else ""
+    if not document["sessionInfo"]:
+        document["sessionInfoCapturedAt"] = ""
+    elif captured_at is None:
+        document["sessionInfoCapturedAt"] = _session_info_now()
+    else:
+        document["sessionInfoCapturedAt"] = str(captured_at).strip()
     return save_credentials_document(storage_root, account, document)
 
 

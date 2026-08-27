@@ -5066,6 +5066,22 @@ def render_google_accounts():
                             key=f"batch_session_info_{account_id}",
                             help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
                         )
+                        captured_at_value = str(
+                            session_health.captured_at
+                            or batch_account.get("sessionInfoCapturedAt")
+                            or batch_account.get("session_info_captured_at")
+                            or ""
+                        ).strip()
+                        try:
+                            account_session_info_captured_at = datetime.fromisoformat(captured_at_value.replace("Z", "+00:00")).date() if captured_at_value else None
+                        except ValueError:
+                            account_session_info_captured_at = None
+                        account_session_info_captured_at = st.date_input(
+                            "Data de Captura",
+                            value=account_session_info_captured_at,
+                            key=f"batch_session_info_captured_at_{account_id}",
+                            help="Data em que o sessionInfo token foi capturado. É usada para calcular o alerta de expiração e não revela o token.",
+                        )
                     save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
 
                 st.markdown("**Documento de cookies/credenciais desta conta Google**")
@@ -5119,8 +5135,14 @@ def render_google_accounts():
                                 credentials_changed = any(existing.get(field, "") != value for field, value in (("email", account_email.strip()), ("client_id", account_client_id.strip()), ("client_secret", account_client_secret.strip())))
                                 if credentials_changed:
                                     delete_youtube_batch_token(existing, STORAGE)
-                                existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip()})
-                                update_credentials_document_session_info(STORAGE, existing, account_session_info.strip())
+                                captured_at_iso = account_session_info_captured_at.isoformat() if isinstance(account_session_info_captured_at, date) else ""
+                                existing.update({"label": account_label.strip() or "Canais YouTube", "email": account_email.strip(), "client_id": account_client_id.strip(), "client_secret": account_client_secret.strip(), "sessionInfo": account_session_info.strip(), "sessionInfoCapturedAt": captured_at_iso})
+                                update_credentials_document_session_info(
+                                    STORAGE,
+                                    existing,
+                                    account_session_info.strip(),
+                                    captured_at=captured_at_iso,
+                                )
                                 ensure_credentials_document(STORAGE, existing, settings, channel_state)
                         settings["youtube_batch_accounts"] = batch_accounts
                         write_json("settings.json", settings)

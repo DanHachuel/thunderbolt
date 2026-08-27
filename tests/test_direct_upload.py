@@ -122,6 +122,21 @@ def test_session_info_override_is_saved_in_credentials_document(tmp_path: Path):
     assert load_credentials_document(tmp_path, account)["sessionInfo"] == "session-updated"
 
 
+def test_session_info_capture_date_from_account_card_is_persisted(tmp_path: Path):
+    account = {"id": "google-capture-date", "email": "capture@example.com"}
+
+    update_credentials_document_session_info(
+        tmp_path,
+        account,
+        "session-updated",
+        captured_at="2026-08-27",
+    )
+
+    document = load_credentials_document(tmp_path, account)
+    assert document["sessionInfo"] == "session-updated"
+    assert document["sessionInfoCapturedAt"] == "2026-08-27"
+
+
 def test_delete_credentials_document_removes_only_selected_account(tmp_path: Path):
     first = {"id": "google-first", "email": "first@example.com"}
     second = {"id": "google-second", "email": "second@example.com"}
