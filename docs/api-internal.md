@@ -107,3 +107,9 @@ O contrato público do YouTube documenta a API Data e o protocolo oficial de upl
 `hermes_ui.pipeline_worker._terminal_helper_detail()` filtra linhas de arranque como `using existing project` e `updated configuration fields`, preservando as últimas linhas accionáveis, incluindo `MPT_ERROR`, progresso de segmentos e causas devolvidas pelo MoneyPrinterTurbo. O estado da tarefa guarda `video_helper_status` e `video_elapsed_seconds` durante a execução para a UI mostrar actividade real, em vez de parecer parada após a sincronização.
 
 A sincronização de `config.toml` usa escrita temporária, `flush`, `fsync` e `os.replace`. Uma falha no replace mantém o TOML anterior intacto e elimina o temporário incompleto.
+
+## Diagnóstico residual da etapa Vídeo — 0.3.78
+
+`_terminal_helper_detail()` remove sucesso de validação Pexels, sincronização do projecto, `uv sync` e marcadores `TASK_DIR`/`LOG_FILE`/`RESULT_FILE` do resumo de falha. Dá prioridade a `MPT_ERROR`, `Traceback`, `Exception`, `failed`, `error`, `timeout`, `missing` e `invalid`, mantendo o output completo limitado no artefacto `video-diagnostics`.
+
+O renderer do backlog não corta o erro a 240 caracteres: mostra um resumo até 700 caracteres e um expander com o texto não editável até ao limite seguro, mais os caminhos do log e do manifesto. `run_checked()` usa timeout de 15 minutos, devolve o tail seguro do `uv` em falha e emite confirmação quando a sincronização termina.

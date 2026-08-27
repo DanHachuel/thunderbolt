@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.77
+> **Versão deste manual:** 0.3.78
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -817,3 +817,9 @@ No card **OpenAI / NVIDIA NIM**, o campo **Modelo** é uma lista suspensa. Use *
 Quando Azure Speech SDK V2 estiver seleccionado, o Thunderbolt prepara a narração em segmentos antes de iniciar o MoneyPrinterTurbo. O tamanho interno dos segmentos é reduzido automaticamente para velocidades de fala lentas, o áudio final é validado e a CLI recebe `--custom-audio-file`. A geração é bloqueada se não houver confirmação dos segmentos; isto evita regressar à chamada monolítica do Azure que pode falhar com `maximum media duration of 600000ms`.
 
 Na interface, uma tarefa em execução mostra a última actividade do helper e o tempo decorrido da etapa Vídeo. Se ocorrer uma falha, consulte o caminho `LOG_FILE` ou `RESULT_FILE` apresentado no erro. A linha `updated configuration fields` é apenas sincronização inicial de configuração e não é a causa terminal. Nunca copie chaves, cookies, tokens ou o conteúdo integral do roteiro para pedidos de suporte.
+
+## 17. Quando o card mostra apenas o início da falha de vídeo
+
+A partir da versão 0.3.78, o card **Backlog Vídeos** mostra a causa terminal e disponibiliza **Ver diagnóstico completo**. As mensagens `Pexels key validation completed`, `installing or verifying project dependencies with uv` e `TASK_DIR` são apenas progresso ou metadados; não são, por si só, uma falha.
+
+Se o `uv` falhar, o erro inclui o detalhe seguro do resolver. Se a CLI do MoneyPrinterTurbo falhar, o resumo inclui `MPT_ERROR` e mantém `Log completo` e `Manifesto`. A interface não exibe chaves, cookies ou tokens. O tempo limite da verificação de dependências é de 15 minutos; a etapa é encerrada em vez de ficar indefinidamente sem resposta.
