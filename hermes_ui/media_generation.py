@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
+import mimetypes
+import os
+import shutil
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -544,3 +550,332 @@ def generate_video_from_pool(
             if not _is_retryable_media_error(exc):
                 raise
     raise MediaGenerationError("Todos os providers do pool de vídeo falharam: " + " | ".join(errors))
+
+
+KIE_FILE_UPLOAD_ENDPOINT = "https://kieai.redpandaai.co/api/file-stream-upload"
+KIE_MOTION_MODEL = "kling-2.6/motion-control"
+KIE_MOTION_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+KIE_MOTION_VIDEO_MAX_BYTES = 100 * 1024 * 1024
+KIE_MOTION_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+KIE_MOTION_VIDEO_EXTENSIONS = {".mp4", ".mov"}
+KIE_VEO_MODELS = {"veo3", "veo3_fast", "veo3_lite"}
+
+
+def _require_kie_card(card: Mapping[str, Any]) -> dict[str, Any]:
+    current = dict(card)
+    if str(current.get("provider") or "").strip().lower() != "kie_ai":
+        raise MediaGenerationError("Este workflow requer um cartão KIE AI activo no pool de vídeo.")
+    if not _api_key(current):
+        raise MediaGenerationError("Configure a API key do KIE AI em Configuração API > API Keys > Imagem e Video IA.")
+    return current
+
+
+def _kie_json_error(payload: Any, *, fallback: str) -> ProviderCallError | None:
+    if not isinstance(payload, Mapping):
+        return ProviderCallError(fallback, category="payload", retryable=False)
+    try:
+        code = int(payload.get("code", 200))
+    except (TypeError, ValueError):
+        code = 200
+    if code == 200:
+        return None
+    category = "quota" if code in {402, 429, 433} else "credential" if code == 401 else "endpoint_or_model" if code in {404, 455, 505} else "transient" if code >= 500 else "payload"
+    return ProviderCallError(str(payload.get("msg") or fallback)[:500], status_code=code, category=category, retryable=category in {"quota", "transient"})
+
+
+def validate_motion_control_file(path: str | Path, *, kind: str) -> dict[str, Any]:
+    """Validate KIE Motion Control local input limits before uploading it."""
+    candidate = Path(path).expanduser()
+    if not candidate.is_file():
+        raise MediaGenerationError(f"O ficheiro de {kind} não está disponível.")
+    suffix = candidate.suffix.lower()
+    if kind == "imagem":
+        allowed, maximum = KIE_MOTION_IMAGE_EXTENSIONS, KIE_MOTION_IMAGE_MAX_BYTES
+    elif kind == "vídeo":
+        allowed, maximum = KIE_MOTION_VIDEO_EXTENSIONS, KIE_MOTION_VIDEO_MAX_BYTES
+    else:
+        raise MediaGenerationError("Tipo de input Motion Control inválido.")
+    if suffix not in allowed:
+        raise MediaGenerationError(f"O {kind} Motion Control deve estar em {', '.join(sorted(allowed))}.")
+    size = candidate.stat().st_size
+    if size <= 0:
+        raise MediaGenerationError(f"O ficheiro de {kind} está vazio.")
+    if size > maximum:
+        raise MediaGenerationError(f"O ficheiro de {kind} excede o limite KIE de {maximum // (1024 * 1024)} MB.")
+    duration = None
+    if kind == "vídeo":
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            raise MediaGenerationError("Não foi possível verificar a duração do vídeo Motion Control: instale FFmpeg/ffprobe e tente novamente.")
+        try:
+            probe = subprocess.run(
+                [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(candidate)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            duration = float(probe.stdout.strip())
+        except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            raise MediaGenerationError("Não foi possível verificar a duração do vídeo Motion Control com ffprobe.") from exc
+        if duration < 3 or duration > 30:
+            raise MediaGenerationError(f"O vídeo Motion Control deve ter entre 3 e 30 segundos; o ficheiro tem {duration:.1f}s.")
+    return {"path": str(candidate), "name": candidate.name, "size_bytes": size, "extension": suffix, "duration_seconds": duration}
+
+
+def upload_kie_file(path: str | Path, card: Mapping[str, Any], *, upload_path: str = "thunderbolt/influencers") -> str:
+    """Upload one local file to KIE's temporary public file store using the selected card."""
+    current = _require_kie_card(card)
+    candidate = Path(path).expanduser()
+    if not candidate.is_file():
+        raise MediaGenerationError("O ficheiro seleccionado não está disponível para upload KIE.")
+    mime = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+    try:
+        with candidate.open("rb") as handle:
+            response = requests.post(
+                KIE_FILE_UPLOAD_ENDPOINT,
+                headers={"Authorization": f"Bearer {_api_key(current)}"},
+                files={"file": (candidate.name, handle, mime)},
+                data={"uploadPath": upload_path, "fileName": candidate.name},
+                timeout=300,
+            )
+    except requests.RequestException as exc:
+        raise MediaGenerationError(f"Falha no upload temporário do ficheiro para KIE: {str(exc)[:220]}") from exc
+    if response.status_code >= 400:
+        raise MediaGenerationError(f"O upload temporário KIE devolveu HTTP {response.status_code}.")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise MediaGenerationError("O upload temporário KIE devolveu uma resposta inválida.") from exc
+    error = _kie_json_error(payload, fallback="O upload temporário KIE falhou.")
+    if error:
+        raise MediaGenerationError(str(error))
+    data = payload.get("data") if isinstance(payload, Mapping) else None
+    url = str((data or {}).get("downloadUrl") or (data or {}).get("fileUrl") or payload.get("downloadUrl") or payload.get("fileUrl") or "").strip() if isinstance(payload, Mapping) else ""
+    if not url.startswith(("http://", "https://")):
+        raise MediaGenerationError("O upload KIE terminou sem devolver um URL público temporário.")
+    return url
+
+
+def _download_video_url(url: str, destination: Path, *, card: Mapping[str, Any] | None = None) -> Path:
+    try:
+        response = requests.get(url, headers=_headers(card or {}) if card else {}, timeout=300)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise MediaGenerationError(f"Não foi possível descarregar o vídeo gerado: {str(exc)[:220]}") from exc
+    if not response.content:
+        raise MediaGenerationError("O provider devolveu um vídeo vazio.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(response.content)
+    return destination
+
+
+def _kie_result_urls(value: Any) -> list[str]:
+    if isinstance(value, str):
+        raw = value.strip()
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            value = [raw] if raw.startswith(("http://", "https://")) else []
+    if isinstance(value, Mapping):
+        value = value.get("resultUrls") or value.get("result_urls") or value.get("urls") or []
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip().startswith(("http://", "https://"))]
+
+
+def _poll_kie_task(card: Mapping[str, Any], task_id: str, *, endpoint: str, attempts: int = 40, interval_seconds: float = 5.0, veo: bool = False) -> list[str]:
+    base = _base_url(card) or "https://api.kie.ai/api/v1"
+    url = f"{base}{endpoint}"
+    for index in range(max(1, attempts)):
+        try:
+            response = requests.get(url, headers=_headers(card), params={"taskId": task_id}, timeout=60)
+            if response.status_code >= 400:
+                category = "quota" if response.status_code == 429 else "transient" if response.status_code >= 500 else "endpoint_or_model"
+                raise ProviderCallError(f"Consulta KIE devolveu HTTP {response.status_code}.", status_code=response.status_code, category=category, retryable=category in {"quota", "transient"})
+            payload = response.json()
+        except requests.RequestException as exc:
+            raise ProviderCallError(f"Falha ao consultar a tarefa KIE: {str(exc)[:220]}", category="transient", retryable=True) from exc
+        error = _kie_json_error(payload, fallback="A consulta KIE devolveu um erro.")
+        if error:
+            raise error
+        data = payload.get("data") if isinstance(payload, Mapping) and isinstance(payload.get("data"), Mapping) else {}
+        if veo:
+            flag = data.get("successFlag")
+            if str(flag) in {"2", "3"}:
+                raise ProviderCallError(str(data.get("errorMessage") or payload.get("msg") or "A tarefa VEO falhou."), category="provider", retryable=False)
+            response_data = data.get("response") if isinstance(data.get("response"), Mapping) else {}
+            urls = _kie_result_urls(response_data.get("resultUrls") or data.get("resultUrls"))
+            if str(flag) == "1" and urls:
+                return urls
+        else:
+            state = str(data.get("state") or payload.get("state") or "").lower()
+            if state in {"fail", "failed", "error", "cancelled", "canceled"}:
+                raise ProviderCallError(str(data.get("failMsg") or payload.get("msg") or "A tarefa KIE falhou."), category="provider", retryable=False)
+            urls = _kie_result_urls(data.get("resultJson"))
+            if state == "success" and urls:
+                return urls
+        if index + 1 < attempts:
+            time.sleep(max(0.2, interval_seconds))
+    raise ProviderCallError("A tarefa KIE não concluiu dentro do limite de polling local.", category="transient", retryable=True)
+
+
+def generate_motion_control_video(
+    settings: Mapping[str, Any],
+    card: Mapping[str, Any],
+    *,
+    image_url: str,
+    video_url: str,
+    prompt: str = "",
+    output_path: Path | None = None,
+) -> tuple[Path, str]:
+    """Create a Kling 2.6 Motion Control video and download it locally."""
+    current = _require_kie_card(card)
+    if not image_url.startswith(("http://", "https://")) or not video_url.startswith(("http://", "https://")):
+        raise MediaGenerationError("Motion Control requer URLs KIE acessíveis para a imagem e o vídeo enviados.")
+    clean_prompt = str(prompt or "").strip()
+    if len(clean_prompt) > 2500:
+        raise MediaGenerationError("O prompt Motion Control não pode exceder 2500 caracteres.")
+    base = _base_url(current) or "https://api.kie.ai/api/v1"
+    body: dict[str, Any] = {
+        "model": KIE_MOTION_MODEL,
+        "input": {
+            "prompt": clean_prompt or "Preserve a identidade visual da imagem de referência e aplique os movimentos do vídeo de forma natural, estável e fisicamente plausível.",
+            "input_urls": [image_url],
+            "video_urls": [video_url],
+            "character_orientation": "video",
+            "mode": "720p",
+        },
+    }
+
+    def request(_: dict[str, Any]) -> Any:
+        response = requests.post(f"{base}/jobs/createTask", headers=_headers(current), json=body, timeout=180)
+        if response.status_code < 400:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {}
+            error = _kie_json_error(payload, fallback="A criação Motion Control KIE falhou.")
+            if error:
+                raise error
+        return response
+
+    try:
+        routed = route_json_request(settings, pool=POOL_VIDEO, cards=[current], request=request)
+        data = routed.payload.get("data") if isinstance(routed.payload.get("data"), Mapping) else {}
+        task_id = str(data.get("taskId") or routed.payload.get("taskId") or "").strip()
+        if not task_id:
+            raise MediaGenerationError("KIE aceitou Motion Control mas não devolveu taskId.")
+        urls = _poll_kie_task(routed.card, task_id, endpoint="/jobs/recordInfo", veo=False)
+    except (ProviderRoutingError, ProviderCallError) as exc:
+        raise MediaGenerationError(str(exc)) from exc
+    destination = output_path or (STORAGE / "influencer_workflows" / f"motion-control-{task_id}.mp4")
+    return _download_video_url(urls[0], destination, card=routed.card), task_id
+
+
+def generate_ugc_segment(
+    settings: Mapping[str, Any],
+    card: Mapping[str, Any],
+    *,
+    image_url: str,
+    prompt: str,
+    output_path: Path,
+    duration: int = 8,
+) -> tuple[Path, str]:
+    """Create one VEO3.1 image-to-video segment through the official KIE endpoint."""
+    current = _require_kie_card(card)
+    if not image_url.startswith(("http://", "https://")):
+        raise MediaGenerationError("UGC Products requer um URL KIE acessível para a imagem do produto.")
+    model = _model(current).lower() or "veo3_fast"
+    if model not in KIE_VEO_MODELS:
+        model = "veo3_fast"
+    if duration not in {4, 6, 8}:
+        raise MediaGenerationError("A duração de um segmento VEO3 deve ser 4, 6 ou 8 segundos.")
+    base = _base_url(current) or "https://api.kie.ai/api/v1"
+    body = {
+        "prompt": str(prompt or "").strip(),
+        "imageUrls": [image_url],
+        "model": model,
+        "aspect_ratio": "16:9",
+        "resolution": "720p",
+        "duration": duration,
+    }
+
+    def request(_: dict[str, Any]) -> Any:
+        response = requests.post(f"{base}/veo/generate", headers=_headers(current), json=body, timeout=180)
+        if response.status_code < 400:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {}
+            error = _kie_json_error(payload, fallback="A criação de segmento VEO KIE falhou.")
+            if error:
+                raise error
+        return response
+
+    try:
+        routed = route_json_request(settings, pool=POOL_VIDEO, cards=[current], request=request)
+        data = routed.payload.get("data") if isinstance(routed.payload.get("data"), Mapping) else {}
+        task_id = str(data.get("taskId") or routed.payload.get("taskId") or "").strip()
+        if not task_id:
+            raise MediaGenerationError("KIE aceitou VEO3 mas não devolveu taskId.")
+        urls = _poll_kie_task(routed.card, task_id, endpoint="/veo/record-info", veo=True)
+    except (ProviderRoutingError, ProviderCallError) as exc:
+        raise MediaGenerationError(str(exc)) from exc
+    return _download_video_url(urls[0], output_path, card=routed.card), task_id
+
+
+def concatenate_video_files(paths: list[Path], output_path: Path) -> Path:
+    """Join generated clips locally with FFmpeg, without uploading the result anywhere."""
+    valid = [Path(path) for path in paths if Path(path).is_file()]
+    if not valid:
+        raise MediaGenerationError("Não existem segmentos locais para concatenar.")
+    if len(valid) == 1:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if valid[0] != output_path:
+            output_path.write_bytes(valid[0].read_bytes())
+        return output_path
+    try:
+        from .metadata_cleaner import _resolve_ffmpeg
+
+        ffmpeg = _resolve_ffmpeg()
+    except Exception as exc:
+        raise MediaGenerationError(str(exc)) from exc
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, manifest_name = tempfile.mkstemp(prefix="ugc-concat-", suffix=".txt", dir=str(output_path.parent))
+    os.close(descriptor)
+    manifest = Path(manifest_name)
+    try:
+        manifest.write_text("\n".join(f"file '{str(path).replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'" for path in valid) + "\n", encoding="utf-8")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        command = [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(manifest), "-c", "copy", str(output_path)]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=600, check=False)
+        if completed.returncode != 0:
+            raise MediaGenerationError(f"FFmpeg não conseguiu juntar os segmentos UGC: {completed.stderr[-500:]}")
+    except OSError as exc:
+        raise MediaGenerationError(f"Não foi possível executar FFmpeg para juntar os segmentos UGC: {exc}") from exc
+    finally:
+        manifest.unlink(missing_ok=True)
+    return output_path
+
+
+def generate_ugc_product_video(
+    settings: Mapping[str, Any],
+    card: Mapping[str, Any],
+    *,
+    image_url: str,
+    prompts: list[str],
+    output_path: Path | None = None,
+) -> tuple[Path, list[str]]:
+    """Generate two 8-second KIE VEO3 clips and concatenate them locally."""
+    clean_prompts = [str(item or "").strip() for item in prompts if str(item or "").strip()]
+    if len(clean_prompts) != 2:
+        raise MediaGenerationError("UGC Products requer exactamente dois prompts de segmento.")
+    ensure_storage()
+    destination = output_path or (STORAGE / "influencer_workflows" / f"ugc-products-{abs(hash((image_url, *clean_prompts))) & 0xffffffffffffffff:x}.mp4")
+    segment_paths = [destination.with_name(f"{destination.stem}-segment-{index + 1}.mp4") for index in range(2)]
+    task_ids: list[str] = []
+    for prompt, segment_path in zip(clean_prompts, segment_paths):
+        _, task_id = generate_ugc_segment(settings, card, image_url=image_url, prompt=prompt, output_path=segment_path, duration=8)
+        task_ids.append(task_id)
+    return concatenate_video_files(segment_paths, destination), task_ids

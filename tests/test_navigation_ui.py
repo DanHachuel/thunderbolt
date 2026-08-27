@@ -79,6 +79,10 @@ def test_ai_influencers_is_visible_with_real_character_and_content_renderers():
     assert 'with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):' in MAIN_SOURCE
     assert '"Personagens": lambda: render_ai_influencer_characters' in MAIN_SOURCE
     assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in MAIN_SOURCE
+    assert '("Motion Control", ":material/motion_photos_on:", "Motion Control")' in MAIN_SOURCE
+    assert '"Motion Control": lambda: render_motion_control' in MAIN_SOURCE
+    assert '("UGC Products", ":material/shopping_bag:", "UGC Products")' in MAIN_SOURCE
+    assert '"UGC Products": lambda: render_ugc_products' in MAIN_SOURCE
     assert '("Models AI", ":material/smart_toy:", "Models AI")' not in MAIN_SOURCE
 
 

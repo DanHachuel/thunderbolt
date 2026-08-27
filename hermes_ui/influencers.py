@@ -20,6 +20,7 @@ from typing import Any, Iterable, Mapping
 from .storage import ROOT, STORAGE
 
 BACKEND_OPTIONS = ("Supabase", "SQLite")
+STANDALONE_CONTENT_INFLUENCER_ID = "__standalone_ai_content__"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 DOCUMENT_EXTENSIONS = {".md", ".json"}
 ASSET_EXTENSIONS = IMAGE_EXTENSIONS | DOCUMENT_EXTENSIONS
@@ -516,6 +517,22 @@ class SupabaseInfluencerRepository:
         return self._data(response)
 
 
+def ensure_standalone_content_owner(repository: Any) -> str:
+    """Return a hidden owner row for AI content that has no character dependency."""
+    existing = repository.get_influencer(STANDALONE_CONTENT_INFLUENCER_ID)
+    if existing:
+        return STANDALONE_CONTENT_INFLUENCER_ID
+    repository.create_influencer(
+        {
+            "id": STANDALONE_CONTENT_INFLUENCER_ID,
+            "name": "__Thunderbolt AI content__",
+            "bio": "Internal owner for standalone Motion Control and UGC Products content.",
+            "language": "",
+        }
+    )
+    return STANDALONE_CONTENT_INFLUENCER_ID
+
+
 def sqlite_path_from_settings(settings: Mapping[str, Any]) -> Path:
     raw = str(settings.get("influencer_sqlite_path") or "storage/state/ai_influencers.db").strip()
     return _resolve_sqlite_path(raw)
@@ -567,12 +584,14 @@ __all__ = [
     "DOCUMENT_EXTENSIONS",
     "IMAGE_EXTENSIONS",
     "InfluencerBackendError",
+    "STANDALONE_CONTENT_INFLUENCER_ID",
     "SQLiteInfluencerRepository",
     "SupabaseInfluencerRepository",
     "SQLITE_SCHEMA",
     "backend_name",
     "backend_status",
     "get_repository",
+    "ensure_standalone_content_owner",
     "parse_document",
     "sqlite_path_from_settings",
     "test_backend",
