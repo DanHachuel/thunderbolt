@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.66
+> **Versão deste manual:** 0.3.67
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -128,13 +128,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.66 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.67 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.66 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.67 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -142,7 +142,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.66 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.67 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -397,6 +397,12 @@ A área **Voz, TTS e música — Azure Speech, restantes serviços e Suno** est�
 
 Na subaba **Imagem e Video**, a lista **Provider de media** inclui **FAL AI, KIE AI, Agnes AI, Nano Banana, Replicate AI, Pollinations.ai, Hugging Face Inference API, InferencePort Proxy e HeyGen** para a rota Full IA. O cartão **HeyGen** pede a API key, o **Avatar ID** e, opcionalmente, o **Voice ID**; a opção **Provider activo**, **Pool Vídeo**, **Prioridade** e **Testar Chamada API** funcionam como nos restantes cartões. O teste HeyGen usa apenas `GET /v3/users/me` e não consome uma geração. Nano Banana e Hugging Face podem permanecer no catálogo sem serem seleccionados para vídeo quando o cartão não declara capacidade de vídeo.
 
+### API Tiktok — várias aplicações
+
+Em **Configuração API > API Tiktok**, situada entre **Contas Google** e **Fontes de Materiais**, cada aplicação TikTok é configurada num card independente. O card contém exclusivamente **TikTok Client ID** e **TikTok Client Secret** e apresenta os botões **Testar chamada API**, **Guardar card** e **Apagar card**. Use **Adicionar nova API** no final da lista para criar outra aplicação sem substituir as anteriores.
+
+O botão de teste é read-only. Sem um token OAuth TikTok já autorizado, o Thunderbolt informa que é necessário concluir o Playground/autorização do TikTok for Developers, sem inventar um resultado nem enviar credenciais. O token e a autorização não são campos dos cards. Instalações que ainda tenham `tiktok_client_key` e `tiktok_client_secret` são migradas automaticamente para o primeiro card; o adapter usa o primeiro card completo e mantém fallback para os campos antigos.
+
 Na criação de vídeo, abra **Configurações de áudio** e escolha **Upload** em **Modo de narração**. Use **Ficheiro de narração** para seleccionar o áudio, clique em **Guardar áudio de narração** e confirme a pré-visualização. O Thunderbolt valida que o ficheiro existe antes de criar a tarefa e encaminha o caminho ao MoneyPrinterTurbo com `--custom-audio-file`; este argumento é necessário porque o motor não persiste automaticamente o caminho carregado. São aceites ficheiros `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac` e `.ogg`, guardados no storage local em `voiceovers`.
 
 O selector **Voiceover Service** oferece **Azure Speech SDK V2** e **Azure TTS V1**. Quando existe **Azure Speech key + região**, a opção V2 é preferida e o worker marca internamente a voz com `-V2`, activando o SDK Azure Speech e evitando o stream `edge_tts`. Tarefas antigas que ainda tenham `Azure TTS V1` guardado também são migradas para V2 quando essas credenciais estão configuradas. Sem credenciais Azure, o V1 continua disponível como fallback sem key; nesse caso o timeout interno do stream passa a 90 segundos para tolerar scripts longos e redes lentas. Um erro de TTS identifica explicitamente **Azure Speech / edge_tts API**, a etapa **Narração TTS** e os providers envolvidos.
@@ -562,7 +568,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.66 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.67 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

@@ -4660,6 +4660,103 @@ def render_upload_conventional():
                 st.button("Preparar Facebook Pages", key=f"upload_facebook_{task['id']}", disabled=True, help="UI preparada; publicação Facebook Pages ainda não está activa.")
 
 
+def _normalise_tiktok_api_cards(settings: dict[str, Any]) -> tuple[list[dict[str, str]], bool]:
+    raw_cards = settings.get("tiktok_api_cards")
+    cards: list[dict[str, str]] = []
+    changed = not isinstance(raw_cards, list)
+    if isinstance(raw_cards, list):
+        for index, raw_card in enumerate(raw_cards):
+            if not isinstance(raw_card, dict):
+                changed = True
+                continue
+            card_id = str(raw_card.get("id") or f"tiktok-api-{index + 1}").strip()
+            client_id = str(raw_card.get("client_id") or raw_card.get("client_key") or "").strip()
+            client_secret = str(raw_card.get("client_secret") or "").strip()
+            normalised = {"id": card_id, "client_id": client_id, "client_secret": client_secret}
+            cards.append(normalised)
+            if normalised != {key: str(raw_card.get(key) or "").strip() for key in ("id", "client_id", "client_secret")}:
+                changed = True
+    if not cards:
+        legacy_client_id = str(settings.get("tiktok_client_key") or "").strip()
+        legacy_client_secret = str(settings.get("tiktok_client_secret") or "").strip()
+        if legacy_client_id or legacy_client_secret:
+            cards = [{"id": "tiktok-api-1", "client_id": legacy_client_id, "client_secret": legacy_client_secret}]
+            changed = True
+    if changed and cards:
+        settings["tiktok_api_cards"] = cards
+        write_json("settings.json", settings)
+    return cards, changed
+
+
+def _persist_tiktok_api_cards(settings: dict[str, Any], cards: list[dict[str, str]]) -> None:
+    clean_cards = [
+        {
+            "id": str(card.get("id") or f"tiktok-api-{index + 1}").strip(),
+            "client_id": str(card.get("client_id") or "").strip(),
+            "client_secret": str(card.get("client_secret") or "").strip(),
+        }
+        for index, card in enumerate(cards)
+    ]
+    settings["tiktok_api_cards"] = clean_cards
+    first = next((card for card in clean_cards if card["client_id"] and card["client_secret"]), clean_cards[0] if clean_cards else {"client_id": "", "client_secret": ""})
+    settings["tiktok_client_key"] = first["client_id"]
+    settings["tiktok_client_secret"] = first["client_secret"]
+    write_json("settings.json", settings)
+
+
+def render_tiktok_api_cards(settings: dict[str, Any]) -> None:
+    st.title("API Tiktok")
+    st.caption("Configure várias aplicações TikTok em cards separados. Cada card mantém apenas o TikTok Client ID e o TikTok Client Secret; autorização OAuth, scopes e tokens continuam a ser geridos no TikTok for Developers Playground.")
+    cards, _ = _normalise_tiktok_api_cards(settings)
+    if not cards:
+        st.info("Ainda não existe nenhuma API TikTok configurada. Use o botão abaixo para criar o primeiro card.")
+    for index, card in enumerate(cards):
+        card_id = str(card["id"])
+        with st.container(border=True):
+            header_cols = st.columns([3.2, 1.2])
+            with header_cols[0]:
+                st.subheader(f"API TikTok {index + 1}")
+            with header_cols[1]:
+                configured = bool(card["client_id"] and card["client_secret"])
+                _api_status_badge("Configured" if configured else "Missing configuration", "ready" if configured else "missing")
+            with st.form(f"tiktok_api_card_form_{card_id}"):
+                client_id = st.text_input("TikTok Client ID", value=card["client_id"], key=f"tiktok_api_{card_id}_client_id")
+                client_secret = st.text_input("TikTok Client Secret", value=card["client_secret"], type="password", key=f"tiktok_api_{card_id}_client_secret")
+                action_cols = st.columns(3)
+                with action_cols[0]:
+                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                with action_cols[1]:
+                    save_clicked = st.form_submit_button("Guardar card", type="primary", use_container_width=True)
+                with action_cols[2]:
+                    delete_clicked = st.form_submit_button("Apagar card", use_container_width=True)
+            edited = {"id": card_id, "client_id": client_id.strip(), "client_secret": client_secret.strip()}
+            if test_clicked:
+                cards[index] = edited
+                _persist_tiktok_api_cards(settings, cards)
+                result = test_tiktok_credentials(edited["client_id"], edited["client_secret"], settings.get("tiktok_access_token", ""))
+                if result.get("status") == "success":
+                    st.success(result.get("message") or "Chamada TikTok concluída.")
+                elif result.get("status") == "unsupported":
+                    st.warning(result.get("message") or "Conclua a autorização TikTok antes do teste.")
+                else:
+                    st.error(result.get("message") or "A chamada TikTok falhou.")
+            elif save_clicked:
+                cards[index] = edited
+                _persist_tiktok_api_cards(settings, cards)
+                st.success("Card TikTok guardado.")
+                st.rerun()
+            elif delete_clicked:
+                cards = [item for item in cards if str(item.get("id")) != card_id]
+                _persist_tiktok_api_cards(settings, cards)
+                st.success("Card TikTok apagado.")
+                st.rerun()
+    if st.button("Adicionar nova API", type="primary", use_container_width=True, key="add_tiktok_api_card"):
+        cards.append({"id": f"tiktok-api-{uuid.uuid4().hex[:10]}", "client_id": "", "client_secret": ""})
+        _persist_tiktok_api_cards(settings, cards)
+        st.success("Novo card TikTok criado.")
+        st.rerun()
+
+
 def render_google_accounts():
     st.title("Contas Google")
     st.caption("Gestão das contas Google/YouTube, documentos de credenciais, canais em lote e credenciais globais do YouTube.")
@@ -5440,7 +5537,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])
+    api_keys_tab, google_accounts_tab, tiktok_api_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -5591,18 +5688,6 @@ def render_settings():
                             widget_key="api_test_voice_suno",
                         )
 
-                with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):
-                    st.caption("Apenas as credenciais da aplicação ficam nesta UI. Redirect URI, scopes, autorização e tokens são geridos no TikTok for Developers Playground.")
-                    tiktok_client_key = text_setting("TikTok Client ID", "tiktok_client_key", secret=True)
-                    _render_credential_status(tiktok_client_key)
-                    tiktok_client_secret = text_setting("TikTok Client Secret", "tiktok_client_secret", secret=True)
-                    _render_api_test_control(
-                        settings,
-                        "tiktok",
-                        lambda: test_tiktok_credentials(tiktok_client_key, tiktok_client_secret, settings.get("tiktok_access_token", "")),
-                        widget_key="api_test_tiktok",
-                    )
-
                 with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
@@ -5651,7 +5736,6 @@ def render_settings():
                         "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
                         "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
                         "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint,
-                        "tiktok_client_key": tiktok_client_key, "tiktok_client_secret": tiktok_client_secret,
                         "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
                         "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
                         "upload_post_auto_upload": upload_post_auto_upload,
@@ -5670,6 +5754,9 @@ def render_settings():
                         st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
     with google_accounts_tab:
         render_google_accounts()
+
+    with tiktok_api_tab:
+        render_tiktok_api_cards(settings)
 
     with material_sources_tab:
         render_material_source_api_keys(settings)

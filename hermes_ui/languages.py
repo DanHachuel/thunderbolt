@@ -114,7 +114,7 @@ _CORE_UI_TEXT_KEYS = (
     "Início", "Niche Finder", "Pipeline", "Pipeline TikTok", "Automação", "Edição", "AI Influencers", "Configurações",
     "Criação de Vídeos", "Criação de Músicas", "Roteiros", "Upload", "Prompts Master", "Contas TikTok", "Automação Youtube",
     "Niche Finder Kaggle", "Niche Finder Apify", "Limpador de Metadados", "Cortes", "Editor Python", "Download Mídia",
-    "Personagens", "Redes Sociais", "Tutorial Meta", "Tutorial Supabase", "Canais Youtube", "Blueprints Youtube", "MCP", "Contas Google",
+    "Personagens", "Redes Sociais", "Tutorial Meta", "Tutorial Supabase", "Canais Youtube", "Blueprints Youtube", "MCP", "Contas Google", "API Tiktok",
     "Configuração API", "Notificações", "Interface local para operação e automação de conteúdo faceless", "Canais", "activos",
     "Tarefas", "total registado", "A fazer", "na pipeline", "Em execução", "a decorrer", "Concluídos", "artefactos prontos",
     "Falhas", "requerem atenção", "Filas locais e dependências da cascata", "Niche", "Blueprints", "Brand", "Script", "Title",
@@ -152,6 +152,9 @@ UI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "Início": "Home", "Niche Finder": "Trova nicchia", "Pipeline": "Pipeline", "Pipeline TikTok": "Pipeline TikTok", "Automação": "Automazione", "Edição": "Modifica", "AI Influencers": "Influencer AI", "Configurações": "Impostazioni", "Criação de Vídeos": "Creazione video", "Criação de Músicas": "Creazione musicale", "Roteiros": "Script", "Upload": "Caricamento", "Prompts Master": "Prompt Master", "Contas TikTok": "Account TikTok", "Automação Youtube": "Automazione YouTube", "Niche Finder Kaggle": "Trova nicchia Kaggle", "Niche Finder Apify": "Trova nicchia Apify", "Limpador de Metadados": "Pulizia metadati", "Cortes": "Tagli", "Editor Python": "Editor Python", "Download Mídia": "Download media", "Personagens": "Personaggi", "Redes Sociais": "Social network", "Tutorial Meta": "Tutorial Meta", "Canais Youtube": "Canali YouTube", "Blueprints Youtube": "Blueprint YouTube", "MCP": "MCP", "Contas Google": "Account Google", "Configuração API": "Configurazione API", "Notificações": "Notifiche", "Interface local para operação e automação de conteúdo faceless": "Interfaccia locale per la gestione e l'automazione di contenuti faceless", "Canais": "Canali", "activos": "attivi", "Tarefas": "Attività", "total registado": "totale registrato", "A fazer": "Da fare", "na pipeline": "nella pipeline", "Em execução": "In esecuzione", "a decorrer": "in corso", "Concluídos": "Completati", "artefactos prontos": "artefatti pronti", "Falhas": "Errori", "requerem atenção": "richiedono attenzione", "Filas locais e dependências da cascata": "Code locali e dipendenze della pipeline", "Niche": "Nicchia", "Blueprints": "Blueprint", "Brand": "Brand", "Script": "Script", "Title": "Titolo", "Thumbnail": "Miniatura", "Video": "Video", "Edit": "Modifica", "fila": "coda", "na biblioteca": "nella libreria", "tarefa(s) na fila": "attività in coda", "Language": "Lingua", "Theme": "Tema", "Dark": "Scuro", "Light": "Chiaro",
     },
 }
+
+for _translation in UI_TRANSLATIONS.values():
+    _translation.setdefault("API Tiktok", "API Tiktok")
 
 # Labels for the independent LLM provider cards.
 _LLM_TRANSLATIONS: dict[str, dict[str, str]] = {
