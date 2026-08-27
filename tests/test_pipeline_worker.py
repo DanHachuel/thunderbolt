@@ -206,6 +206,49 @@ def test_video_helper_uses_configured_root_and_persists_helper_diagnostics(tmp_p
     assert "VIDEO_FILE=" in diagnostics["output_tail"]
 
 
+def test_video_helper_passes_uploaded_voiceover_to_moneyprinterturbo(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    voiceover = tmp_path / "narracao.wav"
+    voiceover.write_bytes(b"audio")
+    video_path = tmp_path / "generated.mp4"
+    video_path.write_bytes(b"mp4")
+    storage.write_json("settings.json", {"moneyprinter_path": str(root)})
+    storage.write_json("tasks.json", [{"id": "video_voiceover", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
+    captured = {}
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        return _FakePopen([f"VIDEO_FILE={video_path}\n"])
+
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", fake_popen)
+    result = pipeline_worker._run_video_helper(
+        {
+            "id": "video_voiceover",
+            "topic": "Tema",
+            "generation_settings": {"voiceover_mode": "Upload", "voiceover_file": str(voiceover)},
+        }
+    )
+
+    assert result == video_path
+    assert captured["command"][captured["command"].index("--custom-audio-file") + 1] == str(voiceover.resolve())
+
+
+def test_video_helper_rejects_upload_mode_without_audio_file(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    with pytest.raises(pipeline_worker.PipelineError, match="ficheiro de narração válido"):
+        pipeline_worker._run_video_helper(
+            {
+                "id": "video_missing_voiceover",
+                "topic": "Tema",
+                "generation_settings": {"voiceover_mode": "Upload", "voiceover_file": ""},
+            }
+        )
+
+
 def test_video_helper_timeout_kills_subprocess_and_returns_pipeline_error(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     storage.write_json("tasks.json", [{"id": "video_timeout", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])

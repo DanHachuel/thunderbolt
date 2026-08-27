@@ -22,6 +22,7 @@ AUDIO_SETTING_KEYS = (
     "voice",
     "voiceover_volume",
     "voiceover_speed",
+    "voiceover_file",
     "background_music_source",
     "background_music_volume",
 )

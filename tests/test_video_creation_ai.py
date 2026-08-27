@@ -30,6 +30,16 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('generate_thumbnail_prompt(', MAIN_SOURCE)
         self.assertNotIn('Gerar títulos e thumbnails com IA', MAIN_SOURCE)
 
+    def test_audio_upload_is_available_and_quantity_control_is_removed(self):
+        self.assertNotIn('st.number_input("Quantidade"', MAIN_SOURCE)
+        self.assertIn('uploaded_voiceover = st.file_uploader(', MAIN_SOURCE)
+        self.assertIn('st.button("Guardar áudio de narração"', MAIN_SOURCE)
+        self.assertIn('settings["voiceover_file"]', MAIN_SOURCE)
+        self.assertIn('store_voiceover_file(', MAIN_SOURCE)
+        self.assertIn('custom-audio-file', PIPELINE_SOURCE)
+        self.assertNotIn('Fonteeeee', MAIN_SOURCE)
+        self.assertNotIn('Fonteeeee', LANGUAGES_SOURCE)
+
     def test_scripts_page_reuses_combined_ai_generation_with_selected_blueprint(self):
         self.assertIn('"pipeline_scripts",', MAIN_SOURCE)
         scripts_source = MAIN_SOURCE.split("def render_scripts():", 1)[1].split("@st.cache_data", 1)[0]

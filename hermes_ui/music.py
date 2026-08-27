@@ -11,6 +11,7 @@ from . import storage
 from .notifications import record_notification
 
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
+VOICEOVER_EXTENSIONS = set(MUSIC_EXTENSIONS)
 
 
 def music_directory() -> Path:
@@ -43,6 +44,32 @@ def store_music_file(name: str, content: bytes) -> Path:
         metadata={"filename": target.name, "source": "local_storage"},
         dedupe_key=f"music:{target.name}:{target.stat().st_mtime_ns}",
     )
+    return target
+
+
+def voiceover_directory() -> Path:
+    directory = storage.STORAGE / "voiceovers"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def safe_voiceover_name(name: str) -> str:
+    stem = re.sub(r"[^\w\-. ]+", "_", Path(name).stem, flags=re.UNICODE).strip() or "voiceover"
+    suffix = Path(name).suffix.lower()
+    if suffix not in VOICEOVER_EXTENSIONS:
+        suffix = ".mp3"
+    return f"{stem}{suffix}"
+
+
+def store_voiceover_file(name: str, content: bytes) -> Path:
+    if not content:
+        raise ValueError("O ficheiro de narração está vazio.")
+    suffix = Path(name).suffix.lower()
+    if suffix not in VOICEOVER_EXTENSIONS:
+        allowed = ", ".join(sorted(VOICEOVER_EXTENSIONS))
+        raise ValueError(f"Formato de narração não suportado: {suffix or '(sem extensão)'}. Use {allowed}.")
+    target = voiceover_directory() / safe_voiceover_name(name)
+    target.write_bytes(content)
     return target
 
 

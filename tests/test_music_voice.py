@@ -22,6 +22,22 @@ def test_music_file_is_stored_and_listed(monkeypatch, tmp_path):
     assert saved in music.list_music_files()
 
 
+def test_voiceover_file_is_stored_in_dedicated_directory(monkeypatch, tmp_path):
+    root = _use_temp_storage(monkeypatch, tmp_path)
+    saved = music.store_voiceover_file("narracao teste.wav", b"audio")
+    assert saved.parent == root / "voiceovers"
+    assert saved.name == "narracao teste.wav"
+    assert saved.read_bytes() == b"audio"
+
+
+def test_voiceover_file_rejects_empty_or_unsupported_content(monkeypatch, tmp_path):
+    _use_temp_storage(monkeypatch, tmp_path)
+    with pytest.raises(ValueError, match="vazio"):
+        music.store_voiceover_file("narracao.mp3", b"")
+    with pytest.raises(ValueError, match="não suportado"):
+        music.store_voiceover_file("narracao.txt", b"audio")
+
+
 def test_suno_requires_explicit_configured_endpoint():
     result = music.request_suno_generation({}, "instrumental")
     assert result["ok"] is False
