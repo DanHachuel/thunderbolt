@@ -678,7 +678,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     command = ["uv", "run", "--no-project", "--python", "3.11", "python", "mpt_agent.py"]
     if configured_root:
         command.extend(["--root", str(configured_root)])
-    command.extend(["--subject", subject])
+    command.extend(["--subject", subject, "--"])
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
     command.extend(_moneyprinter_cli_args(task, route))
     if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
