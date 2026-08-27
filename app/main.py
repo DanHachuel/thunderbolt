@@ -26,7 +26,7 @@ from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
-from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
+from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, atomic_write, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -76,6 +76,7 @@ from integrations.music_uploads import JewelMusicAdapter, PushtunesAdapter, YTMu
 from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
+from integrations.session_info_health import check_account_session_info_health
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -1353,7 +1354,7 @@ def render_blueprints():
                 if destination.exists() and not st.checkbox("Confirmar substituição", key="confirm_blueprint_replace"):
                     st.warning("O ficheiro já existe. Confirme a substituição.")
                 else:
-                    destination.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    atomic_write(destination, data)
                     record_notification("blueprint_completed", f"Blueprint guardado: {destination.stem}", "O Blueprint importado foi guardado no storage local.", metadata={"name": destination.stem}, dedupe_key=f"blueprint:{destination}:{destination.stat().st_mtime_ns}")
                     st.success(f"Blueprint guardado em {destination}")
                     st.rerun()
@@ -1393,7 +1394,7 @@ def render_blueprints():
                     raise ValueError("O JSON raiz deve ser um objecto.")
                 target = BLUEPRINTS / "brandings" / (Path(branding_upload.name).stem.replace(" ", "-") + ".json")
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                atomic_write(target, data)
                 record_notification("branding_completed", f"Branding guardado: {target.stem}", "O Branding importado foi guardado no storage local.", metadata={"name": target.stem}, dedupe_key=f"branding:{target}:{target.stat().st_mtime_ns}")
                 st.success(f"Branding guardado em {target}")
                 st.rerun()
@@ -4966,6 +4967,7 @@ def render_google_accounts():
         account_label_snapshot = str(batch_account.get("label") or "Canais YouTube")
         ensure_credentials_document(STORAGE, batch_account, settings, channel_state)
         direct_status = direct_account_status(STORAGE, batch_account, settings)
+        session_health = check_account_session_info_health(STORAGE, batch_account, settings)
         missing_document_parts = list(direct_status.get("missing_cookies", []))
         if not direct_status.get("has_session_info"):
             missing_document_parts.append("sessionInfo")
@@ -4985,6 +4987,15 @@ def render_google_accounts():
                 st.subheader(f"{account_label_snapshot} — {account_email_snapshot}")
             with account_header_cols[1]:
                 _api_status_badge("Configured" if account_ready else "Missing configuration", "ready" if account_ready else "missing")
+            health_message = f"SessionInfo: {session_health.message}"
+            if session_health.status == "healthy":
+                st.caption(health_message)
+            elif session_health.status == "expiring":
+                st.warning(health_message, icon="⚠️")
+            elif session_health.status == "expired":
+                st.error(health_message, icon="⚠️")
+            elif session_health.status == "unknown":
+                st.warning(health_message, icon="⚠️")
             with st.expander("Detalhes da conta Google", expanded=False):
                 with st.form(f"batch_account_form_{account_id}"):
                     account_cols = st.columns(2)

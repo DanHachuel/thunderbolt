@@ -5,8 +5,11 @@ import os
 import re
 import secrets
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from hermes_ui.storage import atomic_write
 
 COOKIE_KEYS = ("SID", "SSID", "HSID", "APISID", "SAPISID")
 DIRECT_DOCUMENT_NAME = "credentials.json"
@@ -31,6 +34,10 @@ def cookie_file_path(storage_root: Path, account: dict[str, Any]) -> Path:
     """Legacy path retained only to migrate pre-document installations."""
     return account_directory(storage_root, account) / "cookies.json"
 
+
+def _session_info_now() -> str:
+    """Return the UTC timestamp recorded when a sessionInfo token is saved."""
+    return datetime.now(timezone.utc).isoformat()
 
 def _placeholder_to_empty(value: Any) -> str:
     text = str(value or "").strip()
@@ -177,6 +184,7 @@ def _normalise_document(raw: Any, account: dict[str, Any]) -> dict[str, Any]:
         "account_id": str(raw.get("account_id") or account.get("id") or "").strip(),
         "email": str(raw.get("email") or account.get("email") or "").strip(),
         "sessionInfo": _placeholder_to_empty(raw.get("sessionInfo") or raw.get("session_info") or raw.get("direct_session_info") or _account_session_info(account)),
+        "sessionInfoCapturedAt": str(raw.get("sessionInfoCapturedAt") or raw.get("session_info_captured_at") or account.get("sessionInfoCapturedAt") or account.get("session_info_captured_at") or "").strip(),
         "cookies": {key: cookies.get(key, "") for key in COOKIE_KEYS},
         "INNERTUBE_API_KEY": _placeholder_to_empty(raw.get("INNERTUBE_API_KEY") or raw.get("innertube_api_key") or raw.get("direct_innertube_api_key") or ""),
         "chunk_size": _safe_chunk_size(raw.get("chunk_size", raw.get("direct_chunk_size", DEFAULT_CHUNK_SIZE))),
@@ -204,6 +212,7 @@ def _legacy_document(storage_root: Path, account: dict[str, Any], settings: dict
         "account_id": account.get("id"),
         "email": account.get("email"),
         "sessionInfo": _account_session_info(account) or settings.get("direct_session_info"),
+        "sessionInfoCapturedAt": account.get("sessionInfoCapturedAt") or settings.get("direct_session_info_captured_at") or "",
         "cookies": legacy_cookies,
         "INNERTUBE_API_KEY": settings.get("direct_innertube_api_key"),
         "chunk_size": settings.get("direct_chunk_size", DEFAULT_CHUNK_SIZE),
@@ -219,18 +228,13 @@ def save_credentials_document(storage_root: Path, account: dict[str, Any], docum
         "account_id": normalised["account_id"],
         "email": normalised["email"],
         "sessionInfo": normalised["sessionInfo"],
+        "sessionInfoCapturedAt": normalised.get("sessionInfoCapturedAt", ""),
         "cookies": normalised["cookies"],
         # INNERTUBE_API_KEY não pertence ao documento de cookies/credenciais.
         "chunk_size": normalised["chunk_size"],
         "delegated_session_ids": normalised["delegated_session_ids"],
     }
-    temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(6)}.tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    try:
-        os.chmod(temporary, 0o600)
-    except OSError:
-        pass
-    temporary.replace(destination)
+    atomic_write(destination, payload)
     try:
         os.chmod(destination, 0o600)
     except OSError:
@@ -239,13 +243,15 @@ def save_credentials_document(storage_root: Path, account: dict[str, Any], docum
 
 
 def update_credentials_document_session_info(storage_root: Path, account: dict[str, Any], session_info: str) -> Path | None:
-    """Update only sessionInfo in an existing credentials document."""
+    """Save sessionInfo and its UTC capture time without exposing the token."""
     path = credentials_document_path(storage_root, account)
-    if not path.exists():
-        return None
-    raw = _read_json_document(path) or {}
+    if path.exists():
+        raw = _read_json_document(path) or {}
+    else:
+        raw = load_credentials_document(storage_root, {**account, "sessionInfo": session_info}, create=True)
     document = _normalise_document(raw, {**account, "sessionInfo": session_info})
     document["sessionInfo"] = str(session_info or "").strip()
+    document["sessionInfoCapturedAt"] = _session_info_now() if document["sessionInfo"] else ""
     return save_credentials_document(storage_root, account, document)
 
 
@@ -326,8 +332,13 @@ def merge_credentials_document(
         if incoming["cookies"].get(key):
             merged["cookies"][key] = incoming["cookies"][key]
     incoming_session = _placeholder_to_empty(session_info_override) or incoming.get("sessionInfo", "")
+    previous_session = str(merged.get("sessionInfo") or "").strip()
     if incoming_session:
         merged["sessionInfo"] = incoming_session
+        if incoming_session != previous_session or not merged.get("sessionInfoCapturedAt"):
+            merged["sessionInfoCapturedAt"] = _session_info_now()
+    elif not merged.get("sessionInfo"):
+        merged["sessionInfoCapturedAt"] = ""
     # INNERTUBE_API_KEY recebida num JSON é deliberadamente ignorada: a fonte oficial
     # é a configuração separada da secção Contas Google/YouTube.
     if "chunk_size" in raw:

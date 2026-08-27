@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from integrations.platforms import IntegrationResult, YouTubeAdapter
 from integrations.postiz import PostizAdapter
+from integrations.session_info_health import check_account_session_info_health, emit_session_info_health_alerts
 from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from hermes_ui.storage import read_json, write_json
@@ -126,8 +127,16 @@ def upload_with_default_route(
     if account:
         try:
             status = document_status(storage_root, account, channel, settings, [channel])
-            direct_ready = bool(status.get("ready"))
-            if not direct_ready:
+            health = check_account_session_info_health(storage_root, account, settings)
+            emit_session_info_health_alerts([health])
+            direct_ready = bool(status.get("ready")) and health.status != "expired"
+            if health.status == "expired":
+                direct_result = IntegrationResult(
+                    False,
+                    f"Upload directo indisponível: {health.message}",
+                    {"missing": ["sessionInfo"], "session_info_health": health.as_dict()},
+                )
+            elif not direct_ready:
                 missing = list(status.get("missing_cookies", []))
                 if not status.get("has_session_info"):
                     missing.append("sessionInfo")

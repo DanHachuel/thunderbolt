@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant UI as Streamlit/UI
+    participant D as domain.py
+    participant W as pipeline_worker.py
+    participant P as Provider/helper
+    participant S as JSON state
+    UI->>D: create_tasks_for_batch()
+    D->>S: tasks.json + queues.json
+    loop worker tick
+        W->>S: select to_do/doing task
+        W->>W: resolve local-cascade stage
+        alt valid artifact exists
+            W->>S: persist transition and continue
+        else artifact missing
+            W->>P: execute current stage
+            P-->>W: artifact or attributed error
+            W->>S: atomic artifact + task update
+        end
+    end
+    W-->>UI: heartbeat and progress

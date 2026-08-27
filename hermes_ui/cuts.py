@@ -304,8 +304,9 @@ def _run_ffmpeg(command: list[str], output: Path, *, source: Path, segment: dict
 
 
 def _write_manifest(record: dict[str, Any], run_dir: Path) -> Path:
+    """Write a complete clip manifest atomically."""
     path = run_dir / "manifest.json"
-    path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    storage.atomic_write(path, record)
     return path
 
 

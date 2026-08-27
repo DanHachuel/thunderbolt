@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant UI as Account/Upload UI
+    participant H as SessionInfo health
+    participant N as Local notifications
+    participant Y as Direct upload
+    UI->>H: read credentials.json
+    H-->>UI: healthy/expiring/expired/unknown
+    H->>N: deduplicated alert when needed
+    alt expired
+        H-->>Y: block before createvideo
+    else usable or unknown
+        UI->>Y: perform direct upload
+        Y-->>UI: final provider result
+    end

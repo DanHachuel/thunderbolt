@@ -107,7 +107,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.73
+## Navegação da UI 0.3.74
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Geração de Conteúdo IA**, **Motion Control**, **UGC Products**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. A criação de Motion Control e UGC Products ocorre nas páginas standalone e guarda os artefactos localmente; não existem tabs duplicadas dentro de Geração de Conteúdo IA.
  **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Notificações**, **Logs** e **Configuração API**, nessa ordem. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
@@ -418,3 +418,8 @@ Não coloque chaves, cookies, tokens YouTube ou segredos TikTok no Git. Use a co
 
 ## Growth
 As páginas **Analista Facebook Pages** e **Analista Bilibili** foram adicionadas ao grupo **Growth** como áreas reservadas e permanecem vazias nesta versão, prontas para futuras implementações específicas.
+
+## Documentação técnica interna
+A documentação de API interna, os contratos de persistência, o health check de `sessionInfo` e os diagramas de sequência estão em [`docs/api-internal.md`](docs/api-internal.md). Os ficheiros Mermaid editáveis ficam em [`docs/diagrams/`](docs/diagrams/).
+
+A pipeline do worker usa agora um orquestrador local em cascata, com artefactos retomáveis e transições persistidas. As escritas de estado JSON e de Blueprints usam substituição atómica para evitar documentos truncados após interrupções.

@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from integrations.moneyprinter_config import sync_moneyprinter_config
+from integrations.session_info_health import check_all_accounts_session_info_health, emit_session_info_health_alerts
 from integrations.upload_routing import upload_with_default_route
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_thumbnail_prompt, generate_topic_for_channel
 from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
-from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
+from hermes_ui.storage import STORAGE, atomic_write, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
@@ -28,6 +29,7 @@ PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
 STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
 WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
+CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload")
 
 
 class PipelineError(RuntimeError):
@@ -207,14 +209,42 @@ def _task_by_id(task_id: str) -> dict[str, Any] | None:
     return next((task for task in read_json("tasks.json", []) if isinstance(task, dict) and task.get("id") == task_id), None)
 
 
+def _cascade_metadata(current: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+    """Build resumable orchestration metadata for one stage transition."""
+    previous = str(current.get("stage") or "")
+    next_stage = str(updates.get("stage") or previous)
+    raw = current.get("orchestration") if isinstance(current.get("orchestration"), dict) else {}
+    completed = [str(item) for item in raw.get("completed_stages", []) if str(item) in CASCADE_STAGE_ORDER]
+    if previous in CASCADE_STAGE_ORDER and next_stage != previous and previous not in completed:
+        completed.append(previous)
+    if str(updates.get("state") or "") == "done" and next_stage in CASCADE_STAGE_ORDER and next_stage not in completed:
+        completed.append(next_stage)
+    transition_at = raw.get("last_transition_at") or _now()
+    if next_stage != previous:
+        transition_at = _now()
+    try:
+        transition_count = int(raw.get("transition_count") or 0)
+    except (TypeError, ValueError):
+        transition_count = 0
+    return {
+        "name": "local-cascade",
+        "stage_order": list(CASCADE_STAGE_ORDER),
+        "current_stage": next_stage,
+        "completed_stages": completed,
+        "resumable": True,
+        "last_transition_at": transition_at,
+        "transition_count": transition_count + (1 if next_stage != previous else 0),
+    }
+
 def _update(task_id: str, **updates: Any) -> dict[str, Any]:
     from hermes_ui.domain import update_task
-
     current = _task_by_id(task_id)
     if not current:
         raise PipelineError(f"Tarefa {task_id} deixou de existir durante a execução.")
     if str(current.get("state") or "") in {"blocked", "cancelled"}:
         raise PipelineStopped("A tarefa foi parada pelo utilizador.")
+    updates = dict(updates)
+    updates["orchestration"] = _cascade_metadata(current, updates)
     updated = update_task(task_id, updates)
     if not updated:
         raise PipelineError(f"Tarefa {task_id} deixou de existir durante a execução.")
@@ -223,10 +253,9 @@ def _update(task_id: str, **updates: Any) -> dict[str, Any]:
         status="running",
         stage=str(updated.get("stage") or "pipeline"),
         progress=int(updated.get("progress") or 0),
+        orchestration=updated.get("orchestration") or {},
     )
     return updated
-
-
 def _channel_for_task(task: dict[str, Any]) -> dict[str, Any]:
     channel_id = str(task.get("channel_id") or "")
     return next((channel for channel in read_json("channels.json", []) if str(channel.get("id")) == channel_id), {})
@@ -254,12 +283,11 @@ def _keywords(topic: str, title: str, niche: str = "") -> list[str]:
 
 
 def _save_json_artifact(task_id: str, name: str, payload: dict[str, Any]) -> str:
+    """Persist a resumable pipeline artifact atomically."""
     directory = STORAGE / "artifacts"
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{task_id}-{name}.json"
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    atomic_write(path, payload)
     return str(path)
 
 
@@ -947,6 +975,7 @@ def _read_json_artifact(value: Any) -> dict[str, Any] | None:
 
 
 def _run_task(task: dict[str, Any]) -> dict[str, Any]:
+    """Run one resumable local-cascade task, reusing valid persisted artefacts."""
     task_id = str(task.get("id") or "")
     channel = _channel_for_task(task)
     settings = _settings()
@@ -1213,11 +1242,23 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_once() -> dict[str, Any]:
+    """Execute one worker tick and resume the first pending cascade task."""
     ensure_storage()
     lock = _acquire_lock()
     if lock is None:
         return {"ok": True, "busy": True}
     try:
+        try:
+            session_health = check_all_accounts_session_info_health(STORAGE, _settings())
+            session_alerts = emit_session_info_health_alerts(session_health)
+            _worker_heartbeat(
+                session_info_health=[item.as_dict() for item in session_health],
+                session_info_alerts=len(session_alerts),
+                session_info_health_error="",
+            )
+        except Exception as exc:
+            # Monitoring is advisory and must not prevent a resumable task from running.
+            _worker_heartbeat(session_info_health_error=type(exc).__name__)
         recovered = _recover_stale_tasks()
         tasks = read_json("tasks.json", [])
         candidate = next((task for task in tasks if isinstance(task, dict) and task.get("state") in {"to_do", "doing"}), None)

@@ -105,6 +105,8 @@ DEFAULTS: dict[str, Any] = {
         "telegram_chat_id": "",
         "telegram_proxy_url": "",
         "telegram_timeout_seconds": 15,
+        "session_info_ttl_hours": 36,
+        "session_info_alert_hours": 6,
         "notification_preferences": {
             "video_completed": True,
             "music_completed": True,
@@ -122,6 +124,8 @@ DEFAULTS: dict[str, Any] = {
             "automation_completed": True,
             "automation_failed": True,
             "activity_failed": True,
+            "session_info_expiring": True,
+            "session_info_expired": True,
             "upload_youtube_success": True,
             "upload_tiktok_success": True,
             "upload_instagram_success": True,
@@ -401,6 +405,12 @@ def ensure_storage() -> None:
 
 
 def atomic_write(path: Path, data: Any) -> None:
+    """Write JSON through a same-directory temporary file and atomic replace.
+
+    The complete payload is flushed and fsynced before replacement, so a
+    process interruption cannot leave a partially written JSON document at the
+    destination.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -437,6 +447,7 @@ def read_json(name: str, default: Any | None = None) -> Any:
 
 
 def write_json(name: str, data: Any) -> None:
+    """Persist a state JSON file using :func:`atomic_write`."""
     ensure_storage()
     atomic_write(STATE / name, data)
 

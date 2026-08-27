@@ -8,6 +8,9 @@ from .notifications import record_notification
 from .storage import append_json, now, read_json, write_json
 
 STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload"]
+# Ordem executada pelo worker. Cada etapa só é executada quando o seu artefacto
+# ainda não existe; os artefactos persistidos tornam a cascata retomável.
+CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload")
 LEGACY_STAGES = {"edit"}
 VALID_STATES = {"to_do", "doing", "blocked", "done", "failed", "cancelled"}
 
@@ -148,6 +151,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
             thumbnail_status = str(payload.get("thumbnail_status") or ("generated" if thumbnail_path else "not_generated"))
             if thumbnail_path:
                 artifacts.setdefault("thumbnail", thumbnail_path)
+            initial_stage = "topic" if not topic and str(payload.get("topic_source") or options.get("topic_source") or "manual") in {"auto", "llm_pending"} else "script"
             task = {
                 "id": make_id("video"),
                 "batch_id": batch["id"],
@@ -180,7 +184,15 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "title_candidates": payload.get("title_candidates", []),
                 "keywords": payload.get("keywords", options.get("keywords", [])),
                 "ai_generation": payload.get("ai_generation", {}),
-                "stage": "script",
+                "stage": initial_stage,
+                "orchestration": {
+                    "name": "local-cascade",
+                    "stage_order": list(CASCADE_STAGE_ORDER),
+                    "current_stage": initial_stage,
+                    "completed_stages": [],
+                    "resumable": True,
+                    "last_transition_at": now(),
+                },
                 "state": "to_do",
                 "progress": 0,
                 "video_ready": bool(artifacts.get("video")),
