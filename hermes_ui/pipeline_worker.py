@@ -4,6 +4,7 @@ import json
 import os
 import queue
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -27,6 +28,7 @@ from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_th
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
+LONG_STOCK_VIDEO_TIMEOUT_SECONDS = 45 * 60
 STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
 WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
 CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload")
@@ -184,13 +186,14 @@ def _recover_stale_tasks() -> list[str]:
         if not updated_at:
             continue
         age_seconds = (current_time - updated_at.astimezone(timezone.utc)).total_seconds()
-        if age_seconds <= STALE_TASK_SECONDS:
+        timeout_seconds = _task_stale_timeout_seconds(task)
+        if age_seconds <= timeout_seconds:
             continue
         task_id = str(task.get("id") or "")
         if not task_id:
             continue
         message = (
-            f"A tarefa ficou sem heartbeat durante mais de {STALE_TASK_SECONDS // 60} minutos. "
+            f"A tarefa ficou sem heartbeat durante mais de {timeout_seconds // 60} minutos. "
             "Foi marcada como falhada para evitar execução eterna; reveja o log do worker."
         )
         failed_stage = str(task.get("stage") or "pipeline")
@@ -568,7 +571,21 @@ def _persist_video_diagnostics(task: dict[str, Any], output: str) -> dict[str, s
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
     if process.poll() is None:
-        process.kill()
+        try:
+            process_id = getattr(process, "pid", None)
+            if os.name != "nt" and process_id:
+                os.killpg(os.getpgid(process_id), signal.SIGKILL)
+            elif os.name == "nt" and process_id:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process_id), "/T", "/F"],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                process.kill()
+        except (OSError, ProcessLookupError):
+            process.kill()
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
@@ -600,6 +617,23 @@ def _normalise_video_route(task: dict[str, Any], settings: dict[str, Any]) -> st
         configured = selected_material_source(settings)
         return configured if configured in {"pexels", "pixabay"} else "pexels"
     return raw if raw in {"pexels", "pixabay", "local"} else "pexels"
+
+
+def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
+    """Reserve extra bounded time only for long stock-video downloads and assembly."""
+    effective_settings = settings if isinstance(settings, dict) else _settings()
+    route = _normalise_video_route(task, effective_settings)
+    script = str(task.get("video_script") or "").strip()
+    if route in {"pexels", "pixabay"} and len(script) >= 1_200:
+        return max(VIDEO_TIMEOUT_SECONDS, LONG_STOCK_VIDEO_TIMEOUT_SECONDS)
+    return VIDEO_TIMEOUT_SECONDS
+
+
+def _task_stale_timeout_seconds(task: dict[str, Any]) -> int:
+    """Keep stale-task recovery aligned with the actual execution budget."""
+    if str(task.get("stage") or "").strip().casefold() == "video":
+        return _video_timeout_seconds(task) + 5 * 60
+    return STALE_TASK_SECONDS
 
 
 def _mpt_aspect_ratio(value: Any, format_value: Any = "") -> str:
@@ -847,6 +881,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     output_lines: list[str] = []
     line_queue: queue.Queue[str | None] = queue.Queue()
     started_at = time.monotonic()
+    timeout_seconds = _video_timeout_seconds(task, settings)
     process: subprocess.Popen[str] | None = None
 
     def _read_output() -> None:
@@ -863,6 +898,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
             command,
             cwd=helper_dir,
             env=env,
+            start_new_session=os.name != "nt",
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -917,9 +953,9 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 last_heartbeat = elapsed
             if process.poll() is not None and output_finished:
                 break
-            if elapsed >= VIDEO_TIMEOUT_SECONDS:
+            if elapsed >= timeout_seconds:
                 _stop_process(process)
-                message = f"A etapa Vídeo excedeu o limite de {VIDEO_TIMEOUT_SECONDS // 60} minutos e foi encerrada."
+                message = f"A etapa Vídeo excedeu o limite de {timeout_seconds // 60} minutos e foi encerrada."
                 metadata = _failure_attribution(task, settings, "video", error=message)
                 raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     finally:

@@ -600,6 +600,24 @@ def test_video_helper_timeout_kills_subprocess_and_returns_pipeline_error(tmp_pa
     assert process.returncode == -9
 
 
+def test_long_stock_video_receives_bounded_extended_timeout(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    task = {
+        "style_wide": "pexels",
+        "video_script": "word " * 300,
+    }
+
+    assert pipeline_worker._video_timeout_seconds(task, {}) == pipeline_worker.LONG_STOCK_VIDEO_TIMEOUT_SECONDS
+    assert pipeline_worker._task_stale_timeout_seconds({**task, "stage": "video"}) == pipeline_worker.LONG_STOCK_VIDEO_TIMEOUT_SECONDS + 5 * 60
+
+
+def test_short_or_non_stock_video_keeps_default_timeout(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+
+    assert pipeline_worker._video_timeout_seconds({"style_wide": "pexels", "video_script": "short"}, {}) == pipeline_worker.VIDEO_TIMEOUT_SECONDS
+    assert pipeline_worker._video_timeout_seconds({"style_wide": "full_ia", "video_script": "word " * 300}, {}) == pipeline_worker.VIDEO_TIMEOUT_SECONDS
+
+
 def test_run_once_preserves_blocked_state_when_pipeline_is_stopped(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     storage.write_json("tasks.json", [{"id": "video_stopped", "state": "to_do", "stage": "video", "progress": 68, "topic": "Tema"}])
