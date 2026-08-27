@@ -98,15 +98,18 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
     def test_api_keys_google_accounts_material_sources_and_voice_are_direct_sibling_tabs(self):
-        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])')
+        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])')
         api_position = MAIN_SOURCE.index('    with api_keys_tab:', tabs_position)
         google_position = MAIN_SOURCE.index('    with google_accounts_tab:', tabs_position)
         material_position = MAIN_SOURCE.index('    with material_sources_tab:', tabs_position)
+        influencers_position = MAIN_SOURCE.index('    with ai_influencers_tab:', tabs_position)
         voice_position = MAIN_SOURCE.index('    with voice_test_tab:', tabs_position)
         self.assertLess(api_position, google_position)
         self.assertLess(google_position, material_position)
-        self.assertLess(material_position, voice_position)
+        self.assertLess(material_position, influencers_position)
+        self.assertLess(influencers_position, voice_position)
         api_block = MAIN_SOURCE[api_position:google_position]
+        self.assertIn('with st.expander("Banco de Dados Influencers", expanded=False):', api_block)
         self.assertIn('with st.container(border=True):', api_block)
         self.assertIn('with st.form("settings_form"):', api_block)
         self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:material_position])

@@ -10,11 +10,11 @@ STORAGE_SOURCE = (ROOT / "hermes_ui" / "storage.py").read_text(encoding="utf-8")
 
 
 def test_moneyprinter_language_catalog_has_requested_codes_and_flags():
-    assert LANGUAGE_CODES == ("en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it")
-    assert [item["flag"] for item in LANGUAGE_CATALOG] == ["🇺🇸", "🇨🇳", "🇩🇪", "🇻🇳", "🇹🇷", "🇧🇷", "🇷🇺", "🇪🇸", "🇮🇩", "🇮🇹"]
+    assert LANGUAGE_CODES == ("en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it", "pl", "ga", "ar", "he")
+    assert [item["flag"] for item in LANGUAGE_CATALOG] == ["🇺🇸", "🇨🇳", "🇩🇪", "🇻🇳", "🇹🇷", "🇧🇷", "🇷🇺", "🇪🇸", "🇮🇩", "🇮🇹", "🇵🇱", "🇮🇪", "🇸🇦", "🇮🇱"]
     assert language_label("en") == "Inglês (en) 🇺🇸"
     assert language_label("zh") == "Chinês Simplificado (zh) 🇨🇳"
-    assert ui_language_menu_label("ru") == "Russo (ru)"
+    assert ui_language_menu_label("ru") == "Russian"
     assert set(LANGUAGE_FLAG_DATA_URIS) == set(LANGUAGE_CODES)
     assert all(uri.startswith("data:image/svg+xml;base64,") for uri in LANGUAGE_FLAG_DATA_URIS.values())
 
@@ -168,12 +168,12 @@ def test_brazil_flag_svg_uses_official_color_order():
 
 
 def test_all_tab_and_subtab_labels_are_translated_for_every_supported_language():
-    assert len(_TAB_LABELS) == 31
+    assert len(_TAB_LABELS) == 32
     assert "render_localized_tabs" in MAIN_SOURCE
     for code in LANGUAGE_CODES:
         assert set(_TAB_LABELS).issubset(TAB_TRANSLATIONS[code])
     assert ui_text("Pesquisa pública", "en") == "Public search"
     assert ui_text("Cadastro manual", "zh") == "手动注册"
     assert ui_text("Importar do YouTube", "de") == "Von YouTube importieren"
-    assert ui_text("Teste de vozes", "es") == "Prueba de voces"
+    assert ui_text("Teste de Voz", "es") == "Prueba de voces"
     assert ui_text("Serviços e modelos", "it") == "Servizi e modelli"

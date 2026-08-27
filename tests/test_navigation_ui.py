@@ -74,10 +74,11 @@ def test_tutorial_reference_is_packaged_and_contains_meta_setup_sections():
     assert "Be part of a growing community" not in tutorial
 
 
-def test_models_ai_is_renamed_in_visible_navigation_with_placeholder_renderer():
+def test_ai_influencers_is_visible_with_real_character_and_content_renderers():
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in MAIN_SOURCE
     assert 'with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):' in MAIN_SOURCE
-    assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in MAIN_SOURCE
+    assert '"Personagens": lambda: render_ai_influencer_characters' in MAIN_SOURCE
+    assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in MAIN_SOURCE
     assert '("Models AI", ":material/smart_toy:", "Models AI")' not in MAIN_SOURCE
 
 
@@ -94,9 +95,11 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     settings_start = MAIN_SOURCE.index("def render_settings():")
     settings_page = MAIN_SOURCE[settings_start:]
     material_sources_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_material_source_api_keys("):]
-    assert 'api_keys_tab, google_accounts_tab, material_sources_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "Teste de Voz"])' in settings_page
+    assert 'api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in settings_page
     assert 'with material_sources_tab:' in settings_page
     assert 'render_material_source_api_keys(settings)' in settings_page
+    assert 'with ai_influencers_tab:' in settings_page
+    assert 'render_ai_influencers_api_status(settings)' in settings_page
     for label in ("Fontes de Materiais", "Adicionar fonte de materiais", "Configurar Nova Fonte de Materiais"):
         assert label in material_sources_page
 

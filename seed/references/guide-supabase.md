@@ -1,6 +1,6 @@
 # Guia para criar e configurar uma conta Supabase
 
-Este guia mostra como criar uma conta gratuita no Supabase e preparar as tabelas e o armazenamento necessários para utilizar a base de dados com automações n8n.
+Este guia mostra como criar uma conta gratuita no Supabase e preparar as tabelas e o armazenamento necessários para utilizar a base de dados com automações n8n e com o módulo AI Influencers do Thunderbolt.
 
 Comece por abrir o [Supabase](https://supabase.com/) e criar uma nova conta gratuita.
 
@@ -55,6 +55,14 @@ Dê ao bucket o nome `instagram-images` ou outro nome compatível com as regras 
 Depois, carregue a imagem de referência para o bucket usando o botão `Upload files`.
 
 ![Upload files](https://github.com/user-attachments/assets/6cc83262-b92c-4f74-86c3-a45c9c0456f8)
+
+## 3. AI Influencers no Thunderbolt
+
+Para usar **AI Influencers > Personagens** e **Geração de Conteúdo IA** com Supabase, aplique o ficheiro `seed/references/ai_influencers_schema.sql` no SQL Editor. Ele cria as tabelas `influencers`, `influencer_assets`, `influencer_weekly_plans` e `influencer_content`, além dos índices e da activação de RLS.
+
+No Thunderbolt, abra **Configurações > Configuração API > API Keys > Banco de Dados Influencers**, seleccione **Supabase** e preencha o **Supabase Project URL**, a **Supabase API key** e o bucket de Storage. Crie o bucket com o mesmo nome configurado, por defeito `ai-influencers`, e confirme as políticas RLS/Storage antes de guardar imagens ou documentos. A chave não deve ser colocada no GitHub, nos workflows JSON ou em screenshots.
+
+O Thunderbolt usa o Supabase como backend seleccionado, não como executor de n8n: os assets são enviados ao Storage, os metadados ficam nas tabelas e os estados de geração ficam em `influencer_content`. Para uma execução totalmente local, seleccione **SQLite** no mesmo expander; a alternativa cria `storage/state/ai_influencers.db` e não utiliza a conta Supabase.
 
 A conta Supabase está pronta para ser utilizada pela automação.
 

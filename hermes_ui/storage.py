@@ -230,6 +230,12 @@ DEFAULTS: dict[str, Any] = {
         "pollinations_api_key": "",
         "pollinations_base_url": "",
         "pollinations_model_name": "",
+        "influencer_db_backend": "Supabase",
+        "influencer_supabase_url": "",
+        "influencer_supabase_key": "",
+        "influencer_supabase_bucket": "ai-influencers",
+        "influencer_sqlite_path": "storage/state/ai_influencers.db",
+        "influencer_schema_version": 1,
         "log_level": "DEBUG",
         "listen_host": "127.0.0.1",
         "listen_port": 8080,
@@ -383,7 +389,7 @@ def _migrate_settings(settings: Any) -> tuple[dict[str, Any], bool]:
 
 
 def ensure_storage() -> None:
-    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, MEDIA_DOWNLOADS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "skills", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
+    for path in [STATE, BLUEPRINTS / "canais", BLUEPRINTS / "nichos", BLUEPRINTS / "importados", BLUEPRINTS / "brandings", TIKTOK_PROMPT_MASTERS, MEDIA_DOWNLOADS, STORAGE / "brand", STORAGE / "scripts", STORAGE / "thumbnails", STORAGE / "videos", STORAGE / "artifacts", STORAGE / "python_editor", STORAGE / "influencers", STORAGE / "metadata_cleaner", STORAGE / "metadata_cleaner" / "outputs", STORAGE / "music", STORAGE / "voice_previews", STORAGE / "python_editor", NICHES_DATA]:
         path.mkdir(parents=True, exist_ok=True)
     seed_blueprints()
     seed_prompt_masters()

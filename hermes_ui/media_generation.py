@@ -116,6 +116,17 @@ def _image_value(payload: Any) -> tuple[bytes | None, str]:
             url = str(first.get("url") or first.get("image_url") or "").strip()
             if url:
                 return None, url
+    output = payload.get("output")
+    if isinstance(output, list) and output:
+        output = output[0]
+    if isinstance(output, Mapping):
+        output = output.get("url") or output.get("image_url") or output.get("image")
+    if isinstance(output, str):
+        if output.startswith(("http://", "https://")):
+            return None, output
+        output_data = _decode_data(output)
+        if output_data:
+            return output_data, ""
     result = payload.get("result")
     if isinstance(result, Mapping):
         data = _decode_data(result.get("image") or result.get("b64_json") or result.get("data"))
@@ -125,6 +136,44 @@ def _image_value(payload: Any) -> tuple[bytes | None, str]:
         if url:
             return None, url
     return None, ""
+
+
+def _image_request_id(payload: Any) -> str:
+    if not isinstance(payload, Mapping):
+        return ""
+    for key in ("id", "prediction_id", "request_id", "task_id", "job_id"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _poll_image(card: Mapping[str, Any], request_id: str, *, attempts: int = 24, interval_seconds: float = 5.0) -> tuple[bytes | None, str]:
+    """Resolve a Replicate image prediction without exposing its token."""
+    style = str(card.get("api_style") or media_provider_definition(card.get("provider")).api_style)
+    base = _base_url(card)
+    endpoint = str(card.get("status_endpoint") or "").strip().replace("{id}", request_id)
+    if not endpoint:
+        if style != "replicate":
+            return None, ""
+        endpoint = f"{base}/predictions/{request_id}"
+    for index in range(max(1, attempts)):
+        try:
+            response = requests.get(endpoint, headers=_headers(card), timeout=60)
+            if response.status_code >= 400:
+                raise MediaGenerationError(f"Consulta de imagem devolveu HTTP {response.status_code}.")
+            payload = response.json()
+        except requests.RequestException as exc:
+            raise MediaGenerationError(f"Falha ao consultar a imagem: {str(exc)[:180]}") from exc
+        image_bytes, url = _image_value(payload if isinstance(payload, Mapping) else {})
+        if image_bytes or url:
+            return image_bytes, url
+        status = str((payload or {}).get("status") or "").lower() if isinstance(payload, Mapping) else ""
+        if status in {"failed", "error", "cancelled", "canceled"}:
+            raise MediaGenerationError("O provider marcou a tarefa de imagem como falhada.")
+        if index + 1 < attempts:
+            time.sleep(max(0.2, interval_seconds))
+    raise MediaGenerationError("O provider de imagem não concluiu dentro do limite de polling.")
 
 
 def _download_or_write(image_bytes: bytes | None, url: str, destination: Path, card: Mapping[str, Any]) -> Path:
@@ -151,6 +200,8 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
         return explicit
     if style in {"openai_compatible", "huggingface", "agnes", "kie"}:
         return f"{base}/images/generations"
+    if style == "replicate":
+        return f"{base}/predictions"
     if style == "cloudflare":
         account_id = str(card.get("account_id") or "").strip()
         if not account_id:
@@ -183,6 +234,9 @@ def _image_request(card: dict[str, Any], prompt: str) -> Any:
         return requests.post(endpoint, headers=_headers(card, fal=True), json={"prompt": constrained_prompt, "num_images": 1}, timeout=180)
     if style == "dashscope":
         body = {"model": _model(card), "input": {"prompt": constrained_prompt}, "parameters": {"n": 1}}
+        return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
+    if style == "replicate":
+        body = {"version": _model(card), "input": {"prompt": constrained_prompt}}
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
@@ -237,6 +291,11 @@ def generate_image_for_card(
     except ProviderRoutingError as exc:
         raise MediaGenerationError(str(exc)) from exc
     image_bytes, url = _image_value(routed.payload)
+    if not image_bytes and not url:
+        request_id = _image_request_id(routed.payload)
+        style = str(routed.card.get("api_style") or media_provider_definition(routed.card.get("provider")).api_style)
+        if request_id and style == "replicate":
+            image_bytes, url = _poll_image(routed.card, request_id)
     return _download_or_write(image_bytes, url, destination, routed.card)
 
 
@@ -294,6 +353,8 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
         return f"{base}/{_model(card).lstrip('/')}"
     if style in {"openai_compatible", "agnes", "kie"}:
         return f"{base}/videos/generations"
+    if style == "replicate":
+        return f"{base}/predictions"
     if style == "dashscope":
         return f"{base}/services/aigc/video-generation/video-synthesis"
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de vídeo configurado.")
@@ -316,12 +377,21 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
     if style == "fal_queue":
         body.pop("model", None)
         return requests.post(endpoint, headers=_headers(card, fal=True), json=body, timeout=180)
+    if style == "replicate":
+        image_input_key = str(card.get("image_input_key") or "image").strip() or "image"
+        input_payload = {"prompt": body["prompt"]}
+        if image_url:
+            input_payload[image_input_key] = image_url
+        return requests.post(endpoint, headers=_headers(card), json={"version": _model(card), "input": input_payload}, timeout=180)
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
 
 
 def _video_result(payload: Mapping[str, Any]) -> tuple[str, str]:
-    direct = str(payload.get("video_url") or payload.get("url") or payload.get("output") or "").strip()
-    if direct:
+    raw_output = payload.get("output")
+    if isinstance(raw_output, list) and raw_output:
+        raw_output = raw_output[0]
+    direct = str(payload.get("video_url") or payload.get("url") or raw_output or "").strip()
+    if direct.startswith(("http://", "https://")):
         return direct, ""
     result = payload.get("result")
     if isinstance(result, Mapping):
@@ -350,6 +420,8 @@ def _poll_video(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
         endpoint = explicit_status.replace("{id}", request_id)
     elif style == "fal_queue":
         endpoint = f"{base}/requests/{request_id}/status"
+    elif style == "replicate":
+        endpoint = f"{base}/predictions/{request_id}"
     else:
         endpoint = f"{base}/videos/{request_id}"
     headers = _headers(card, fal=style == "fal_queue")
@@ -366,7 +438,7 @@ def _poll_video(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
         if url:
             return url
         status = str((payload or {}).get("status") or "").lower() if isinstance(payload, Mapping) else ""
-        if status in {"failed", "error", "cancelled"}:
+        if status in {"failed", "error", "cancelled", "canceled"}:
             raise ProviderCallError("O provider marcou a tarefa de vídeo como falhada.", category="provider", retryable=False)
         if index + 1 < attempts:
             time.sleep(max(0.2, interval_seconds))

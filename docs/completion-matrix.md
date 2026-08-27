@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.2.89.
+Estado auditado para o release 0.3.53.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -16,7 +16,8 @@ Estado auditado para o release 0.2.89.
 | Aba MCP e skill local | Concluído na camada UI | Catálogo, portas, toggle, detecção passiva e download; cliente MCP operacional por serviço ainda requer integração de endpoints/comandos. |
 | Idiomas MoneyPrinterTurbo, navegação, subabas e conteúdo interno | Concluído | `hermes_ui/languages.py` fornece os códigos `en`, `zh`, `de`, `vi`, `tr`, `pt`, `ru`, `es`, `id` e `it`, com normalização legada, assets SVG locais das bandeiras e labels sem siglas de emoji. O selector nativo mostra `Language` acima do campo, persiste `ui_language` e não altera `video_language`. O dashboard, a navegação lateral, as 31 labels de abas/subabas e o conteúdo interno dos renderers usam o idioma seleccionado através da camada global de widgets e `render_localized_tabs`, incluindo títulos, campos, placeholders, opções, botões, avisos, estados, métricas e Markdown/HTML. O toolbar do Streamlit não é manipulado. |
 | Suporte de temas Light e Dark | Concluído | `.streamlit/config.toml` define Dark como base inicial e é incluído no pacote npm; a alternância Light/Dark permanece exclusivamente no menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe selector Theme dentro da página; o CSS próprio usa `currentColor`/`color-mix` e transparência, preservando o toolbar nativo e as cores intencionais dos chips de plataformas. |
-| Tutorial Supabase em AI Influencers | Concluído | Nova página **Tutorial Supabase** em `AI Influencers`, com tabelas `plans`/`posts`, bucket `instagram-images`, imagens do guia original e link de fonte; as duas frases promocionais do Skool foram omitidas. |
+| AI Influencers: Personagens, conteúdos IA e Supabase/SQLite | Concluído | `AI Influencers > Personagens` aceita múltiplas imagens e documentos `.md`/`.json`, com deduplicação e preview; `Geração de Conteúdo IA` separa Imagens, Vídeos e Motion Control; o backend dual está em `hermes_ui/influencers.py`, com migração Supabase em `seed/references/ai_influencers_schema.sql` e SQLite local. |
+| Tutorial Supabase em AI Influencers | Concluído | O tutorial Supabase permanece distribuído e agora inclui a preparação do schema AI Influencers, bucket e regras de segurança, sem remover as tabelas legadas `plans`/`posts`. |
 | Lista histórica ampliada de idiomas de vídeo | Concluído | `VIDEO_LANGUAGE_OPTIONS` continua preservada para tarefas e Blueprints antigos; `VIDEO_LANGUAGE_SELECTION_OPTIONS` acrescenta os códigos MoneyPrinterTurbo, mostra bandeiras e sincroniza `ui.video_language`. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
