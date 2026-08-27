@@ -528,8 +528,18 @@ class YouTubeAdapter:
 
 class TikTokAdapter:
     def __init__(self, settings: dict[str, Any]):
-        self.client_key = settings.get("tiktok_client_key", "")
-        self.client_secret = settings.get("tiktok_client_secret", "")
+        cards = settings.get("tiktok_api_cards") if isinstance(settings.get("tiktok_api_cards"), list) else []
+        selected = next(
+            (
+                card for card in cards
+                if isinstance(card, dict)
+                and str(card.get("client_id") or card.get("client_key") or "").strip()
+                and str(card.get("client_secret") or "").strip()
+            ),
+            {},
+        )
+        self.client_key = str(selected.get("client_id") or selected.get("client_key") or settings.get("tiktok_client_key", "")).strip()
+        self.client_secret = str(selected.get("client_secret") or settings.get("tiktok_client_secret", "")).strip()
         # Redirect URI, scopes, OAuth e access token são geridos no TikTok for Developers Playground.
         # A UI guarda apenas as credenciais da aplicação.
         self.access_token = os.getenv("TIKTOK_ACCESS_TOKEN", "")

@@ -95,11 +95,16 @@ def test_api_keys_contains_material_sources_subtab_with_multi_key_controls():
     settings_start = MAIN_SOURCE.index("def render_settings():")
     settings_page = MAIN_SOURCE[settings_start:]
     material_sources_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_material_source_api_keys("):]
-    assert 'api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in settings_page
+    assert 'api_keys_tab, google_accounts_tab, tiktok_api_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in settings_page
     assert 'with material_sources_tab:' in settings_page
     assert 'render_material_source_api_keys(settings)' in settings_page
     assert 'with ai_influencers_tab:' in settings_page
     assert 'render_ai_influencers_api_status(settings)' in settings_page
+    assert 'with tiktok_api_tab:' in settings_page
+    assert 'render_tiktok_api_cards(settings)' in settings_page
+    tiktok_page = MAIN_SOURCE[MAIN_SOURCE.index("def render_tiktok_api_cards("):]
+    for label in ("API Tiktok", "Adicionar nova API", "TikTok Client ID", "TikTok Client Secret", "Testar chamada API", "Apagar card"):
+        assert label in tiktok_page
     for label in ("Fontes de Materiais", "Adicionar fonte de materiais", "Configurar Nova Fonte de Materiais"):
         assert label in material_sources_page
 

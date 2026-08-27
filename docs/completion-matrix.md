@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.66.
+Estado auditado para o release 0.3.67.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -31,6 +31,7 @@ Estado auditado para o release 0.3.66.
 | Pool Full IA multimédia e HeyGen | Concluído | A whitelist de vídeo inclui FAL AI, KIE AI, Agnes AI, Nano Banana, Replicate AI, Pollinations.ai, Hugging Face Inference API, InferencePort Proxy e HeyGen. O catálogo **Provider de media** reflecte os mesmos nomes; HeyGen usa API V3, `X-Api-Key`, Avatar ID, Voice ID e health-check read-only. A execução filtra cartões activos que declarem capacidade real de vídeo. |
 | Azure Speech SDK V2 e fallback edge_tts | Concluído | O selector oferece Azure Speech SDK V2 e Azure TTS V1; com key e região configuradas, vozes novas e tarefas antigas são encaminhadas para o SDK V2, enquanto o fallback edge_tts recebe timeout interno de 90 segundos. |
 | API Keys por fonte de materiais com múltiplas chaves | Concluído | `Configuração API > API Keys > Fontes de materiais` permite seleccionar Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou local, adicionar várias chaves na mesma fonte, deduplicar e guardar listas independentes em `material_api_keys`; `build_moneyprinter_config()` exporta arrays legados para o `config.toml` e internaliza parâmetros técnicos da área de fontes. |
+| API Tiktok multi-card | Concluído | A subaba **API Tiktok** fica entre **Contas Google** e **Fontes de Materiais**; cada card contém apenas TikTok Client ID/Client Secret e os botões Testar chamada API, Guardar card e Apagar card, com Adicionar nova API abaixo. Credenciais legadas migram para `tiktok_api_cards`, o primeiro card completo é usado pelo adapter e o fallback legado é preservado. O teste sem OAuth é read-only e informa a necessidade de autorização. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
 | Área de teste de vozes em Configuração API | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download, acessível dentro de Configuração API. |
 | OpenAI/ NVIDIA NIM — descoberta de modelos OpenAI-compatible | Concluído | `integrations/openai_model_discovery.py` consulta explicitamente `/models`, valida `data[].id`, envia Bearer API key sem a expor, apresenta selector e mantém fallback manual; `openai_model_name` continua sincronizado com o MoneyPrinterTurbo. A chamada do modelo manual usa `help`, compatível com o Streamlit suportado, e não `help_text`. |

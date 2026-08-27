@@ -10,7 +10,7 @@ SCHEMA = (ROOT / "seed" / "references" / "ai_influencers_schema.sql").read_text(
 
 
 def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
-    assert 'render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in MAIN
+    assert 'render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in MAIN
     assert 'st.subheader("Banco de Dados Influencers")' in MAIN
     assert 'with st.form("influencer_database_settings_form"):' in MAIN
     assert 'key="settings_influencer_db_backend"' in MAIN

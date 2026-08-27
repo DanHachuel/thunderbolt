@@ -1,6 +1,6 @@
 import json
 
-from integrations.platforms import YouTubeAdapter, _extract_json_assignment, _parse_public_count
+from integrations.platforms import TikTokAdapter, YouTubeAdapter, _extract_json_assignment, _parse_public_count
 
 
 class FakeResponse:
@@ -154,3 +154,24 @@ def test_fetch_channel_videos_public_caps_result_at_ten(monkeypatch):
 
     assert result.ok
     assert len(result.data["videos"]) == 10
+
+
+def test_tiktok_adapter_reads_first_complete_api_card_before_legacy_credentials():
+    adapter = TikTokAdapter({
+        "tiktok_api_cards": [
+            {"id": "incomplete", "client_id": "only-id", "client_secret": ""},
+            {"id": "ready", "client_id": "card-client", "client_secret": "card-secret"},
+        ],
+        "tiktok_client_key": "legacy-client",
+        "tiktok_client_secret": "legacy-secret",
+    })
+    assert adapter.client_key == "card-client"
+    assert adapter.client_secret == "card-secret"
+    assert adapter.configured is True
+
+
+def test_tiktok_adapter_keeps_legacy_credentials_when_cards_are_absent():
+    adapter = TikTokAdapter({"tiktok_client_key": "legacy-client", "tiktok_client_secret": "legacy-secret"})
+    assert adapter.client_key == "legacy-client"
+    assert adapter.client_secret == "legacy-secret"
+    assert adapter.configured is True

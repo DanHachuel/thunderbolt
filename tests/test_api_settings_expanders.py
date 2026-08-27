@@ -16,7 +16,6 @@ class ApiSettingsExpandersTests(unittest.TestCase):
             "Imagem e Video",
             "LLM — providers e modelos",
             "Voz, TTS e música — Azure Speech, restantes serviços e Suno",
-            "TikTok for Developers — Client ID e Client Secret",
             "Publicação através do Upload-Post",
             "Postiz — API key, integração e MCP",
         ]
@@ -25,7 +24,7 @@ class ApiSettingsExpandersTests(unittest.TestCase):
 
     def test_voice_services_are_split_into_provider_cards(self):
         start = MAIN_SOURCE.index('with st.expander("Voz, TTS e música — Azure Speech, restantes serviços e Suno", expanded=False):')
-        end = MAIN_SOURCE.index('with st.expander("TikTok for Developers — Client ID e Client Secret", expanded=False):', start)
+        end = MAIN_SOURCE.index('with st.expander("Publicação através do Upload-Post", expanded=False):', start)
         voice_block = MAIN_SOURCE[start:end]
         for provider in ("Azure Speech", "ElevenLabs", "SiliconFlow", "MiniMax TTS", "Chatterbox", "Sonilo", "Suno — agente musical opcional"):
             self.assertIn(f'st.markdown("#### {provider}")', voice_block)
@@ -98,14 +97,16 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
     def test_api_keys_google_accounts_material_sources_and_voice_are_direct_sibling_tabs(self):
-        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])')
+        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])')
         api_position = MAIN_SOURCE.index('    with api_keys_tab:', tabs_position)
         google_position = MAIN_SOURCE.index('    with google_accounts_tab:', tabs_position)
+        tiktok_position = MAIN_SOURCE.index('    with tiktok_api_tab:', tabs_position)
         material_position = MAIN_SOURCE.index('    with material_sources_tab:', tabs_position)
         influencers_position = MAIN_SOURCE.index('    with ai_influencers_tab:', tabs_position)
         voice_position = MAIN_SOURCE.index('    with voice_test_tab:', tabs_position)
         self.assertLess(api_position, google_position)
-        self.assertLess(google_position, material_position)
+        self.assertLess(google_position, tiktok_position)
+        self.assertLess(tiktok_position, material_position)
         self.assertLess(material_position, influencers_position)
         self.assertLess(influencers_position, voice_position)
         api_block = MAIN_SOURCE[api_position:google_position]
@@ -120,7 +121,9 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('Supabase Storage bucket', influencers_block)
         self.assertIn('SQLite ficheiro local', influencers_block)
         self.assertIn('Guardar configuração do backend', influencers_block)
-        self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:material_position])
+        self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:tiktok_position])
+        self.assertIn('def render_tiktok_api_cards(', MAIN_SOURCE)
+        self.assertIn('render_tiktok_api_cards(settings)', MAIN_SOURCE[tiktok_position:material_position])
         self.assertNotIn('render_localized_tabs(["Serviços e modelos", "Fontes de Materiais"])', MAIN_SOURCE)
 
     def test_material_sources_use_individual_cards_and_add_provider_button(self):
@@ -153,7 +156,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
             'widget_key="api_test_voice_chatterbox"',
             'widget_key="api_test_voice_sonilo"',
             'widget_key="api_test_voice_suno"',
-            'widget_key="api_test_tiktok"',
+            'def render_tiktok_api_cards(',
+            'test_tiktok_credentials(edited["client_id"], edited["client_secret"]',
             'widget_key="api_test_upload_post"',
             'widget_key="api_test_postiz"',
         )
