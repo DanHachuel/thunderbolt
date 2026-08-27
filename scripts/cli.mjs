@@ -193,6 +193,11 @@ const proxy = http.createServer((request, response) => {
 });
 
 proxy.on("upgrade", (request, clientSocket, head) => {
+  // Clientes remotos podem encerrar o WebSocket antes de o Streamlit concluir
+  // a resposta. Tratar ECONNRESET impede que o Node termine o launcher.
+  clientSocket.on("error", () => {
+    if (!clientSocket.destroyed) clientSocket.destroy();
+  });
   const upstreamSocket = net.connect(backendPort, "127.0.0.1", () => {
     const headers = Object.entries(request.headers)
       .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(", ") : value}`)
@@ -201,10 +206,14 @@ proxy.on("upgrade", (request, clientSocket, head) => {
     if (head.length) upstreamSocket.write(head);
     clientSocket.pipe(upstreamSocket).pipe(clientSocket);
   });
-  upstreamSocket.on("error", () => clientSocket.destroy());
+  upstreamSocket.on("error", () => {
+    if (!clientSocket.destroyed) clientSocket.destroy();
+  });
 });
 
-proxy.listen(publicPort, "127.0.0.1", () => {
+// O backend Streamlit fica em 127.0.0.1; apenas o proxy escuta em todas as
+// interfaces para que o encaminhamento seguro do ambiente consiga alcançá-lo.
+proxy.listen(publicPort, () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
 const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
