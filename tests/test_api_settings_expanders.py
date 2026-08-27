@@ -101,15 +101,17 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
     def test_api_keys_use_direct_tabs_and_material_sources_are_inside_api_keys(self):
-        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "AI Influencers", "Teste de Voz"])')
+        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])')
         api_position = MAIN_SOURCE.index('    with api_keys_tab:', tabs_position)
         google_position = MAIN_SOURCE.index('    with google_accounts_tab:', tabs_position)
         tiktok_position = MAIN_SOURCE.index('    with tiktok_api_tab:', tabs_position)
+        bilibili_position = MAIN_SOURCE.index('    with bilibili_api_tab:', tabs_position)
         influencers_position = MAIN_SOURCE.index('    with ai_influencers_tab:', tabs_position)
         voice_position = MAIN_SOURCE.index('    with voice_test_tab:', tabs_position)
         self.assertLess(api_position, google_position)
         self.assertLess(google_position, tiktok_position)
-        self.assertLess(tiktok_position, influencers_position)
+        self.assertLess(tiktok_position, bilibili_position)
+        self.assertLess(bilibili_position, influencers_position)
         self.assertLess(influencers_position, voice_position)
         api_block = MAIN_SOURCE[api_position:google_position]
         material_position = api_block.index('render_material_source_api_keys(settings, embedded=True)')
