@@ -107,7 +107,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.76
+## Navegação da UI 0.3.77
 
 A barra lateral apresenta os níveis principais nesta ordem: **Início**, **Automação**, **Niche Finder**, **Canais/Perfis (Vídeos)**, **Pipeline Vídeos**, **Pipeline Música**, **AI Influencers**, **Edição**, **Growth**, **Documentação** e **Configurações**. **Canais/Perfis (Vídeos)** é expansível e contém **Canais YouTube**, **Blueprints Youtube**, **Contas TikTok**, **Prompt Masters** e **Facebook Pages**, nessa ordem. O menu **Arquivos Base** foi removido por ficar vazio.
 **Pipeline Vídeos** contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**; **Pipeline Música** contém **Criação de Músicas** e **Upload Música**; **Automação** contém **Automação Youtube**; **Niche Finder** contém **Niche Finder Kaggle** e **Niche Finder Apify**; **AI Influencers** contém **Personagens**, **Geração de Conteúdo IA**, **Motion Control**, **UGC Products** e **Redes Sociais**. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
@@ -426,3 +426,9 @@ A pipeline do worker usa agora um orquestrador local em cascata, com artefactos 
 
 ## Selector de modelos LLM
 O campo **Modelo** em **Configuração API > API Keys > LLM — providers e modelos** é apresentado como lista suspensa permanente. A lista usa os modelos descobertos pelo endpoint e preserva o modelo guardado; a opção manual continua disponível apenas como fallback explícito.
+
+## Correcção prioritária de geração de vídeo
+
+No fluxo MoneyPrinterTurbo, a voz Azure Speech SDK V2 é preparada antes da CLI upstream. O Thunderbolt divide o roteiro em segmentos conservadores ajustados à velocidade, concatena o áudio localmente e só inicia o motor depois de confirmar o ficheiro e a contagem de segmentos. Se essa preparação falhar, a tarefa é interrompida e não existe fallback silencioso para uma chamada monolítica sujeita ao limite de 600000 ms.
+
+Durante a execução, o backlog mostra a actividade recente do helper e o tempo da etapa Vídeo. Em caso de falha, a mensagem terminal é extraída do output accionável, enquanto as linhas `using existing project` e `updated configuration fields` deixam de ser tratadas como causa. Os caminhos do log e do manifesto são preservados mesmo quando a falha ocorre antes da criação do MP4.

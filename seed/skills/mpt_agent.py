@@ -24,6 +24,7 @@ PROJECT_ARCHIVE_URL = (
     "https://github.com/harry0703/MoneyPrinterTurbo/archive/refs/heads/main.zip"
 )
 DEFAULT_ROOT = Path.home() / "MoneyPrinterTurbo"
+CHUNKED_SYNTHESIS_TIMEOUT_SECONDS = 15 * 60
 DEFAULT_VOICE_NAME = "zh-CN-XiaoxiaoNeural-Female"
 NEEDS_INPUT_EXIT_CODE = 10
 SUPPORTED_SOURCES = {"pexels", "pixabay", "coverr", "local"}
@@ -70,6 +71,33 @@ class SkillError(RuntimeError):
 def log(message: str) -> None:
     """Flush concise progress so the agent knows the long-running job started."""
     print(f"[MoneyPrinterTurbo] {message}", flush=True)
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Replace a text file atomically so an interrupted Windows write keeps the old file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=str(path.parent),
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    except Exception:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -239,7 +267,7 @@ def apply_environment_config(config_path: Path) -> None:
     if pixabay_keys:
         text = _replace_config_value(text, "pixabay_api_keys", pixabay_keys)
         changes.append("pixabay_api_keys")
-    config_path.write_text(text, encoding="utf-8")
+    _atomic_write_text(config_path, text)
     log("updated configuration fields: " + ", ".join(changes))
 
 
@@ -279,7 +307,7 @@ def reuse_existing_llm_provider(config_path: Path) -> str:
     for provider in reusable_providers:
         if _provider_is_ready(text, provider):
             text = _replace_config_value(text, "llm_provider", provider)
-            config_path.write_text(text, encoding="utf-8")
+            _atomic_write_text(config_path, text)
             log(f"reusing configured LLM provider: {provider}")
             return provider
     return current_provider
@@ -325,12 +353,10 @@ def _forwarded_option_value(cli_args: list[str], option: str) -> str:
 def _azure_v2_voice(cli_args: list[str]) -> str:
     """Return the unmarked Azure voice when this invocation requests Azure V2."""
     voice = _forwarded_option_value(cli_args, "--voice-name")
-    if "-V2-" not in voice and not voice.endswith("-V2"):
+    if "-v2" not in voice.casefold():
         return ""
-    base_voice = re.sub(r"-V2(?=-|$)", "", voice, count=1).strip()
-    return re.sub(r"-(?:Female|Male)$", "", base_voice, flags=re.IGNORECASE).strip()
-
-
+    base_voice = re.sub("-v2", "", voice, count=1, flags=re.IGNORECASE).strip()
+    return re.sub(r"-(Female|Male)$", "", base_voice, flags=re.IGNORECASE).strip()
 def _voice_rate(cli_args: list[str]) -> float:
     value = _forwarded_option_value(cli_args, "--voice-rate")
     try:
@@ -358,7 +384,7 @@ def _prepare_azure_v2_chunked_audio(
     text_file = task_dir / "azure-v2-script.txt"
     audio_file = task_dir / "azure-v2-audio.mp3"
     text_file.parent.mkdir(parents=True, exist_ok=True)
-    text_file.write_text(text.strip(), encoding="utf-8")
+    _atomic_write_text(text_file, text.strip() + "\n")
     chunk_script = Path(__file__).with_name("azure_tts_chunked.py")
     command = [
         uv,
@@ -382,24 +408,55 @@ def _prepare_azure_v2_chunked_audio(
     ffmpeg_path = _toml_section_value(config_path, "app", "ffmpeg_path")
     if ffmpeg_path:
         environment["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
-    log("synthesizing Azure Speech V2 in safe chunks before MoneyPrinterTurbo")
-    result = subprocess.run(
-        command,
-        cwd=root,
-        env=environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            cwd=root,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            check=False,
+            timeout=CHUNKED_SYNTHESIS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SkillError(
+            "A síntese segmentada Azure Speech SDK V2 excedeu 15 minutos; "
+            "a chamada monolítica não será usada."
+        ) from exc
+    chunk_match = re.search(r"(?m)^AZURE_CHUNK_COUNT=(\d+)$", result.stdout or "")
+    if not chunk_match:
+        detail = "\n".join((result.stdout or "").splitlines()[-12:]).strip()
+        detail = detail.replace(speech_key, "[redacted]").replace(speech_region, "[redacted]")
+        raise SkillError(
+            "Azure Speech SDK V2 não confirmou segmentos e áudio customizado. "
+            + (detail or "O helper não devolveu detalhes.")
+        )
     if result.returncode != 0 or not audio_file.is_file() or audio_file.stat().st_size <= 0:
         detail = "\n".join((result.stdout or "").splitlines()[-12:]).strip()
+        detail = detail.replace(speech_key, "[redacted]").replace(speech_region, "[redacted]")
         raise SkillError(
             "Azure Speech SDK V2 falhou na síntese segmentada. "
             + (detail or "O helper não devolveu detalhes.")
         )
-    return audio_file
+    chunk_count = int(chunk_match.group(1))
+    if chunk_count <= 0:
+        raise SkillError("Azure Speech SDK V2 não confirmou segmentos de áudio válidos.")
+    _atomic_write_text(
+        audio_file.with_suffix(".json"),
+        json.dumps(
+            {
+                "status": "completed",
+                "audio_file": str(audio_file.resolve()),
+                "chunk_count": chunk_count,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+    )
+    log(f"Azure Speech V2 segmentado: {chunk_count} segmentos; áudio customizado preparado")
+    return audio_file.resolve()
 
 
 def missing_config(config_path: Path, cli_args: list[str]) -> tuple[str, list[str]]:
@@ -524,7 +581,7 @@ def validate_pexels_config(config_path: Path, cli_args: list[str]) -> bool:
     if valid_keys:
         if valid_keys != keys:
             text = _replace_config_value(text, "pexels_api_keys", valid_keys)
-            config_path.write_text(text, encoding="utf-8")
+            _atomic_write_text(config_path, text)
         log(
             "Pexels key validation completed: "
             f"valid={len(valid_keys)}, rejected={rejected_count}, "
@@ -621,7 +678,9 @@ def generate_video(
         else ["--voice-name", DEFAULT_VOICE_NAME]
     )
     forwarded_args = list(cli_args)
-    if not has_cli_option(forwarded_args, "--custom-audio-file"):
+    azure_v2_requested = bool(_azure_v2_voice(forwarded_args))
+    custom_audio_requested = has_cli_option(forwarded_args, "--custom-audio-file")
+    if azure_v2_requested and not custom_audio_requested:
         chunked_audio = _prepare_azure_v2_chunked_audio(
             root,
             config_path,
@@ -629,8 +688,20 @@ def generate_video(
             forwarded_args,
             uv,
         )
-        if chunked_audio is not None:
-            forwarded_args.extend(["--custom-audio-file", str(chunked_audio)])
+        if chunked_audio is None or not chunked_audio.is_file() or chunked_audio.stat().st_size <= 0:
+            raise SkillError(
+                "Azure Speech SDK V2 não produziu áudio segmentado; "
+                "a geração foi interrompida para não usar a chamada monolítica."
+            )
+        forwarded_args.extend(["--custom-audio-file", str(chunked_audio.resolve())])
+    elif azure_v2_requested and custom_audio_requested:
+        custom_audio_value = _forwarded_option_value(forwarded_args, "--custom-audio-file")
+        custom_audio_path = Path(custom_audio_value).expanduser()
+        if not custom_audio_value or not custom_audio_path.is_file() or custom_audio_path.stat().st_size <= 0:
+            raise SkillError(
+                "Azure Speech SDK V2 recebeu um áudio customizado inválido; "
+                "a geração foi interrompida para não usar a chamada monolítica."
+            )
     command = [
         uv,
         "run",
@@ -750,6 +821,18 @@ def main(argv: list[str] | None = None) -> int:
             root, args.subject, args.cli_args
         )
     except (OSError, SkillError, urllib.error.URLError, zipfile.BadZipFile) as exc:
+        manifest_path = result_manifest_path(root)
+        try:
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
+        except (OSError, json.JSONDecodeError):
+            manifest_payload = {}
+        if manifest_payload.get("status") == "running":
+            manifest_payload.update({"status": "failed", "error": str(exc)[:1000]})
+            write_result_manifest(root, manifest_payload)
+        for output_key, manifest_key in (("TASK_DIR", "task_dir"), ("LOG_FILE", "log_file"), ("RESULT_FILE", "result_file")):
+            value = str(manifest_payload.get(manifest_key) or "").strip()
+            if value:
+                print(f"{output_key}={value}", file=sys.stderr)
         print(f"MPT_ERROR={exc}", file=sys.stderr)
         return 1
 

@@ -3582,6 +3582,15 @@ def _render_video_task_state(task: dict[str, Any]) -> None:
     st.write(state or "—")
     st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
     st.progress(progress, text=f"{progress}%")
+    helper_status = str(task.get("video_helper_status") or "").strip()
+    if state == "doing" and helper_status:
+        st.caption(f"Actividade: {helper_status[-240:]}")
+    if state == "doing" and task.get("video_elapsed_seconds") is not None:
+        try:
+            elapsed_seconds = max(0, int(task.get("video_elapsed_seconds") or 0))
+            st.caption(f"Tempo da etapa Vídeo: {elapsed_seconds // 60}m {elapsed_seconds % 60:02d}s")
+        except (TypeError, ValueError):
+            pass
     if task.get("error"):
         st.caption(str(task.get("error"))[:240])
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import tempfile
 from typing import Any
 
 from hermes_ui.languages import language_code
@@ -177,6 +179,28 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
     return config
 
 
+def _atomic_write_text(target: Path, text: str) -> None:
+    """Replace TOML atomically so a failed write cannot truncate the prior file."""
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=str(target.parent),
+            prefix=f".{target.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, target)
+    except Exception:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
+
 def sync_moneyprinter_config(settings: dict[str, Any], moneyprinter_path: str) -> Path | None:
     if not moneyprinter_path or toml is None:
         return None
@@ -191,5 +215,5 @@ def sync_moneyprinter_config(settings: dict[str, Any], moneyprinter_path: str) -
         except Exception:
             existing = {}
     payload = build_moneyprinter_config(settings, existing)
-    target.write_text(toml.dumps(payload), encoding="utf-8")
+    _atomic_write_text(target, toml.dumps(payload))
     return target

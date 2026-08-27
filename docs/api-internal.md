@@ -95,3 +95,15 @@ O contrato público do YouTube documenta a API Data e o protocolo oficial de upl
 [2]: https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol "YouTube resumable upload protocol"
 
 [3]: https://docs.python.org/3/library/os.html#os.replace "Python os.replace"
+
+## Azure Speech V2 segmentado
+
+`seed/skills/azure_tts_chunked.py` aplica um orçamento interno de caracteres ajustado à taxa de fala. O limite não representa uma conversão exacta entre caracteres e duração; é uma margem conservadora para manter cada pedido de síntese muito abaixo dos 600000 ms documentados para real-time TTS. Cada segmento é tentado individualmente, o MP3 é concatenado por FFmpeg/pydub e o helper exige `AZURE_CHUNK_COUNT` e um ficheiro não vazio antes de prosseguir.
+
+`seed/skills/mpt_agent.py` reconhece o marcador de voz Azure V2, prepara o áudio task-local e só passa `--custom-audio-file` depois da validação. Sem áudio segmentado confirmado, lança `SkillError` e não inicia a CLI upstream; portanto, o caminho monolítico não é usado como fallback. O manifesto `latest-result.json` e o `LOG_FILE` continuam disponíveis em falhas, sem guardar credenciais ou o texto do roteiro.
+
+## Diagnóstico terminal do worker
+
+`hermes_ui.pipeline_worker._terminal_helper_detail()` filtra linhas de arranque como `using existing project` e `updated configuration fields`, preservando as últimas linhas accionáveis, incluindo `MPT_ERROR`, progresso de segmentos e causas devolvidas pelo MoneyPrinterTurbo. O estado da tarefa guarda `video_helper_status` e `video_elapsed_seconds` durante a execução para a UI mostrar actividade real, em vez de parecer parada após a sincronização.
+
+A sincronização de `config.toml` usa escrita temporária, `flush`, `fsync` e `os.replace`. Uma falha no replace mantém o TOML anterior intacto e elimina o temporário incompleto.

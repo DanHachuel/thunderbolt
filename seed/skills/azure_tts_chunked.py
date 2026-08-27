@@ -1,10 +1,10 @@
-"""Generate long Azure Speech V2 audio by synthesizing safe sequential chunks.
+"""Generate long Azure Speech V2 audio through conservative sequential chunks.
 
-This helper runs inside the MoneyPrinterTurbo uv project so it can use the
-same Azure Speech SDK and audio dependencies as the installed engine. Secrets
-are read only from environment variables and are never printed.
+The Azure real-time TTS endpoint limits the produced audio of one request to
+10 minutes.  This helper deliberately stays far below that limit, adjusts the
+text budget for slow voices, and concatenates the completed segments locally.
+Secrets are read only from environment variables and are never printed.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -18,12 +18,19 @@ from tempfile import TemporaryDirectory
 from xml.sax.saxutils import escape
 
 
-MAX_CHUNK_CHARACTERS = 1800
+# Azure documents a 600000 ms maximum for real-time TTS.  This is an internal
+# character budget, not a claim that characters map to a fixed duration.  The
+# deliberately conservative ceiling leaves room for slow voices, pauses and
+# punctuation before the service limit can be approached.
+MAX_CHUNK_CHARACTERS = 900
+MIN_CHUNK_CHARACTERS = 180
 RETRY_COUNT = 3
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Synthesize Azure Speech V2 audio in safe chunks.")
+    parser = argparse.ArgumentParser(
+        description="Synthesize Azure Speech V2 audio in conservative chunks."
+    )
     parser.add_argument("--text-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--voice", required=True)
@@ -57,18 +64,27 @@ def _split_long_piece(piece: str, limit: int) -> list[str]:
     return chunks
 
 
-def split_text(text: str, limit: int = MAX_CHUNK_CHARACTERS) -> list[str]:
-    """Split paragraphs and sentences without sending a 10-minute request."""
+def split_text(text: str, limit: int | None = None) -> list[str]:
+    """Split paragraphs and sentences without sending an oversized request."""
+    try:
+        effective_limit = int(limit if limit is not None else MAX_CHUNK_CHARACTERS)
+    except (TypeError, ValueError):
+        effective_limit = MAX_CHUNK_CHARACTERS
+    effective_limit = max(1, effective_limit)
     normalized = re.sub(r"\r\n?", "\n", text).strip()
     if not normalized:
         return []
-    pieces = [part.strip() for part in re.split(r"\n+|(?<=[.!?。！？；;])\s+", normalized) if part.strip()]
+    pieces = [
+        part.strip()
+        for part in re.split(r"\n+|(?<=[.!?。！？；;])\s+", normalized)
+        if part.strip()
+    ]
     chunks: list[str] = []
     current = ""
     for piece in pieces:
-        for fragment in _split_long_piece(piece, limit):
+        for fragment in _split_long_piece(piece, effective_limit):
             candidate = f"{current} {fragment}".strip()
-            if current and len(candidate) > limit:
+            if current and len(candidate) > effective_limit:
                 chunks.append(current)
                 current = fragment
             else:
@@ -86,8 +102,20 @@ def _normalise_rate(value: float) -> float:
     return max(0.25, min(4.0, rate))
 
 
+def chunk_character_limit(rate: float) -> int:
+    """Return a conservative text budget adjusted to the requested speech rate."""
+    normalized_rate = _normalise_rate(rate)
+    # A slow rate stretches the audio, so reduce the text budget proportionally.
+    # A fast rate is capped: the service limit is not a reason to send huge SSML.
+    return max(
+        MIN_CHUNK_CHARACTERS,
+        min(MAX_CHUNK_CHARACTERS, int(round(MAX_CHUNK_CHARACTERS * normalized_rate))),
+    )
+
+
 def _build_ssml(text: str, voice: str, rate: float) -> str:
-    locale = "-".join(voice.split("-", 2)[:2]) if len(voice.split("-", 2)) >= 2 else "en-US"
+    parts = voice.split("-", 2)
+    locale = "-".join(parts[:2]) if len(parts) >= 2 else "en-US"
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
         f'xml:lang="{escape(locale)}">'
@@ -97,35 +125,51 @@ def _build_ssml(text: str, voice: str, rate: float) -> str:
     )
 
 
-def _synthesise_chunk(speechsdk, text: str, voice: str, rate: float, target: Path) -> None:
+def _synthesise_chunk(
+    speechsdk, text: str, voice: str, rate: float, target: Path
+) -> None:
     speech_key = os.environ.get("AZURE_SPEECH_KEY", "").strip()
     region = os.environ.get("AZURE_SPEECH_REGION", "").strip()
     if not speech_key or not region:
-        raise RuntimeError("Azure Speech SDK V2 requer AZURE_SPEECH_KEY e AZURE_SPEECH_REGION.")
+        raise RuntimeError(
+            "Azure Speech SDK V2 requer AZURE_SPEECH_KEY e AZURE_SPEECH_REGION."
+        )
     speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=region)
     speech_config.speech_synthesis_voice_name = voice
     speech_config.set_speech_synthesis_output_format(
         speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3
     )
-    audio_config = speechsdk.audio.AudioOutputConfig(filename=str(target), use_default_speaker=False)
-    synthesizer = speechsdk.SpeechSynthesizer(audio_config=audio_config, speech_config=speech_config)
+    audio_config = speechsdk.audio.AudioOutputConfig(
+        filename=str(target), use_default_speaker=False
+    )
+    synthesizer = speechsdk.SpeechSynthesizer(
+        audio_config=audio_config, speech_config=speech_config
+    )
     try:
         result = synthesizer.speak_ssml_async(_build_ssml(text, voice, rate)).get()
     finally:
         synthesizer.close()
     if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
-        details = getattr(getattr(result, "cancellation_details", None), "error_details", "")
+        details = getattr(
+            getattr(result, "cancellation_details", None), "error_details", ""
+        )
         reason = str(details or getattr(result, "reason", "unknown"))
-        raise RuntimeError(f"Azure Speech SDK V2 não concluiu um segmento: {reason[:500]}")
+        raise RuntimeError(
+            f"Azure Speech SDK V2 não concluiu um segmento: {reason[:500]}"
+        )
     if not target.is_file() or target.stat().st_size <= 0:
-        raise RuntimeError("Azure Speech SDK V2 terminou sem produzir o áudio do segmento.")
+        raise RuntimeError(
+            "Azure Speech SDK V2 terminou sem produzir o áudio do segmento."
+        )
 
 
 def generate(text: str, voice: str, rate: float, output: Path) -> int:
     import azure.cognitiveservices.speech as speechsdk
     from pydub import AudioSegment
 
-    ffmpeg_binary = os.environ.get("IMAGEIO_FFMPEG_EXE", "").strip() or shutil.which("ffmpeg")
+    ffmpeg_binary = os.environ.get("IMAGEIO_FFMPEG_EXE", "").strip() or shutil.which(
+        "ffmpeg"
+    )
     if not ffmpeg_binary:
         try:
             import imageio_ffmpeg
@@ -133,16 +177,21 @@ def generate(text: str, voice: str, rate: float, output: Path) -> int:
             ffmpeg_binary = imageio_ffmpeg.get_ffmpeg_exe()
         except Exception:
             ffmpeg_binary = ""
-    if ffmpeg_binary:
-        AudioSegment.converter = ffmpeg_binary
-    else:
-        raise RuntimeError("FFmpeg não está disponível para concatenar os segmentos Azure Speech V2.")
+    if not ffmpeg_binary:
+        raise RuntimeError(
+            "FFmpeg não está disponível para concatenar os segmentos Azure Speech V2."
+        )
+    AudioSegment.converter = ffmpeg_binary
 
-    chunks = split_text(text)
+    normalized_rate = _normalise_rate(rate)
+    limit = chunk_character_limit(normalized_rate)
+    chunks = split_text(text, limit=limit)
     if not chunks:
         raise RuntimeError("O roteiro não contém texto para síntese Azure Speech.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(prefix="azure-v2-chunks-", dir=str(output.parent)) as temporary:
+    with TemporaryDirectory(
+        prefix="azure-v2-chunks-", dir=str(output.parent)
+    ) as temporary:
         temporary_path = Path(temporary)
         segment_paths: list[Path] = []
         for index, chunk in enumerate(chunks, start=1):
@@ -150,21 +199,28 @@ def generate(text: str, voice: str, rate: float, output: Path) -> int:
             last_error: Exception | None = None
             for attempt in range(1, RETRY_COUNT + 1):
                 try:
-                    _synthesise_chunk(speechsdk, chunk, voice, rate, segment_path)
+                    segment_path.unlink(missing_ok=True)
+                    _synthesise_chunk(
+                        speechsdk, chunk, voice, normalized_rate, segment_path
+                    )
                     last_error = None
                     break
-                except Exception as exc:  # Azure SDK exposes provider-specific exception classes.
+                except Exception as exc:  # Azure SDK exposes provider-specific classes.
                     last_error = exc
                     if attempt < RETRY_COUNT:
                         time.sleep(2 ** (attempt - 1))
             if last_error is not None:
-                raise RuntimeError(f"Falha no segmento Azure Speech {index}/{len(chunks)}: {last_error}") from last_error
+                raise RuntimeError(
+                    f"Falha no segmento Azure Speech {index}/{len(chunks)}: {last_error}"
+                ) from last_error
             segment_paths.append(segment_path)
+            print(f"AZURE_CHUNK_PROGRESS={index}/{len(chunks)}", flush=True)
 
         combined = AudioSegment.empty()
         for segment_path in segment_paths:
             combined += AudioSegment.from_file(segment_path, format="mp3")
         combined.export(output, format="mp3", bitrate="192k")
+
     if not output.is_file() or output.stat().st_size <= 0:
         raise RuntimeError("A concatenação Azure Speech V2 não produziu áudio válido.")
     return len(chunks)
@@ -180,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"AZURE_CHUNKED_AUDIO={args.output.resolve()}")
     print(f"AZURE_CHUNK_COUNT={count}")
+    print(f"AZURE_CHUNK_CHARACTER_LIMIT={chunk_character_limit(args.rate)}")
     return 0
 
 
