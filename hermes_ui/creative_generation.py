@@ -121,6 +121,46 @@ def channel_context(channel: dict[str, Any], blueprint: dict[str, Any] | None = 
     }
 
 
+def generate_video_description(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    topic: str,
+    *,
+    title: str = "",
+    tags: list[str] | None = None,
+    language: str = "",
+) -> str:
+    """Generate a concise YouTube description through the configured text LLM pool."""
+    topic = str(topic or "").strip()
+    title = str(title or "").strip()
+    if not topic and not title:
+        raise CreativeGenerationError("É necessário um tópico ou título antes de gerar a descrição do vídeo.")
+    context = channel_context(channel)
+    normalized_tags = [str(item).strip() for item in (tags or []) if str(item).strip()][:15]
+    system = (
+        "És um editor de metadados de YouTube. Cria uma descrição útil, clara e envolvente para o vídeo, "
+        "sem alegações não verificadas, sem clickbait falso e sem mencionar que foi gerada por IA. "
+        "Usa dois parágrafos curtos, inclui um convite natural para subscrever quando apropriado e devolve "
+        "apenas JSON válido com a chave description."
+    )
+    user = json.dumps(
+        {
+            "channel": context,
+            "language": language or context["language"],
+            "topic": topic,
+            "title": title or topic,
+            "tags": normalized_tags,
+            "requirements": {"paragraphs": 2, "max_characters": 1800, "no_unverified_claims": True},
+        },
+        ensure_ascii=False,
+    )
+    result = _chat_json(settings, system, user)
+    description = str(result.get("description") or "").strip()
+    if not description:
+        raise CreativeGenerationError("O provider LLM não devolveu uma descrição válida para o vídeo.")
+    return description[:1800]
+
+
 def generate_topic_for_channel(
     settings: dict[str, Any],
     channel: dict[str, Any],
