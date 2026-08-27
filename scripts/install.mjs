@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, rmSync, renameSync, cpSync, copyFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, renameSync, cpSync, copyFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -143,6 +143,57 @@ function copySeedPromptMasters(storageRoot) {
     const target = join(destination, filename);
     if (!existsSync(target)) copyFileSync(source, target);
   }
+}
+
+function copyMissingTree(source, target) {
+  if (!existsSync(source)) return 0;
+  let copied = 0;
+  let sourceStat;
+  try { sourceStat = statSync(source); } catch { return 0; }
+  if (sourceStat.isDirectory()) {
+    mkdirSync(target, { recursive: true });
+    for (const entry of readdirSync(source, { withFileTypes: true })) {
+      copied += copyMissingTree(join(source, entry.name), join(target, entry.name));
+    }
+    return copied;
+  }
+  if (existsSync(target)) return 0;
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(source, target);
+  return 1;
+}
+
+function legacyNpxPackageRoots() {
+  const roots = new Set();
+  const cacheHashes = [resolve(root, "../../..")];
+  const cacheRoot = resolve(root, "../../../..");
+  if (existsSync(cacheRoot)) {
+    try {
+      for (const entry of readdirSync(cacheRoot, { withFileTypes: true })) {
+        if (entry.isDirectory()) cacheHashes.push(join(cacheRoot, entry.name));
+      }
+    } catch { /* cache inacessível: a instalação normal continua */ }
+  }
+  for (const hashRoot of cacheHashes) {
+    const candidate = resolve(hashRoot, "node_modules", "@danhachuel", "thunderbolt");
+    if (candidate === root || roots.has(candidate)) continue;
+    if (existsSync(join(candidate, "storage", "state", "ai_influencers.db"))) roots.add(candidate);
+  }
+  return [...roots].sort((left, right) => {
+    try { return statSync(join(right, "storage", "state", "ai_influencers.db")).mtimeMs - statSync(join(left, "storage", "state", "ai_influencers.db")).mtimeMs; }
+    catch { return 0; }
+  });
+}
+
+function migrateLegacyNpxStorage() {
+  const targetStorage = join(thunderboltHome, "storage");
+  const candidates = legacyNpxPackageRoots();
+  let copied = 0;
+  for (const candidate of candidates) {
+    copied += copyMissingTree(join(candidate, "storage"), targetStorage);
+    if (existsSync(join(targetStorage, "state", "ai_influencers.db"))) break;
+  }
+  if (copied > 0) console.log(`Dados locais AI Influencers recuperados do cache npm para ${targetStorage}.`);
 }
 
 function copyOrMove(source, target, label) {
@@ -325,6 +376,7 @@ function main() {
   migrateLegacyInstallation();
   cleanInstallationRoots(moneyprinterPath);
   ensureDirs();
+  migrateLegacyNpxStorage();
   const python = skipDeps ? null : ensurePython();
   if (!skipMpt) cloneMoneyPrinter(moneyprinterPath);
   if (!skipDeps) installThunderboltDependencies(python);

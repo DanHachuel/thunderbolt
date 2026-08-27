@@ -27,11 +27,11 @@ const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (e
 const main = resolve(root, "app", "main.py");
 const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
 
-function run(command, commandArgs, label = "comando") {
+function run(command, commandArgs, label = "comando", environment = process.env) {
   console.log(`Thunderbolt: a iniciar ${label}...`);
   const result = spawnSync(command, commandArgs, {
     stdio: "inherit",
-    env: process.env,
+    env: environment,
     cwd: root,
     windowsHide: false,
   });
@@ -144,11 +144,11 @@ const runtimeEnv = {
 };
 
 if (args[0] === "worker" || args.includes("--worker")) {
-  run(python, ["-m", "hermes_ui.automation_worker", ...args.filter((arg) => arg !== "worker" && arg !== "--worker")], "worker de automação");
+  run(python, ["-m", "hermes_ui.automation_worker", ...args.filter((arg) => arg !== "worker" && arg !== "--worker")], "worker de automação", runtimeEnv);
 }
 
 if (args[0] === "pipeline-worker" || args.includes("--pipeline-worker")) {
-  run(python, ["-m", "hermes_ui.pipeline_worker", ...args.filter((arg) => arg !== "pipeline-worker" && arg !== "--pipeline-worker")], "worker do pipeline de vídeos");
+  run(python, ["-m", "hermes_ui.pipeline_worker", ...args.filter((arg) => arg !== "pipeline-worker" && arg !== "--pipeline-worker")], "worker do pipeline de vídeos", runtimeEnv);
 }
 
 const port = process.env.THUNDERBOLT_PORT || process.env.HERMES_PORT || "3030";
