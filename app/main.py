@@ -6599,6 +6599,8 @@ def main():
         ("Analista Growth Youtube", ":material/analytics:", "Analista Growth Youtube"),
         ("Analista Growth Tiktok", ":material/analytics:", "Analista Growth Tiktok"),
         ("Analista Growth Instagram", ":material/analytics:", "Analista Growth Instagram"),
+        ("Analista Facebook Pages", ":material/analytics:", "Analista Facebook Pages"),
+        ("Analista Bilibili", ":material/analytics:", "Analista Bilibili"),
     ]
     documentation_items = [
         ("Tutorial Meta", ":material/menu_book:", "Tutorial Meta"),
@@ -6739,6 +6741,8 @@ def main():
         "Analista Growth Youtube": lambda: render_edit_placeholder("Analista Growth Youtube", ""),
         "Analista Growth Tiktok": lambda: render_edit_placeholder("Analista Growth Tiktok", ""),
         "Analista Growth Instagram": lambda: render_edit_placeholder("Analista Growth Instagram", ""),
+        "Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", ""),
+        "Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", ""),
         "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,

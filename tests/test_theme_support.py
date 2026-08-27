@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.3.72"' in PACKAGE_SOURCE
+    assert '"version": "0.3.73"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
@@ -66,3 +66,9 @@ def test_theme_fix_keeps_native_streamlit_toolbar_and_platform_chip_identity_col
     assert "stToolbar" not in MAIN_SOURCE
     assert '[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="YouTube"] { background:#ff0000 !important; }' in MAIN_SOURCE
     assert '[data-testid="stMultiSelectTagsContainer"] span[data-tag][aria-label="TikTok"] { background:#000000 !important; }' in MAIN_SOURCE
+
+
+def test_growth_labels_have_translation_entries():
+    source = Path(__file__).parents[1].joinpath("hermes_ui", "languages.py").read_text(encoding="utf-8")
+    assert source.count('"Analista Facebook Pages"') >= 10
+    assert source.count('"Analista Bilibili"') >= 10
