@@ -775,6 +775,11 @@ def _moneyprinter_cli_args(task: dict[str, Any], route: str, settings: dict[str,
     clip_duration = generation_settings.get("maximum_clip_duration")
     if str(clip_duration or "").strip().isdigit() and int(clip_duration) > 0:
         args.extend(["--video-clip-duration", str(int(clip_duration))])
+    elif route in {"pexels", "pixabay"} and len(script) >= 1_200:
+        # Vídeos longos com o padrão de 5 s podem exigir dezenas de downloads
+        # sequenciais. Para manter variedade e terminar de forma previsível,
+        # adoptamos 15 s apenas quando não há escolha explícita do utilizador.
+        args.extend(["--video-clip-duration", "15"])
     if bool(generation_settings.get("match_visuals_to_script_order")):
         args.append("--match-materials-to-script")
 
