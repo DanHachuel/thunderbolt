@@ -103,9 +103,7 @@ def _provider_label(card: Mapping[str, Any]) -> str:
 
 
 def render_ai_influencers_api_status(settings: dict[str, Any]) -> None:
-    """Show backend status; editable selector and credentials are rendered by the settings page."""
-    st.subheader("AI Influencers")
-    st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")
+    """Show the effective backend status after selector and credentials are loaded."""
     status = backend_status(settings)
     cols = st.columns(3)
     with cols[0]:
@@ -118,7 +116,7 @@ def render_ai_influencers_api_status(settings: dict[str, Any]) -> None:
         st.info(f"{status['message']} Destino: `{status['target']}`")
     else:
         st.warning(status["message"])
-    st.markdown("A migração SQL idempotente está disponível em `seed/references/ai_influencers_schema.sql`. No Supabase, aplique-a no SQL Editor e confirme as políticas RLS e o bucket configurado.")
+    st.markdown("A migração SQL idempotente está disponível em `seed/references/ai_influencers_schema.sql`. No Supabase, aplique-a no SQL Editor e confirme as políticas RLS.")
     if st.button("Testar backend AI Influencers", key="influencers_api_status_test"):
         result = test_backend(settings)
         if result.get("ok"):

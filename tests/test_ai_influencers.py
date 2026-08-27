@@ -119,6 +119,9 @@ class AIInfluencerRepositoryTests(unittest.TestCase):
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "sqlite"}), "SQLite")
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase"}), "SQLite")
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase", "influencer_supabase_url": "https://example.supabase.co", "influencer_supabase_key": "key"}), "Supabase")
+        fallback_status = influencers.backend_status({"influencer_db_backend": "Supabase"})
+        self.assertEqual(fallback_status["backend"], "SQLite")
+        self.assertTrue(fallback_status["configured"])
         status = influencers.backend_status({"influencer_db_backend": "SQLite", "influencer_sqlite_path": "storage/state/test.db"})
         self.assertTrue(status["configured"])
 
