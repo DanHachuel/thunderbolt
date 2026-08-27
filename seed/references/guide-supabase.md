@@ -60,9 +60,9 @@ Depois, carregue a imagem de referência para o bucket usando o botão `Upload f
 
 Para usar **AI Influencers > Personagens** e **Geração de Conteúdo IA** com Supabase, aplique o ficheiro `seed/references/ai_influencers_schema.sql` no SQL Editor. Ele cria as tabelas `influencers`, `influencer_assets`, `influencer_weekly_plans` e `influencer_content`, além dos índices e da activação de RLS.
 
-No Thunderbolt, abra **Configurações > Configuração API > API Keys > Banco de Dados Influencers**, seleccione **Supabase** e preencha o **Supabase Project URL**, a **Supabase API key** e o bucket de Storage. Crie o bucket com o mesmo nome configurado, por defeito `ai-influencers`, e confirme as políticas RLS/Storage antes de guardar imagens ou documentos. A chave não deve ser colocada no GitHub, nos workflows JSON ou em screenshots.
+No Thunderbolt, abra **Configurações > Configuração API > AI Influencers > Banco de Dados Influencers**, seleccione **Supabase** e preencha o **Supabase Project URL**, a **Supabase API key** e o bucket de Storage. Crie o bucket com o mesmo nome configurado, por defeito `ai-influencers`, e confirme as políticas RLS/Storage antes de guardar imagens ou documentos. A chave não deve ser colocada no GitHub, nos workflows JSON ou em screenshots.
 
-O Thunderbolt usa o Supabase como backend seleccionado, não como executor de n8n: os assets são enviados ao Storage, os metadados ficam nas tabelas e os estados de geração ficam em `influencer_content`. Para uma execução totalmente local, seleccione **SQLite** no mesmo expander; a alternativa cria `storage/state/ai_influencers.db` e não utiliza a conta Supabase.
+O Thunderbolt usa o Supabase como backend seleccionado, não como executor de n8n: os assets são enviados ao Storage, os metadados ficam nas tabelas e os estados de geração ficam em `influencer_content`. Para uma execução totalmente local, seleccione **SQLite** no mesmo painel; a alternativa cria `storage/state/ai_influencers.db` e não utiliza a conta Supabase.
 
 A conta Supabase está pronta para ser utilizada pela automação.
 

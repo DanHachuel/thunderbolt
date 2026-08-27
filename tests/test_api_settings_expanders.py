@@ -109,9 +109,17 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertLess(material_position, influencers_position)
         self.assertLess(influencers_position, voice_position)
         api_block = MAIN_SOURCE[api_position:google_position]
-        self.assertIn('with st.expander("Banco de Dados Influencers", expanded=False):', api_block)
+        self.assertNotIn('with st.expander("Banco de Dados Influencers", expanded=False):', api_block)
         self.assertIn('with st.container(border=True):', api_block)
         self.assertIn('with st.form("settings_form"):', api_block)
+        influencers_block = MAIN_SOURCE[influencers_position:voice_position]
+        self.assertIn('st.subheader("Banco de Dados Influencers")', influencers_block)
+        self.assertIn('key="settings_influencer_db_backend"', influencers_block)
+        self.assertIn('Supabase Project URL', influencers_block)
+        self.assertIn('Supabase API key', influencers_block)
+        self.assertIn('Supabase Storage bucket', influencers_block)
+        self.assertIn('SQLite ficheiro local', influencers_block)
+        self.assertIn('Guardar configuração do backend', influencers_block)
         self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:material_position])
         self.assertNotIn('render_localized_tabs(["Serviços e modelos", "Fontes de Materiais"])', MAIN_SOURCE)
 
