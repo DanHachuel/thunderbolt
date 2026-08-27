@@ -323,7 +323,7 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
             current = str(st.session_state.get("influencer_selected_id") or options[0])
             cards, provider_options = _provider_options(settings, "image")
             if not cards:
-                st.warning("Não existem providers activos no pool de imagem. Configure um provider em Configuração API > API Keys > Imagem e Video.")
+                st.warning("Não existem providers activos no pool de imagem. Configure um provider em Configuração API > API Keys > Imagem e Video IA.")
             with st.form("influencer_image_content_form"):
                 influencer_id = st.selectbox("Personagem", options, index=options.index(current) if current in options else 0, format_func=lambda value: _influencer_label(influencers, value), key="content_image_influencer")
                 assets = repository.list_assets(influencer_id)
@@ -371,7 +371,7 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
             current = str(st.session_state.get("influencer_selected_id") or options[0])
             cards, provider_options = _provider_options(settings, "video")
             if not cards:
-                st.warning("Não existem providers activos no pool de vídeo. Configure KIE AI, Replicate, FAL AI ou outro provider compatível em Configuração API > API Keys > Imagem e Video.")
+                st.warning("Não existem providers activos no pool de vídeo. Configure KIE AI, Replicate, FAL AI ou outro provider compatível em Configuração API > API Keys > Imagem e Video IA.")
             with st.form("influencer_video_content_form"):
                 influencer_id = st.selectbox("Personagem", options, index=options.index(current) if current in options else 0, format_func=lambda value: _influencer_label(influencers, value), key="content_video_influencer")
                 assets = repository.list_assets(influencer_id)

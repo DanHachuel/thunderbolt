@@ -5039,7 +5039,7 @@ def _material_source_card_definition(provider: str) -> dict[str, str]:
     }
 
 
-def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int) -> None:
+def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int, *, embedded: bool = False) -> None:
     card = normalize_material_card(cards[index], index)
     cards[index] = card
     card_id = str(card["id"])
@@ -5054,7 +5054,8 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
             st.caption(definition["description"])
         with header_cols[1]:
             _render_credential_status("" if is_local else card.get("api_key"), local=is_local, required=not is_local)
-        with st.form(f"material_source_card_form_{card_id}"):
+        card_form = nullcontext() if embedded else st.form(f"material_source_card_form_{card_id}")
+        with card_form:
             content_cols = st.columns(2)
             with content_cols[0]:
                 if is_local:
@@ -5085,29 +5086,30 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
             st.rerun()
 
 
-def render_material_source_api_keys(settings: dict[str, Any]) -> None:
-    st.subheader("Fontes de Materiais")
-    st.caption("Configure cada provedor num cartão independente. Pode repetir o mesmo provedor para guardar várias API keys; a fonte seleccionada será usada pela pipeline.")
-    migrated, changed = ensure_material_source_cards(settings)
-    cards = [dict(item) for item in migrated.get("material_source_cards", [])]
-    if changed:
-        write_json("settings.json", settings)
-    for index in range(len(cards)):
-        _render_material_source_card(settings, cards, index)
+def render_material_source_api_keys(settings: dict[str, Any], *, embedded: bool = False) -> None:
+    with st.expander("Imagem e Video Montagem/MoviePy", expanded=False):
+        st.caption("Configure as fontes usadas pela montagem de vídeo com MoviePy/FFmpeg num cartão independente. Pode repetir o mesmo provedor para guardar várias API keys; a fonte seleccionada será usada pela pipeline.")
+        migrated, changed = ensure_material_source_cards(settings)
+        cards = [dict(item) for item in migrated.get("material_source_cards", [])]
+        if changed:
+            write_json("settings.json", settings)
+        for index in range(len(cards)):
+            _render_material_source_card(settings, cards, index, embedded=embedded)
 
-    st.divider()
-    st.markdown("**Adicionar fonte de materiais**")
-    provider_codes = [item["code"] for item in material_source_catalog()] + ["local"]
-    provider_to_add = st.selectbox(
-        "Provedor de materiais",
-        provider_codes,
-        format_func=lambda value: _material_source_card_definition(value)["label"],
-        key="material_new_provider_choice",
-    )
-    if st.button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card"):
-        cards.append(new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
-        _persist_material_source_cards(settings, cards, str(settings.get("material_active_card_id") or ""))
-        st.rerun()
+        st.divider()
+        st.markdown("**Adicionar fonte de materiais**")
+        provider_codes = [item["code"] for item in material_source_catalog()] + ["local"]
+        provider_to_add = st.selectbox(
+            "Provedor de materiais",
+            provider_codes,
+            format_func=lambda value: _material_source_card_definition(value)["label"],
+            key="material_new_provider_choice",
+        )
+        add_source_clicked = st.form_submit_button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card") if embedded else st.button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card")
+        if add_source_clicked:
+            cards.append(new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
+            _persist_material_source_cards(settings, cards, str(settings.get("material_active_card_id") or ""))
+            st.rerun()
 
 
 def _api_status_badge(label: str, kind: str = "missing") -> None:
@@ -5490,7 +5492,7 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
     if changed:
         settings.update(migrated)
         write_json("settings.json", settings)
-    with st.expander("Imagem e Video", expanded=False):
+    with st.expander("Imagem e Video IA", expanded=False):
         full_ia_labels = ", ".join(media_provider_definition(code).label for code in FULL_IA_VIDEO_PROVIDER_CODES)
         st.caption(f"Configure providers de imagem e vídeo em cartões independentes. O router usa apenas o pool correspondente e faz failover entre providers activos. Pool Full IA: {full_ia_labels}.")
         image_cards = [card for card in cards if card.get("supports_image")]
@@ -5537,7 +5539,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, google_accounts_tab, tiktok_api_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])
+    api_keys_tab, google_accounts_tab, tiktok_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -5585,6 +5587,8 @@ def render_settings():
                 llm_rpm_limit_enabled = bool(llm_rpm_settings["llm_rpm_limit_enabled"])
                 llm_rpm_limit = int(llm_rpm_settings["llm_rpm_limit"])
                 llm_rpm_window_seconds = int(llm_rpm_settings["llm_rpm_window_seconds"])
+
+                render_material_source_api_keys(settings, embedded=True)
 
                 render_media_provider_cards(settings, embedded=True)
 
@@ -5757,9 +5761,6 @@ def render_settings():
 
     with tiktok_api_tab:
         render_tiktok_api_cards(settings)
-
-    with material_sources_tab:
-        render_material_source_api_keys(settings)
 
     with ai_influencers_tab:
         st.subheader("AI Influencers")

@@ -13,7 +13,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         labels = [
             "Niche Finder — Kaggle",
             "Niche Finder — Apify",
-            "Imagem e Video",
+            "Imagem e Video Montagem/MoviePy",
+            "Imagem e Video IA",
             "LLM — providers e modelos",
             "Voz, TTS e música — Azure Speech, restantes serviços e Suno",
             "Publicação através do Upload-Post",
@@ -60,10 +61,13 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         llm_position = MAIN_SOURCE.index('render_llm_provider_cards(settings, embedded=True)')
         apify_position = MAIN_SOURCE.index('with st.expander("Niche Finder — Apify", expanded=False)')
         settings_position = MAIN_SOURCE.index('def render_settings():')
+        material_position = MAIN_SOURCE.index('render_material_source_api_keys(settings, embedded=True)', settings_position)
         media_position = MAIN_SOURCE.index('render_media_provider_cards(settings, embedded=True)', settings_position)
         self.assertLess(apify_position, llm_position)
-        self.assertLess(llm_position, media_position)
-        self.assertIn('with st.expander("Imagem e Video", expanded=False)', MAIN_SOURCE)
+        self.assertLess(llm_position, material_position)
+        self.assertLess(material_position, media_position)
+        self.assertIn('with st.expander("Imagem e Video Montagem/MoviePy", expanded=False)', MAIN_SOURCE)
+        self.assertIn('with st.expander("Imagem e Video IA", expanded=False)', MAIN_SOURCE)
         self.assertNotIn('Nano Banana — geração de thumbnails', MAIN_SOURCE)
         self.assertNotIn('Niche Finder — execução remota no Kaggle', MAIN_SOURCE)
         self.assertNotIn('Niche Finder — execução através da Apify', MAIN_SOURCE)
@@ -96,23 +100,26 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('status_cols = st.columns(3)', MAIN_SOURCE)
         self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
-    def test_api_keys_google_accounts_material_sources_and_voice_are_direct_sibling_tabs(self):
-        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, material_sources_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])')
+    def test_api_keys_use_direct_tabs_and_material_sources_are_inside_api_keys(self):
+        tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "AI Influencers", "Teste de Voz"])')
         api_position = MAIN_SOURCE.index('    with api_keys_tab:', tabs_position)
         google_position = MAIN_SOURCE.index('    with google_accounts_tab:', tabs_position)
         tiktok_position = MAIN_SOURCE.index('    with tiktok_api_tab:', tabs_position)
-        material_position = MAIN_SOURCE.index('    with material_sources_tab:', tabs_position)
         influencers_position = MAIN_SOURCE.index('    with ai_influencers_tab:', tabs_position)
         voice_position = MAIN_SOURCE.index('    with voice_test_tab:', tabs_position)
         self.assertLess(api_position, google_position)
         self.assertLess(google_position, tiktok_position)
-        self.assertLess(tiktok_position, material_position)
-        self.assertLess(material_position, influencers_position)
+        self.assertLess(tiktok_position, influencers_position)
         self.assertLess(influencers_position, voice_position)
         api_block = MAIN_SOURCE[api_position:google_position]
-        self.assertNotIn('with st.expander("Banco de Dados Influencers", expanded=False):', api_block)
+        material_position = api_block.index('render_material_source_api_keys(settings, embedded=True)')
+        media_position = api_block.index('render_media_provider_cards(settings, embedded=True)')
+        self.assertLess(material_position, media_position)
+        self.assertIn('with st.expander("Imagem e Video Montagem/MoviePy", expanded=False):', MAIN_SOURCE)
+        self.assertIn('with st.expander("Imagem e Video IA", expanded=False):', MAIN_SOURCE)
         self.assertIn('with st.container(border=True):', api_block)
         self.assertIn('with st.form("settings_form"):', api_block)
+        self.assertNotIn('with material_sources_tab:', MAIN_SOURCE)
         influencers_block = MAIN_SOURCE[influencers_position:voice_position]
         self.assertIn('st.subheader("AI Influencers")', influencers_block)
         self.assertIn('Estado do backend usado por Personagens e Geração de Conteúdo IA.', influencers_block)
@@ -126,8 +133,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('render_ai_influencers_api_status(effective_settings)', influencers_block)
         self.assertIn('render_google_accounts()', MAIN_SOURCE[google_position:tiktok_position])
         self.assertIn('def render_tiktok_api_cards(', MAIN_SOURCE)
-        self.assertIn('render_tiktok_api_cards(settings)', MAIN_SOURCE[tiktok_position:material_position])
-        self.assertNotIn('render_localized_tabs(["Serviços e modelos", "Fontes de Materiais"])', MAIN_SOURCE)
+        tiktok_block = MAIN_SOURCE[tiktok_position:influencers_position]
+        self.assertIn('render_tiktok_api_cards(settings)', tiktok_block)
 
     def test_material_sources_use_individual_cards_and_add_provider_button(self):
         self.assertIn('def _render_material_source_card(', MAIN_SOURCE)
@@ -135,6 +142,14 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('Configurar Nova Fonte de Materiais', MAIN_SOURCE)
         self.assertIn('key="add_material_source_card"', MAIN_SOURCE)
         self.assertIn('MATERIAL_CARDS_KEY = "material_source_cards"', (ROOT / "hermes_ui" / "material_sources.py").read_text(encoding="utf-8"))
+
+    def test_material_sources_expander_is_safe_inside_api_keys_form(self):
+        material_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_material_source_card('):MAIN_SOURCE.index('def _api_status_badge(')]
+        self.assertIn('embedded: bool = False', material_renderer)
+        self.assertIn('card_form = nullcontext() if embedded else st.form(', material_renderer)
+        self.assertIn('render_material_source_api_keys(settings, embedded=True)', MAIN_SOURCE)
+        self.assertIn('st.form_submit_button("Configurar Nova Fonte de Materiais"', material_renderer)
+        self.assertIn('if embedded else st.button', material_renderer)
 
     def test_streamlit_port_is_not_rendered_and_video_engine_path_is_read_only(self):
         self.assertNotIn('st.number_input("Porta Streamlit"', MAIN_SOURCE)
@@ -200,7 +215,8 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         for language in LANGUAGE_CODES:
             self.assertIn("Niche Finder — Kaggle", UI_TRANSLATIONS[language])
             self.assertIn("Niche Finder — Apify", UI_TRANSLATIONS[language])
-            self.assertIn("Imagem e Video", UI_TRANSLATIONS[language])
+            self.assertIn("Imagem e Video IA", UI_TRANSLATIONS[language])
+            self.assertIn("Imagem e Video Montagem/MoviePy", UI_TRANSLATIONS[language])
 
     def test_api_test_feedback_has_all_language_translations(self):
         labels = (
