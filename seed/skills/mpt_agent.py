@@ -203,6 +203,27 @@ def _replace_config_value(text: str, key: str, value: object) -> str:
     return pattern.sub(lambda match: f"{match.group(1)}{encoded}", text, count=1)
 
 
+def _replace_toml_section_value(text: str, section: str, key: str, value: object) -> str:
+    """Replace or append a scalar value inside one TOML section."""
+    encoded = json.dumps(value, ensure_ascii=False)
+    section_pattern = re.compile(
+        rf"(?ms)^\[{re.escape(section)}\][ \t]*(?:\n|$)(.*?)(?=^\[|\Z)"
+    )
+    section_match = section_pattern.search(text)
+    if section_match is None:
+        separator = "" if not text.strip() else "\n\n"
+        return f"{text.rstrip()}{separator}[{section}]\n{key} = {encoded}\n"
+    body = section_match.group(1)
+    value_pattern = re.compile(rf"(?m)^({re.escape(key)}\s*=\s*).*$")
+    if value_pattern.search(body):
+        updated_body = value_pattern.sub(
+            lambda match: f"{match.group(1)}{encoded}", body, count=1
+        )
+    else:
+        updated_body = f"{body.rstrip()}\n{key} = {encoded}\n"
+    return f"{text[:section_match.start(1)]}{updated_body}{text[section_match.end(1):]}"
+
+
 def _has_configured_value(value: str) -> bool:
     """Treat empty strings and whitespace-only key arrays as unconfigured."""
     if not value:
@@ -237,13 +258,15 @@ def apply_environment_config(config_path: Path) -> None:
     model_name = os.environ.get("MPT_LLM_MODEL_NAME", "").strip()
     pexels_key = os.environ.get("MPT_PEXELS_API_KEY", "").strip()
     pixabay_key = os.environ.get("MPT_PIXABAY_API_KEY", "").strip()
+    azure_speech_key = os.environ.get("MPT_AZURE_SPEECH_KEY", "").strip()
+    azure_speech_region = os.environ.get("MPT_AZURE_SPEECH_REGION", "").strip()
     pexels_keys = _parse_string_list(os.environ.get("MPT_PEXELS_API_KEYS", ""))
     pixabay_keys = _parse_string_list(os.environ.get("MPT_PIXABAY_API_KEYS", ""))
     if not pexels_keys and pexels_key:
         pexels_keys = [pexels_key]
     if not pixabay_keys and pixabay_key:
         pixabay_keys = [pixabay_key]
-    if not any((provider, llm_key, base_url, model_name, pexels_keys, pixabay_keys)):
+    if not any((provider, llm_key, base_url, model_name, pexels_keys, pixabay_keys, azure_speech_key, azure_speech_region)):
         return
 
     text = config_path.read_text(encoding="utf-8")
@@ -268,6 +291,12 @@ def apply_environment_config(config_path: Path) -> None:
     if pixabay_keys:
         text = _replace_config_value(text, "pixabay_api_keys", pixabay_keys)
         changes.append("pixabay_api_keys")
+    if azure_speech_key:
+        text = _replace_toml_section_value(text, "azure", "speech_key", azure_speech_key)
+        changes.append("azure.speech_key")
+    if azure_speech_region:
+        text = _replace_toml_section_value(text, "azure", "speech_region", azure_speech_region)
+        changes.append("azure.speech_region")
     _atomic_write_text(config_path, text)
     log("updated configuration fields: " + ", ".join(changes))
 

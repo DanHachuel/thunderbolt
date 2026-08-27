@@ -38,6 +38,18 @@ def test_split_text_handles_newlines_and_long_unbroken_tokens():
     assert chunks[-1] == "x" * 500
 
 
+def test_mpt_agent_applies_azure_environment_to_azure_toml_section(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('[app]\npexels_api_keys = []\n\n[azure]\nspeech_key = ""\nspeech_region = ""\n', encoding="utf-8")
+    monkeypatch.setenv("MPT_AZURE_SPEECH_KEY", "azure-test-key")
+    monkeypatch.setenv("MPT_AZURE_SPEECH_REGION", "eastus")
+
+    MPT_AGENT.apply_environment_config(config_path)
+
+    assert MPT_AGENT._toml_section_value(config_path, "azure", "speech_key") == "azure-test-key"
+    assert MPT_AGENT._toml_section_value(config_path, "azure", "speech_region") == "eastus"
+
+
 def test_mpt_agent_prepares_azure_audio_without_logging_credentials(tmp_path, monkeypatch):
     root = tmp_path / "MoneyPrinterTurbo"
     root.mkdir()
