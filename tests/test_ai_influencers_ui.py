@@ -37,6 +37,15 @@ def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
     assert 'st.file_uploader' in UI
 
 
+def test_new_character_form_clears_fields_after_save():
+    assert 'with st.form("influencer_create_form", clear_on_submit=True):' in UI
+    assert 'key="influencer_new_name"' in UI
+    assert 'key="influencer_new_language"' in UI
+    assert 'key="influencer_new_instagram_id"' in UI
+    assert 'key="influencer_new_bio"' in UI
+    assert 'key="influencer_new_assets"' in UI
+
+
 def test_video_ui_uses_active_video_pool_instead_of_hardcoded_veo():
     assert '_provider_options(settings, "video")' in UI
     assert 'media_cards_for_pool(settings, pool)' in UI
