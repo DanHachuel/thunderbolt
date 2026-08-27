@@ -459,6 +459,58 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     return video_path
 
 
+def _read_persisted_script(task: dict[str, Any], channel: dict[str, Any], blueprint: dict[str, Any], topic: str) -> dict[str, Any] | None:
+    """Load a previously saved script so retries do not regenerate it."""
+    artifacts = task.get("artifacts") if isinstance(task.get("artifacts"), dict) else {}
+    script_path = Path(str(artifacts.get("script") or "")).expanduser()
+    if not script_path.is_file() or script_path.stat().st_size <= 0:
+        return None
+    try:
+        raw = script_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not raw:
+        return None
+    content = raw
+    if raw.startswith("---"):
+        parts = raw.split("---", 2)
+        if len(parts) == 3:
+            content = parts[2].strip()
+            if content.startswith(">"):
+                content = "\n".join(line[1:].lstrip() if line.startswith(">") else line for line in content.splitlines()).strip()
+    return {
+        "document_type": "video_script",
+        "title": str(task.get("title") or topic),
+        "summary": topic,
+        "content": content,
+        "language": str(task.get("language") or channel.get("language") or "Português"),
+        "blueprint_id": str(blueprint.get("id") or ""),
+        "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        "channel_id": str(channel.get("id") or ""),
+        "channel_name": str(channel.get("name") or "Canal sem nome"),
+        "generated_by": "persisted_pipeline_artifact",
+    }
+
+
+def _valid_artifact_path(value: Any) -> Path | None:
+    path = Path(str(value or "")).expanduser()
+    try:
+        return path if path.is_file() and path.stat().st_size > 0 else None
+    except OSError:
+        return None
+
+
+def _read_json_artifact(value: Any) -> dict[str, Any] | None:
+    path = _valid_artifact_path(value)
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     task_id = str(task.get("id") or "")
     channel = _channel_for_task(task)
@@ -473,116 +525,130 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
             raise PipelineError("A IA não devolveu um tema válido.")
         _update(task_id, topic=topic, topic_source="llm", ai_generation={"topic": topic_result}, progress=12)
 
-    _update(task_id, stage="script", state="doing", progress=18, error=None)
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
-    provided_script = str(generation_settings.get("video_script") or "").strip()
-    if provided_script:
-        script = {
-            "document_type": "video_script",
-            "title": str(task.get("title") or topic),
-            "summary": topic,
-            "content": provided_script,
-            "language": str(task.get("language") or channel.get("language") or "Português"),
-            "blueprint_id": str(blueprint.get("id") or ""),
-            "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
-            "channel_id": str(channel.get("id") or ""),
-            "channel_name": str(channel.get("name") or "Canal sem nome"),
-            "generation_settings": generation_settings,
-            "generated_by": "video_creation_form",
-        }
-    else:
-        script = generate_script_document(
-            settings,
-            document_type="Roteiro de vídeo",
-            title=str(task.get("title") or topic),
-            brief=topic,
-            language=str(task.get("language") or channel.get("language") or "Português"),
-            channel=channel,
-            blueprint=blueprint,
-            structure_notes=str(generation_settings.get("script_structure_notes") or ""),
-            generation_settings=generation_settings,
-        )
-    script_record = save_script_document(script)
     artifacts = dict(task.get("artifacts") or {})
-    artifacts["script"] = script_record.get("path", "")
-    _update(task_id, artifacts=artifacts, progress=30)
+    script = _read_persisted_script(task, channel, blueprint, topic)
+    if script is None:
+        _update(task_id, stage="script", state="doing", progress=18, error=None)
+        provided_script = str(generation_settings.get("video_script") or "").strip()
+        if provided_script:
+            script = {
+                "document_type": "video_script",
+                "title": str(task.get("title") or topic),
+                "summary": topic,
+                "content": provided_script,
+                "language": str(task.get("language") or channel.get("language") or "Português"),
+                "blueprint_id": str(blueprint.get("id") or ""),
+                "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+                "channel_id": str(channel.get("id") or ""),
+                "channel_name": str(channel.get("name") or "Canal sem nome"),
+                "generation_settings": generation_settings,
+                "generated_by": "video_creation_form",
+            }
+        else:
+            script = generate_script_document(
+                settings,
+                document_type="Roteiro de vídeo",
+                title=str(task.get("title") or topic),
+                brief=topic,
+                language=str(task.get("language") or channel.get("language") or "Português"),
+                channel=channel,
+                blueprint=blueprint,
+                structure_notes=str(generation_settings.get("script_structure_notes") or ""),
+                generation_settings=generation_settings,
+            )
+        script_record = save_script_document(script)
+        artifacts["script"] = script_record.get("path", "")
+        _update(task_id, artifacts=artifacts, progress=max(30, int(task.get("progress") or 0)))
+    else:
+        _update(task_id, artifacts=artifacts, error=None, progress=max(30, int(task.get("progress") or 0)))
 
-    _update(task_id, stage="title", state="doing", progress=35)
-    provided_title = str(task.get("title") or "").strip()
-    provided_keywords = generation_settings.get("video_keywords") or task.get("keywords")
+    title = str(task.get("title") or "").strip()
+    provided_keywords = generation_settings.get("video_keywords") or task.get("keywords") or task.get("tags")
     if isinstance(provided_keywords, str):
         provided_keywords = re.split(r"[,\n;|]+", provided_keywords)
-    provided_keywords = [str(item).strip() for item in provided_keywords or [] if str(item).strip()]
+    keywords = [str(item).strip() for item in provided_keywords or [] if str(item).strip()][:15]
     title_candidates = task.get("title_candidates") if isinstance(task.get("title_candidates"), list) else []
-    editorial: dict[str, Any] = {
-        "title": provided_title or topic,
-        "title_candidates": title_candidates,
-        "keywords": provided_keywords,
-    }
-    if not provided_title:
-        try:
-            editorial = generate_title_and_keywords(
-                settings,
-                channel,
-                topic,
-                blueprint,
-                language=str(task.get("language") or channel.get("language") or "Português"),
-            )
-        except CreativeGenerationError:
-            # A falha editorial não deve impedir a geração do vídeo: usa o tema
-            # como título e keywords determinísticas, deixando o erro de imagem
-            # para a etapa posterior e independente da criação do MP4.
-            editorial = {"title": topic, "title_candidates": [], "keywords": []}
-    title = str(editorial.get("title") or provided_title or topic).strip()
-    keywords = provided_keywords[:15] or (
-        editorial.get("keywords") if isinstance(editorial.get("keywords"), list) else []
-    )
-    keywords = [str(item).strip() for item in keywords if str(item).strip()][:15] or _keywords(
-        topic,
-        title,
-        str(channel.get("niche") or ""),
-    )
-    title_candidates = editorial.get("title_candidates") if isinstance(editorial.get("title_candidates"), list) else title_candidates
-    title_artifact = _save_json_artifact(
-        task_id,
-        "title-keywords",
-        {"topic": topic, "title": title, "keywords": keywords, "title_candidates": title_candidates},
-    )
-    artifacts = {**artifacts, "title_keywords": title_artifact}
-    _update(task_id, title=title, tags=keywords, artifacts=artifacts, title_candidates=title_candidates, progress=45)
+    if not title or not keywords:
+        _update(task_id, stage="title", state="doing", progress=max(35, int(task.get("progress") or 0)), error=None)
+        editorial: dict[str, Any] = {
+            "title": title or topic,
+            "title_candidates": title_candidates,
+            "keywords": keywords,
+        }
+        if not title:
+            try:
+                editorial = generate_title_and_keywords(
+                    settings,
+                    channel,
+                    topic,
+                    blueprint,
+                    language=str(task.get("language") or channel.get("language") or "Português"),
+                )
+            except CreativeGenerationError:
+                # A falha editorial não deve impedir a geração do vídeo: usa o tema
+                # como título e keywords determinísticas, deixando o erro de imagem
+                # para a etapa posterior e independente da criação do MP4.
+                editorial = {"title": topic, "title_candidates": [], "keywords": []}
+        title = str(editorial.get("title") or title or topic).strip()
+        keywords = keywords or (
+            editorial.get("keywords") if isinstance(editorial.get("keywords"), list) else []
+        )
+        keywords = [str(item).strip() for item in keywords if str(item).strip()][:15] or _keywords(
+            topic,
+            title,
+            str(channel.get("niche") or ""),
+        )
+        title_candidates = editorial.get("title_candidates") if isinstance(editorial.get("title_candidates"), list) else title_candidates
+        title_artifact = _save_json_artifact(
+            task_id,
+            "title-keywords",
+            {"topic": topic, "title": title, "keywords": keywords, "title_candidates": title_candidates},
+        )
+        artifacts["title_keywords"] = title_artifact
+        _update(task_id, title=title, tags=keywords, artifacts=artifacts, title_candidates=title_candidates, progress=max(45, int(task.get("progress") or 0)))
+    else:
+        _update(task_id, title=title, tags=keywords, artifacts=artifacts, title_candidates=title_candidates, error=None, progress=max(50, int(task.get("progress") or 0)))
 
-    _update(task_id, stage="keywords", state="doing", progress=48)
-    _update(task_id, tags=keywords, progress=50)
+    _update(task_id, stage="keywords", state="doing", progress=max(50, int(task.get("progress") or 0)), error=None)
+    _update(task_id, tags=keywords, progress=max(50, int(task.get("progress") or 0)))
 
     # O vídeo é deliberadamente concluído antes de qualquer chamada ao provider
     # de imagem. O artefacto fica persistido mesmo que a quota da thumbnail falhe.
-    _update(task_id, stage="video", state="doing", progress=52, error=None)
-    video_cards = media_cards_for_pool(settings, "video")
-    if bool(settings.get("media_video_pool_enabled")) and video_cards:
-        try:
-            video_prompt = _append_generation_constraints(
-                f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}",
-                kind="video",
-            )
-            video_path = generate_video_from_pool(settings, video_prompt)
-        except MediaGenerationError as exc:
-            raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
+    existing_video = _valid_artifact_path(artifacts.get("video"))
+    if existing_video is None:
+        _update(task_id, stage="video", state="doing", progress=max(52, int(task.get("progress") or 0)), error=None)
+        video_cards = media_cards_for_pool(settings, "video")
+        if bool(settings.get("media_video_pool_enabled")) and video_cards:
+            try:
+                video_prompt = _append_generation_constraints(
+                    f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}",
+                    kind="video",
+                )
+                video_path = generate_video_from_pool(settings, video_prompt)
+            except MediaGenerationError as exc:
+                raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
+        else:
+            video_path = _run_video_helper({**task, "topic": topic, "title": title})
+        current_after_video = _task_by_id(task_id) or {}
+        artifacts = dict(current_after_video.get("artifacts") or artifacts)
+        artifacts["video"] = str(video_path)
+        _update(task_id, artifacts=artifacts, video_ready=True, progress=max(80, int(task.get("progress") or 0)))
     else:
-        video_path = _run_video_helper({**task, "topic": topic, "title": title})
-    current_after_video = _task_by_id(task_id) or {}
-    artifacts = dict(current_after_video.get("artifacts") or artifacts)
-    artifacts["video"] = str(video_path)
-    _update(task_id, artifacts=artifacts, video_ready=True, progress=80)
+        video_path = existing_video
+        artifacts["video"] = str(existing_video)
+        _update(task_id, stage="video", state="doing", artifacts=artifacts, video_ready=True, error=None, progress=max(80, int(task.get("progress") or 0)))
 
-    _update(task_id, stage="thumbnail_prompt", state="doing", progress=82, error=None)
+    persisted_prompt = _read_json_artifact(artifacts.get("thumbnail_prompt_json"))
+    persisted_variant = persisted_prompt.get("thumbnail") if isinstance(persisted_prompt, dict) and isinstance(persisted_prompt.get("thumbnail"), dict) else {}
     existing_variant = task.get("thumbnail_variant") if isinstance(task.get("thumbnail_variant"), dict) else {}
-    existing_variant = dict(existing_variant)
-    if not str(existing_variant.get("image_prompt") or "").strip() and str(task.get("thumbnail_prompt") or "").strip():
-        existing_variant["image_prompt"] = str(task.get("thumbnail_prompt") or "").strip()
-    if not str(existing_variant.get("overlay_text") or "").strip() and str(task.get("thumbnail_text") or "").strip():
-        existing_variant["overlay_text"] = str(task.get("thumbnail_text") or "").strip()
-    variant = existing_variant
+    variant = {**persisted_variant, **dict(existing_variant)}
+    if not str(variant.get("image_prompt") or "").strip() and str(task.get("thumbnail_prompt") or "").strip():
+        variant["image_prompt"] = str(task.get("thumbnail_prompt") or "").strip()
+    if not str(variant.get("overlay_text") or "").strip() and str(task.get("thumbnail_text") or "").strip():
+        variant["overlay_text"] = str(task.get("thumbnail_text") or "").strip()
     if not str(variant.get("image_prompt") or "").strip():
+        _update(task_id, stage="thumbnail_prompt", state="doing", progress=max(82, int(task.get("progress") or 0)), error=None)
         try:
             variant = generate_thumbnail_prompt(
                 settings,
@@ -608,24 +674,25 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
             "lettering_prompt": str(variant.get("lettering_prompt") or ""),
         },
     }
-    prompt_artifact = _save_json_artifact(task_id, "thumbnail-prompt", prompt_payload)
-    artifacts["thumbnail_prompt_json"] = prompt_artifact
+    if _valid_artifact_path(artifacts.get("thumbnail_prompt_json")) is None:
+        artifacts["thumbnail_prompt_json"] = _save_json_artifact(task_id, "thumbnail-prompt", prompt_payload)
     _update(
         task_id,
         stage="thumbnail_prompt",
         state="doing",
-        progress=84,
+        progress=max(84, int(task.get("progress") or 0)),
         thumbnail_variant=variant,
         thumbnail_prompt=str(variant.get("image_prompt") or ""),
         thumbnail_text=str(variant.get("overlay_text") or ""),
         thumbnail_status="prompt_ready",
         artifacts=artifacts,
+        error=None,
     )
 
-    _update(task_id, stage="thumbnail", state="doing", progress=86, error=None)
+    _update(task_id, stage="thumbnail", state="doing", progress=max(86, int(task.get("progress") or 0)), error=None)
     current_artifacts = dict((_task_by_id(task_id) or {}).get("artifacts") or artifacts)
-    existing_thumbnail = Path(str(current_artifacts.get("thumbnail") or variant.get("image_path") or "")).expanduser()
-    if existing_thumbnail.is_file() and existing_thumbnail.stat().st_size > 0:
+    existing_thumbnail = _valid_artifact_path(current_artifacts.get("thumbnail") or variant.get("image_path"))
+    if existing_thumbnail is not None:
         thumbnail_path = existing_thumbnail
     else:
         try:
@@ -641,9 +708,13 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
             raise PipelineError(f"A thumbnail não foi gerada; o vídeo já está disponível em {video_path}: {exc}") from exc
     artifacts = dict((_task_by_id(task_id) or {}).get("artifacts") or current_artifacts)
     artifacts["thumbnail"] = str(thumbnail_path)
-    _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=90)
+    _update(task_id, artifacts=artifacts, thumbnail_status="generated", progress=max(90, int(task.get("progress") or 0)))
 
-    _update(task_id, stage="upload", state="doing", progress=94, error=None)
+    stored_upload = artifacts.get("upload")
+    if isinstance(stored_upload, dict) and stored_upload:
+        return _update(task_id, stage="upload", state="done", progress=100, artifacts=artifacts, video_ready=True, error=None)
+
+    _update(task_id, stage="upload", state="doing", progress=max(94, int(task.get("progress") or 0)), error=None)
     result = upload_with_default_route(
         settings,
         storage_root=STORAGE,

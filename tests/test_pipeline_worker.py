@@ -107,6 +107,72 @@ def test_run_task_reuses_prepared_title_and_thumbnail_without_full_creative_gene
     assert any(update.get("stage") == "upload" and update.get("state") == "done" for update in updates)
 
 
+def test_run_task_resumes_from_persisted_artifacts_without_regenerating_previous_stages(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    script_path = tmp_path / "roteiro-pronto.md"
+    script_path.write_text("---\nid: script-ready\ntype: video_script\n---\n\nRoteiro persistido", encoding="utf-8")
+    video_path = tmp_path / "video-pronto.mp4"
+    video_path.write_bytes(b"mp4")
+    thumbnail_path = tmp_path / "thumbnail-pronta.jpg"
+    thumbnail_path.write_bytes(b"jpg")
+    prompt_path = tmp_path / "thumbnail-prompt.json"
+    prompt_path.write_text('{"thumbnail": {"image_prompt": "prompt persistido", "overlay_text": "PRONTO"}}', encoding="utf-8")
+    task = {
+        "id": "video_resume",
+        "state": "failed",
+        "stage": "thumbnail",
+        "progress": 86,
+        "topic": "Tema retomado",
+        "topic_source": "manual",
+        "title": "Título persistido",
+        "tags": ["tema", "retomado"],
+        "channel_id": "channel-resume",
+        "language": "pt-BR",
+        "artifacts": {
+            "script": str(script_path),
+            "video": str(video_path),
+            "thumbnail": str(thumbnail_path),
+            "thumbnail_prompt_json": str(prompt_path),
+        },
+        "thumbnail_variant": {"image_prompt": "prompt persistido", "overlay_text": "PRONTO"},
+        "thumbnail_prompt": "prompt persistido",
+        "thumbnail_text": "PRONTO",
+    }
+    channel = {"id": "channel-resume", "name": "Canal retomado", "language": "pt-BR", "niche": "Teste"}
+    storage.write_json("channels.json", [channel])
+    storage.write_json("tasks.json", [task])
+    calls = {"upload": 0}
+
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {"youtube_batch_accounts": []})
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "save_script_document", lambda *args, **kwargs: pytest.fail("não deve guardar novamente o roteiro"))
+    monkeypatch.setattr(pipeline_worker, "generate_script_document", lambda *args, **kwargs: pytest.fail("não deve regenerar o roteiro"))
+    monkeypatch.setattr(pipeline_worker, "generate_title_and_keywords", lambda *args, **kwargs: pytest.fail("não deve regenerar título e keywords"))
+    monkeypatch.setattr(pipeline_worker, "_run_video_helper", lambda *args, **kwargs: pytest.fail("não deve regenerar o vídeo"))
+    monkeypatch.setattr(pipeline_worker, "generate_video_from_pool", lambda *args, **kwargs: pytest.fail("não deve chamar o pool de vídeo"))
+    monkeypatch.setattr(pipeline_worker, "generate_thumbnail_prompt", lambda *args, **kwargs: pytest.fail("não deve regenerar o prompt da thumbnail"))
+    monkeypatch.setattr(pipeline_worker, "_generate_pipeline_thumbnail", lambda *args, **kwargs: pytest.fail("não deve regenerar a thumbnail pronta"))
+
+    def fake_upload(*args, **kwargs):
+        calls["upload"] += 1
+        assert kwargs["video_path"] == str(video_path)
+        assert kwargs["thumbnail_path"] == str(thumbnail_path)
+        return SimpleNamespace(ok=True, message="", data={"uploaded": True})
+
+    monkeypatch.setattr(pipeline_worker, "upload_with_default_route", fake_upload)
+
+    result = pipeline_worker._run_task(task)
+
+    persisted = storage.read_json("tasks.json")[0]
+    assert result["state"] == "done"
+    assert persisted["stage"] == "upload"
+    assert persisted["state"] == "done"
+    assert persisted["artifacts"]["video"] == str(video_path)
+    assert persisted["artifacts"]["thumbnail"] == str(thumbnail_path)
+    assert calls["upload"] == 1
+
+
 def test_run_once_marks_unexpected_pipeline_error_terminal(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     storage.write_json("tasks.json", [{"id": "video_error", "state": "to_do", "stage": "script", "progress": 0, "title": "Erro", "channel_name": "Canal"}])

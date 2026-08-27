@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.56.
+Estado auditado para o release 0.3.57.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -21,7 +21,7 @@ Estado auditado para o release 0.3.56.
 | Lista histórica ampliada de idiomas de vídeo | Concluído | `VIDEO_LANGUAGE_OPTIONS` continua preservada para tarefas e Blueprints antigos; `VIDEO_LANGUAGE_SELECTION_OPTIONS` acrescenta os códigos MoneyPrinterTurbo, mostra bandeiras, sincroniza `ui.video_language` e é reutilizada em AI Influencers > Personagens. |
 | Alinhamento dos nomes da barra lateral à esquerda | Concluído | CSS da sidebar força alinhamento do wrapper, markdown e parágrafo à esquerda. |
 | Botão Apagar canal abaixo de Activo | Concluído | `delete_channel()` com confirmação inline e preservação de tarefas/artefactos. |
-| Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. |
+| Aba Automação com toggle e horário diário por canal | Concluído | Renderer, estado por canal, validação HH:MM e worker local baseado no relógio do computador; o worker gera conteúdo específico por canal quando o provider LLM está configurado e regista erros sem usar placeholder. Start retoma tarefas através dos artefactos persistidos, sem regenerar etapas prontas; Apagar remove a tarefa de `tasks.json` e das filas após confirmação, preservando os artefactos. |
 | Instagram e Facebook Pages no Upload | Concluído no Upload-Post e preparado no convencional | Os destinos continuam visíveis no Upload convencional; a publicação real para Instagram/Facebook pode ser feita pela subaba **Upload-Post** com plataformas ligadas ao perfil, enquanto os botões convencionais permanecem desactivados. |
 | Upload para Postiz por API key/MCP | Concluído como integração configurável | Aba **Postiz** em Upload, `PostizAdapter` com `GET /integrations`, `POST /upload` para MP4 e `POST /posts` para YouTube; campos de API key, Base URL, MCP URL e integração padrão em Configuração API. |
 | Upload-Post para múltiplas plataformas | Concluído como integração configurável | Quarta subaba **Upload-Post** em Upload; `UploadPostAdapter` usa `POST /upload` com `multipart/form-data`, `Authorization: Apikey`, username/perfil, plataformas repetidas em `platform[]`, suporte a `async_upload`, `request_id`, histórico local e notificação própria. |

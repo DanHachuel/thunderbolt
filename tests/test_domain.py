@@ -148,6 +148,48 @@ def test_delete_channel_removes_only_selected_channel(tmp_path, monkeypatch):
     assert delete_channel("channel_inexistente") is None
 
 
+def test_delete_task_removes_selected_video_from_tasks_and_queues(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import delete_task
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    storage.write_json("tasks.json", [
+        {"id": "video_remove", "state": "failed", "title": "Remover"},
+        {"id": "video_keep", "state": "to_do", "title": "Manter"},
+    ])
+    storage.write_json("queues.json", {"script": ["video_remove", "video_keep"], "video": ["video_remove"]})
+
+    removed = delete_task("video_remove")
+
+    assert removed["id"] == "video_remove"
+    assert [item["id"] for item in storage.read_json("tasks.json")] == ["video_keep"]
+    queues = storage.read_json("queues.json")
+    assert queues == {"script": ["video_keep"], "video": []}
+    assert delete_task("video_missing") is None
+
+
+def test_delete_task_rejects_running_video_until_it_is_stopped(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import delete_task
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    storage.write_json("tasks.json", [{"id": "video_running", "state": "doing"}])
+
+    import pytest
+    with pytest.raises(ValueError, match="Pare a tarefa"):
+        delete_task("video_running")
+
+    assert storage.read_json("tasks.json")[0]["id"] == "video_running"
+
+
 def test_general_batch_uses_independent_channel_payloads(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage

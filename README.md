@@ -79,7 +79,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.56
+## Navegação da UI 0.3.57
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Geração de Conteúdo IA**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. A página Geração de Conteúdo IA divide-se em **Imagens**, **Vídeos** e **Motion Control**; a subaba Motion Control permanece vazia nesta release.
  **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Notificações**, **Logs** e **Configuração API**, nessa ordem. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.
@@ -117,6 +117,8 @@ A página **Edição > Download Mídia** utiliza a API Python do [yt-dlp](https:
 **Backlog Vídeos** e **Automação Youtube > Vídeos cadastrados** usam o mesmo catálogo completo persistido em `storage/state/tasks.json`. Assim, todas as tarefas criadas manualmente ou pela automação diária aparecem nos dois fluxos, sem duplicação nem filtros implícitos por origem. O filtro de estado do Backlog mantém os estados conhecidos e acrescenta estados novos encontrados no storage.
 
 Os dois cards mostram de forma consistente o estado técnico, o rótulo legível, a barra de progresso, a etapa e o formato do vídeo. São suportados estados como `to_do`, `doing`, `blocked`, `done`, `failed` e `cancelled`; formatos ausentes usam `format`, `style_wide` ou `wide` como fallback. Quando existe `artifacts.video`, o Backlog mostra que o vídeo está pronto e disponibiliza a descarga do MP4 mesmo que a thumbnail esteja pendente.
+
+Em **Automação Youtube > Vídeos cadastrados**, o botão **Start** retoma a tarefa a partir dos artefactos persistidos. O worker reutiliza o roteiro, título/keywords, MP4, prompt de thumbnail e imagem já existentes; só volta a gerar uma etapa quando o respectivo resultado não está disponível, e repete o upload apenas quando ele ainda não foi concluído. O botão **Apagar** remove o vídeo da fila e de `tasks.json` após confirmação, preservando os ficheiros de artefactos; tarefas em execução devem ser paradas antes de serem removidas.
 
 ## Canais Youtube — edição por cartão e vídeos recentes
 
@@ -356,7 +358,7 @@ A subaba **Roteiros**, entre **Criação de Músicas** e **Upload**, permite esc
 
 Na subaba **Vídeos** de **Criação de Vídeos**, a frase `Os vídeos são guardados em <storage>/videos` identifica a pasta real onde os artefactos de vídeo devem ser procurados.
 
-O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais Youtube**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação Youtube**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação Youtube** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados; por definição, esta entrega não executa workers de fundo.
+O agente musical guarda os ficheiros em `storage/music/`, aceita formatos de áudio comuns e pode descarregar uma URL de áudio devolvida por um endpoint Suno compatível. Em **Canais Youtube**, abra **Definir Blueprint e voz padrão** no cartão do canal para guardar os defaults; em **Automação Youtube**, os mesmos dois selectores aparecem no cartão e são sincronizados. Esses valores são usados automaticamente em novas tarefas criadas para o canal. A aba **Automação Youtube** também guarda `Automação ON` e um horário diário `HH:MM` por canal e lista os vídeos cadastrados. Nos cards, **Start** retoma o processamento sem regenerar etapas já prontas, enquanto **Apagar** remove o card da fila após confirmação e preserva os artefactos locais. O worker continua a ser executado pelo processo local configurado.
 
 ## Teste de vozes
 

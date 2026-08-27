@@ -259,6 +259,29 @@ def update_task(task_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def delete_task(task_id: str) -> dict[str, Any] | None:
+    """Remove uma tarefa de vídeo da fila sem apagar os ficheiros dos artefactos."""
+    normalized_id = str(task_id or "").strip()
+    if not normalized_id:
+        return None
+    tasks = read_json("tasks.json", [])
+    if not isinstance(tasks, list):
+        return None
+    removed = next((task for task in tasks if isinstance(task, dict) and str(task.get("id") or "") == normalized_id), None)
+    if removed is None:
+        return None
+    if str(removed.get("state") or "") == "doing":
+        raise ValueError("Pare a tarefa antes de a remover da fila.")
+    write_json("tasks.json", [task for task in tasks if not (isinstance(task, dict) and str(task.get("id") or "") == normalized_id)])
+    queues = read_json("queues.json", {})
+    if isinstance(queues, dict):
+        for queue_name, queue_items in list(queues.items()):
+            if isinstance(queue_items, list):
+                queues[queue_name] = [item for item in queue_items if str(item) != normalized_id]
+        write_json("queues.json", queues)
+    return removed
+
+
 def transition_task(task_id: str, state: str | None = None, stage: str | None = None, error: str | None = None) -> dict[str, Any] | None:
     if state and state not in VALID_STATES:
         raise ValueError(f"Estado inválido: {state}")
