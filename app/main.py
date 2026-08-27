@@ -5473,28 +5473,29 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                 if not isinstance(model_catalog, list):
                     model_catalog = []
                 current_model = str(card.get("model") or "").strip()
-                manual_model = "__manual_model__"
                 discovered_models = [str(item).strip() for item in model_catalog if str(item).strip()]
-                options = list(dict.fromkeys(discovered_models))
+                default_models = [
+                    "gpt-4.1-mini",
+                    "gpt-4o-mini",
+                    "meta/llama-3.1-8b-instruct",
+                    "meta/llama-3.1-70b-instruct",
+                    "meta/llama-3.3-70b-instruct",
+                    "nvidia/llama-3.1-nemotron-70b-instruct",
+                ] if definition.code == "openai" else []
+                options = ["__select_model__", *list(dict.fromkeys([*discovered_models, *default_models]))]
                 # Mantém modelos guardados mesmo quando a descoberta ainda não foi
                 # executada ou quando o provider deixou de os devolver temporariamente.
                 if current_model and current_model not in options:
-                    options.insert(0, current_model)
-                options.append(manual_model)
+                    options.insert(1, current_model)
                 selected = st.selectbox(
                     "Modelo",
                     options,
-                    index=options.index(current_model) if current_model in options else len(options) - 1,
-                    format_func=lambda value: "Escrever modelo manualmente" if value == manual_model else value,
-                    help="Seleccione um modelo descoberto pelo provider. Use a opção manual apenas quando o endpoint exigir um identificador que não esteja na lista.",
+                    index=options.index(current_model) if current_model in options else 0,
+                    format_func=lambda value: "Seleccione um modelo" if value == "__select_model__" else value,
+                    help="Seleccione um modelo da lista ou actualize o catálogo a partir do endpoint do provider.",
                     key=f"llm_card_{card_id}_model_select",
                 )
-                model = st.text_input(
-                    "Modelo manual",
-                    value=current_model if selected == manual_model and current_model not in discovered_models else "",
-                    help="ID do modelo usado pelo endpoint Chat Completions.",
-                    key=f"llm_card_{card_id}_model_manual",
-                ) if selected == manual_model else selected
+                model = "" if selected == "__select_model__" else selected
             base_url = str(card.get("base_url") or definition.default_base_url)
             endpoint_col, action_col = st.columns([1.65, 1.05])
             with endpoint_col:

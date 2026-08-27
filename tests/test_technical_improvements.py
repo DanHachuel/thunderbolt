@@ -128,4 +128,7 @@ def test_llm_model_is_always_a_dropdown():
     assert 'selected = st.selectbox(' in block
     assert 'key=f"llm_card_{card_id}_model_select"' in block
     assert 'st.text_input("Modelo", value=current_model' not in block
-    assert 'manual_model = "__manual_model__"' in block
+    assert 'manual_model = "__manual_model__"' not in block
+    assert '"__select_model__"' in block
+    assert '"meta/llama-3.1-8b-instruct"' in block
+    assert '"Modelo manual"' not in block
