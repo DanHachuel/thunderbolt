@@ -355,6 +355,12 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     if configured_root:
         command.extend(["--root", str(configured_root)])
     command.extend(["--subject", subject])
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
+        voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
+        if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
+            raise PipelineError("O modo Upload foi seleccionado, mas não existe um ficheiro de narração válido. Carregue o áudio em Configurações de áudio.")
+        command.extend(["--custom-audio-file", str(voiceover_file.resolve())])
     output_lines: list[str] = []
     line_queue: queue.Queue[str | None] = queue.Queue()
     started_at = time.monotonic()

@@ -40,7 +40,7 @@ from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.media_providers import MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
-from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file
+from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file, store_voiceover_file
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.logs import list_logs, logs_to_rows
@@ -947,6 +947,26 @@ def render_video_generation_settings(
             audio_cols = st.columns(2)
             with audio_cols[0]:
                 settings["voiceover_mode"] = st.radio("Voiceover Mode", VOICEOVER_MODE_OPTIONS, horizontal=True, key=f"{prefix}_voiceover_mode")
+                settings["voiceover_file"] = str(st.session_state.get(f"{prefix}_voiceover_file", "") or "")
+                if settings["voiceover_mode"] == "Upload":
+                    st.caption("Carregue uma narração pronta; o ficheiro será usado directamente pelo MoneyPrinterTurbo.")
+                    uploaded_voiceover = st.file_uploader(
+                        "Ficheiro de narração",
+                        type=["mp3", "wav", "m4a", "aac", "flac", "ogg"],
+                        key=f"{prefix}_voiceover_upload",
+                    )
+                    if uploaded_voiceover is not None and st.button("Guardar áudio de narração", key=f"{prefix}_voiceover_store", use_container_width=True):
+                        try:
+                            stored_voiceover = store_voiceover_file(uploaded_voiceover.name, uploaded_voiceover.getvalue())
+                            st.session_state[f"{prefix}_voiceover_file"] = str(stored_voiceover)
+                            settings["voiceover_file"] = str(stored_voiceover)
+                            st.success(f"Narração guardada em `{stored_voiceover}`")
+                        except (OSError, ValueError) as exc:
+                            st.error(str(exc))
+                    stored_voiceover_value = str(st.session_state.get(f"{prefix}_voiceover_file", "") or "")
+                    if stored_voiceover_value and Path(stored_voiceover_value).is_file():
+                        st.audio(stored_voiceover_value)
+                        settings["voiceover_file"] = stored_voiceover_value
                 settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
                 if channel is not None:
                     channel_id = str(channel.get("id") or channel.get("name") or "")
@@ -965,7 +985,8 @@ def render_video_generation_settings(
                     settings["voiceover_speed"] = st.selectbox("Voiceover Speed", VOICEOVER_SPEED_OPTIONS, index=VOICEOVER_SPEED_OPTIONS.index("1.0x"), key=f"{prefix}_voiceover_speed")
                 st.button("Preview Voice", key=f"{prefix}_preview_voice", disabled=True, help="A pré-visualização de voz será ligada ao provider configurado.")
             with audio_cols[1]:
-                settings["background_music_source"] = st.selectbox("Background Music Source", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
+                background_music_label = "Fonte da música de fundo" if current_ui_language() == "pt" else "Background Music Source"
+                settings["background_music_source"] = st.selectbox(background_music_label, BACKGROUND_MUSIC_SOURCE_OPTIONS, index=3, key=f"{prefix}_background_music_source")
                 settings["background_music_volume"] = st.selectbox("Background Music Volume", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=2, key=f"{prefix}_background_music_volume")
 
     if "Configurações de legendas" in visible_sections:
@@ -2220,7 +2241,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 st.warning(f"Pedido criado, mas não foi possível descarregar o áudio: {exc}")
                     music_path = st.session_state.get(f"{prefix}_music_path", "")
 
-            quantity = st.number_input("Quantidade", min_value=1, max_value=100, value=1, disabled=mode != "same_channel", key=f"{prefix}_quantity")
+            same_channel_quantity = max(1, min(100, int(generation_settings.get("videos_per_run") or 1))) if mode == "same_channel" else 1
             payloads: dict[str, dict[str, Any]] = {}
             if mode == "general":
                 existing_topics = st.session_state.get(f"{prefix}_general_topics", {})
@@ -2311,7 +2332,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                     read_json("settings.json", {}),
                                     selected_one,
                                     topic_for_thumbnail,
-                                    int(quantity if mode == "same_channel" else 1),
+                                    same_channel_quantity,
                                     title=existing_title,
                                     topic_source=_video_topic_source(topic_for_thumbnail, prefix),
                                 )
@@ -2320,7 +2341,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 generated["title"] = existing_title
                                 generated["title_candidates"] = existing_payload.get("title_candidates", [])
                                 st.session_state[f"{prefix}_creative_payload"] = generated
-                                st.success(f"Thumbnail pronta para {int(quantity if mode == 'same_channel' else 1)} vídeo(s); o título existente foi preservado.")
+                                st.success(f"Thumbnail pronta para {same_channel_quantity} vídeo(s); o título existente foi preservado.")
                                 st.rerun()
                             except CreativeGenerationError as exc:
                                 st.error(str(exc))
@@ -2386,6 +2407,11 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 if style == "music" and not music_path:
                     st.error("Escolha, carregue ou gere uma música antes de criar o vídeo Apenas Música.")
                     st.stop()
+                if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
+                    voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
+                    if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
+                        st.error("Carregue e guarde um ficheiro de narração em Configurações de áudio antes de criar o vídeo.")
+                        st.stop()
                 if mode == "general":
                     payloads = dict(st.session_state.get(f"{prefix}_general_payloads", {}))
                     topics = dict(st.session_state.get(f"{prefix}_general_topics", {}))
@@ -2437,7 +2463,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         if not topic_value:
                             st.error("Preencha o campo Video Subject ou use o botão de geração automática abaixo das keywords.")
                             st.stop()
-                        quantity_value = int(quantity if mode == "same_channel" else 1)
+                        quantity_value = same_channel_quantity
                         payload = dict(st.session_state.get(f"{prefix}_creative_payload") or {})
                         if not payload.get("title") or not payload.get("thumbnail_variants"):
                             try:
