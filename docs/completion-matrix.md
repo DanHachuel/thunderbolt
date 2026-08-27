@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.72.
+Estado auditado para o release 0.3.73.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -64,3 +64,5 @@ A publicação directa Instagram/Facebook continua deliberadamente desactivada: 
 Nenhum release será descrito como final enquanto os itens marcados como pendentes nesta matriz não estiverem implementados, testados ou explicitamente classificados como dependências externas pelo utilizador.
 
 | Upload Bilibili via bilibili-api e DistroKid | Concluído | `Upload` disponibiliza Bilibili com contas multi-card e upload via `bilibili-api-python`; `Configuração API > API Bilibili` permite testar, guardar e apagar cards. `Upload Música > DistroKid` adapta o upload do musikai com browser assistido, múltiplas faixas, capa, metadata local e submissão final manual. Cookies e credenciais não entram nos logs ou no histórico público. |
+
+| Growth: Analista Facebook Pages e Analista Bilibili | Concluído como área reservada | As duas abas existem no grupo Growth, estão ligadas a renderers vazios e não executam operações nesta versão. |

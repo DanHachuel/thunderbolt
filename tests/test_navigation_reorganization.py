@@ -54,7 +54,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
             "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Redes Sociais",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
-            "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
+            "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram", "Analista Facebook Pages", "Analista Bilibili",
             "Documentação", "Tutorial Meta", "Tutorial Supabase", "Tutorial Kaggle", "Tutorial Apify",
         )
         for label in required:
@@ -116,7 +116,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Arquivos Base", "Pipeline Vídeos", "Canais e Perfis de Vídeos", "Canais YouTube",
             "Facebook Pages", "Prompt Masters", "Backlog Vídeos", "Música", "Upload Música",
             "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Growth",
-            "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
+            "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram", "Analista Facebook Pages", "Analista Bilibili",
             "Documentação", "Tutorial Kaggle", "Tutorial Apify", "Pipeline Música", "Thumbnails", "módulos disponíveis",
         )
         navigation_source = LANGUAGES_SOURCE.split("UI_NAV_TRANSLATIONS", 1)[1]

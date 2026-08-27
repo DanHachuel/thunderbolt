@@ -141,3 +141,10 @@ def test_supabase_tutorial_is_packaged_and_added_to_ai_influencers():
     assert '("Tutorial Supabase", ":material/storage:", "Tutorial Supabase")' in MAIN_SOURCE
     assert '"Tutorial Supabase": render_supabase_tutorial' in MAIN_SOURCE
     assert 'guide-supabase.md' in MAIN_SOURCE
+
+
+def test_growth_pages_are_empty_placeholders():
+    assert '("Analista Facebook Pages", ":material/analytics:", "Analista Facebook Pages")' in MAIN_SOURCE
+    assert '("Analista Bilibili", ":material/analytics:", "Analista Bilibili")' in MAIN_SOURCE
+    assert '"Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", "")' in MAIN_SOURCE
+    assert '"Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", "")' in MAIN_SOURCE
