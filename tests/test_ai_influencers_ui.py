@@ -34,6 +34,14 @@ def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
     assert 'language_normalizer=normalize_video_language' in MAIN
     assert '"Motion Control": render_ai_influencer_motion_control' not in MAIN
     assert '("Motion Control", ":material/motion_mode:", "Motion Control")' not in MAIN
+    assert 'st.tabs(["Novo personagem", "Personagens criados"])' in UI
+    assert 'with new_character_tab:' in UI
+    assert 'with created_characters_tab:' in UI
+    assert 'with st.expander(f"Card do personagem · {selected.get(\'name\') or selected_id}", expanded=False):' in UI
+    created_position = UI.index('with created_characters_tab:')
+    card_position = UI.index('with st.expander(f"Card do personagem · {selected.get(\'name\') or selected_id}", expanded=False):')
+    assets_position = UI.index('st.subheader(f"Assets de referência · {selected.get(\'name\') or selected_id}")')
+    assert created_position < card_position < assets_position
     assert 'st.tabs(["Imagens", "Vídeos", "Motion Control"])' in UI
     assert 'language_options: list[str] | None = None' in UI
     assert 'language = st.selectbox(' in UI

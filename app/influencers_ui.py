@@ -153,122 +153,126 @@ def render_ai_influencer_characters(
     if repository is None:
         return
 
-    with st.form("influencer_create_form", clear_on_submit=True):
-        st.subheader("Novo personagem")
-        cols = st.columns(3)
-        with cols[0]:
-            name = st.text_input("Nome do personagem", key="influencer_new_name")
-        with cols[1]:
-            language = st.selectbox(
-                "Idioma",
-                language_options,
-                index=language_index(st.session_state.get("influencer_new_language", "pt")),
-                format_func=language_formatter,
-                key="influencer_new_language",
+    new_character_tab, created_characters_tab = st.tabs(["Novo personagem", "Personagens criados"])
+
+    with new_character_tab:
+        with st.form("influencer_create_form", clear_on_submit=True):
+            st.subheader("Novo personagem")
+            cols = st.columns(3)
+            with cols[0]:
+                name = st.text_input("Nome do personagem", key="influencer_new_name")
+            with cols[1]:
+                language = st.selectbox(
+                    "Idioma",
+                    language_options,
+                    index=language_index(st.session_state.get("influencer_new_language", "pt")),
+                    format_func=language_formatter,
+                    key="influencer_new_language",
+                )
+            with cols[2]:
+                instagram_id = st.text_input("Instagram Business ID (opcional)", key="influencer_new_instagram_id")
+            bio = st.text_area("Biografia e instruções", height=130, key="influencer_new_bio")
+            files = st.file_uploader(
+                "Imagens e documentos de referência",
+                type=[item.lstrip(".") for item in sorted({".png", ".jpg", ".jpeg", ".webp", ".gif", ".md", ".json"})],
+                accept_multiple_files=True,
+                key="influencer_new_assets",
+                help="Pode seleccionar várias imagens e ficheiros .md/.json no mesmo upload.",
             )
-        with cols[2]:
-            instagram_id = st.text_input("Instagram Business ID (opcional)", key="influencer_new_instagram_id")
-        bio = st.text_area("Biografia e instruções", height=130, key="influencer_new_bio")
-        files = st.file_uploader(
-            "Imagens e documentos de referência",
-            type=[item.lstrip(".") for item in sorted({".png", ".jpg", ".jpeg", ".webp", ".gif", ".md", ".json"})],
-            accept_multiple_files=True,
-            key="influencer_new_assets",
-            help="Pode seleccionar várias imagens e ficheiros .md/.json no mesmo upload.",
-        )
-        create = st.form_submit_button("Guardar personagem", type="primary", use_container_width=True)
-    if create:
-        try:
-            record = repository.create_influencer({"name": name, "bio": bio, "language": language, "instagram_business_id": instagram_id})
-            saved_assets = 0
-            for uploaded in files or []:
-                repository.save_asset(record["id"], uploaded.name, uploaded.getvalue())
-                saved_assets += 1
-            st.session_state["influencer_selected_id"] = record["id"]
-            st.success(f"Personagem guardado com {saved_assets} asset(s) de referência.")
-            st.rerun()
-        except (ValueError, InfluencerBackendError) as exc:
-            st.error(str(exc))
-        except Exception:
-            st.error("Não foi possível guardar o personagem ou os assets seleccionados.")
-
-    try:
-        influencers = repository.list_influencers()
-    except Exception:
-        st.error("Não foi possível consultar os personagens no backend seleccionado.")
-        return
-    if not influencers:
-        st.info("Ainda não existem personagens. Crie o primeiro acima.")
-        return
-
-    options = _influencer_options(influencers)
-    current = str(st.session_state.get("influencer_selected_id") or options[0])
-    selected_id = st.selectbox("Personagem seleccionado", options, index=options.index(current) if current in options else 0, format_func=lambda value: _influencer_label(influencers, value), key="influencer_selected_id")
-    selected = next(item for item in influencers if str(item.get("id")) == selected_id)
-
-    with st.expander("Editar perfil", expanded=False):
-        with st.form(f"influencer_edit_form_{selected_id}"):
-            edit_name = st.text_input("Nome", value=str(selected.get("name") or ""), key=f"influencer_edit_name_{selected_id}")
-            edit_language = st.selectbox(
-                "Idioma",
-                language_options,
-                index=language_index(selected.get("language") or "pt"),
-                format_func=language_formatter,
-                key=f"influencer_edit_language_{selected_id}",
-            )
-            edit_instagram = st.text_input("Instagram Business ID", value=str(selected.get("instagram_business_id") or ""), key=f"influencer_edit_instagram_{selected_id}")
-            edit_bio = st.text_area("Biografia e instruções", value=str(selected.get("bio") or ""), height=130, key=f"influencer_edit_bio_{selected_id}")
-            save_edit = st.form_submit_button("Guardar alterações", type="primary")
-        if save_edit:
+            create = st.form_submit_button("Guardar personagem", type="primary", use_container_width=True)
+        if create:
             try:
-                repository.update_influencer(selected_id, {"name": edit_name, "language": edit_language, "instagram_business_id": edit_instagram, "bio": edit_bio})
-                st.success("Perfil do personagem actualizado.")
+                record = repository.create_influencer({"name": name, "bio": bio, "language": language, "instagram_business_id": instagram_id})
+                saved_assets = 0
+                for uploaded in files or []:
+                    repository.save_asset(record["id"], uploaded.name, uploaded.getvalue())
+                    saved_assets += 1
+                st.session_state["influencer_selected_id"] = record["id"]
+                st.success(f"Personagem guardado com {saved_assets} asset(s) de referência.")
                 st.rerun()
-            except Exception as exc:
+            except (ValueError, InfluencerBackendError) as exc:
                 st.error(str(exc))
+            except Exception:
+                st.error("Não foi possível guardar o personagem ou os assets seleccionados.")
 
-    with st.form(f"influencer_append_assets_form_{selected_id}"):
-        more_files = st.file_uploader(
-            "Adicionar imagens/documentos de referência",
-            type=[item.lstrip(".") for item in sorted({".png", ".jpg", ".jpeg", ".webp", ".gif", ".md", ".json"})],
-            accept_multiple_files=True,
-            key=f"influencer_append_assets_{selected_id}",
-        )
-        append_assets = st.form_submit_button("Adicionar assets ao personagem", use_container_width=True)
-    if append_assets:
+    with created_characters_tab:
         try:
-            saved_assets = 0
-            for uploaded in more_files or []:
-                repository.save_asset(selected_id, uploaded.name, uploaded.getvalue())
-                saved_assets += 1
-            st.success(f"{saved_assets} asset(s) adicionado(s).")
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
+            influencers = repository.list_influencers()
+        except Exception:
+            st.error("Não foi possível consultar os personagens no backend seleccionado.")
+            return
+        if not influencers:
+            st.info("Ainda não existem personagens. Crie o primeiro na subaba Novo personagem.")
+            return
 
-    try:
-        assets = repository.list_assets(selected_id)
-    except Exception:
-        assets = []
-    st.subheader(f"Assets de referência · {selected.get('name') or selected_id}")
-    if not assets:
-        st.info("Este personagem ainda não tem imagens ou documentos de referência.")
-    else:
-        cols = st.columns(min(4, max(1, len(assets))))
-        for index, asset in enumerate(assets):
-            with cols[index % len(cols)]:
-                st.caption(_asset_label(asset))
-                path = _local_asset_path(asset)
-                if str(asset.get("asset_type") or "") == "image" and path:
-                    st.image(str(path), use_container_width=True)
-                elif str(asset.get("asset_type") or "") == "document":
-                    raw = str(asset.get("document_json") or "")
-                    try:
-                        preview = json.loads(raw) if raw else {}
-                        st.json(preview, expanded=False)
-                    except (TypeError, json.JSONDecodeError):
-                        st.code(raw[:1600], language="markdown")
-                st.caption(f"{asset.get('size_bytes', 0)} bytes · {asset.get('mime_type') or 'unknown'}")
+        options = _influencer_options(influencers)
+        current = str(st.session_state.get("influencer_selected_id") or options[0])
+        selected_id = st.selectbox("Personagem seleccionado", options, index=options.index(current) if current in options else 0, format_func=lambda value: _influencer_label(influencers, value), key="influencer_selected_id")
+        selected = next(item for item in influencers if str(item.get("id")) == selected_id)
+
+        with st.expander(f"Card do personagem · {selected.get('name') or selected_id}", expanded=False):
+            with st.form(f"influencer_edit_form_{selected_id}"):
+                edit_name = st.text_input("Nome", value=str(selected.get("name") or ""), key=f"influencer_edit_name_{selected_id}")
+                edit_language = st.selectbox(
+                    "Idioma",
+                    language_options,
+                    index=language_index(selected.get("language") or "pt"),
+                    format_func=language_formatter,
+                    key=f"influencer_edit_language_{selected_id}",
+                )
+                edit_instagram = st.text_input("Instagram Business ID", value=str(selected.get("instagram_business_id") or ""), key=f"influencer_edit_instagram_{selected_id}")
+                edit_bio = st.text_area("Biografia e instruções", value=str(selected.get("bio") or ""), height=130, key=f"influencer_edit_bio_{selected_id}")
+                save_edit = st.form_submit_button("Guardar alterações", type="primary")
+            if save_edit:
+                try:
+                    repository.update_influencer(selected_id, {"name": edit_name, "language": edit_language, "instagram_business_id": edit_instagram, "bio": edit_bio})
+                    st.success("Perfil do personagem actualizado.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+            with st.form(f"influencer_append_assets_form_{selected_id}"):
+                more_files = st.file_uploader(
+                    "Adicionar imagens/documentos de referência",
+                    type=[item.lstrip(".") for item in sorted({".png", ".jpg", ".jpeg", ".webp", ".gif", ".md", ".json"})],
+                    accept_multiple_files=True,
+                    key=f"influencer_append_assets_{selected_id}",
+                )
+                append_assets = st.form_submit_button("Adicionar assets ao personagem", use_container_width=True)
+            if append_assets:
+                try:
+                    saved_assets = 0
+                    for uploaded in more_files or []:
+                        repository.save_asset(selected_id, uploaded.name, uploaded.getvalue())
+                        saved_assets += 1
+                    st.success(f"{saved_assets} asset(s) adicionado(s).")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+            try:
+                assets = repository.list_assets(selected_id)
+            except Exception:
+                assets = []
+            st.subheader(f"Assets de referência · {selected.get('name') or selected_id}")
+            if not assets:
+                st.info("Este personagem ainda não tem imagens ou documentos de referência.")
+            else:
+                cols = st.columns(min(4, max(1, len(assets))))
+                for index, asset in enumerate(assets):
+                    with cols[index % len(cols)]:
+                        st.caption(_asset_label(asset))
+                        path = _local_asset_path(asset)
+                        if str(asset.get("asset_type") or "") == "image" and path:
+                            st.image(str(path), use_container_width=True)
+                        elif str(asset.get("asset_type") or "") == "document":
+                            raw = str(asset.get("document_json") or "")
+                            try:
+                                preview = json.loads(raw) if raw else {}
+                                st.json(preview, expanded=False)
+                            except (TypeError, json.JSONDecodeError):
+                                st.code(raw[:1600], language="markdown")
+                        st.caption(f"{asset.get('size_bytes', 0)} bytes · {asset.get('mime_type') or 'unknown'}")
 
 
 def _render_content_history(repository: Any, influencer_id: str = "") -> None:
