@@ -256,6 +256,9 @@ st.markdown("""
 [data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="Instagram"]) { background:#e1306c !important; }
 [data-testid="stMultiSelect"] [data-baseweb="tag"]:has(button[aria-label*="Facebook Pages"]) { background:#1877f2 !important; }
 [data-testid="stMultiSelect"] [data-baseweb="tag"] svg { color:#ffffff !important; fill:#ffffff !important; }
+/* Notificações globais: o histórico continua persistente, mas os avisos surgem sem abrir a aba. */
+[data-testid="stToastContainer"] { top:auto !important; right:1rem !important; bottom:1rem !important; left:auto !important; z-index:100000 !important; }
+[data-testid="stToast"] { max-width:min(28rem, calc(100vw - 2rem)); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -336,6 +339,66 @@ def install_streamlit_content_translation() -> None:
 
 
 install_streamlit_content_translation()
+
+
+NOTIFICATION_TOAST_INTERVAL = "3s"
+NOTIFICATION_TOAST_MAX_PER_CYCLE = 3
+NOTIFICATION_TOAST_SEEN_KEY = "_thunderbolt_notification_toast_seen_ids"
+NOTIFICATION_TOAST_INITIALISED_KEY = "_thunderbolt_notification_toast_initialised"
+
+
+def _notification_toast_seen_ids() -> set[str]:
+    raw = st.session_state.get(NOTIFICATION_TOAST_SEEN_KEY, [])
+    if isinstance(raw, (list, tuple, set)):
+        return {str(item) for item in raw if str(item).strip()}
+    return set()
+
+
+def _save_notification_toast_seen_ids(notification_ids: set[str]) -> None:
+    # Limitar o estado evita crescimento indefinido numa sessão longa.
+    st.session_state[NOTIFICATION_TOAST_SEEN_KEY] = sorted(notification_ids)[-500:]
+
+
+def _render_notification_toast_cycle() -> None:
+    """Reconcile completions and display only new unread notifications in this session."""
+    try:
+        reconcile_persisted_notifications()
+    except Exception:
+        # A camada visual nunca deve interromper o pipeline ou os workers.
+        return
+    entries = list_notifications(limit=500, unread_only=True)
+    current_ids = {str(item.get("id") or "") for item in entries if str(item.get("id") or "")}
+    seen_ids = _notification_toast_seen_ids()
+    if not st.session_state.get(NOTIFICATION_TOAST_INITIALISED_KEY, False):
+        # Não transformar o histórico antigo numa avalanche de pop-ups ao abrir a UI.
+        seen_ids.update(current_ids)
+        _save_notification_toast_seen_ids(seen_ids)
+        st.session_state[NOTIFICATION_TOAST_INITIALISED_KEY] = True
+        return
+
+    pending = [item for item in reversed(entries) if str(item.get("id") or "") not in seen_ids]
+    for item in pending[:NOTIFICATION_TOAST_MAX_PER_CYCLE]:
+        notification_id = str(item.get("id") or "")
+        if not notification_id:
+            continue
+        title = str(item.get("title") or item.get("label") or "Notificação").strip()
+        message = str(item.get("message") or "").strip()
+        body = f"**{title}**"
+        if message:
+            body = f"{body}\n\n{message}"
+        if hasattr(st, "toast"):
+            st.toast(body)
+        seen_ids.add(notification_id)
+    _save_notification_toast_seen_ids(seen_ids)
+
+
+if hasattr(st, "fragment"):
+    @st.fragment(run_every=NOTIFICATION_TOAST_INTERVAL)
+    def render_global_notification_toasts() -> None:
+        _render_notification_toast_cycle()
+else:
+    def render_global_notification_toasts() -> None:
+        _render_notification_toast_cycle()
 
 
 def localized_tab_labels(labels: list[str], language: str | None = None) -> list[str]:
@@ -6295,10 +6358,7 @@ def main():
         "Notificações": render_notifications,
         "Logs": render_logs,
     }
-    try:
-        reconcile_persisted_notifications()
-    except Exception:
-        pass
+    render_global_notification_toasts()
     renderers.get(current_page, render_dashboard)()
 
 if __name__ == "__main__":
