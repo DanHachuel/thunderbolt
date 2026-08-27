@@ -5439,20 +5439,31 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                     api_key = ""
             with model_col:
                 model_catalog = st.session_state.get(f"llm_model_catalog_{card_id}", [])
-                current_model = str(card.get("model") or "")
-                if model_catalog:
-                    manual_model = "__manual_model__"
-                    options = [manual_model, *[str(item) for item in model_catalog]]
-                    selected = st.selectbox(
-                        "Modelo",
-                        options,
-                        index=options.index(current_model) if current_model in options else 0,
-                        format_func=lambda value: "Escrever modelo manualmente" if value == manual_model else value,
-                        key=f"llm_card_{card_id}_model_select",
-                    )
-                    model = st.text_input("Modelo manual", value=current_model if selected == manual_model and current_model not in model_catalog else "", key=f"llm_card_{card_id}_model_manual") if selected == manual_model else selected
-                else:
-                    model = st.text_input("Modelo", value=current_model, help="ID do modelo usado pelo endpoint Chat Completions.", key=f"llm_card_{card_id}_model")
+                if not isinstance(model_catalog, list):
+                    model_catalog = []
+                current_model = str(card.get("model") or "").strip()
+                manual_model = "__manual_model__"
+                discovered_models = [str(item).strip() for item in model_catalog if str(item).strip()]
+                options = list(dict.fromkeys(discovered_models))
+                # Mantém modelos guardados mesmo quando a descoberta ainda não foi
+                # executada ou quando o provider deixou de os devolver temporariamente.
+                if current_model and current_model not in options:
+                    options.insert(0, current_model)
+                options.append(manual_model)
+                selected = st.selectbox(
+                    "Modelo",
+                    options,
+                    index=options.index(current_model) if current_model in options else len(options) - 1,
+                    format_func=lambda value: "Escrever modelo manualmente" if value == manual_model else value,
+                    help="Seleccione um modelo descoberto pelo provider. Use a opção manual apenas quando o endpoint exigir um identificador que não esteja na lista.",
+                    key=f"llm_card_{card_id}_model_select",
+                )
+                model = st.text_input(
+                    "Modelo manual",
+                    value=current_model if selected == manual_model and current_model not in discovered_models else "",
+                    help="ID do modelo usado pelo endpoint Chat Completions.",
+                    key=f"llm_card_{card_id}_model_manual",
+                ) if selected == manual_model else selected
             base_url = str(card.get("base_url") or definition.default_base_url)
             endpoint_col, action_col = st.columns([1.65, 1.05])
             with endpoint_col:

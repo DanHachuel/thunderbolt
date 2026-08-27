@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.74.
+Estado auditado para o release 0.3.75.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -69,3 +69,5 @@ Nenhum release será descrito como final enquanto os itens marcados como pendent
 
 | Documentação de API interna, escritas atómicas e health check SessionInfo | Concluído | `docs/api-internal.md` e três diagramas Mermaid documentam os contratos; `atomic_write` cobre estado, Blueprints, artefactos e manifestos; contas Google e workers recebem estados healthy/expiring/expired/unknown com alertas deduplicados. |
 | Orquestrador local em cascata | Concluído | `create_tasks_for_batch` inicializa `local-cascade`; `pipeline_worker` persiste ordem, etapa actual, etapas concluídas e transições, retomando artefactos válidos sem regeneração. |
+
+| Selector LLM OpenAI/NVIDIA NIM como lista suspensa | Concluído | O card usa `st.selectbox` mesmo antes da descoberta de modelos, preserva o modelo guardado e mantém fallback manual explícito. |

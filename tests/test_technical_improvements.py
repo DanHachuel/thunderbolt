@@ -119,3 +119,13 @@ def test_internal_api_documentation_and_diagrams_exist():
     assert "local-cascade" in documentation
     assert "docs/api-internal.md" in readme
     assert all((root / "docs" / "diagrams" / name).is_file() for name in ("pipeline-cascade.mmd", "session-info-health.mmd", "atomic-json.mmd"))
+
+
+def test_llm_model_is_always_a_dropdown():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "app" / "main.py").read_text(encoding="utf-8")
+    block = source.split("def _render_llm_card", 1)[1].split("def render_media_provider_cards", 1)[0]
+    assert 'selected = st.selectbox(' in block
+    assert 'key=f"llm_card_{card_id}_model_select"' in block
+    assert 'st.text_input("Modelo", value=current_model' not in block
+    assert 'manual_model = "__manual_model__"' in block
