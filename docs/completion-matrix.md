@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.65.
+Estado auditado para o release 0.3.66.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -28,6 +28,7 @@ Estado auditado para o release 0.3.65.
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
 | Rotas de vídeo por fonte e ordem da pipeline | Concluído | `pipeline_worker.py` encaminha por tarefa a fonte efectiva e os parâmetros para o helper MoneyPrinterTurbo; Pexels/Pixabay usam pesquisa, cache, download e composição MoviePy/FFmpeg, Full IA fica limitado a FAL AI/KIE AI/Agnes AI e Apenas Música termina no artefacto de áudio. A ordem é `topic → script → title → keywords opcional → video → thumbnail_prompt JSON → thumbnail → upload`; o teste estrutural garante que vídeo ocorre antes de prompt e imagem. O worker coloca `--` antes dessas flags para o parser `argparse.REMAINDER` do `mpt_agent.py` as encaminhar para a CLI filha. |
 | Attribution de API em falhas de vídeo e Logs | Concluído | O helper interpreta `LLM_PROVIDER`, `MISSING` e `INVALID` do MoneyPrinterTurbo; tarefas, notificações e Logs persistem `failure_api`, `failure_provider`, `failure_service`, `failure_route` e `failure_config_fields`. A tabela Logs expõe a coluna **API/Provider** e identifica explicitamente registos históricos sem attribution. Timeouts `azure_tts_v1`/`edge_tts` são atribuídos a **Azure Speech / edge_tts API**. |
+| Pool Full IA multimédia e HeyGen | Concluído | A whitelist de vídeo inclui FAL AI, KIE AI, Agnes AI, Nano Banana, Replicate AI, Pollinations.ai, Hugging Face Inference API, InferencePort Proxy e HeyGen. O catálogo **Provider de media** reflecte os mesmos nomes; HeyGen usa API V3, `X-Api-Key`, Avatar ID, Voice ID e health-check read-only. A execução filtra cartões activos que declarem capacidade real de vídeo. |
 | Azure Speech SDK V2 e fallback edge_tts | Concluído | O selector oferece Azure Speech SDK V2 e Azure TTS V1; com key e região configuradas, vozes novas e tarefas antigas são encaminhadas para o SDK V2, enquanto o fallback edge_tts recebe timeout interno de 90 segundos. |
 | API Keys por fonte de materiais com múltiplas chaves | Concluído | `Configuração API > API Keys > Fontes de materiais` permite seleccionar Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou local, adicionar várias chaves na mesma fonte, deduplicar e guardar listas independentes em `material_api_keys`; `build_moneyprinter_config()` exporta arrays legados para o `config.toml` e internaliza parâmetros técnicos da área de fontes. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |

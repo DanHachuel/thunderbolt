@@ -116,6 +116,18 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(get.call_args.args[0], "http://localhost:8080/v1/models")
 
+    def test_heygen_media_diagnostic_uses_read_only_account_endpoint(self):
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "heygen",
+                "api_key": "heygen-secret",
+                "base_url": "https://api.heygen.com",
+            })
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "https://api.heygen.com/v3/users/me")
+        self.assertEqual(get.call_args.kwargs["headers"], {"X-Api-Key": "heygen-secret"})
+        self.assertNotIn("heygen-secret", str(result))
+
     def test_cloudflare_media_diagnostic_requires_account_id_without_network(self):
         with patch.object(api_key_tests.requests, "get") as get:
             result = api_key_tests.test_media_provider_card({

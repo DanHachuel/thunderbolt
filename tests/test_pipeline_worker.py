@@ -502,7 +502,7 @@ def test_run_task_uses_only_full_ia_video_pool_for_full_ia_route(tmp_path, monke
     result = pipeline_worker._run_task(task)
 
     assert result["state"] == "done"
-    assert captured["allowed_providers"] == {"fal_ai", "kie_ai", "agnes"}
+    assert captured["allowed_providers"] == set(pipeline_worker.FULL_IA_VIDEO_PROVIDER_CODES)
     assert storage.read_json("tasks.json")[0]["artifacts"]["video"] == str(video_path)
 
 
