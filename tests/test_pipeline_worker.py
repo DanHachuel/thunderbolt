@@ -352,6 +352,7 @@ def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, m
 
     assert result == video_path
     command = captured["command"]
+    assert command[command.index("--video-source") - 1] == "--"
     assert command[command.index("--video-source") + 1] == "pixabay"
     assert command[command.index("--video-script") + 1] == "Roteiro preparado"
     assert command[command.index("--video-terms") + 1] == "economia,mercado"
