@@ -3505,7 +3505,7 @@ def _render_pipeline_worker_banner(worker_status: dict[str, Any], active_count: 
         st.warning("Worker de vídeo sem heartbeat recente. O launcher deve estar aberto para processar as tarefas.")
     heartbeat = worker_status.get("last_heartbeat_at") or worker_status.get("updated_at")
     if heartbeat:
-        st.caption(f"{_pipeline_time_age(heartbeat)} · timeout de execução: {STALE_TASK_SECONDS // 60} minutos")
+        st.caption(f"{_pipeline_time_age(heartbeat)} · vídeo: até 90 min com watchdog de inactividade de 10 min")
     if worker_status.get("last_error"):
         st.error(f"Último erro do worker: {worker_status['last_error']}")
 

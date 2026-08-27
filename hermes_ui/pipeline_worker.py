@@ -28,7 +28,8 @@ from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_th
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
-LONG_STOCK_VIDEO_TIMEOUT_SECONDS = 45 * 60
+LONG_STOCK_VIDEO_TIMEOUT_SECONDS = 90 * 60
+VIDEO_IDLE_TIMEOUT_SECONDS = 10 * 60
 STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
 WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
 CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload")
@@ -636,6 +637,17 @@ def _task_stale_timeout_seconds(task: dict[str, Any]) -> int:
     return STALE_TASK_SECONDS
 
 
+def _latest_helper_log_activity(log_path: Path | None, previous_mtime: float) -> tuple[float, bool]:
+    """Return whether the helper's file log advanced without reading its content."""
+    if log_path is None:
+        return previous_mtime, False
+    try:
+        current_mtime = log_path.stat().st_mtime
+    except OSError:
+        return previous_mtime, False
+    return (current_mtime, current_mtime > previous_mtime)
+
+
 def _mpt_aspect_ratio(value: Any, format_value: Any = "") -> str:
     raw = str(value or format_value or "").strip().casefold()
     if raw in {"landscape 16:9", "wide", "16:9", "landscape"}:
@@ -915,6 +927,9 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     output_finished = False
     last_heartbeat = 0.0
     last_output_line = ""
+    last_activity_at = started_at
+    helper_log_path: Path | None = None
+    helper_log_mtime = 0.0
     try:
         while True:
             try:
@@ -924,9 +939,19 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 elif line:
                     last_output_line = _redact_helper_output(line).strip()
                     output_lines.append(line)
+                    last_activity_at = time.monotonic()
+                    match = re.search(r"full generation log:\s*(.+)$", last_output_line, flags=re.IGNORECASE)
+                    if match:
+                        candidate = Path(match.group(1).strip()).expanduser()
+                        helper_log_path = candidate if candidate.is_file() else None
             except queue.Empty:
                 pass
             elapsed = time.monotonic() - started_at
+            helper_log_mtime, helper_log_advanced = _latest_helper_log_activity(helper_log_path, helper_log_mtime)
+            if helper_log_advanced:
+                last_activity_at = time.monotonic()
+                if not last_output_line:
+                    last_output_line = "[MoneyPrinterTurbo] actividade de geração confirmada"
             if elapsed - last_heartbeat >= 5:
                 # O helper expõe o resultado final, mas não uma percentagem estável.
                 # Mantemos uma faixa reservada para a etapa de vídeo e avançamos-a
@@ -956,6 +981,14 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
             if elapsed >= timeout_seconds:
                 _stop_process(process)
                 message = f"A etapa Vídeo excedeu o limite de {timeout_seconds // 60} minutos e foi encerrada."
+                metadata = _failure_attribution(task, settings, "video", error=message)
+                raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+            if time.monotonic() - last_activity_at >= VIDEO_IDLE_TIMEOUT_SECONDS:
+                _stop_process(process)
+                message = (
+                    "A etapa Vídeo não apresentou actividade comprovada do motor durante "
+                    f"{VIDEO_IDLE_TIMEOUT_SECONDS // 60} minutos e foi encerrada."
+                )
                 metadata = _failure_attribution(task, settings, "video", error=message)
                 raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     finally:

@@ -600,6 +600,34 @@ def test_video_helper_timeout_kills_subprocess_and_returns_pipeline_error(tmp_pa
     assert process.returncode == -9
 
 
+def test_video_helper_idle_timeout_kills_process_with_no_activity(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    storage.write_json("settings.json", {"pexels_api_keys": ["pexels-test-key"]})
+    storage.write_json("tasks.json", [{"id": "video_idle", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
+    process = _FakePopen([], stays_alive=True)
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(pipeline_worker, "VIDEO_TIMEOUT_SECONDS", 999)
+    monkeypatch.setattr(pipeline_worker, "VIDEO_IDLE_TIMEOUT_SECONDS", 0)
+
+    with pytest.raises(pipeline_worker.PipelineError, match="não apresentou actividade comprovada"):
+        pipeline_worker._run_video_helper({"id": "video_idle", "topic": "Tema"})
+
+    assert process.returncode == -9
+
+
+def test_helper_log_activity_advances_only_when_file_mtime_changes(tmp_path):
+    log_path = tmp_path / "moneyprinter.log"
+    log_path.write_text("started", encoding="utf-8")
+    first_mtime, advanced = pipeline_worker._latest_helper_log_activity(log_path, 0.0)
+
+    unchanged_mtime, unchanged = pipeline_worker._latest_helper_log_activity(log_path, first_mtime)
+
+    assert advanced is True
+    assert first_mtime > 0
+    assert unchanged is False
+    assert unchanged_mtime == first_mtime
+
+
 def test_long_stock_video_receives_bounded_extended_timeout(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     task = {
