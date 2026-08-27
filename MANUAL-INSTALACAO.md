@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.69
+> **Versão deste manual:** 0.3.70
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -128,13 +128,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.69 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.69 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -142,7 +142,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.69 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -391,15 +391,17 @@ Em **Configuração API > API Keys**, o expander **LLM — providers e modelos**
 
 Dentro do expander **LLM — providers e modelos**, acima dos cartões de providers, está o card **Limite LLM NVIDIA NIM**. Ele permite ligar **Activar limitador NVIDIA NIM — 40 RPM**. O valor padrão é 40 pedidos numa janela de 60 segundos. O contador é persistido localmente por cartão/chave e aplica-se à criação manual, aos workers e às automações. A opção vem desligada para não alterar instalações existentes; ligue-a quando o endpoint activo for NVIDIA NIM e a sua conta tiver esse limite.
 
-O expander **Imagem e Video** substitui o antigo bloco isolado da Nano Banana. Os cartões disponíveis são **Nano Banana**, **Pollinations.ai**, **Agnes AI**, **Hugging Face Inference API**, **Cloudflare Workers AI**, **InferencePort Proxy**, **阿里云 (Alibaba Cloud Model Studio)**, **KIE AI** e **FAL AI**. Em cada cartão, configure a API key/token, o modelo, a Base URL, o estado **Provider activo**, a participação no **Pool Imagem**, a participação no **Pool Vídeo** e a prioridade. **Image Size** e **Aspect Ratio** não aparecem nos cartões e não são editáveis: são defaults internos aplicados automaticamente no prompt da geração. O botão **Testar Chamada API** faz apenas uma verificação read-only; não inicia geração de imagem ou vídeo.
+O expander **Imagem e Video Montagem/MoviePy** aparece primeiro dentro de **Configuração API > API Keys**. Ele reúne as fontes usadas pela montagem local de vídeo com MoviePy/FFmpeg, incluindo os cartões de Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs e ficheiro local. Pode manter várias API keys do mesmo provedor, seleccionar a fonte activa e testar cada fonte remota; a opção local não apresenta um diagnóstico remoto artificial.
+
+Logo abaixo fica o expander **Imagem e Video IA**, que substitui o antigo bloco isolado da Nano Banana. Os cartões disponíveis são **Nano Banana**, **Pollinations.ai**, **Agnes AI**, **Hugging Face Inference API**, **Cloudflare Workers AI**, **InferencePort Proxy**, **阿里云 (Alibaba Cloud Model Studio)**, **KIE AI** e **FAL AI**. Em cada cartão, configure a API key/token, o modelo, a Base URL, o estado **Provider activo**, a participação no **Pool Imagem**, a participação no **Pool Vídeo** e a prioridade. **Image Size** e **Aspect Ratio** não aparecem nos cartões e não são editáveis: são defaults internos aplicados automaticamente no prompt da geração. O botão **Testar Chamada API** faz apenas uma verificação read-only; não inicia geração de imagem ou vídeo.
 
 A área **Voz, TTS e música — Azure Speech, restantes serviços e Suno** está dividida em cartões independentes para **Azure Speech**, **ElevenLabs**, **SiliconFlow**, **MiniMax TTS**, **Chatterbox**, **Sonilo** e **Suno**. Cada cartão agrupa apenas as credenciais, parâmetros e diagnóstico do serviço correspondente. O Suno aparece num cartão próprio porque é uma integração de criação musical, enquanto os restantes providers são serviços de voz/TTS.
 
-Na subaba **Imagem e Video**, a lista **Provider de media** inclui **FAL AI, KIE AI, Agnes AI, Nano Banana, Replicate AI, Pollinations.ai, Hugging Face Inference API, InferencePort Proxy e HeyGen** para a rota Full IA. O cartão **HeyGen** pede a API key, o **Avatar ID** e, opcionalmente, o **Voice ID**; a opção **Provider activo**, **Pool Vídeo**, **Prioridade** e **Testar Chamada API** funcionam como nos restantes cartões. O teste HeyGen usa apenas `GET /v3/users/me` e não consome uma geração. Nano Banana e Hugging Face podem permanecer no catálogo sem serem seleccionados para vídeo quando o cartão não declara capacidade de vídeo.
+No expander **Imagem e Video IA**, a lista **Provider de media** inclui **FAL AI, KIE AI, Agnes AI, Nano Banana, Replicate AI, Pollinations.ai, Hugging Face Inference API, InferencePort Proxy e HeyGen** para a rota Full IA. O cartão **HeyGen** pede a API key, o **Avatar ID** e, opcionalmente, o **Voice ID**; a opção **Provider activo**, **Pool Vídeo**, **Prioridade** e **Testar Chamada API** funcionam como nos restantes cartões. O teste HeyGen usa apenas `GET /v3/users/me` e não consome uma geração. Nano Banana e Hugging Face podem permanecer no catálogo sem serem seleccionados para vídeo quando o cartão não declara capacidade de vídeo.
 
 ### API Tiktok — várias aplicações
 
-Em **Configuração API > API Tiktok**, situada entre **Contas Google** e **Fontes de Materiais**, cada aplicação TikTok é configurada num card independente. O card contém exclusivamente **TikTok Client ID** e **TikTok Client Secret** e apresenta os botões **Testar chamada API**, **Guardar card** e **Apagar card**. Use **Adicionar nova API** no final da lista para criar outra aplicação sem substituir as anteriores.
+Em **Configuração API > API Tiktok**, situada entre **Contas Google** e **AI Influencers**, cada aplicação TikTok é configurada num card independente. O card contém exclusivamente **TikTok Client ID** e **TikTok Client Secret** e apresenta os botões **Testar chamada API**, **Guardar card** e **Apagar card**. Use **Adicionar nova API** no final da lista para criar outra aplicação sem substituir as anteriores.
 
 O botão de teste é read-only. Sem um token OAuth TikTok já autorizado, o Thunderbolt informa que é necessário concluir o Playground/autorização do TikTok for Developers, sem inventar um resultado nem enviar credenciais. O token e a autorização não são campos dos cards. Instalações que ainda tenham `tiktok_client_key` e `tiktok_client_secret` são migradas automaticamente para o primeiro card; o adapter usa o primeiro card completo e mantém fallback para os campos antigos.
 
@@ -568,7 +570,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.69 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.70 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 
