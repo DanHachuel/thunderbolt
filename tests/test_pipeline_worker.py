@@ -318,6 +318,8 @@ def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, m
         {
             "moneyprinter_path": str(root),
             "material_api_keys": {"pixabay": ["pixabay-test-key", "pixabay-second-key"]},
+            "azure_speech_key": "azure-test-key",
+            "azure_speech_region": "eastus",
         },
     )
     storage.write_json("tasks.json", [{"id": "video_pixabay", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
@@ -365,6 +367,8 @@ def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, m
     assert "--no-subtitle-enabled" in command
     assert captured["env"]["MPT_PIXABAY_API_KEY"] == "pixabay-test-key"
     assert captured["env"]["MPT_PIXABAY_API_KEYS"] == '["pixabay-test-key", "pixabay-second-key"]'
+    assert captured["env"]["MPT_AZURE_SPEECH_KEY"] == "azure-test-key"
+    assert captured["env"]["MPT_AZURE_SPEECH_REGION"] == "eastus"
     config = tomllib.loads((root / "config.toml").read_text(encoding="utf-8"))
     assert config["app"]["pixabay_api_keys"] == ["pixabay-test-key", "pixabay-second-key"]
 

@@ -807,6 +807,8 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
         "MPT_PEXELS_API_KEYS": json.dumps(source_keys, ensure_ascii=False) if route == "pexels" and source_keys else "",
         "MPT_PIXABAY_API_KEY": source_keys[0] if route == "pixabay" and source_keys else "",
         "MPT_PIXABAY_API_KEYS": json.dumps(source_keys, ensure_ascii=False) if route == "pixabay" and source_keys else "",
+        "MPT_AZURE_SPEECH_KEY": str(settings.get("azure_speech_key") or "").strip(),
+        "MPT_AZURE_SPEECH_REGION": str(settings.get("azure_speech_region") or "").strip(),
     }
     for key, value in env_values.items():
         if value:
