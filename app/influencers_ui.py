@@ -103,9 +103,9 @@ def _provider_label(card: Mapping[str, Any]) -> str:
 
 
 def render_ai_influencers_api_status(settings: dict[str, Any]) -> None:
-    """Read-only status tab; credentials are edited in the API Keys expander."""
+    """Show backend status; editable selector and credentials are rendered by the settings page."""
     st.subheader("AI Influencers")
-    st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. As credenciais são editadas apenas em API Keys > Banco de Dados Influencers.")
+    st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")
     status = backend_status(settings)
     cols = st.columns(3)
     with cols[0]:

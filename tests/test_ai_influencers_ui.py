@@ -11,11 +11,19 @@ SCHEMA = (ROOT / "seed" / "references" / "ai_influencers_schema.sql").read_text(
 
 def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
     assert 'render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in MAIN
-    assert 'with st.expander("Banco de Dados Influencers", expanded=False):' in MAIN
+    assert 'st.subheader("Banco de Dados Influencers")' in MAIN
+    assert 'with st.form("influencer_database_settings_form"):' in MAIN
+    assert 'key="settings_influencer_db_backend"' in MAIN
+    assert 'Supabase Project URL' in MAIN
+    assert 'Supabase API key' in MAIN
+    assert 'Supabase Storage bucket' in MAIN
+    assert 'SQLite ficheiro local' in MAIN
     assert "SQLite local funciona sem credenciais externas" in MAIN
     assert '"influencer_db_backend": influencer_db_backend' in MAIN
     assert '"influencer_supabase_url": influencer_supabase_url.strip()' in MAIN
     assert '"influencer_sqlite_path": influencer_sqlite_path.strip()' in MAIN
+    assert 'test_backend_clicked = st.form_submit_button("Testar ligação do backend"' in MAIN
+    assert 'save_backend_clicked = st.form_submit_button("Guardar configuração do backend"' in MAIN
 
 
 def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
