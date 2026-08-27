@@ -24,6 +24,7 @@ def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
     assert '"influencer_sqlite_path": influencer_sqlite_path.strip()' in MAIN
     assert 'test_backend_clicked = st.form_submit_button("Testar ligação do backend"' in MAIN
     assert 'save_backend_clicked = st.form_submit_button("Guardar configuração do backend"' in MAIN
+    assert 'A configuração do backend AI Influencers, incluindo o selector entre SQLite e Supabase e as credenciais, está na aba AI Influencers.' not in MAIN
 
 
 def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
