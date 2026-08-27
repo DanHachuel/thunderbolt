@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -245,7 +246,7 @@ def test_video_helper_uses_configured_root_and_persists_helper_diagnostics(tmp_p
     (root / "config.toml").write_text("[app]\n", encoding="utf-8")
     video_path = tmp_path / "generated.mp4"
     video_path.write_bytes(b"mp4")
-    storage.write_json("settings.json", {"moneyprinter_path": str(root)})
+    storage.write_json("settings.json", {"moneyprinter_path": str(root), "pexels_api_keys": ["pexels-test-key"]})
     storage.write_json("tasks.json", [{"id": "video_root", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
     captured = {}
 
@@ -272,6 +273,170 @@ def test_video_helper_uses_configured_root_and_persists_helper_diagnostics(tmp_p
     assert "VIDEO_FILE=" in diagnostics["output_tail"]
 
 
+def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    video_path = tmp_path / "generated.mp4"
+    video_path.write_bytes(b"mp4")
+    storage.write_json(
+        "settings.json",
+        {
+            "moneyprinter_path": str(root),
+            "material_api_keys": {"pixabay": ["pixabay-test-key", "pixabay-second-key"]},
+        },
+    )
+    storage.write_json("tasks.json", [{"id": "video_pixabay", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
+    captured = {}
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return _FakePopen([f"VIDEO_FILE={video_path}\n"])
+
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", fake_popen)
+    result = pipeline_worker._run_video_helper(
+        {
+            "id": "video_pixabay",
+            "topic": "Tema",
+            "style_wide": "pixabay",
+            "language": "pt-BR",
+            "format": "wide",
+            "video_script": "Roteiro preparado",
+            "video_keywords": ["economia", "mercado"],
+            "generation_settings": {
+                "video_aspect_ratio": "Landscape 16:9",
+                "video_concatenation_mode": "Sequential Concatenation",
+                "video_transition_mode": "Dissolve",
+                "maximum_clip_duration": 8,
+                "match_visuals_to_script_order": True,
+                "voiceover_mode": "None",
+                "enable_subtitles": False,
+            },
+        }
+    )
+
+    assert result == video_path
+    command = captured["command"]
+    assert command[command.index("--video-source") + 1] == "pixabay"
+    assert command[command.index("--video-script") + 1] == "Roteiro preparado"
+    assert command[command.index("--video-terms") + 1] == "economia,mercado"
+    assert command[command.index("--video-aspect") + 1] == "16:9"
+    assert command[command.index("--video-concat-mode") + 1] == "sequential"
+    assert command[command.index("--video-transition-mode") + 1] == "fade-out"
+    assert command[command.index("--video-clip-duration") + 1] == "8"
+    assert "--match-materials-to-script" in command
+    assert command[command.index("--voice-name") + 1] == "no-voice"
+    assert "--no-subtitle-enabled" in command
+    assert captured["env"]["MPT_PIXABAY_API_KEY"] == "pixabay-test-key"
+    assert captured["env"]["MPT_PIXABAY_API_KEYS"] == '["pixabay-test-key", "pixabay-second-key"]'
+    config = tomllib.loads((root / "config.toml").read_text(encoding="utf-8"))
+    assert config["app"]["pixabay_api_keys"] == ["pixabay-test-key", "pixabay-second-key"]
+
+
+def test_video_helper_rejects_missing_selected_stock_key_with_actionable_message(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    with pytest.raises(pipeline_worker.PipelineError, match="API key de Pixabay"):
+        pipeline_worker._run_video_helper({"id": "video-no-pixabay-key", "topic": "Tema", "material_source": "pixabay"})
+
+
+def test_moneyprinter_cli_args_prioritise_wide_and_shorts_format_aspect_ratio():
+    wide_args = pipeline_worker._moneyprinter_cli_args({"format": "wide", "generation_settings": {"video_aspect_ratio": "Portrait 9:16"}}, "pexels")
+    shorts_args = pipeline_worker._moneyprinter_cli_args({"format": "shorts", "generation_settings": {"video_aspect_ratio": "Landscape 16:9"}}, "pexels")
+
+    assert wide_args[wide_args.index("--video-aspect") + 1] == "16:9"
+    assert shorts_args[shorts_args.index("--video-aspect") + 1] == "9:16"
+
+
+def test_normalise_video_route_keeps_stock_ai_and_music_separate():
+    assert pipeline_worker._normalise_video_route({"style_wide": "Pexels/Pixabay"}, {}) == "pexels"
+    assert pipeline_worker._normalise_video_route({"style_wide": "pixabay"}, {}) == "pixabay"
+    assert pipeline_worker._normalise_video_route({"style_wide": "pexels", "material_source": "pixabay"}, {}) == "pixabay"
+    assert pipeline_worker._normalise_video_route({"style_wide": "full_ia"}, {}) == "full_ia"
+    assert pipeline_worker._normalise_video_route({"style_wide": "music", "music_mode": True}, {}) == "music"
+
+
+def test_run_task_uses_only_full_ia_video_pool_for_full_ia_route(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    script_path = tmp_path / "prepared-script.md"
+    script_path.write_text("Roteiro preparado para Full IA.", encoding="utf-8")
+    video_path = tmp_path / "full-ia.mp4"
+    video_path.write_bytes(b"mp4")
+    thumbnail_path = tmp_path / "thumbnail.png"
+    thumbnail_path.write_bytes(b"png")
+    channel = {"id": "channel-full-ia", "name": "Canal Full IA", "language": "pt-BR", "niche": "tecnologia"}
+    task = {
+        "id": "video-full-ia",
+        "state": "to_do",
+        "stage": "script",
+        "progress": 0,
+        "topic": "Tema Full IA",
+        "topic_source": "manual",
+        "title": "Título Full IA",
+        "tags": ["tecnologia"],
+        "style_wide": "full_ia",
+        "channel_id": channel["id"],
+        "language": "pt-BR",
+        "artifacts": {"script": str(script_path)},
+        "generation_settings": {},
+    }
+    storage.write_json("channels.json", [channel])
+    storage.write_json("tasks.json", [task])
+    captured = {}
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: {})
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: channel)
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "_run_video_helper", lambda value: pytest.fail("Full IA não deve chamar o helper stock"))
+    def fake_full_ia_pool(settings, prompt, **kwargs):
+        captured["allowed_providers"] = kwargs["allowed_providers"]
+        return video_path
+
+    monkeypatch.setattr(pipeline_worker, "generate_video_from_pool", fake_full_ia_pool)
+    monkeypatch.setattr(pipeline_worker, "generate_thumbnail_prompt", lambda *args, **kwargs: {"image_prompt": "thumbnail", "overlay_text": "FULL IA"})
+    monkeypatch.setattr(pipeline_worker, "_generate_pipeline_thumbnail", lambda *args, **kwargs: thumbnail_path)
+    monkeypatch.setattr(pipeline_worker, "upload_with_default_route", lambda *args, **kwargs: SimpleNamespace(ok=True, data={"uploaded": True}, message="ok"))
+
+    result = pipeline_worker._run_task(task)
+
+    assert result["state"] == "done"
+    assert captured["allowed_providers"] == {"fal_ai", "kie_ai", "agnes"}
+    assert storage.read_json("tasks.json")[0]["artifacts"]["video"] == str(video_path)
+
+
+def test_run_task_marks_music_only_ready_without_video_pipeline(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    music_path = tmp_path / "music.mp3"
+    music_path.write_bytes(b"audio")
+    channel = {"id": "channel-music", "name": "Canal Música", "language": "pt-BR"}
+    task = {
+        "id": "music-only",
+        "state": "to_do",
+        "stage": "script",
+        "progress": 0,
+        "topic": "",
+        "style_wide": "music",
+        "music_mode": True,
+        "music_path": str(music_path),
+        "channel_id": channel["id"],
+        "artifacts": {},
+        "generation_settings": {},
+    }
+    storage.write_json("channels.json", [channel])
+    storage.write_json("tasks.json", [task])
+    monkeypatch.setattr(pipeline_worker, "generate_topic_for_channel", lambda *args, **kwargs: pytest.fail("Apenas Música não deve gerar tema"))
+    monkeypatch.setattr(pipeline_worker, "generate_script_document", lambda *args, **kwargs: pytest.fail("Apenas Música não deve gerar roteiro"))
+    monkeypatch.setattr(pipeline_worker, "_run_video_helper", lambda value: pytest.fail("Apenas Música não deve gerar vídeo"))
+
+    result = pipeline_worker._run_task(task)
+
+    assert result["state"] == "done"
+    assert result["music_ready"] is True
+    assert result["video_ready"] is False
+    assert result["artifacts"]["music"] == str(music_path)
+
+
 def test_video_helper_passes_uploaded_voiceover_to_moneyprinterturbo(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     root = tmp_path / "MoneyPrinterTurbo"
@@ -282,7 +447,7 @@ def test_video_helper_passes_uploaded_voiceover_to_moneyprinterturbo(tmp_path, m
     voiceover.write_bytes(b"audio")
     video_path = tmp_path / "generated.mp4"
     video_path.write_bytes(b"mp4")
-    storage.write_json("settings.json", {"moneyprinter_path": str(root)})
+    storage.write_json("settings.json", {"moneyprinter_path": str(root), "pexels_api_keys": ["pexels-test-key"]})
     storage.write_json("tasks.json", [{"id": "video_voiceover", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
     captured = {}
 
@@ -305,6 +470,7 @@ def test_video_helper_passes_uploaded_voiceover_to_moneyprinterturbo(tmp_path, m
 
 def test_video_helper_rejects_upload_mode_without_audio_file(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
+    storage.write_json("settings.json", {"pexels_api_keys": ["pexels-test-key"]})
     with pytest.raises(pipeline_worker.PipelineError, match="ficheiro de narração válido"):
         pipeline_worker._run_video_helper(
             {
@@ -317,6 +483,7 @@ def test_video_helper_rejects_upload_mode_without_audio_file(tmp_path, monkeypat
 
 def test_video_helper_timeout_kills_subprocess_and_returns_pipeline_error(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
+    storage.write_json("settings.json", {"pexels_api_keys": ["pexels-test-key"]})
     storage.write_json("tasks.json", [{"id": "video_timeout", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
     process = _FakePopen([], stays_alive=True)
     monkeypatch.setattr(pipeline_worker.subprocess, "Popen", lambda *args, **kwargs: process)

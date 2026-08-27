@@ -2,7 +2,7 @@
 
 > Consulte o [Manual completo de instalação](MANUAL-INSTALACAO.md) antes do primeiro teste local.
 
-Thunderbolt — UI web local da Fase 3, baseada no fluxo Streamlit do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). A aplicação organiza canais, blueprints, lotes de vídeos, filas, artefactos e upload em armazenamento local JSON.
+Thunderbolt — UI web local da Fase 3, baseada no fluxo Streamlit do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). A aplicação organiza canais, blueprints, lotes de vídeos, filas, artefactos e upload em armazenamento local JSON. O pacote npm distribui apenas os seeds versionados em `seed/`; não inclui `storage/` persistente, pelo que Blueprints, personagens, configurações e artefactos locais não são enviados durante uma actualização.
 
 ## Estado actual
 
@@ -37,6 +37,12 @@ O backend local predefinido é **SQLite**, por isso Personagens e Geração de C
 A página **AI Influencers > Geração de Conteúdo IA** contém as subabas **Imagens**, **Vídeos** e **Motion Control**. Imagens usam os cartões activos do **Pool Imagem**; Vídeos usam os cartões activos do **Pool Vídeo** e exigem uma imagem inicial image-to-video. O selector de modelo não está preso ao Veo 3.1: pode utilizar KIE AI, Replicate, FAL AI, Pollinations ou outro cartão que declare suporte para vídeo. Para Replicate, o campo Modelo deve conter o identificador aceito pela API, como `owner/model` ou `owner/model:version`; a tarefa usa `POST /v1/predictions`, consulta o estado assíncrono e guarda o resultado localmente. A publicação para Instagram, TikTok, YouTube Shorts ou Facebook não é automática: os destinos são registados para revisão e o envio exige uma acção posterior explícita.
 
 A migração é baseada no workflow público [AI Agents A-Z — episódio 35](https://github.com/gyoridavid/ai_agents_az/tree/main/episode_35), mas o runtime do Thunderbolt não instala nem executa n8n. Os formulários, Data Tables, waits e subworkflows são substituídos pela UI Streamlit, pelo repositório dual Supabase/SQLite, pelos adapters multimédia e pelos logs/notificações locais. As API keys são sempre configuradas localmente e não devem ser colocadas nos JSONs do workflow ou no GitHub.
+
+## Pipeline de vídeo — fontes e ordem de execução
+
+Em **Pipeline Vídeos > Criação de Vídeos** e **Automação Youtube**, a opção **Pexels/Pixabay** usa a rota stock do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo): as keywords do roteiro são encaminhadas para a pesquisa da fonte seleccionada, os clips são descarregados e reutilizados localmente, e o motor faz a composição com MoviePy/FFmpeg, respeitando proporção, duração máxima, concatenação, transições, correspondência visual ao roteiro, narração, legendas e música de fundo. As API keys de Pexels e Pixabay são exportadas para o `config.toml` do motor e a fonte efectiva é encaminhada por tarefa, sem depender apenas da fonte global guardada nas configurações.
+
+A ordem persistida da criação é **Tema → Script → Título → Keywords opcional → Vídeo → Prompt Thumbnail em JSON → Thumbnail → Upload**. O vídeo é materializado antes do prompt e da imagem da thumbnail; uma falha posterior de thumbnail não invalida um MP4 já pronto. **Full IA** é uma rota separada e usa exclusivamente os cartões activos FAL AI, KIE AI e Agnes AI do pool de vídeo. **Apenas Música** não chama a pipeline de vídeo nem tenta gerar thumbnail: reutiliza o áudio local/Suno já descarregado e deixa-o pronto para a integração de upload musical.
 
 ## Upload-Post — publicação para múltiplas plataformas
 
@@ -79,7 +85,7 @@ No topo da área principal da aplicação existe o menu nativo de idioma no padr
 
 A UI suporta os temas **Dark** e **Light** através do menu nativo de três pontos do Streamlit, no local original do toolbar. Não existe um selector Theme adicional dentro da página. A configuração distribuída em `.streamlit/config.toml` disponibiliza as variantes nomeadas **Dark** e **Light**, e o menu nativo continua responsável por alternar entre os modos, seguindo o padrão do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo). O CSS próprio do Thunderbolt usa cores semânticas, `currentColor` e `color-mix` para acompanhar o tema activo, sem alterar a posição nem a funcionalidade do toolbar, do botão Deploy e do menu principal.
 
-## Navegação da UI 0.3.61
+## Navegação da UI 0.3.62
 
 A barra lateral mantém os níveis principais, nesta ordem: **Início**, **Niche Finder**, **Pipeline**, **Pipeline TikTok**, **Automação**, **Edição**, **AI Influencers** e **Configurações**. **Pipeline Vídeos** é expansível e contém **Criação de Vídeos**, **Backlog Vídeos**, **Roteiros**, **Thumbnails** e **Upload**. **Pipeline Música** é expansível e contém **Criação de Músicas** e **Upload Música**. **Automação** também é expansível e contém **Automação Youtube**. **Edição** é expansível e contém **Limpador de Metadados**, **Cortes**, **Editor Python** e **Download Mídia**, nessa ordem. **AI Influencers** é expansível e contém **Personagens**, **Geração de Conteúdo IA**, **Redes Sociais**, **Tutorial Meta** e **Tutorial Supabase**, nessa ordem. A página Geração de Conteúdo IA divide-se em **Imagens**, **Vídeos** e **Motion Control**; a subaba Motion Control permanece vazia nesta release.
  **Niche Finder** é expansível e contém **Niche Finder Kaggle** e **Niche Finder Apify**. **Configurações** é expansível e contém **Canais Youtube**, **Blueprints Youtube**, **MCP**, **Contas Google**, **Notificações**, **Logs** e **Configuração API**, nessa ordem. O Início reúne o dashboard e as filas do Pipeline, sem botões de acções rápidas.

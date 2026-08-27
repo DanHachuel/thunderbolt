@@ -489,9 +489,13 @@ def generate_video_from_pool(
     *,
     image_url: str = "",
     output_path: Path | None = None,
+    allowed_providers: set[str] | None = None,
 ) -> Path:
-    """Try eligible video cards in priority order, keeping image and video pools separate."""
+    """Try eligible video cards in priority order, optionally restricted to a route."""
     cards = media_cards_for_pool(settings, "video")
+    if allowed_providers is not None:
+        allowed = {str(provider).strip().lower() for provider in allowed_providers}
+        cards = [card for card in cards if str(card.get("provider") or "").strip().lower() in allowed]
     if not cards:
         raise MediaGenerationError("Não existem providers activos no pool de vídeo.")
     errors: list[str] = []

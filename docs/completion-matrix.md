@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.61.
+Estado auditado para o release 0.3.62.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -26,6 +26,7 @@ Estado auditado para o release 0.3.61.
 | Upload para Postiz por API key/MCP | Concluído como integração configurável | Aba **Postiz** em Upload, `PostizAdapter` com `GET /integrations`, `POST /upload` para MP4 e `POST /posts` para YouTube; campos de API key, Base URL, MCP URL e integração padrão em Configuração API. |
 | Upload-Post para múltiplas plataformas | Concluído como integração configurável | Quarta subaba **Upload-Post** em Upload; `UploadPostAdapter` usa `POST /upload` com `multipart/form-data`, `Authorization: Apikey`, username/perfil, plataformas repetidas em `platform[]`, suporte a `async_upload`, `request_id`, histórico local e notificação própria. |
 | Pexels/Pixabay como rótulo, Estilo IA condicional e Apenas Música | Concluído | Labels, lista de 12 estilos IA e task com `background_mode=none` para música. |
+| Rotas de vídeo por fonte e ordem da pipeline | Concluído | `pipeline_worker.py` encaminha por tarefa a fonte efectiva e os parâmetros para o helper MoneyPrinterTurbo; Pexels/Pixabay usam pesquisa, cache, download e composição MoviePy/FFmpeg, Full IA fica limitado a FAL AI/KIE AI/Agnes AI e Apenas Música termina no artefacto de áudio. A ordem é `topic → script → title → keywords opcional → video → thumbnail_prompt JSON → thumbnail → upload`; o teste estrutural garante que vídeo ocorre antes de prompt e imagem. |
 | API Keys por fonte de materiais com múltiplas chaves | Concluído | `Configuração API > API Keys > Fontes de materiais` permite seleccionar Pexels, Pixabay, Coverr, WaveSpeed AI, LoomLoom, TwelveLabs ou local, adicionar várias chaves na mesma fonte, deduplicar e guardar listas independentes em `material_api_keys`; `build_moneyprinter_config()` exporta arrays legados para o `config.toml` e internaliza parâmetros técnicos da área de fontes. |
 | Agente de música, Suno/pasta local e vídeo wide musical | Concluído como integração configurável | `hermes_ui/music.py`, storage/music, upload local e endpoint Suno explicitamente configurado. |
 | Área de teste de vozes em Configuração API | Concluído | Preview isolado com Edge/Azure Speech e providers HTTP, reprodução e download, acessível dentro de Configuração API. |

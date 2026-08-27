@@ -160,6 +160,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "language": payload.get("language", options.get("language", channel.get("language", "Português"))),
                 "format": payload.get("format", options.get("format", "wide")),
                 "style_wide": payload.get("style_wide", options.get("style_wide", channel.get("style_wide", "pexels"))),
+                "material_source": payload.get("material_source", options.get("material_source", channel.get("material_source", ""))),
                 "style_ia": payload.get("style_ia", options.get("style_ia", "")),
                 "music_mode": payload.get("music_mode", options.get("music_mode", False)),
                 "music_path": payload.get("music_path", options.get("music_path", "")),

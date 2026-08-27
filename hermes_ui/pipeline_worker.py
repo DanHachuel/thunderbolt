@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.upload_routing import upload_with_default_route
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_thumbnail_prompt, generate_topic_for_channel
 from hermes_ui.script_documents import save_script_document
@@ -19,6 +20,7 @@ from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import media_cards_for_pool
+from hermes_ui.material_sources import material_api_keys, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
@@ -324,6 +326,156 @@ def _stop_process(process: subprocess.Popen[str]) -> None:
         process.wait()
 
 
+def _normalise_video_route(task: dict[str, Any], settings: dict[str, Any]) -> str:
+    """Resolve the per-task source without conflating stock, AI and music routes."""
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    if bool(task.get("music_mode")):
+        return "music"
+    explicit_source = str(
+        task.get("material_source")
+        or generation_settings.get("material_source")
+        or generation_settings.get("video_material_source")
+        or ""
+    ).strip().casefold()
+    if explicit_source in {"pexels", "pixabay", "local"}:
+        return explicit_source
+    raw = str(task.get("style_wide") or generation_settings.get("video_source") or "pexels").strip().casefold()
+    if raw in {"full_ia", "full ia", "full-ai", "ai", "ia"}:
+        return "full_ia"
+    if raw in {"music", "apenas música", "apenas musica", "only music"}:
+        return "music"
+    if raw in {"pixabay", "pixabay only"}:
+        return "pixabay"
+    if raw in {"pexels", "pexels/pixabay", "stock", "materials", "materiales"}:
+        configured = selected_material_source(settings)
+        return configured if configured in {"pexels", "pixabay"} else "pexels"
+    return raw if raw in {"pexels", "pixabay", "local"} else "pexels"
+
+
+def _mpt_aspect_ratio(value: Any, format_value: Any = "") -> str:
+    raw = str(value or format_value or "").strip().casefold()
+    if raw in {"landscape 16:9", "wide", "16:9", "landscape"}:
+        return "16:9"
+    if raw in {"square 1:1", "square", "1:1"}:
+        return "1:1"
+    return "9:16"
+
+
+def _mpt_concat_mode(value: Any) -> str:
+    raw = str(value or "").strip().casefold()
+    return "sequential" if raw in {"sequential", "sequential concatenation", "ordem sequencial"} else "random"
+
+
+def _mpt_transition_mode(value: Any) -> str:
+    raw = str(value or "").strip().casefold()
+    return {"fade": "fade-in", "dissolve": "fade-out", "fade-in": "fade-in", "fade-out": "fade-out"}.get(raw, "none")
+
+
+def _mpt_percent(value: Any, fallback: float = 1.0) -> str:
+    raw = str(value or "").strip().replace("%", "")
+    try:
+        return str(max(0.0, min(2.0, float(raw) / 100.0)))
+    except ValueError:
+        return str(fallback)
+
+
+def _valid_audio_artifact(value: Any) -> Path | None:
+    path = _valid_artifact_path(value)
+    if path is None or path.suffix.lower() not in {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}:
+        return None
+    return path
+
+
+def _mpt_rate(value: Any, fallback: float = 1.0) -> str:
+    raw = str(value or "").strip().casefold().replace("x", "")
+    try:
+        return str(max(0.1, float(raw)))
+    except ValueError:
+        return str(fallback)
+
+
+def _mpt_video_language(value: Any) -> str:
+    """Convert common Thunderbolt labels to the language codes accepted by MPT."""
+    raw = str(value or "").strip()
+    folded = raw.casefold()
+    aliases = {
+        "português": "pt-BR", "portugues": "pt-BR", "português (brasil)": "pt-BR",
+        "portuguese": "pt-BR", "inglês": "en-US", "ingles": "en-US", "english": "en-US",
+        "espanhol": "es-ES", "español": "es-ES", "francês": "fr-FR", "frances": "fr-FR",
+        "alemão": "de-DE", "alemao": "de-DE", "italiano": "it-IT", "japonês": "ja-JP",
+        "japones": "ja-JP", "mandarim": "zh-CN", "chinês": "zh-CN", "chines": "zh-CN",
+    }
+    if folded in aliases:
+        return aliases[folded]
+    return raw if re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?", raw) else ""
+
+
+def _moneyprinter_cli_args(task: dict[str, Any], route: str) -> list[str]:
+    """Build the explicit MPT CLI contract for the stock Pexels/Pixabay route."""
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    args: list[str] = ["--video-source", route]
+    script = str(task.get("video_script") or generation_settings.get("video_script") or "").strip()
+    if script:
+        args.extend(["--video-script", script])
+    keywords = task.get("video_keywords") or generation_settings.get("video_keywords") or task.get("keywords") or task.get("tags")
+    if isinstance(keywords, str):
+        keywords = [part.strip() for part in re.split(r"[,;|\n]+", keywords) if part.strip()]
+    if isinstance(keywords, list):
+        terms = [str(item).strip() for item in keywords if str(item).strip()]
+        if terms:
+            args.extend(["--video-terms", ",".join(terms[:15])])
+
+    language = _mpt_video_language(task.get("language"))
+    if language:
+        args.extend(["--video-language", language])
+    format_value = str(task.get("format") or generation_settings.get("video_format") or "").strip().casefold()
+    if format_value in {"wide", "landscape", "16:9"}:
+        aspect_ratio = "16:9"
+    elif format_value in {"shorts", "portrait", "9:16"}:
+        aspect_ratio = "9:16"
+    else:
+        aspect_ratio = _mpt_aspect_ratio(generation_settings.get("video_aspect_ratio"), task.get("format"))
+    args.extend(["--video-aspect", aspect_ratio])
+    args.extend(["--video-concat-mode", _mpt_concat_mode(generation_settings.get("video_concatenation_mode"))])
+    args.extend(["--video-transition-mode", _mpt_transition_mode(generation_settings.get("video_transition_mode"))])
+    clip_duration = generation_settings.get("maximum_clip_duration")
+    if str(clip_duration or "").strip().isdigit() and int(clip_duration) > 0:
+        args.extend(["--video-clip-duration", str(int(clip_duration))])
+    if bool(generation_settings.get("match_visuals_to_script_order")):
+        args.append("--match-materials-to-script")
+
+    voice_mode = str(generation_settings.get("voiceover_mode") or "").strip().casefold()
+    voice = str(task.get("voice") or generation_settings.get("voice") or "").strip()
+    if voice_mode == "none" or voice_mode == "upload":
+        args.extend(["--voice-name", "no-voice"])
+    elif voice:
+        args.extend(["--voice-name", voice])
+    volume = generation_settings.get("voiceover_volume")
+    speed = generation_settings.get("voiceover_speed")
+    if volume is not None:
+        args.extend(["--voice-volume", _mpt_percent(volume)])
+    if speed is not None:
+        args.extend(["--voice-rate", _mpt_rate(speed)])
+
+    subtitles = generation_settings.get("enable_subtitles")
+    if subtitles is not None:
+        args.append("--subtitle-enabled" if bool(subtitles) else "--no-subtitle-enabled")
+    subtitle_position = str(generation_settings.get("subtitle_position") or "").strip().casefold()
+    if subtitle_position in {"top", "center", "bottom", "custom"}:
+        args.extend(["--subtitle-position", subtitle_position])
+    font_name = str(generation_settings.get("subtitle_font") or "").strip()
+    if font_name:
+        args.extend(["--font-name", font_name])
+    bgm_source = str(generation_settings.get("background_music_source") or "").strip().casefold()
+    bgm_type = {"sem música": "none", "sem musica": "none", "random background music": "random", "ficheiro existente": "custom"}.get(bgm_source)
+    if bgm_type:
+        args.extend(["--bgm-type", bgm_type])
+    bgm_volume = generation_settings.get("background_music_volume")
+    if bgm_volume is not None:
+        args.extend(["--bgm-volume", _mpt_percent(bgm_volume)])
+    return args
+
+
 def _run_video_helper(task: dict[str, Any]) -> Path:
     helper_dir = Path(__file__).resolve().parents[1] / "seed" / "skills"
     helper = helper_dir / "mpt_agent.py"
@@ -341,12 +493,27 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     card = active_llm_card(settings)
     provider = str(card.get("provider") or "openai").strip()
     definition = provider_definition(provider)
+    route = _normalise_video_route(task, settings)
+    source_keys = material_api_keys(settings, route) if route in {"pexels", "pixabay"} else []
+    if route in {"pexels", "pixabay"} and not source_keys:
+        source_label = "Pexels" if route == "pexels" else "Pixabay"
+        raise PipelineError(
+            f"Configure pelo menos uma API key de {source_label} em Configurações > Configuração API > Fontes de materiais."
+        )
+    if configured_root:
+        try:
+            sync_moneyprinter_config(settings, str(configured_root))
+        except OSError as exc:
+            raise PipelineError(f"Não foi possível sincronizar a configuração do MoneyPrinterTurbo: {exc}") from exc
     env_values = {
         "MPT_LLM_PROVIDER": provider,
         "MPT_LLM_API_KEY": str(card.get("api_key") or "").strip(),
         "MPT_LLM_BASE_URL": str(card.get("base_url") or definition.default_base_url or "").strip(),
         "MPT_LLM_MODEL_NAME": str(card.get("model") or "").strip(),
-        "MPT_PEXELS_API_KEY": str(settings.get("pexels_api_key") or "").strip(),
+        "MPT_PEXELS_API_KEY": source_keys[0] if route == "pexels" and source_keys else "",
+        "MPT_PEXELS_API_KEYS": json.dumps(source_keys, ensure_ascii=False) if route == "pexels" and source_keys else "",
+        "MPT_PIXABAY_API_KEY": source_keys[0] if route == "pixabay" and source_keys else "",
+        "MPT_PIXABAY_API_KEYS": json.dumps(source_keys, ensure_ascii=False) if route == "pixabay" and source_keys else "",
     }
     for key, value in env_values.items():
         if value:
@@ -356,6 +523,7 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
         command.extend(["--root", str(configured_root)])
     command.extend(["--subject", subject])
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    command.extend(_moneyprinter_cli_args(task, route))
     if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
         voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
         if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
@@ -516,8 +684,9 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     channel = _channel_for_task(task)
     settings = _settings()
     blueprint = _blueprint_for_channel(channel)
+    route = _normalise_video_route(task, settings)
     topic = str(task.get("topic") or "").strip()
-    if not topic or str(task.get("topic_source") or "") in {"auto", "llm_pending"}:
+    if route != "music" and (not topic or str(task.get("topic_source") or "") in {"auto", "llm_pending"}):
         _update(task_id, stage="topic", state="doing", progress=5, error=None)
         topic_result = generate_topic_for_channel(settings, channel, blueprint, user_context=str(task.get("topic_context") or ""))
         topic = str(topic_result.get("topic") or "").strip()
@@ -527,6 +696,32 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
     generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
     artifacts = dict(task.get("artifacts") or {})
+    if route == "music":
+        # Apenas Música não é uma tarefa de vídeo: reutiliza o áudio preparado e
+        # termina pronta para a integração de upload musical, sem chamar LLM,
+        # Pexels/Pixabay, MoviePy de vídeo, thumbnail ou upload de vídeo.
+        music_candidates = [
+            task.get("music_path"),
+            generation_settings.get("music_path"),
+            artifacts.get("music"),
+        ]
+        music_path = next((path for path in (_valid_audio_artifact(item) for item in music_candidates) if path is not None), None)
+        if music_path is None:
+            raise PipelineError("A fonte Apenas Música exige um ficheiro de áudio local válido ou uma música Suno já descarregada antes de criar a tarefa.")
+        artifacts["music"] = str(music_path)
+        _update(
+            task_id,
+            stage="upload",
+            state="done",
+            progress=100,
+            artifacts=artifacts,
+            music_ready=True,
+            video_ready=False,
+            thumbnail_status="not_applicable",
+            error=None,
+        )
+        return _task_by_id(task_id) or task
+
     script = _read_persisted_script(task, channel, blueprint, topic)
     if script is None:
         _update(task_id, stage="script", state="doing", progress=18, error=None)
@@ -618,18 +813,30 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     existing_video = _valid_artifact_path(artifacts.get("video"))
     if existing_video is None:
         _update(task_id, stage="video", state="doing", progress=max(52, int(task.get("progress") or 0)), error=None)
-        video_cards = media_cards_for_pool(settings, "video")
-        if bool(settings.get("media_video_pool_enabled")) and video_cards:
-            try:
-                video_prompt = _append_generation_constraints(
-                    f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}",
-                    kind="video",
+        try:
+            video_prompt = _append_generation_constraints(
+                f"Título: {title}\n\nRoteiro:\n{str(script.get('content') or '')[:12000]}",
+                kind="video",
+            )
+            if route == "full_ia":
+                video_path = generate_video_from_pool(
+                    settings,
+                    video_prompt,
+                    allowed_providers={"fal_ai", "kie_ai", "agnes"},
                 )
-                video_path = generate_video_from_pool(settings, video_prompt)
-            except MediaGenerationError as exc:
-                raise PipelineError(f"Pool de vídeo externo: {exc}") from exc
-        else:
-            video_path = _run_video_helper({**task, "topic": topic, "title": title})
+            else:
+                video_path = _run_video_helper({
+                    **task,
+                    "topic": topic,
+                    "title": title,
+                    "video_script": str(script.get("content") or ""),
+                    "video_keywords": keywords,
+                    "style_wide": route,
+                })
+        except MediaGenerationError as exc:
+            if route == "full_ia":
+                raise PipelineError(f"Pool Full IA (FAL/KIE AI/Agnes AI): {exc}") from exc
+            raise PipelineError(f"Pipeline MoneyPrinterTurbo ({route}): {exc}") from exc
         current_after_video = _task_by_id(task_id) or {}
         artifacts = dict(current_after_video.get("artifacts") or artifacts)
         artifacts["video"] = str(video_path)

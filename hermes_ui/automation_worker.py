@@ -10,6 +10,7 @@ from typing import Any
 from . import storage
 from .creative_generation import generate_title_and_keywords, generate_topic_for_channel
 from .domain import create_batch, create_tasks_for_batch
+from .material_sources import selected_material_source
 from .notifications import record_notification
 
 WORKER_STATE_FILE = "automation_worker.json"
@@ -156,6 +157,8 @@ def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         blueprint,
         language=str(channel.get("language") or "Português"),
     )
+    style_wide = str(channel.get("style_wide") or "pexels").strip().casefold()
+    material_source = selected_material_source(settings) if style_wide in {"pexels", "pexels/pixabay", "stock"} else ""
     payload = {
         "topic": topic_package["topic"],
         "topic_source": "llm",
@@ -169,7 +172,8 @@ def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
         "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
         "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
-        "generation_settings": {"video_keywords": editorial.get("keywords", [])},
+        "material_source": material_source,
+        "generation_settings": {"video_keywords": editorial.get("keywords", []), "material_source": material_source},
         "ai_generation": {"topic": topic_package, "editorial": editorial},
     }
     return topic_package["topic"], payload
@@ -204,6 +208,7 @@ def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, 
         "format": "wide",
         "style_wide": style_wide,
         "style_ia": channel.get("style_ia") or "",
+        "material_source": payload.get("material_source") or "",
         "music_mode": music_mode,
         "background_mode": "none" if music_mode else ("ai" if style_wide == "full_ia" else "stock"),
         "music_path": channel.get("music_path") or "",

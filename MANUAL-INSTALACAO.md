@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.61
+> **Versão deste manual:** 0.3.62
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -40,6 +40,20 @@ Em **AI Influencers > Geração de Conteúdo IA**, utilize as subabas **Imagens*
 A geração guarda prompt, caption, provider, modelo, plataforma, estado e caminho do artefacto no backend. **Instagram**, **TikTok**, **YouTube Shorts** e **Facebook** são destinos de revisão; não existe publicação automática nesta primeira adaptação. A publicação só deve ser executada depois de configurar e confirmar a integração social correspondente numa acção separada.
 
 O runtime do Thunderbolt adapta o comportamento dos workflows do episódio 35, mas não instala nem executa n8n. Formulários, Data Tables, Switch, Wait e subworkflows são substituídos por páginas Streamlit, repository Supabase/SQLite, adapters multimédia, worker, logs e notificações. Nunca coloque API keys nos JSONs dos workflows, em ficheiros versionados ou em mensagens de diagnóstico.
+
+## Pipeline de vídeo: fontes, composição e ordem
+
+Em **Pipeline Vídeos > Criação de Vídeos** e **Automação Youtube**, seleccione a fonte no próprio vídeo ou na automação. **Pexels/Pixabay** é a rota stock e usa a infraestrutura do [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo): pesquisa por keywords, filtros de proporção e duração, cache e deduplicação de clips, descarga de materiais e composição MoviePy/FFmpeg com concatenação, transições, narração, legendas e música de fundo. A fonte escolhida é passada explicitamente ao processo (`pexels` ou `pixabay`) e as listas de API keys são sincronizadas no `config.toml`, permitindo a rotação configurada.
+
+A execução segue sempre **Tema → Script → Título → Keywords (opcional) → Vídeo → Prompt Thumbnail (JSON) → Thumbnail (imagem) → Upload**. Keywords são opcionais: se a geração por LLM falhar, é usado um fallback determinístico para não bloquear a etapa de vídeo. O worker guarda o MP4 antes de iniciar prompt ou imagem da thumbnail; assim, uma falha de quota na imagem não elimina um vídeo concluído.
+
+| Opção visível | Rota executada | Resultado esperado |
+|---|---|---|
+| Pexels/Pixabay | MoneyPrinterTurbo stock com a fonte efectiva e as chaves correspondentes | MP4 composto localmente |
+| Full IA | Pool de vídeo limitado a FAL AI, KIE AI e Agnes AI | MP4 gerado pelo provider activo |
+| Apenas Música | Áudio local/Suno já preparado | Ficheiro musical pronto para um upload de música; não gera MP4, thumbnail nem upload YouTube |
+
+Antes de iniciar a rota stock, confirme em **Configurações > Configuração API > Fontes de materiais** que existe pelo menos uma API key para a fonte efectiva. Sem uma key Pexels/Pixabay, o erro é apresentado como configuração da fonte, em vez de uma falha genérica de vídeo. **Google Lyria não é apresentado como implementado nesta release**; a rota Apenas Música aceita áudio local e a integração Suno existente.
 
 ## 2. Pré-requisitos
 
@@ -114,13 +128,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -128,7 +142,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -542,7 +556,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.62 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

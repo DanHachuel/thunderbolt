@@ -18,7 +18,8 @@ def test_prompt_master_storage_is_not_blueprints_storage():
     assert 'TIKTOK_PROMPT_MASTERS = STORAGE / "tiktok" / "prompts_master"' in STORAGE_SOURCE
     assert 'def list_prompt_master_files()' in STORAGE_SOURCE
     assert 'def load_prompt_master_file(path: Path)' in STORAGE_SOURCE
-    assert 'storage/tiktok/prompts_master/**/*.md' in PACKAGE_SOURCE
+    assert 'seed/prompt_masters/**/*.md' in PACKAGE_SOURCE
+    assert 'storage/tiktok/prompts_master/**/*.md' not in PACKAGE_SOURCE
     assert 'BLUEPRINTS / "importados"' in STORAGE_SOURCE
     assert '"display_names.json": {"blueprints": {}, "prompt_masters": {}}' in STORAGE_SOURCE
     assert 'def get_display_name(kind: str, path: Path, fallback: str)' in STORAGE_SOURCE
