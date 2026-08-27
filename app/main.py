@@ -164,7 +164,7 @@ VIDEO_CONCATENATION_OPTIONS = ["Random Concatenation (Recommended)", "Sequential
 VIDEO_TRANSITION_OPTIONS = ["None", "Fade", "Dissolve"]
 VIDEO_ENCODER_OPTIONS = ["Default (Recommended)", "H.264", "H.265"]
 VOICEOVER_MODE_OPTIONS = ["Auto", "Upload", "None"]
-VOICEOVER_SERVICE_OPTIONS = ["Azure TTS V1"]
+VOICEOVER_SERVICE_OPTIONS = ["Azure Speech SDK V2", "Azure TTS V1"]
 VOICEOVER_VOLUME_OPTIONS = ["20%", "40%", "60%", "80%", "100%"]
 VOICEOVER_SPEED_OPTIONS = ["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"]
 BACKGROUND_MUSIC_SOURCE_OPTIONS = ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API", "Random Background Music", "Sem música"]
@@ -1046,7 +1046,20 @@ def render_video_generation_settings(
                     if stored_voiceover_value and Path(stored_voiceover_value).is_file():
                         st.audio(stored_voiceover_value)
                         settings["voiceover_file"] = stored_voiceover_value
-                settings["voiceover_service"] = st.selectbox("Voiceover Service", VOICEOVER_SERVICE_OPTIONS, key=f"{prefix}_voiceover_service")
+                configured_voice_settings = read_json("settings.json", {})
+                configured_azure_voice = bool(
+                    str(configured_voice_settings.get("azure_speech_key") or "").strip()
+                    and str(configured_voice_settings.get("azure_speech_region") or "").strip()
+                )
+                voice_service_default = "Azure Speech SDK V2" if configured_azure_voice else "Azure TTS V1"
+                voice_service_index = VOICEOVER_SERVICE_OPTIONS.index(voice_service_default)
+                settings["voiceover_service"] = st.selectbox(
+                    "Voiceover Service",
+                    VOICEOVER_SERVICE_OPTIONS,
+                    index=voice_service_index,
+                    key=f"{prefix}_voiceover_service",
+                    help="Azure Speech SDK V2 usa a key/região configuradas e não depende do stream edge_tts. Azure TTS V1 usa edge_tts e pode funcionar sem key Azure.",
+                )
                 if channel is not None:
                     channel_id = str(channel.get("id") or channel.get("name") or "")
                     channel_voice = str(channel.get("default_voice") or channel.get("voice") or "").strip()

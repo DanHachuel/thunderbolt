@@ -116,6 +116,13 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
     for settings_key, config_key in app_map.items():
         if settings_key in settings:
             app[config_key] = settings[settings_key]
+    # Edge TTS V1 is retained as a keyless fallback, but its default 30-second
+    # stream deadline is too short for longer scripts or slow networks.
+    try:
+        edge_tts_timeout = float(settings.get("edge_tts_timeout", 90))
+    except (TypeError, ValueError):
+        edge_tts_timeout = 90.0
+    app["edge_tts_timeout"] = max(30, int(edge_tts_timeout))
     # A UI can store the canonical mapping while older installations still
     # expose one legacy field per source.  Export every supported source as a
     # TOML array so MoneyPrinterTurbo can rotate keys without CSV parsing.
