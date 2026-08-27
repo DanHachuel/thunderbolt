@@ -2,7 +2,7 @@
 
 Este manual descreve a instalação local da UI Thunderbolt, baseada no MoneyPrinterTurbo, utilizando o pacote npm `@danhachuel/thunderbolt`. O fluxo recomendado instala automaticamente o ambiente Python, as dependências da aplicação, as dependências do MoneyPrinterTurbo, o Streamlit e o suporte FFmpeg através de `imageio-ffmpeg`.
 
-> **Versão deste manual:** 0.3.60
+> **Versão deste manual:** 0.3.61
 > **Pacote npm:** `@danhachuel/thunderbolt`
 > **Porta padrão da UI:** `localhost:3030`  
 > **Repositório:** [github.com/DanHachuel/thunderbolt](https://github.com/DanHachuel/thunderbolt)
@@ -33,7 +33,7 @@ A área **AI Influencers > Personagens** permite criar personagens com nome, bio
 
 O backend local predefinido é **SQLite**, pelo que Personagens e Geração de Conteúdo IA podem ser usados sem credenciais externas. Abra **Configurações > Configuração API > AI Influencers > Banco de Dados Influencers** para confirmar **SQLite** ou seleccionar **Supabase**. Se seleccionar Supabase, preencha **Supabase Project URL**, **Supabase API key** e **Supabase Storage bucket**, clique em **Testar ligação do backend**, aplique primeiro `seed/references/ai_influencers_schema.sql` no SQL Editor do projecto, exponha as quatro tabelas na Data API e configure permissões/RLS adequadas. O bucket deve existir com o nome configurado, por defeito `ai-influencers`.
 
-Se pretender trabalhar sem serviço externo, seleccione **SQLite** no selector da aba **Configuração API > AI Influencers** e indique o caminho do ficheiro. O padrão é `storage/state/ai_influencers.db`; o SQLite cria o schema e guarda os assets em `storage/influencers/`. Apenas um backend é usado de cada vez. A aba **AI Influencers** mostra o estado e permite editar directamente o selector, os campos Supabase e o caminho SQLite.
+Se pretender trabalhar sem serviço externo, seleccione **SQLite** no selector da aba **Configuração API > AI Influencers** e indique o caminho do ficheiro. O padrão é `storage/state/ai_influencers.db`; o SQLite cria o schema e guarda os assets em `storage/influencers/`. Apenas um backend é usado de cada vez. A aba **AI Influencers** mostra o estado e permite editar directamente o selector, os campos Supabase e o caminho SQLite. A base fica na pasta persistente do Thunderbolt, fora da instalação temporária do pacote npm; numa actualização normal, personagens, assets e configurações são preservados. O instalador também procura uma base `ai_influencers.db` válida em instalações anteriores do cache npm e recupera-a sem substituir uma base persistente já existente.
 
 Em **AI Influencers > Geração de Conteúdo IA**, utilize as subabas **Imagens**, **Vídeos** e **Motion Control**. Seleccione um personagem, prompt e destinos sociais. A subaba **Imagens** usa o pool de imagem configurado em **Imagem e Video**. A subaba **Vídeos** requer uma imagem inicial e usa o pool de vídeo; escolha o provider/modelo no cartão configurado, sem dependência obrigatória do Veo 3.1. KIE AI, Replicate e FAL AI podem usar tarefas assíncronas; o Thunderbolt consulta o estado e guarda o resultado local antes da revisão. Na Replicate, o campo Modelo deve ser o identificador do modelo ou da versão, e os inputs específicos dependem do modelo configurado.
 
@@ -114,13 +114,13 @@ Execute:
 Windows PowerShell ou MobaXterm:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.60 install
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install
 ```
 
 Linux/macOS:
 
 ```bash
-npx --yes --prefer-online @danhachuel/thunderbolt@0.3.60 install
+npx --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install
 ```
 
 A instalação normal é **segura para actualizações**: preserva `storage`, Blueprints, Brandings, configurações e artefactos do utilizador. Remove apenas `.venv`, o clone técnico do MoneyPrinterTurbo e dependências que serão recriadas. Uma pasta antiga sem dados do utilizador, como `C:\Users\<utilizador>\AppData\Local\hermes` da tentativa incompleta, pode ser removida; uma pasta antiga que contenha Blueprints, Brandings ou storage é preservada e apenas avisada no terminal. Feche processos Python, Node, Streamlit e MobaXterm que estejam a usar as pastas antes de executar.
@@ -128,7 +128,7 @@ A instalação normal é **segura para actualizações**: preserva `storage`, Bl
 Se quiser apagar absolutamente tudo de forma intencional, use o comando destrutivo separado:
 
 ```powershell
-npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.60 install --purge-data
+npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install --purge-data
 ```
 
 O parâmetro `--purge-data` apaga Blueprints, Brandings, configurações, storage e artefactos locais. Não o use numa actualização normal.
@@ -542,7 +542,7 @@ Ao abrir a página, o Thunderbolt não prepara dados públicos, não descarrega 
 
 Os parâmetros da UI são número de clusters entre 2 e 10, suporte mínimo entre 0,01 e 0,50, país, engagement, intervalo de datas e tags, todos dentro da área principal da aba. O núcleo normaliza os dados, calcula engagement, aplica filtros, faz transformação logarítmica e standardização, executa K-Means e calcula itemsets/regras com FP-Growth. Não são apresentados resultados até ao primeiro clique em **Analisar Nichos**; o mesmo botão aplica alterações posteriores aos filtros. Os resultados são DataFrames de clusters, itemsets frequentes, regras de associação e dados analisados; o gráfico de dispersão é criado nativamente com Plotly.
 
-As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.60 install`; o instalador detecta e reutiliza o que já estiver válido.
+As dependências adicionais — `scikit-learn`, `mlxtend`, `plotly`, `seaborn`, `matplotlib` e `kagglehub` — são instaladas pelo procedimento normal de `npx`. Em instalações existentes, execute novamente `npx.cmd --yes --prefer-online @danhachuel/thunderbolt@0.3.61 install`; o instalador detecta e reutiliza o que já estiver válido.
 
 ### Niche Finder Apify
 

@@ -106,6 +106,15 @@ class AIInfluencerRepositoryTests(unittest.TestCase):
         self.assertEqual(client.inserted[0][0], "influencers")
         self.assertNotIn("secret", repr(client.inserted))
 
+    def test_relative_sqlite_path_uses_persistent_storage_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            persistent_storage = Path(temp_dir) / "storage"
+            with patch.object(influencers, "STORAGE", persistent_storage):
+                expected = (persistent_storage / "state" / "ai_influencers.db").resolve()
+                self.assertEqual(influencers.sqlite_path_from_settings({}), expected)
+                self.assertEqual(influencers.sqlite_path_from_settings({"influencer_sqlite_path": "storage/state/ai_influencers.db"}), expected)
+                self.assertEqual(influencers.SQLiteInfluencerRepository("storage/state/ai_influencers.db").path, expected)
+
     def test_backend_selector_is_exclusive_and_sqlite_is_defaultable(self):
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "sqlite"}), "SQLite")
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase"}), "SQLite")

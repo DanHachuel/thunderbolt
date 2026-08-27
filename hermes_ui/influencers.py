@@ -211,14 +211,21 @@ class InfluencerBackendError(RuntimeError):
     """Raised when the selected database backend is unavailable or misconfigured."""
 
 
+def _resolve_sqlite_path(path: str | Path | None = None) -> Path:
+    raw_path = Path(path or (STORAGE / "state" / "ai_influencers.db")).expanduser()
+    if raw_path.is_absolute():
+        return raw_path.resolve()
+    parts = raw_path.parts
+    if parts and parts[0].casefold() == "storage":
+        raw_path = Path(*parts[1:]) if len(parts) > 1 else Path("state") / "ai_influencers.db"
+    return (STORAGE / raw_path).resolve()
+
+
 class SQLiteInfluencerRepository:
     backend = "SQLite"
 
     def __init__(self, path: str | Path | None = None):
-        candidate = Path(path or (STORAGE / "state" / "ai_influencers.db"))
-        if not candidate.is_absolute():
-            candidate = ROOT / candidate
-        self.path = candidate.resolve()
+        self.path = _resolve_sqlite_path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def ensure_schema(self) -> None:
@@ -511,8 +518,7 @@ class SupabaseInfluencerRepository:
 
 def sqlite_path_from_settings(settings: Mapping[str, Any]) -> Path:
     raw = str(settings.get("influencer_sqlite_path") or "storage/state/ai_influencers.db").strip()
-    path = Path(raw).expanduser()
-    return path if path.is_absolute() else ROOT / path
+    return _resolve_sqlite_path(raw)
 
 
 def backend_name(settings: Mapping[str, Any]) -> str:
