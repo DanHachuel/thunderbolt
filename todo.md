@@ -8,3 +8,6 @@
 - [x] Testar, validar visualmente e publicar os ajustes do formulário de Upload.
 - [x] Criar a aba Documentação > Tutorial YouTube Video-Upload Frontend com conteúdo orientado ao uso seguro do fluxo.
 - [x] Testar, validar visualmente e publicar a nova aba de documentação.
+- [x] Adicionar o campo Data de Captura do sessionInfo token aos cartões Contas Google/YouTube — canais em lote.
+- [x] Integrar a Data de Captura no alerta de validade do sessionInfo sem expor o token.
+- [ ] Testar, validar visualmente e publicar a correcção da Data de Captura.
