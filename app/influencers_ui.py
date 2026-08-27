@@ -127,8 +127,27 @@ def render_ai_influencers_api_status(settings: dict[str, Any]) -> None:
             st.error(result.get("message") or "O backend não está disponível.")
 
 
-def render_ai_influencer_characters(settings: dict[str, Any]) -> None:
+def render_ai_influencer_characters(
+    settings: dict[str, Any],
+    *,
+    language_options: list[str] | None = None,
+    language_formatter: Any = None,
+    language_normalizer: Any = None,
+) -> None:
     st.title("Personagens")
+    language_options = list(language_options or ["pt"])
+    language_formatter = language_formatter or (lambda value: value)
+    language_normalizer = language_normalizer or (lambda value, default="pt": str(value or default))
+
+    def language_index(value: Any) -> int:
+        try:
+            normalized = language_normalizer(value, default="pt")
+        except TypeError:
+            normalized = language_normalizer(value)
+        if normalized in language_options:
+            return language_options.index(normalized)
+        return language_options.index("pt") if "pt" in language_options else 0
+
     st.caption("Crie personagens virtuais com várias imagens de referência e documentos Markdown/JSON. Os assets ficam associados ao personagem e não são enviados para IA sem uma acção de geração.")
     repository = _repository(settings)
     if repository is None:
@@ -140,7 +159,13 @@ def render_ai_influencer_characters(settings: dict[str, Any]) -> None:
         with cols[0]:
             name = st.text_input("Nome do personagem", key="influencer_new_name")
         with cols[1]:
-            language = st.text_input("Idioma", placeholder="pt-BR, en-US…", key="influencer_new_language")
+            language = st.selectbox(
+                "Idioma",
+                language_options,
+                index=language_index(st.session_state.get("influencer_new_language", "pt")),
+                format_func=language_formatter,
+                key="influencer_new_language",
+            )
         with cols[2]:
             instagram_id = st.text_input("Instagram Business ID (opcional)", key="influencer_new_instagram_id")
         bio = st.text_area("Biografia e instruções", height=130, key="influencer_new_bio")
@@ -184,7 +209,13 @@ def render_ai_influencer_characters(settings: dict[str, Any]) -> None:
     with st.expander("Editar perfil", expanded=False):
         with st.form(f"influencer_edit_form_{selected_id}"):
             edit_name = st.text_input("Nome", value=str(selected.get("name") or ""), key=f"influencer_edit_name_{selected_id}")
-            edit_language = st.text_input("Idioma", value=str(selected.get("language") or ""), key=f"influencer_edit_language_{selected_id}")
+            edit_language = st.selectbox(
+                "Idioma",
+                language_options,
+                index=language_index(selected.get("language") or "pt"),
+                format_func=language_formatter,
+                key=f"influencer_edit_language_{selected_id}",
+            )
             edit_instagram = st.text_input("Instagram Business ID", value=str(selected.get("instagram_business_id") or ""), key=f"influencer_edit_instagram_{selected_id}")
             edit_bio = st.text_area("Biografia e instruções", value=str(selected.get("bio") or ""), height=130, key=f"influencer_edit_bio_{selected_id}")
             save_edit = st.form_submit_button("Guardar alterações", type="primary")
@@ -387,14 +418,8 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
         st.info("A subaba Motion Control foi preparada para a próxima evolução. Nenhuma operação é executada nesta versão.")
 
 
-def render_ai_influencer_motion_control() -> None:
-    st.title("Motion Control")
-    st.info("A área Motion Control está reservada para desenvolvimento futuro e permanece vazia nesta versão.")
-
-
 __all__ = [
     "render_ai_influencer_characters",
     "render_ai_influencer_content",
-    "render_ai_influencer_motion_control",
     "render_ai_influencers_api_status",
 ]
