@@ -153,7 +153,7 @@ def render_ai_influencer_characters(
     if repository is None:
         return
 
-    with st.form("influencer_create_form", clear_on_submit=False):
+    with st.form("influencer_create_form", clear_on_submit=True):
         st.subheader("Novo personagem")
         cols = st.columns(3)
         with cols[0]:
