@@ -21,8 +21,17 @@ def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
 def test_ai_influencers_routes_are_real_and_content_has_three_subtabs():
     assert '"Personagens": lambda: render_ai_influencer_characters' in MAIN
     assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in MAIN
-    assert '"Motion Control": render_ai_influencer_motion_control' in MAIN
+    assert 'language_options=VIDEO_LANGUAGE_SELECTION_OPTIONS' in MAIN
+    assert 'language_formatter=video_language_label' in MAIN
+    assert 'language_normalizer=normalize_video_language' in MAIN
+    assert '"Motion Control": render_ai_influencer_motion_control' not in MAIN
+    assert '("Motion Control", ":material/motion_mode:", "Motion Control")' not in MAIN
     assert 'st.tabs(["Imagens", "Vídeos", "Motion Control"])' in UI
+    assert 'language_options: list[str] | None = None' in UI
+    assert 'language = st.selectbox(' in UI
+    assert 'edit_language = st.selectbox(' in UI
+    assert 'format_func=language_formatter' in UI
+    assert 'st.text_input("Idioma"' not in UI
     assert 'accept_multiple_files=True' in UI
     assert '".md"' in UI and '".json"' in UI
     assert 'st.file_uploader' in UI

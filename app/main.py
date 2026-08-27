@@ -31,7 +31,7 @@ from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_a
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
 from app.modules.niche_finder.summarizer import summarize_items
-from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencer_motion_control, render_ai_influencers_api_status
+from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
@@ -6236,7 +6236,6 @@ def main():
     models_ai_items = [
         ("Personagens", ":material/person:", "Personagens"),
         ("Geração de Conteúdo IA", ":material/auto_awesome:", "Geração de Conteúdo IA"),
-        ("Motion Control", ":material/motion_mode:", "Motion Control"),
         ("UGC Products", ":material/shopping_bag:", "UGC Products"),
         ("Redes Sociais", ":material/share:", "Redes Sociais"),
     ]
@@ -6371,9 +6370,13 @@ def main():
         "Editor Python": render_python_editor,
         "Download Mídia": render_media_download,
         "AI Influencers": lambda: render_edit_placeholder("AI Influencers", "Seleccione uma das abas AI Influencers no menu expansível."),
-        "Personagens": lambda: render_ai_influencer_characters(read_json("settings.json", {})),
+        "Personagens": lambda: render_ai_influencer_characters(
+            read_json("settings.json", {}),
+            language_options=VIDEO_LANGUAGE_SELECTION_OPTIONS,
+            language_formatter=video_language_label,
+            language_normalizer=normalize_video_language,
+        ),
         "Geração de Conteúdo IA": lambda: render_ai_influencer_content(read_json("settings.json", {})),
-        "Motion Control": render_ai_influencer_motion_control,
         "UGC Products": lambda: render_edit_placeholder("UGC Products", ""),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Analista Growth Youtube": lambda: render_edit_placeholder("Analista Growth Youtube", ""),

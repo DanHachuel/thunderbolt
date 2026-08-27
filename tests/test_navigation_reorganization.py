@@ -52,7 +52,7 @@ class NavigationReorganizationTests(unittest.TestCase):
             "Arquivos Base", "Blueprints Youtube", "Prompt Masters",
             "Canais e Perfis de Vídeos", "Canais YouTube", "Contas TikTok", "Facebook Pages",
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
-            "AI Influencers", "Personagens", "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Redes Sociais",
+            "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Redes Sociais",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
             "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram",
             "Documentação", "Tutorial Meta", "Tutorial Supabase", "Tutorial Kaggle", "Tutorial Apify",
