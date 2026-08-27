@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from integrations.youtube_direct_credentials import COOKIE_KEYS, account_innertube_api_key, delegated_session_id, load_credentials_document
+from integrations.session_info_health import session_info_health_from_settings
 from urllib.parse import quote
 
 import requests
@@ -201,11 +202,23 @@ class YouTubeDirectUploader:
         validation_error = validate_direct_upload(path, self.channel, self.settings, self.account, self.storage_root)
         if validation_error:
             return DirectUploadResult(False, validation_error, {"mechanism": "youtube-frontend-direct"})
+        session_health = session_info_health_from_settings(
+            self.account or {},
+            self.document,
+            self.settings,
+            credential_file=(str(self.storage_root) if self.storage_root else ""),
+        )
+        if session_health.status == "expired":
+            return DirectUploadResult(
+                False,
+                f"Upload directo bloqueado: {session_health.message}",
+                {"mechanism": "youtube-frontend-direct", "session_info_health": session_health.as_dict()},
+            )
         try:
             self.describe_file(path)
             self.create_video(title, description, visibility)
             configured_chunk_size = int(chunk_size or self.document.get("chunk_size") or CHUNK_GRANULARITY)
             self.upload_chunks(path, configured_chunk_size)
-            return DirectUploadResult(True, f"Upload directo concluído: {self.video_id}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id, "page_id": self.channel.get("delegated_session_id", ""), "google_account_id": (self.account or {}).get("id", "")})
+            return DirectUploadResult(True, f"Upload directo concluído: {self.video_id}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id, "page_id": self.channel.get("delegated_session_id", ""), "google_account_id": (self.account or {}).get("id", ""), "session_info_health": session_health.as_dict()})
         except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
             return DirectUploadResult(False, f"Upload directo falhou: {exc}", {"mechanism": "youtube-frontend-direct", "video_id": self.video_id})

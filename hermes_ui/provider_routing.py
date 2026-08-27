@@ -25,7 +25,7 @@ from .llm_providers import (
     normalize_llm_card,
     provider_definition,
 )
-from .storage import STORAGE, ensure_storage
+from .storage import STORAGE, atomic_write, ensure_storage
 
 
 POOL_LLM = "llm_text"
@@ -159,10 +159,8 @@ def _load_state(path: Path, default: Any) -> Any:
 
 
 def _save_state(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(temporary, path)
+    """Persist provider routing state without exposing a partial JSON file."""
+    atomic_write(path, value)
 
 
 def nvidia_rpm_enabled(settings: Mapping[str, Any]) -> bool:

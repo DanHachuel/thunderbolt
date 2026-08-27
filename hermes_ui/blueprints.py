@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .storage import BLUEPRINTS, now
+from .storage import BLUEPRINTS, atomic_write, now
 
 
 def _slug(value: str) -> str:
@@ -140,15 +140,16 @@ def create_branding_for_blueprint(blueprint: dict[str, Any]) -> dict[str, Any]:
 
 
 def save_generated_blueprint(blueprint: dict[str, Any], branding: dict[str, Any] | None = None) -> tuple[Path, Path | None]:
+    """Persist generated Blueprint/Branding JSON using atomic replacement."""
     BLUEPRINTS.mkdir(parents=True, exist_ok=True)
     target = BLUEPRINTS / "canais" / f"{_slug(blueprint.get('name', 'blueprint'))}-{blueprint['id']}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(__import__("json").dumps(blueprint, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_write(target, blueprint)
     branding_path = None
     if branding:
         branding_path = BLUEPRINTS / "brandings" / f"{_slug(branding.get('name', 'branding'))}-{branding['id']}.json"
         branding_path.parent.mkdir(parents=True, exist_ok=True)
-        branding_path.write_text(__import__("json").dumps(branding, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        atomic_write(branding_path, branding)
     return target, branding_path
 
 

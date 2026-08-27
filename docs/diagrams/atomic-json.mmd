@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant C as Caller
+    participant A as atomic_write
+    participant T as Same-directory temp file
+    participant F as Destination JSON
+    C->>A: payload completo
+    A->>T: serialise + flush + fsync
+    alt serialisation fails
+        A-->>C: error; remove temp; keep F
+    else serialisation succeeds
+        A->>F: os.replace(temp, destination)
+        A-->>C: success
+    end

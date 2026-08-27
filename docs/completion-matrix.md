@@ -1,6 +1,6 @@
 # Matriz de conclusão do Thunderbolt
 
-Estado auditado para o release 0.3.73.
+Estado auditado para o release 0.3.74.
 
 | Requisito | Estado auditado | Evidência / pendência |
 |---|---|---|
@@ -66,3 +66,6 @@ Nenhum release será descrito como final enquanto os itens marcados como pendent
 | Upload Bilibili via bilibili-api e DistroKid | Concluído | `Upload` disponibiliza Bilibili com contas multi-card e upload via `bilibili-api-python`; `Configuração API > API Bilibili` permite testar, guardar e apagar cards. `Upload Música > DistroKid` adapta o upload do musikai com browser assistido, múltiplas faixas, capa, metadata local e submissão final manual. Cookies e credenciais não entram nos logs ou no histórico público. |
 
 | Growth: Analista Facebook Pages e Analista Bilibili | Concluído como área reservada | As duas abas existem no grupo Growth, estão ligadas a renderers vazios e não executam operações nesta versão. |
+
+| Documentação de API interna, escritas atómicas e health check SessionInfo | Concluído | `docs/api-internal.md` e três diagramas Mermaid documentam os contratos; `atomic_write` cobre estado, Blueprints, artefactos e manifestos; contas Google e workers recebem estados healthy/expiring/expired/unknown com alertas deduplicados. |
+| Orquestrador local em cascata | Concluído | `create_tasks_for_batch` inicializa `local-cascade`; `pipeline_worker` persiste ordem, etapa actual, etapas concluídas e transições, retomando artefactos válidos sem regeneração. |

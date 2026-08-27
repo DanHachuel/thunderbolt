@@ -12,6 +12,7 @@ from .creative_generation import generate_title_and_keywords, generate_topic_for
 from .domain import create_batch, create_tasks_for_batch
 from .material_sources import selected_material_source
 from .notifications import record_notification
+from integrations.session_info_health import check_all_accounts_session_info_health, emit_session_info_health_alerts
 
 WORKER_STATE_FILE = "automation_worker.json"
 LOCK_FILENAME = "automation_worker.lock"
@@ -233,6 +234,14 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
     status["last_tick_local"] = _local_iso(current)
     status["last_heartbeat_local"] = _local_iso(current)
     status["last_error"] = ""
+    try:
+        session_health = check_all_accounts_session_info_health(storage.STORAGE, storage.read_json("settings.json", {}))
+        session_alerts = emit_session_info_health_alerts(session_health, now=current.astimezone())
+        status["session_info_health"] = [item.as_dict() for item in session_health]
+        status["session_info_alerts"] = len(session_alerts)
+    except Exception as exc:
+        # Session monitoring must never stop creation of a scheduled batch.
+        status["session_info_health_error"] = type(exc).__name__
     created: list[dict[str, Any]] = []
     skipped: list[str] = []
     channels = storage.read_json("channels.json", [])
