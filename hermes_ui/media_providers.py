@@ -12,6 +12,18 @@ MEDIA_VIDEO_ACTIVE_CARD_KEY = "media_video_active_card_id"
 MEDIA_IMAGE_ACTIVE_PROVIDER_KEY = "media_image_provider"
 MEDIA_VIDEO_ACTIVE_PROVIDER_KEY = "media_video_provider"
 
+FULL_IA_VIDEO_PROVIDER_CODES = (
+    "fal_ai",
+    "kie_ai",
+    "agnes",
+    "nano_banana",
+    "replicate",
+    "pollinations",
+    "huggingface",
+    "inferenceport",
+    "heygen",
+)
+
 # Mantidos internamente para preservar compatibilidade e controlar o prompt dos providers.
 INTERNAL_IMAGE_ASPECT_RATIO = "16:9"
 INTERNAL_IMAGE_SIZE = "1K"
@@ -55,7 +67,7 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
     ),
     MediaProviderDefinition(
         "replicate",
-        "Replicate",
+        "Replicate AI",
         default_base_url="https://api.replicate.com/v1",
         supports_image=True,
         supports_video=True,
@@ -132,6 +144,15 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
         supports_video=True,
         api_style="fal_queue",
         description="Model APIs da FAL com queue, status e resultado.",
+    ),
+    MediaProviderDefinition(
+        "heygen",
+        "HeyGen",
+        default_base_url="https://api.heygen.com",
+        supports_video=True,
+        api_style="heygen",
+        extra_fields=("avatar_id", "voice_id"),
+        description="Vídeos com avatar, script ou áudio pela API V3 da HeyGen.",
     ),
 )
 

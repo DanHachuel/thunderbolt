@@ -13,9 +13,13 @@ from hermes_ui.provider_routing import POOL_IMAGE, RoutedResponse
 class MediaProvidersTests(unittest.TestCase):
     def test_catalog_contains_requested_current_providers_and_excludes_deprecated_names(self):
         codes = {item["code"] for item in media_providers.media_provider_catalog()}
-        self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai"}.issubset(codes))
+        self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai", "heygen"}.issubset(codes))
         self.assertNotIn("nexaapi", codes)
         self.assertNotIn("openimagegen", codes)
+        self.assertEqual(
+            set(media_providers.FULL_IA_VIDEO_PROVIDER_CODES),
+            {"fal_ai", "kie_ai", "agnes", "nano_banana", "replicate", "pollinations", "huggingface", "inferenceport", "heygen"},
+        )
 
     def test_legacy_nano_settings_migrate_to_image_card(self):
         migrated, changed = media_providers.ensure_media_provider_cards(
@@ -99,6 +103,39 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertIn("1080p", prompt)
         self.assertNotIn("size", post.call_args.kwargs["json"])
         self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
+
+    def test_heygen_video_request_uses_v3_avatar_contract_and_api_key_header(self):
+        response = Mock(status_code=200)
+        card = {
+            "provider": "heygen",
+            "api_style": "heygen",
+            "api_key": "heygen-secret",
+            "base_url": "https://api.heygen.com",
+            "avatar_id": "avatar-123",
+            "voice_id": "voice-456",
+        }
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._video_request(card, "script do vídeo")
+        self.assertEqual(post.call_args.args[0], "https://api.heygen.com/v3/videos")
+        self.assertEqual(post.call_args.kwargs["headers"]["X-Api-Key"], "heygen-secret")
+        self.assertNotIn("Authorization", post.call_args.kwargs["headers"])
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["type"], "avatar")
+        self.assertEqual(body["avatar_id"], "avatar-123")
+        self.assertEqual(body["voice_id"], "voice-456")
+        self.assertEqual(body["aspect_ratio"], "16:9")
+        self.assertEqual(body["output_format"], "mp4")
+        self.assertIn("script do vídeo", body["script"])
+
+    def test_heygen_polling_reads_completed_video_url_from_v3_data(self):
+        response = Mock(status_code=200)
+        response.json.return_value = {"data": {"status": "completed", "video_url": "https://files.heygen.ai/video.mp4"}}
+        card = {"provider": "heygen", "api_style": "heygen", "api_key": "secret", "base_url": "https://api.heygen.com"}
+        with patch.object(media_generation.requests, "get", return_value=response) as get:
+            output = media_generation._poll_video(card, "video-123", attempts=1)
+        self.assertEqual(output, "https://files.heygen.ai/video.mp4")
+        self.assertEqual(get.call_args.args[0], "https://api.heygen.com/v3/videos/video-123")
+        self.assertEqual(get.call_args.kwargs["headers"]["X-Api-Key"], "secret")
 
     def test_video_result_accepts_direct_url_or_task_id(self):
         self.assertEqual(media_generation._video_result({"url": "https://example/video.mp4"}), ("https://example/video.mp4", ""))

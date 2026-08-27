@@ -53,9 +53,13 @@ def _base_url(card: Mapping[str, Any]) -> str:
 
 def _headers(card: Mapping[str, Any], *, fal: bool = False) -> dict[str, str]:
     key = _api_key(card)
+    provider = str(card.get("provider") or "").strip().lower()
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if key:
-        headers["Authorization"] = f"Key {key}" if fal else f"Bearer {key}"
+        if provider == "heygen":
+            headers["X-Api-Key"] = key
+        else:
+            headers["Authorization"] = f"Key {key}" if fal else f"Bearer {key}"
     return headers
 
 
@@ -347,6 +351,8 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
     definition = media_provider_definition(card.get("provider"))
     style = str(card.get("api_style") or definition.api_style)
     base = _base_url(card)
+    if style == "heygen":
+        return f"{base}/v3/videos"
     if style == "fal_queue":
         if not _model(card):
             raise MediaGenerationError("FAL AI requer o identificador da rota/modelo para gerar vídeo.")
@@ -374,6 +380,21 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
     }
     if image_url:
         body["image_url"] = image_url
+    if style == "heygen":
+        avatar_id = str(card.get("avatar_id") or "").strip()
+        if not avatar_id:
+            raise MediaGenerationError("HeyGen requer Avatar ID no cartão de media para gerar vídeo.")
+        heygen_body: dict[str, Any] = {
+            "type": "avatar",
+            "avatar_id": avatar_id,
+            "script": body["prompt"],
+            "aspect_ratio": str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO),
+            "output_format": "mp4",
+        }
+        voice_id = str(card.get("voice_id") or "").strip()
+        if voice_id:
+            heygen_body["voice_id"] = voice_id
+        return requests.post(endpoint, headers=_headers(card), json=heygen_body, timeout=180)
     if style == "fal_queue":
         body.pop("model", None)
         return requests.post(endpoint, headers=_headers(card, fal=True), json=body, timeout=180)
@@ -403,6 +424,14 @@ def _video_result(payload: Mapping[str, Any]) -> tuple[str, str]:
         if value:
             return "", value
     data = payload.get("data")
+    if isinstance(data, Mapping):
+        direct = str(data.get("video_url") or data.get("url") or "").strip()
+        if direct.startswith(("http://", "https://")):
+            return direct, ""
+        for key in ("video_id", "id", "request_id", "task_id", "job_id"):
+            value = str(data.get(key) or "").strip()
+            if value:
+                return "", value
     if isinstance(data, list) and data and isinstance(data[0], Mapping):
         first = data[0]
         direct = str(first.get("url") or first.get("video_url") or "").strip()
@@ -422,6 +451,8 @@ def _poll_video(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
         endpoint = f"{base}/requests/{request_id}/status"
     elif style == "replicate":
         endpoint = f"{base}/predictions/{request_id}"
+    elif style == "heygen":
+        endpoint = f"{base}/v3/videos/{request_id}"
     else:
         endpoint = f"{base}/videos/{request_id}"
     headers = _headers(card, fal=style == "fal_queue")
@@ -437,8 +468,14 @@ def _poll_video(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
         url, _ = _video_result(payload if isinstance(payload, Mapping) else {})
         if url:
             return url
-        status = str((payload or {}).get("status") or "").lower() if isinstance(payload, Mapping) else ""
+        status_payload = payload.get("data") if isinstance(payload, Mapping) and isinstance(payload.get("data"), Mapping) else payload
+        status = str((status_payload or {}).get("status") or "").lower() if isinstance(status_payload, Mapping) else ""
         if status in {"failed", "error", "cancelled", "canceled"}:
+            if style == "heygen" and isinstance(status_payload, Mapping):
+                code = str(status_payload.get("failure_code") or "").strip()
+                detail = str(status_payload.get("failure_message") or "").strip()
+                suffix = f" ({code})" if code else ""
+                raise ProviderCallError(f"HeyGen marcou a tarefa como falhada{suffix}: {detail or 'sem detalhe'}", category="provider", retryable=False)
             raise ProviderCallError("O provider marcou a tarefa de vídeo como falhada.", category="provider", retryable=False)
         if index + 1 < attempts:
             time.sleep(max(0.2, interval_seconds))
@@ -474,7 +511,7 @@ def generate_video_for_card(
         raise MediaGenerationError(f"O provider {provider} não devolveu URL nem identificador de vídeo.")
     destination = output_path or (STORAGE / "videos" / f"media-{provider}-{abs(hash((prompt, url))) & 0xffffffffffffffff:x}.mp4")
     try:
-        response = requests.get(url, headers={"Authorization": f"Bearer {_api_key(routed.card)}"} if _api_key(routed.card) else {}, timeout=300)
+        response = requests.get(url, headers=_headers(routed.card), timeout=300)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise MediaGenerationError(f"Não foi possível descarregar o vídeo gerado: {exc}") from exc

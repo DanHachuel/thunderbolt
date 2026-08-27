@@ -124,7 +124,9 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
         return _result("missing", "Complete a Base URL antes de testar.")
     if provider not in {"inferenceport", "ollama", "lmstudio"} and not api_key:
         return _missing("Introduza a API key/token antes de testar este provider.")
-    if not model and provider not in {"inferenceport", "cloudflare_workers_ai"}:
+    if provider == "heygen":
+        return _get(f"{base_url}/v3/users/me", headers={"X-Api-Key": api_key})
+    if not model and provider not in {"inferenceport", "cloudflare_workers_ai", "heygen"}:
         return _result("missing", "Complete o modelo antes de testar.")
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     if provider == "cloudflare_workers_ai":

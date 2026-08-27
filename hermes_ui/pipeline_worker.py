@@ -19,7 +19,7 @@ from hermes_ui.script_generation import generate_script_document
 from hermes_ui.storage import STORAGE, ensure_storage, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
-from hermes_ui.media_providers import media_cards_for_pool
+from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
 from hermes_ui.material_sources import material_api_keys, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
@@ -369,7 +369,10 @@ def _failure_attribution(
             "failure_stage": stage,
         }
     if stage == "video" and route == "full_ia":
-        providers = [("fal_ai", "FAL AI"), ("kie_ai", "KIE AI"), ("agnes", "Agnes AI")]
+        providers = [
+            (code, media_provider_definition(code).label)
+            for code in FULL_IA_VIDEO_PROVIDER_CODES
+        ]
         found = [label for code, label in providers if code in combined or label.casefold() in combined]
         labels = found or [label for _, label in providers]
         codes = [code for code, label in providers if label in labels] or [code for code, _ in providers]
@@ -1060,7 +1063,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
                 video_path = generate_video_from_pool(
                     settings,
                     video_prompt,
-                    allowed_providers={"fal_ai", "kie_ai", "agnes"},
+                    allowed_providers=set(FULL_IA_VIDEO_PROVIDER_CODES),
                 )
             else:
                 video_path = _run_video_helper({
@@ -1073,7 +1076,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
                 })
         except MediaGenerationError as exc:
             if route == "full_ia":
-                message = f"Pool Full IA (FAL/KIE AI/Agnes AI): {exc}"
+                message = f"Pool Full IA (FAL AI/KIE AI/Agnes AI/Nano Banana/Replicate AI/Pollinations.ai/Hugging Face Inference API/InferencePort Proxy/HeyGen): {exc}"
             else:
                 message = f"Pipeline MoneyPrinterTurbo ({route}): {exc}"
             metadata = _failure_attribution(task, settings, "video", error=str(exc))
