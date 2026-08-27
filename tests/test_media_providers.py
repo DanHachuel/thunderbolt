@@ -43,16 +43,17 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertNotIn("aspect_ratio", definition.extra_fields)
         self.assertNotIn("image_size", definition.extra_fields)
 
-    def test_pools_filter_capabilities_and_prioritize_active_card(self):
+    def test_pools_filter_capabilities_and_use_active_card_only_as_priority_tiebreaker(self):
         settings = {
             "media_provider_cards": [
                 {"id": "video", "provider": "fal_ai", "model": "video-model", "supports_video": True, "supports_image": False, "enabled": True, "priority": 2},
-                {"id": "image", "provider": "nano_banana", "model": "image-model", "supports_video": False, "supports_image": True, "enabled": True, "priority": 3},
+                {"id": "active-image", "provider": "nano_banana", "model": "image-model", "supports_video": False, "supports_image": True, "enabled": True, "priority": 3},
+                {"id": "priority-image", "provider": "pollinations", "model": "flux", "supports_video": False, "supports_image": True, "enabled": True, "priority": 1},
             ],
-            "media_image_active_card_id": "image",
+            "media_image_active_card_id": "active-image",
             "media_video_active_card_id": "video",
         }
-        self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "image")], ["image"])
+        self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "image")], ["priority-image", "active-image"])
         self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "video")], ["video"])
 
     def test_openai_compatible_image_base64_is_saved(self):
