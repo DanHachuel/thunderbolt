@@ -12,6 +12,7 @@ SCHEMA = (ROOT / "seed" / "references" / "ai_influencers_schema.sql").read_text(
 def test_api_configuration_adds_ai_influencers_tab_and_database_expander():
     assert 'render_localized_tabs(["API Keys", "Contas Google", "Fontes de Materiais", "AI Influencers", "Teste de Voz"])' in MAIN
     assert 'with st.expander("Banco de Dados Influencers", expanded=False):' in MAIN
+    assert "SQLite local funciona sem credenciais externas" in MAIN
     assert '"influencer_db_backend": influencer_db_backend' in MAIN
     assert '"influencer_supabase_url": influencer_supabase_url.strip()' in MAIN
     assert '"influencer_sqlite_path": influencer_sqlite_path.strip()' in MAIN

@@ -369,7 +369,7 @@ class SupabaseInfluencerRepository:
         self.key = str(key or "").strip()
         self.bucket = str(bucket or "ai-influencers").strip() or "ai-influencers"
         if not self.url or not self.key:
-            raise InfluencerBackendError("Complete o Supabase Project URL e a API key.")
+            raise InfluencerBackendError("Supabase seleccionado sem credenciais completas; seleccione SQLite ou preencha as credenciais do Supabase.")
         if client is not None:
             self.client = client
             return
@@ -516,8 +516,13 @@ def sqlite_path_from_settings(settings: Mapping[str, Any]) -> Path:
 
 
 def backend_name(settings: Mapping[str, Any]) -> str:
-    value = str(settings.get("influencer_db_backend") or "Supabase").strip().casefold()
-    return "SQLite" if value == "sqlite" else "Supabase"
+    """Return the usable backend; an empty Supabase configuration never blocks local use."""
+    value = str(settings.get("influencer_db_backend") or "").strip().casefold()
+    if value == "sqlite":
+        return "SQLite"
+    if value == "supabase" and str(settings.get("influencer_supabase_url") or "").strip() and str(settings.get("influencer_supabase_key") or "").strip():
+        return "Supabase"
+    return "SQLite"
 
 
 def get_repository(settings: Mapping[str, Any], *, client: Any | None = None) -> SQLiteInfluencerRepository | SupabaseInfluencerRepository:
@@ -546,7 +551,7 @@ def backend_status(settings: Mapping[str, Any]) -> dict[str, Any]:
         "backend": backend,
         "configured": bool(url and key),
         "target": url or "Project URL não configurado",
-        "message": "Supabase configurado; confirme schema/RLS/bucket." if url and key else "Complete Project URL e API key do Supabase.",
+        "message": "Supabase configurado; confirme schema/RLS/bucket.",
     }
 
 
