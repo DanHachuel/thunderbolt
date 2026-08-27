@@ -22,3 +22,10 @@ def test_future_platform_target_lists_are_reserved_in_settings():
     assert '"Instagram": "instagram_profiles"' in SOURCE
     assert '"Facebook Pages": "facebook_pages"' in SOURCE
     assert 'A lista de {destination} será ligada numa etapa própria de credenciais/API.' in SOURCE
+
+
+def test_bilibili_is_a_real_upload_destination_with_api_cards():
+    assert '"Bilibili": "bilibili_api_cards"' in SOURCE
+    assert '"Bilibili"' in SOURCE
+    assert 'Enviar via bilibili-api (Python)' in SOURCE
+    assert 'Configuração API > API Bilibili' in SOURCE
