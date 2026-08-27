@@ -308,6 +308,22 @@ def _provider_api_label(provider: str) -> str:
     return f"{provider_definition(code).label} API"
 
 
+def _is_azure_long_audio_error(text: str) -> bool:
+    combined = str(text or "").casefold()
+    duration_marker = any(
+        marker in combined
+        for marker in (
+            "600000ms",
+            "600000 ms",
+            "maximum media duration",
+            "maximum audio length",
+        )
+    )
+    code_marker = any(marker in combined for marker in ("error code: 1007", "error code=1007", "code 1007"))
+    speech_marker = any(marker in combined for marker in ("azure", "speech synthesis", "speech sdk", "tts"))
+    return speech_marker and (duration_marker or code_marker)
+
+
 def _failure_attribution(
     task: dict[str, Any],
     settings: dict[str, Any],
@@ -323,6 +339,16 @@ def _failure_attribution(
     invalid = list(markers["invalid_fields"])
     provider_code = str(markers["helper_provider"] or "").strip().casefold()
     combined = f"{output} {error}".casefold()
+
+    if stage == "video" and _is_azure_long_audio_error(combined):
+        return {
+            "failure_api": "Azure Speech SDK V2 API",
+            "failure_provider": "azure_speech",
+            "failure_service": "Narração TTS — limite de 600000 ms",
+            "failure_route": route,
+            "failure_config_fields": "",
+            "failure_stage": stage,
+        }
 
     if stage == "video" and any(marker in combined for marker in ("edge_tts", "edge tts", "azure_tts_v1", "azure speech")):
         return {

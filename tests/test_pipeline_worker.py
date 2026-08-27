@@ -662,3 +662,19 @@ def test_pipeline_stage_order_places_video_before_thumbnail_prompt():
     from hermes_ui.domain import STAGES
 
     assert STAGES.index("video") < STAGES.index("thumbnail_prompt") < STAGES.index("thumbnail") < STAGES.index("upload")
+
+
+def test_azure_v2_long_audio_error_is_attributed_to_specific_api():
+    metadata = pipeline_worker._failure_attribution(
+        {"style_wide": "pexels"},
+        {},
+        "video",
+        error=(
+            "re v2 speech synthesis error: Connection was closed by the remote host. "
+            "Error code: 1007. Error details: The processed audio has exceeded "
+            "the configured maximum media duration of 600000ms"
+        ),
+    )
+    assert metadata["failure_api"] == "Azure Speech SDK V2 API"
+    assert metadata["failure_provider"] == "azure_speech"
+    assert metadata["failure_service"] == "Narração TTS — limite de 600000 ms"

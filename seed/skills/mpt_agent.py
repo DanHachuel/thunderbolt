@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import urllib.error
 import urllib.request
 import uuid
@@ -299,6 +300,108 @@ def has_cli_option(cli_args: list[str], option: str) -> bool:
     return any(item == option or item.startswith(f"{option}=") for item in cli_args)
 
 
+def _toml_section_value(config_path: Path, section: str, key: str) -> str:
+    """Read one nested TOML value without logging the value or its contents."""
+    try:
+        payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return ""
+    section_payload = payload.get(section)
+    if not isinstance(section_payload, dict):
+        return ""
+    value = section_payload.get(key, "")
+    return str(value or "").strip()
+
+
+def _forwarded_option_value(cli_args: list[str], option: str) -> str:
+    for index, item in enumerate(cli_args):
+        if item == option and index + 1 < len(cli_args):
+            return str(cli_args[index + 1]).strip()
+        if item.startswith(f"{option}="):
+            return item.split("=", 1)[1].strip()
+    return ""
+
+
+def _azure_v2_voice(cli_args: list[str]) -> str:
+    """Return the unmarked Azure voice when this invocation requests Azure V2."""
+    voice = _forwarded_option_value(cli_args, "--voice-name")
+    if "-V2-" not in voice and not voice.endswith("-V2"):
+        return ""
+    base_voice = re.sub(r"-V2(?=-|$)", "", voice, count=1).strip()
+    return re.sub(r"-(?:Female|Male)$", "", base_voice, flags=re.IGNORECASE).strip()
+
+
+def _voice_rate(cli_args: list[str]) -> float:
+    value = _forwarded_option_value(cli_args, "--voice-rate")
+    try:
+        return float(value) if value else 1.0
+    except ValueError:
+        return 1.0
+
+
+def _prepare_azure_v2_chunked_audio(
+    root: Path,
+    config_path: Path,
+    task_dir: Path,
+    cli_args: list[str],
+    uv: str,
+) -> Path | None:
+    """Create task-local audio in chunks before MPT starts its normal pipeline."""
+    voice = _azure_v2_voice(cli_args)
+    text = _forwarded_option_value(cli_args, "--video-script")
+    if not voice or not text.strip():
+        return None
+    speech_key = _toml_section_value(config_path, "azure", "speech_key")
+    speech_region = _toml_section_value(config_path, "azure", "speech_region")
+    if not speech_key or not speech_region:
+        raise SkillError("Azure Speech SDK V2 foi seleccionado, mas as credenciais não estão completas.")
+    text_file = task_dir / "azure-v2-script.txt"
+    audio_file = task_dir / "azure-v2-audio.mp3"
+    text_file.parent.mkdir(parents=True, exist_ok=True)
+    text_file.write_text(text.strip(), encoding="utf-8")
+    chunk_script = Path(__file__).with_name("azure_tts_chunked.py")
+    command = [
+        uv,
+        "run",
+        "--project",
+        str(root),
+        "python",
+        str(chunk_script),
+        "--text-file",
+        str(text_file),
+        "--output",
+        str(audio_file),
+        "--voice",
+        voice,
+        "--rate",
+        str(_voice_rate(cli_args)),
+    ]
+    environment = os.environ.copy()
+    environment["AZURE_SPEECH_KEY"] = speech_key
+    environment["AZURE_SPEECH_REGION"] = speech_region
+    ffmpeg_path = _toml_section_value(config_path, "app", "ffmpeg_path")
+    if ffmpeg_path:
+        environment["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
+    log("synthesizing Azure Speech V2 in safe chunks before MoneyPrinterTurbo")
+    result = subprocess.run(
+        command,
+        cwd=root,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0 or not audio_file.is_file() or audio_file.stat().st_size <= 0:
+        detail = "\n".join((result.stdout or "").splitlines()[-12:]).strip()
+        raise SkillError(
+            "Azure Speech SDK V2 falhou na síntese segmentada. "
+            + (detail or "O helper não devolveu detalhes.")
+        )
+    return audio_file
+
+
 def missing_config(config_path: Path, cli_args: list[str]) -> tuple[str, list[str]]:
     """Return the active provider and only the fields required by this run."""
     text = config_path.read_text(encoding="utf-8")
@@ -493,9 +596,11 @@ def generate_video(
     if not uv:
         raise SkillError("uv was not found; reopen the terminal or add uv to PATH")
     run_checked([uv, "sync", "--frozen"], cwd=root)
+    config_path = ensure_config(root)
 
     task_id = str(uuid.uuid4())
     task_dir = root / "storage" / "tasks" / task_id
+    task_dir.mkdir(parents=True, exist_ok=True)
     log_dir = root / ".agent-logs" / "moneyprinterturbo-video"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"run-{task_id}.log"
@@ -515,12 +620,23 @@ def generate_video(
         if has_cli_option(cli_args, "--voice-name")
         else ["--voice-name", DEFAULT_VOICE_NAME]
     )
+    forwarded_args = list(cli_args)
+    if not has_cli_option(forwarded_args, "--custom-audio-file"):
+        chunked_audio = _prepare_azure_v2_chunked_audio(
+            root,
+            config_path,
+            task_dir,
+            forwarded_args,
+            uv,
+        )
+        if chunked_audio is not None:
+            forwarded_args.extend(["--custom-audio-file", str(chunked_audio)])
     command = [
         uv,
         "run",
         "python",
         "cli.py",
-        *cli_args,
+        *forwarded_args,
         "--video-subject",
         subject,
         "--task-id",
