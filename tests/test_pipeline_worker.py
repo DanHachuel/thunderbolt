@@ -639,6 +639,21 @@ def test_long_stock_video_receives_bounded_extended_timeout(tmp_path, monkeypatc
     assert pipeline_worker._task_stale_timeout_seconds({**task, "stage": "video"}) == pipeline_worker.LONG_STOCK_VIDEO_TIMEOUT_SECONDS + 5 * 60
 
 
+def test_long_stock_video_uses_fewer_downloads_without_overriding_explicit_clip_duration(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    long_task = {"style_wide": "pexels", "video_script": "word " * 300}
+
+    automatic_args = pipeline_worker._moneyprinter_cli_args(long_task, "pexels", settings={})
+    explicit_args = pipeline_worker._moneyprinter_cli_args(
+        {**long_task, "generation_settings": {"maximum_clip_duration": 7}},
+        "pexels",
+        settings={},
+    )
+
+    assert automatic_args[automatic_args.index("--video-clip-duration") + 1] == "15"
+    assert explicit_args[explicit_args.index("--video-clip-duration") + 1] == "7"
+
+
 def test_short_or_non_stock_video_keeps_default_timeout(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
 
