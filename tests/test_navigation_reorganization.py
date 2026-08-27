@@ -15,13 +15,12 @@ class NavigationReorganizationTests(unittest.TestCase):
             '"Início"',
             '"Automação"',
             '"Niche Finder"',
-            '"Arquivos Base"',
-            '"Canais e Perfis de Vídeos"',
-            '"Growth"',
+            '"Canais/Perfis (Vídeos)"',
             '"Pipeline Vídeos"',
             '"Pipeline Música"',
             '"AI Influencers"',
             '"Edição"',
+            '"Growth"',
             '"Documentação"',
             '"Configurações"',
         ]
@@ -49,8 +48,7 @@ class NavigationReorganizationTests(unittest.TestCase):
 
     def test_requested_groups_and_children_are_present(self):
         required = (
-            "Arquivos Base", "Blueprints Youtube", "Prompt Masters",
-            "Canais e Perfis de Vídeos", "Canais YouTube", "Contas TikTok", "Facebook Pages",
+            "Canais/Perfis (Vídeos)", "Canais YouTube", "Blueprints Youtube", "Contas TikTok", "Prompt Masters", "Facebook Pages",
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
             "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Redes Sociais",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
@@ -113,7 +111,7 @@ class NavigationReorganizationTests(unittest.TestCase):
     def test_navigation_labels_have_translations_for_all_languages(self):
         languages = ("pt", "en", "zh", "de", "vi", "tr", "ru", "es", "id", "it")
         labels = (
-            "Arquivos Base", "Pipeline Vídeos", "Canais e Perfis de Vídeos", "Canais YouTube",
+            "Pipeline Vídeos", "Canais/Perfis (Vídeos)", "Canais YouTube",
             "Facebook Pages", "Prompt Masters", "Backlog Vídeos", "Música", "Upload Música",
             "Geração de Conteúdo IA", "Motion Control", "UGC Products", "Growth",
             "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram", "Analista Facebook Pages", "Analista Bilibili",
@@ -129,3 +127,22 @@ class NavigationReorganizationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_confirmed_video_profiles_children_are_ordered_and_base_files_is_removed():
+    channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
+    expected_children = [
+        '("Canais YouTube",',
+        '("Blueprints Youtube",',
+        '("Contas TikTok",',
+        '("Prompt Masters",',
+        '("Facebook Pages",',
+    ]
+    positions = [channel_block.index(item) for item in expected_children]
+    assert positions == sorted(positions)
+    assert 'base_files_items = [' not in MAIN_SOURCE
+    assert '("Arquivos Base", ":material/folder:", "Arquivos Base")' not in MAIN_SOURCE
+    assert '"Arquivos Base": base_files_items' not in MAIN_SOURCE
+    top_block = MAIN_SOURCE.split("    top_pages = [", 1)[1].split("    ]", 1)[0]
+    assert '"Canais/Perfis (Vídeos)"' in top_block
+    assert '"Arquivos Base"' not in top_block
