@@ -108,9 +108,17 @@ class AIInfluencerRepositoryTests(unittest.TestCase):
 
     def test_backend_selector_is_exclusive_and_sqlite_is_defaultable(self):
         self.assertEqual(influencers.backend_name({"influencer_db_backend": "sqlite"}), "SQLite")
-        self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase"}), "Supabase")
+        self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase"}), "SQLite")
+        self.assertEqual(influencers.backend_name({"influencer_db_backend": "Supabase", "influencer_supabase_url": "https://example.supabase.co", "influencer_supabase_key": "key"}), "Supabase")
         status = influencers.backend_status({"influencer_db_backend": "SQLite", "influencer_sqlite_path": "storage/state/test.db"})
         self.assertTrue(status["configured"])
+
+    def test_empty_or_missing_supabase_settings_open_local_sqlite(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            settings = {"influencer_sqlite_path": str(Path(temp_dir) / "local.db")}
+            repository = influencers.get_repository(settings)
+            self.assertIsInstance(repository, influencers.SQLiteInfluencerRepository)
+            self.assertTrue(influencers.test_backend(settings)["ok"])
 
 
 class ReplicateAdapterTests(unittest.TestCase):

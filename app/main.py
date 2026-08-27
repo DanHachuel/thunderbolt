@@ -5438,8 +5438,9 @@ def render_settings():
                 render_media_provider_cards(settings, embedded=True)
 
                 with st.expander("Banco de Dados Influencers", expanded=False):
-                    st.caption("Escolha um backend para personagens e conteúdos. Supabase é o padrão remoto; SQLite mantém tudo localmente. O teste é read-only e não cria nem elimina registos.")
-                    influencer_db_backend = st.selectbox("Backend da base de dados de AI Influencers", list(BACKEND_OPTIONS), index=0 if str(settings.get("influencer_db_backend") or "Supabase") == "Supabase" else 1, key="settings_influencer_db_backend")
+                    st.caption("Escolha um backend para personagens e conteúdos. SQLite local funciona sem credenciais externas; Supabase é opcional para quem quiser usar uma base remota. O teste é read-only e não cria nem elimina registos.")
+                    configured_backend = backend_name(settings)
+                    influencer_db_backend = st.selectbox("Backend da base de dados de AI Influencers", list(BACKEND_OPTIONS), index=list(BACKEND_OPTIONS).index(configured_backend), key="settings_influencer_db_backend")
                     db_cols = st.columns(2)
                     with db_cols[0]:
                         influencer_supabase_url = text_setting("Supabase Project URL", "influencer_supabase_url", help_text="URL do projecto, por exemplo https://project-id.supabase.co")

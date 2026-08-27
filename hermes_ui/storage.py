@@ -230,7 +230,7 @@ DEFAULTS: dict[str, Any] = {
         "pollinations_api_key": "",
         "pollinations_base_url": "",
         "pollinations_model_name": "",
-        "influencer_db_backend": "Supabase",
+        "influencer_db_backend": "SQLite",
         "influencer_supabase_url": "",
         "influencer_supabase_key": "",
         "influencer_supabase_bucket": "ai-influencers",
