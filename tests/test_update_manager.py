@@ -60,11 +60,25 @@ def test_update_does_not_run_when_the_package_is_already_current():
 
 def test_home_is_the_only_page_that_renders_the_update_button():
     source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+    home_controls = source.split("def render_home_update_controls() -> None:", 1)[1].split("def render_dashboard():", 1)[0]
     dashboard = source.split("def render_dashboard():", 1)[1].split("def render_blueprints():", 1)[0]
 
-    assert 'key="home_update_version"' in dashboard
+    assert 'key="home_update_version"' in home_controls
     assert source.count('key="home_update_version"') == 1
-    assert 'button[kind="primary"]' in dashboard
+    assert 'button[kind="primary"]' in home_controls
+    assert 'if current_page == "Início":\n        render_home_update_controls()' in source
+    assert 'key="home_update_version"' not in dashboard
+
+
+def test_home_update_notice_has_a_close_button_and_constrained_width():
+    source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+    home_controls = source.split("def render_home_update_controls() -> None:", 1)[1].split("def render_dashboard():", 1)[0]
+
+    assert 'st.columns([1.45, 2.55, 3.0])' in home_controls
+    assert 'st.columns([8.5, 1])' in home_controls
+    assert 'key="home_update_notice_close"' in home_controls
+    assert 'home_update_notice_dismissed' in home_controls
+    assert 'help="Fechar este aviso"' in home_controls
 
 
 def test_version_label_keeps_the_two_digit_patch_convention():
