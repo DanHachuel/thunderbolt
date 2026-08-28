@@ -2724,6 +2724,12 @@ def render_music_creation():
         placeholder="Ex.: pôr do sol mediterrânico, estrada molhada, nostalgia suave e arranjos acústicos contemporâneos",
         height=90,
     )
+    prompt = st.text_area(
+        "Prompt musical",
+        placeholder="Use Gerar campos musicais com IA para criar letra e estilo completos, ou escreva um prompt próprio.",
+        key="music_task_prompt",
+        height=300,
+    )
     if st.button("Gerar campos musicais com IA", key="music_task_generate_fields", use_container_width=True, icon=":material/auto_awesome:"):
         try:
             with st.spinner("A criar título, letra e prompt musical originais…"):
@@ -2739,12 +2745,6 @@ def render_music_creation():
             st.rerun()
         except CreativeGenerationError as exc:
             st.error(str(exc))
-    prompt = st.text_area(
-        "Prompt musical",
-        placeholder="Use Gerar campos musicais com IA para criar letra e estilo completos, ou escreva um prompt próprio.",
-        key="music_task_prompt",
-        height=300,
-    )
     lyria_model = ""
     if provider_label == "Google Lyria":
         models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]

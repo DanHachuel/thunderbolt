@@ -56,6 +56,8 @@ def test_music_creation_is_audio_only_and_supports_suno_and_lyria():
     assert '"Referências culturais, paisagens, clima ou artistas similares (opcional)"' in creation
     assert 'st.button("Gerar campos musicais com IA"' in creation
     assert 'st.button("Gerar Música"' in creation
+    assert creation.index('st.button("Gerar campos musicais com IA"') < creation.index('st.button("Gerar Música"')
+    assert creation.index('key="music_task_prompt"') < creation.index('st.button("Gerar campos musicais com IA"')
     assert 'st.session_state["music_task_generated_fields"] = generated' in creation
     assert 'Adicionar ao Music Backlog' not in creation
     assert "MoneyPrinterTurbo" in creation

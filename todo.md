@@ -52,3 +52,5 @@
 - [x] Validar e publicar os ajustes da aba Início e do cartão Google Lyria.
 - [x] Renomear a aba Vozes Personalizadas, Funcionará como um Blueprint para Vozes Personalizadas em toda a interface.
 - [x] Validar e publicar a alteração do nome da aba Vozes Personalizadas.
+- [x] Mover Gerar campos musicais com IA para baixo do Prompt musical e acima de Gerar Música.
+- [x] Validar e publicar a nova ordem dos botões musicais.
