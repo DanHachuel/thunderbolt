@@ -2726,6 +2726,11 @@ def render_music_creation():
             st.error(str(exc))
 
 
+def render_custom_music_voices() -> None:
+    """Reserved view for future reusable custom music-voice blueprints."""
+    st.title("Vozes Personalizadas, Funcionará como um Blueprint")
+
+
 def render_scripts():
     st.title("Roteiros")
     st.caption("Produza e guarde roteiros de vídeos ou letras de músicas a partir dos Blueprints do Thunderbolt.")
@@ -6250,6 +6255,21 @@ def render_settings():
                         saved_lyria_model = str(settings.get("lyria_model") or lyria_models[0])
                         lyria_model = st.selectbox("Modelo Google Lyria", lyria_models, index=lyria_models.index(saved_lyria_model) if saved_lyria_model in lyria_models else 0, key="settings_lyria_model")
 
+                        def save_google_lyria() -> None:
+                            settings.update({"lyria_api_key": lyria_api_key.strip(), "lyria_model": lyria_model})
+                            write_json("settings.json", settings)
+
+                        if st.form_submit_button("Guardar Google Lyria", type="primary", use_container_width=True, key="save_google_lyria"):
+                            save_google_lyria()
+                            st.success("Google Lyria guardado.")
+                        _render_api_test_control(
+                            settings,
+                            "voice:google_lyria",
+                            lambda: test_voice_provider("google_lyria", {"lyria_api_key": lyria_api_key, "lyria_model": lyria_model}),
+                            widget_key="api_test_voice_google_lyria",
+                            persist_callback=save_google_lyria,
+                        )
+
                 with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
@@ -6968,6 +6988,7 @@ def main():
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
         ("Music Backlog", ":material/queue_music:", "Music Backlog"),
+        ("Vozes Personalizadas, Funcionará como um Blueprint", ":material/record_voice_over:", "Vozes Personalizadas, Funcionará como um Blueprint"),
         ("Upload Música", ":material/library_music:", "Upload Música"),
     ]
     models_ai_items = [
@@ -7091,6 +7112,7 @@ def main():
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
         "Music Backlog": render_music_backlog,
+        "Vozes Personalizadas, Funcionará como um Blueprint": render_custom_music_voices,
         "Upload Música": render_music_upload,
         "Roteiros": render_scripts,
         "Thumbnails": render_thumbnails,

@@ -39,3 +39,7 @@
 - [x] Adicionar download local em cada card de imagens de AI Influencers.
 - [x] Adicionar download local em cada card de vídeos de AI Influencers.
 - [x] Criar regressões e publicar os botões de download de media.
+- [x] Adicionar a aba vazia Vozes Personalizadas, Funcionará como um Blueprint em Pipeline Música.
+- [x] Incluir Google Lyria API key e selecção de modelo em Voz, TTS e música.
+- [x] Adicionar teste seguro de chamada API para Google Lyria sem expor a chave.
+- [x] Criar regressões e publicar as configurações e navegação solicitadas.
