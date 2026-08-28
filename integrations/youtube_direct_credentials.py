@@ -363,6 +363,9 @@ def merge_credentials_document(
 
 
 def delegated_session_id(document: dict[str, Any], channel: dict[str, Any]) -> str:
+    channel_value = str(channel.get("delegated_session_id") or "").strip() if isinstance(channel, dict) else ""
+    if channel_value:
+        return channel_value
     mapping = document.get("delegated_session_ids", {}) if isinstance(document, dict) else {}
     if not isinstance(mapping, dict):
         return ""

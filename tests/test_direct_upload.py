@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from integrations.youtube_direct_credentials import credentials_document_path, delete_credentials_document, direct_account_status, document_status, load_credentials_document, merge_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document, update_credentials_document_session_info
+from integrations.youtube_direct_credentials import credentials_document_path, delegated_session_id, delete_credentials_document, direct_account_status, document_status, load_credentials_document, merge_credentials_document, parse_cookie_file, parse_credentials_document, save_cookie_file, save_credentials_document, update_credentials_document_session_info
 from integrations.youtube_direct_upload import YouTubeDirectUploader, validate_direct_upload
 
 
@@ -135,6 +135,13 @@ def test_session_info_capture_date_from_account_card_is_persisted(tmp_path: Path
     document = load_credentials_document(tmp_path, account)
     assert document["sessionInfo"] == "session-updated"
     assert document["sessionInfoCapturedAt"] == "2026-08-27"
+
+
+def test_channel_delegated_session_id_overrides_shared_account_document_mapping():
+    document = {"delegated_session_ids": {"channel-one": "old-document-value"}}
+    channel = {"id": "channel-one", "delegated_session_id": "channel-specific-value"}
+
+    assert delegated_session_id(document, channel) == "channel-specific-value"
 
 
 def test_delete_credentials_document_removes_only_selected_account(tmp_path: Path):

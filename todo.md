@@ -15,3 +15,6 @@
 - [x] Adicionar Testar chamada API ao cartão Niche Finder — Kaggle.
 - [x] Adicionar Testar chamada API ao cartão Niche Finder — Apify.
 - [x] Cobrir os três testes de credenciais com regressões e publicar a correcção.
+- [x] Adicionar o campo individual DELEGATED_SESSION_ID em Upload directo — documento da conta deste canal.
+- [x] Sincronizar o identificador individual do canal no documento da conta Google sem o expor.
+- [ ] Testar e publicar a correcção do campo DELEGATED_SESSION_ID por canal.
