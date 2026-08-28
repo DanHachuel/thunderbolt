@@ -61,4 +61,4 @@
 - [x] Validar e publicar o ajuste de largura do botão Actualizar Versão.
 - [x] Fazer todos os itens da barra lateral reflectirem a página activa actual.
 - [x] Destacar adequadamente os pais quando um subitem estiver activo.
-- [ ] Criar regressões e publicar a melhoria do estado activo da navegação.
+- [x] Criar regressões e publicar a melhoria do estado activo da navegação.
