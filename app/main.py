@@ -3844,7 +3844,7 @@ def render_music_backlog() -> None:
                     music_file = Path(music_path)
                     st.success("Música pronta; pode continuar para o destino configurado.")
                     st.download_button(
-                        "Descarregar música pronta",
+                        "Descarregar música",
                         data=music_file.read_bytes(),
                         file_name=music_file.name,
                         mime="audio/mpeg",
@@ -3921,6 +3921,14 @@ def render_thumbnails():
                 image_path = record.get("image_path")
                 if image_path and image_path.is_file():
                     st.image(str(image_path), use_container_width=True)
+                    st.download_button(
+                        "Descarregar thumbnail",
+                        data=image_path.read_bytes(),
+                        file_name=image_path.name,
+                        mime="image/jpeg" if image_path.suffix.lower() in {".jpg", ".jpeg"} else "image/png",
+                        key=f"thumbnail_download_{task_id}_{record['variant_index']}",
+                        use_container_width=True,
+                    )
                 else:
                     st.markdown("### Sem imagem")
                     st.caption("Imagem ainda não gerada")

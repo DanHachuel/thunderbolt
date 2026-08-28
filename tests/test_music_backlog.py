@@ -30,6 +30,8 @@ def test_music_backlog_has_the_same_state_controls_as_video_backlog():
     assert 'key=f"music_backlog_stop_{task[\'id\']}"' in backlog
     assert 'run_music_task(str(task["id"]), read_json("settings.json", {}))' in backlog
     assert 'transition_music_task(str(task["id"]), "blocked")' in backlog
+    assert '"Descarregar música"' in backlog
+    assert 'key=f"music_backlog_download_{task[\'id\']}"' in backlog
     assert '"Tipo")' in backlog
     assert '"Áudio")' in backlog
 
@@ -49,3 +51,10 @@ def test_music_creation_is_audio_only_and_supports_suno_and_lyria():
     assert "MoneyPrinterTurbo" in creation
     assert "render_new_video" not in creation
     assert '"Google Lyria API key"' in MAIN_SOURCE
+
+
+def test_thumbnail_cards_offer_download_for_generated_images():
+    thumbnails = MAIN_SOURCE.split("def render_thumbnails():", 1)[1].split("def render_automation():", 1)[0]
+
+    assert '"Descarregar thumbnail"' in thumbnails
+    assert 'key=f"thumbnail_download_{task_id}_{record[\'variant_index\']}"' in thumbnails
