@@ -23,4 +23,4 @@
 - [x] Testar e publicar a nova aba Music Backlog.
 - [x] Remover do Music Backlog a leitura de progresso, worker e tarefas da pipeline de vídeo.
 - [x] Criar pool persistido exclusivo para geração de áudio por Suno AI ou Google Lyria.
-- [ ] Testar e publicar a separação completa do Music Backlog.
+- [x] Testar e publicar a separação completa do Music Backlog.
