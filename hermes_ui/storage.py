@@ -4,9 +4,12 @@ import json
 import os
 import shutil
 import tempfile
+import time
+from contextlib import contextmanager
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 STORAGE = Path(os.getenv("THUNDERBOLT_STORAGE_DIR") or ROOT / "storage")
@@ -407,13 +410,55 @@ def ensure_storage() -> None:
             atomic_write(target, default)
 
 
-def atomic_write(path: Path, data: Any) -> None:
-    """Write JSON through a same-directory temporary file and atomic replace.
+_LOCK_TIMEOUT_SECONDS = 30.0
+_LOCK_POLL_SECONDS = 0.05
+_LOCK_STALE_SECONDS = 15 * 60
+_PROTECTED_STATE_FILES = {"channels.json", "tasks.json", "batches.json", "queues.json", "uploads.json"}
 
-    The complete payload is flushed and fsynced before replacement, so a
-    process interruption cannot leave a partially written JSON document at the
-    destination.
+
+class StorageIntegrityError(RuntimeError):
+    """Raised when protected state cannot be recovered without risking data loss."""
+
+
+@contextmanager
+def _state_lock(path: Path) -> Iterator[None]:
+    """Serialise state mutations across the UI and both local workers.
+
+    A lock file is used instead of an in-memory mutex because the launcher
+    runs Streamlit and workers as separate Python processes. Stale locks from
+    a machine shutdown are reclaimed after a conservative timeout.
     """
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
+    descriptor: int | None = None
+    while descriptor is None:
+        try:
+            descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+        except FileExistsError:
+            try:
+                if time.time() - lock_path.stat().st_mtime > _LOCK_STALE_SECONDS:
+                    lock_path.unlink()
+                    continue
+            except OSError:
+                pass
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Não foi possível obter o lock de storage: {path.name}")
+            time.sleep(_LOCK_POLL_SECONDS)
+    try:
+        yield
+    finally:
+        try:
+            os.close(descriptor)
+        finally:
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _atomic_write_unlocked(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -428,25 +473,79 @@ def atomic_write(path: Path, data: Any) -> None:
             os.unlink(temp_name)
 
 
+def atomic_write(path: Path, data: Any) -> None:
+    """Write JSON through a locked, same-directory temporary file and replace.
+
+    The complete payload is flushed and fsynced before replacement, so a
+    process interruption cannot leave a partially written JSON document at the
+    destination, while the lock prevents another process from racing with the
+    replacement.
+    """
+    with _state_lock(path):
+        _atomic_write_unlocked(path, data)
+
+
+def _corrupt_backup(path: Path) -> Path | None:
+    if not path.exists():
+        return None
+    backup = path.with_suffix(path.suffix + f".corrupt-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}")
+    shutil.copy2(path, backup)
+    return backup
+
+
+def _load_json_unlocked(path: Path) -> Any:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _recover_json_unlocked(name: str, path: Path, default: Any | None) -> Any:
+    backup = _corrupt_backup(path)
+    if name in _PROTECTED_STATE_FILES:
+        candidates = sorted(path.parent.glob(f"{path.name}.corrupt-*"), key=lambda item: item.stat().st_mtime, reverse=True)
+        for candidate in candidates:
+            if backup is not None and candidate == backup:
+                continue
+            try:
+                recovered = _load_json_unlocked(candidate)
+            except (json.JSONDecodeError, OSError):
+                continue
+            _atomic_write_unlocked(path, recovered)
+            return recovered
+        location = str(backup or path)
+        raise StorageIntegrityError(f"O ficheiro protegido {name} está corrompido. A cópia foi preservada em {location}.")
+    fallback = deepcopy(DEFAULTS.get(name, [] if default is None else default))
+    _atomic_write_unlocked(path, fallback)
+    return fallback
+
+
 def read_json(name: str, default: Any | None = None) -> Any:
     ensure_storage()
     path = STATE / name
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
+    with _state_lock(path):
+        try:
+            data = _load_json_unlocked(path)
+        except (json.JSONDecodeError, OSError):
+            data = _recover_json_unlocked(name, path, default)
         if name != "settings.json":
             return data
         migrated, changed = _migrate_settings(data)
         if changed:
-            atomic_write(path, migrated)
+            _atomic_write_unlocked(path, migrated)
         return migrated
-    except (json.JSONDecodeError, OSError):
-        backup = path.with_suffix(path.suffix + f".corrupt-{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        if path.exists():
-            shutil.copy2(path, backup)
-        fallback = DEFAULTS.get(name, [] if default is None else default)
-        atomic_write(path, fallback)
-        return fallback
+
+
+def update_json(name: str, default: Any, mutator: Callable[[Any], Any]) -> Any:
+    """Atomically mutate one JSON document under the cross-process state lock."""
+    ensure_storage()
+    path = STATE / name
+    with _state_lock(path):
+        try:
+            current = _load_json_unlocked(path)
+        except (json.JSONDecodeError, OSError):
+            current = _recover_json_unlocked(name, path, default)
+        result = mutator(current)
+        _atomic_write_unlocked(path, current)
+        return result
 
 
 def write_json(name: str, data: Any) -> None:
@@ -456,12 +555,13 @@ def write_json(name: str, data: Any) -> None:
 
 
 def append_json(name: str, item: dict[str, Any]) -> dict[str, Any]:
-    entries = read_json(name, [])
-    if not isinstance(entries, list):
-        entries = []
-    entries.append(item)
-    write_json(name, entries)
-    return item
+    def append(entries: Any) -> dict[str, Any]:
+        if not isinstance(entries, list):
+            raise StorageIntegrityError(f"O ficheiro {name} não contém uma lista válida.")
+        entries.append(item)
+        return item
+
+    return update_json(name, [], append)
 
 
 def _display_name_key(kind: str, path: Path) -> str:

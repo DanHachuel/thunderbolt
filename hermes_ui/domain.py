@@ -5,7 +5,7 @@ import uuid
 from typing import Any
 
 from .notifications import record_notification
-from .storage import append_json, now, read_json, write_json
+from .storage import StorageIntegrityError, append_json, now, read_json, update_json, write_json
 
 STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload"]
 # Ordem executada pelo worker. Cada etapa só é executada quando o seu artefacto
@@ -116,7 +116,6 @@ def create_batch(mode: str, channel_ids: list[str], topic: str, quantity: int, o
 
 def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
     """Expand a batch into tasks, allowing independent payloads for each channel."""
-    tasks = read_json("tasks.json", [])
     channels = {c["id"]: c for c in read_json("channels.json", [])}
     options = batch.get("options") or {}
     channel_payloads = options.get("channel_payloads") or {}
@@ -201,15 +200,26 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "created_at": now(),
                 "updated_at": now(),
             }
-            tasks.append(task)
             created.append(task)
-    write_json("tasks.json", tasks)
-    queues = read_json("queues.json", {})
-    if not isinstance(queues, dict):
-        queues = {}
-    queues.setdefault("script", [])
-    queues["script"].extend(task["id"] for task in created)
-    write_json("queues.json", queues)
+
+    def persist_tasks(tasks: Any) -> list[dict[str, Any]]:
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        tasks.extend(created)
+        return created
+
+    update_json("tasks.json", [], persist_tasks)
+
+    def persist_queues(queues: Any) -> dict[str, Any]:
+        if not isinstance(queues, dict):
+            raise StorageIntegrityError("O ficheiro queues.json não contém um objecto válido.")
+        queues.setdefault("script", [])
+        if not isinstance(queues["script"], list):
+            queues["script"] = []
+        queues["script"].extend(task["id"] for task in created)
+        return queues
+
+    update_json("queues.json", {}, persist_queues)
     return created
 
 
@@ -271,16 +281,24 @@ def _notify_task_completion(task: dict[str, Any], previous_state: str = "") -> N
 
 
 def update_task(task_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
-    tasks = read_json("tasks.json", [])
-    for task in tasks:
-        if task.get("id") == task_id:
-            previous_state = str(task.get("state") or "")
-            task.update(updates)
-            task["updated_at"] = now()
-            write_json("tasks.json", tasks)
-            _notify_task_completion(task, previous_state)
-            return task
-    return None
+    previous_state = ""
+
+    def mutate(tasks: Any) -> dict[str, Any] | None:
+        nonlocal previous_state
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        for task in tasks:
+            if isinstance(task, dict) and task.get("id") == task_id:
+                previous_state = str(task.get("state") or "")
+                task.update(updates)
+                task["updated_at"] = now()
+                return task
+        return None
+
+    updated = update_json("tasks.json", [], mutate)
+    if updated is not None:
+        _notify_task_completion(updated, previous_state)
+    return updated
 
 
 def delete_task(task_id: str) -> dict[str, Any] | None:
@@ -288,30 +306,50 @@ def delete_task(task_id: str) -> dict[str, Any] | None:
     normalized_id = str(task_id or "").strip()
     if not normalized_id:
         return None
-    tasks = read_json("tasks.json", [])
-    if not isinstance(tasks, list):
-        return None
-    removed = next((task for task in tasks if isinstance(task, dict) and str(task.get("id") or "") == normalized_id), None)
+    removed: dict[str, Any] | None = None
+
+    def mutate(tasks: Any) -> list[dict[str, Any]]:
+        nonlocal removed
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        for task in tasks:
+            if isinstance(task, dict) and str(task.get("id") or "") == normalized_id:
+                if str(task.get("state") or "") == "doing":
+                    raise ValueError("Pare a tarefa antes de a remover da fila.")
+                removed = task
+                break
+        if removed is not None:
+            tasks[:] = [task for task in tasks if not (isinstance(task, dict) and str(task.get("id") or "") == normalized_id)]
+        return tasks
+
+    update_json("tasks.json", [], mutate)
     if removed is None:
         return None
-    if str(removed.get("state") or "") == "doing":
-        raise ValueError("Pare a tarefa antes de a remover da fila.")
-    write_json("tasks.json", [task for task in tasks if not (isinstance(task, dict) and str(task.get("id") or "") == normalized_id)])
-    queues = read_json("queues.json", {})
-    if isinstance(queues, dict):
+
+    def clean_queues(queues: Any) -> dict[str, Any]:
+        if not isinstance(queues, dict):
+            raise StorageIntegrityError("O ficheiro queues.json não contém um objecto válido.")
         for queue_name, queue_items in list(queues.items()):
             if isinstance(queue_items, list):
                 queues[queue_name] = [item for item in queue_items if str(item) != normalized_id]
-        write_json("queues.json", queues)
+        return queues
+
+    update_json("queues.json", {}, clean_queues)
     return removed
 
 
 def transition_task(task_id: str, state: str | None = None, stage: str | None = None, error: str | None = None) -> dict[str, Any] | None:
     if state and state not in VALID_STATES:
         raise ValueError(f"Estado inválido: {state}")
-    tasks = read_json("tasks.json", [])
-    for task in tasks:
-        if task.get("id") == task_id:
+    previous_state = ""
+
+    def mutate(tasks: Any) -> dict[str, Any] | None:
+        nonlocal previous_state
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        for task in tasks:
+            if not isinstance(task, dict) or task.get("id") != task_id:
+                continue
             previous_state = str(task.get("state") or "")
             if state:
                 task["state"] = state
@@ -322,10 +360,13 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
             if error is not None:
                 task["error"] = error
             task["updated_at"] = now()
-            write_json("tasks.json", tasks)
-            _notify_task_completion(task, previous_state)
             return task
-    return None
+        return None
+
+    updated = update_json("tasks.json", [], mutate)
+    if updated is not None:
+        _notify_task_completion(updated, previous_state)
+    return updated
 
 
 def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:
@@ -335,28 +376,31 @@ def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:
     retry always uses the currently saved API keys, active provider priorities,
     and provider endpoints while retaining the task's completed artefacts.
     """
-    tasks = read_json("tasks.json", [])
-    for task in tasks:
-        if task.get("id") != task_id:
-            continue
-        previous_state = str(task.get("state") or "")
-        if previous_state not in {"failed", "blocked"}:
-            raise ValueError("Apenas tarefas falhadas ou bloqueadas podem ser retomadas.")
-        try:
-            retry_count = int(task.get("retry_count") or 0)
-        except (TypeError, ValueError):
-            retry_count = 0
-        task["state"] = "to_do"
-        task["error"] = None
-        task["retry_count"] = retry_count + 1
-        task["retry_requested_at"] = now()
-        task["retry_config_source"] = "settings.json_at_execution"
-        for field in ("failure_api", "failure_provider", "failure_service", "failure_config_fields"):
-            task.pop(field, None)
-        task["updated_at"] = now()
-        write_json("tasks.json", tasks)
-        return task
-    return None
+    def mutate(tasks: Any) -> dict[str, Any] | None:
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        for task in tasks:
+            if not isinstance(task, dict) or task.get("id") != task_id:
+                continue
+            previous_state = str(task.get("state") or "")
+            if previous_state not in {"failed", "blocked"}:
+                raise ValueError("Apenas tarefas falhadas ou bloqueadas podem ser retomadas.")
+            try:
+                retry_count = int(task.get("retry_count") or 0)
+            except (TypeError, ValueError):
+                retry_count = 0
+            task["state"] = "to_do"
+            task["error"] = None
+            task["retry_count"] = retry_count + 1
+            task["retry_requested_at"] = now()
+            task["retry_config_source"] = "settings.json_at_execution"
+            for field in ("failure_api", "failure_provider", "failure_service", "failure_config_fields"):
+                task.pop(field, None)
+            task["updated_at"] = now()
+            return task
+        return None
+
+    return update_json("tasks.json", [], mutate)
 
 
 def pipeline_summary() -> dict[str, Any]:
