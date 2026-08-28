@@ -22,7 +22,7 @@ from hermes_ui.storage import STORAGE, atomic_write, ensure_storage, read_json, 
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
-from hermes_ui.material_sources import material_api_keys, selected_material_source
+from hermes_ui.material_sources import material_api_keys, material_source_cards, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
@@ -38,9 +38,16 @@ CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbna
 class PipelineError(RuntimeError):
     """Raised when a pipeline stage cannot complete with an actionable error."""
 
-    def __init__(self, message: str, *, failure_metadata: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_metadata: dict[str, Any] | None = None,
+        fallback_eligible: bool = False,
+    ):
         super().__init__(message)
         self.failure_metadata = dict(failure_metadata or {})
+        self.fallback_eligible = bool(fallback_eligible)
 
 
 class PipelineStopped(PipelineError):
@@ -620,6 +627,30 @@ def _normalise_video_route(task: dict[str, Any], settings: dict[str, Any]) -> st
     return raw if raw in {"pexels", "pixabay", "local"} else "pexels"
 
 
+def _material_video_routes(task: dict[str, Any], settings: dict[str, Any]) -> list[str]:
+    """Return stock providers to try, starting with the task's selected source."""
+    route = _normalise_video_route(task, settings)
+    if route not in {"pexels", "pixabay"}:
+        return [route]
+
+    ordered_providers: list[str] = []
+    for card in material_source_cards(settings, enabled_only=True):
+        provider = str(card.get("provider") or "").strip().casefold()
+        if provider not in {"pexels", "pixabay"} or provider in ordered_providers:
+            continue
+        if material_api_keys(settings, provider):
+            ordered_providers.append(provider)
+
+    # A selected source is an explicit preference for this task. The remaining
+    # configured sources follow their persisted priority and are true fallbacks.
+    if route in ordered_providers:
+        ordered_providers.remove(route)
+        ordered_providers.insert(0, route)
+    elif material_api_keys(settings, route):
+        ordered_providers.insert(0, route)
+    return ordered_providers or [route]
+
+
 def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
     """Reserve extra bounded time only for long stock-video downloads and assembly."""
     effective_settings = settings if isinstance(settings, dict) else _settings()
@@ -633,7 +664,9 @@ def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None
 def _task_stale_timeout_seconds(task: dict[str, Any]) -> int:
     """Keep stale-task recovery aligned with the actual execution budget."""
     if str(task.get("stage") or "").strip().casefold() == "video":
-        return _video_timeout_seconds(task) + 5 * 60
+        settings = _settings()
+        attempts = max(1, len(_material_video_routes(task, settings)))
+        return _video_timeout_seconds(task, settings) * attempts + 5 * 60
     return STALE_TASK_SECONDS
 
 
@@ -820,7 +853,12 @@ def _moneyprinter_cli_args(task: dict[str, Any], route: str, settings: dict[str,
     return args
 
 
-def _run_video_helper(task: dict[str, Any]) -> Path:
+def _run_video_helper_once(
+    task: dict[str, Any],
+    *,
+    route_override: str = "",
+    settings: dict[str, Any] | None = None,
+) -> Path:
     helper_dir = Path(__file__).resolve().parents[1] / "seed" / "skills"
     helper = helper_dir / "mpt_agent.py"
     if not helper.is_file():
@@ -828,16 +866,23 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     subject = str(task.get("topic") or "").strip()
     if not subject:
         raise PipelineError("A etapa Vídeo não recebeu um tema válido.")
-    settings = _settings()
+    settings = settings if isinstance(settings, dict) else _settings()
     configured_root = _configured_moneyprinter_root(settings)
     task_id = str(task.get("id") or "").strip()
     if not task_id:
         raise PipelineError("A tarefa de vídeo não tem um identificador válido.")
     env = os.environ.copy()
+    for key in (
+        "MPT_PEXELS_API_KEY",
+        "MPT_PEXELS_API_KEYS",
+        "MPT_PIXABAY_API_KEY",
+        "MPT_PIXABAY_API_KEYS",
+    ):
+        env.pop(key, None)
     card = active_llm_card(settings)
     provider = str(card.get("provider") or "openai").strip()
     definition = provider_definition(provider)
-    route = _normalise_video_route(task, settings)
+    route = str(route_override or _normalise_video_route(task, settings)).strip().casefold()
     source_keys = material_api_keys(settings, route) if route in {"pexels", "pixabay"} else []
     if route in {"pexels", "pixabay"} and not source_keys:
         source_label = "Pexels" if route == "pexels" else "Pixabay"
@@ -987,7 +1032,11 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                 _stop_process(process)
                 message = f"A etapa Vídeo excedeu o limite de {timeout_seconds // 60} minutos e foi encerrada."
                 metadata = _failure_attribution(task, settings, "video", error=message)
-                raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+                raise PipelineError(
+                    _failure_message(message, metadata),
+                    failure_metadata=metadata,
+                    fallback_eligible=True,
+                )
             if time.monotonic() - last_activity_at >= VIDEO_IDLE_TIMEOUT_SECONDS:
                 _stop_process(process)
                 message = (
@@ -995,7 +1044,11 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
                     f"{VIDEO_IDLE_TIMEOUT_SECONDS // 60} minutos e foi encerrada."
                 )
                 metadata = _failure_attribution(task, settings, "video", error=message)
-                raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+                raise PipelineError(
+                    _failure_message(message, metadata),
+                    failure_metadata=metadata,
+                    fallback_eligible=True,
+                )
     finally:
         reader.join(timeout=2)
         _persist_video_diagnostics(task, "\n".join(output_lines))
@@ -1010,12 +1063,20 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
         message = "A geração de vídeo precisa de credenciais adicionais do MoneyPrinterTurbo"
         if detail:
             message += f". Detalhe do helper: {detail}"
-        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+        raise PipelineError(
+            _failure_message(message, metadata),
+            failure_metadata=metadata,
+            fallback_eligible=True,
+        )
     if result_code != 0:
         detail = _terminal_helper_detail(output) or "erro sem detalhes devolvidos pelo helper"
         metadata = _failure_attribution(task, settings, "video", error=detail, output=output)
         message = f"MoneyPrinterTurbo falhou na etapa Vídeo: {detail}"
-        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+        raise PipelineError(
+            _failure_message(message, metadata),
+            failure_metadata=metadata,
+            fallback_eligible=True,
+        )
     match = re.search(r"(?m)^VIDEO_FILE=(.+)$", output)
     video_path = Path(match.group(1).strip()).expanduser() if match else None
     if not video_path or not video_path.is_file() or video_path.stat().st_size <= 0:
@@ -1030,8 +1091,64 @@ def _run_video_helper(task: dict[str, Any]) -> Path:
     if not video_path or not video_path.is_file() or video_path.stat().st_size <= 0:
         message = "MoneyPrinterTurbo terminou sem devolver um MP4 válido."
         metadata = _failure_attribution(task, settings, "video", error=message, output=output)
-        raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
+        raise PipelineError(
+            _failure_message(message, metadata),
+            failure_metadata=metadata,
+            fallback_eligible=True,
+        )
     return video_path
+
+
+def _stock_fallback_is_eligible(route: str, error: PipelineError) -> bool:
+    """Allow fallback only when the failed attempt points to its stock source."""
+    if route not in {"pexels", "pixabay"} or not getattr(error, "fallback_eligible", False):
+        return False
+    metadata = dict(getattr(error, "failure_metadata", {}) or {})
+    providers = {
+        item.strip().casefold()
+        for item in str(metadata.get("failure_provider") or "").split(",")
+        if item.strip()
+    }
+    if providers and providers - {route}:
+        return False
+    fields = {
+        item.strip().casefold()
+        for item in str(metadata.get("failure_config_fields") or "").split(",")
+        if item.strip()
+    }
+    if fields and fields - {f"{route}_api_key", f"{route}_api_keys"}:
+        return False
+    return True
+
+
+def _run_video_helper(task: dict[str, Any]) -> Path:
+    """Run the stock helper with provider fallback in the configured priority order."""
+    settings = _settings()
+    routes = _material_video_routes(task, settings)
+    if len(routes) <= 1:
+        return _run_video_helper_once(task, route_override=routes[0] if routes else "", settings=settings)
+
+    for index, route in enumerate(routes):
+        attempt_task = dict(task)
+        generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+        attempt_task["material_source"] = route
+        attempt_task["generation_settings"] = {**generation_settings, "material_source": route}
+        try:
+            return _run_video_helper_once(attempt_task, route_override=route, settings=settings)
+        except PipelineStopped:
+            raise
+        except PipelineError as exc:
+            if not _stock_fallback_is_eligible(route, exc) or index == len(routes) - 1:
+                metadata = dict(getattr(exc, "failure_metadata", {}) or {})
+                metadata["failure_route"] = route
+                metadata["fallback_attempts"] = " → ".join(_provider_api_label(item) for item in routes[: index + 1])
+                message = (
+                    f"Falha no provider {_provider_api_label(route)} após tentar "
+                    f"{metadata['fallback_attempts']}. Último erro: {exc}"
+                )
+                raise PipelineError(message, failure_metadata=metadata) from exc
+
+    raise PipelineError("Nenhum provider de vídeo stock configurado.")
 
 
 def _read_persisted_script(task: dict[str, Any], channel: dict[str, Any], blueprint: dict[str, Any], topic: str) -> dict[str, Any] | None:
