@@ -13,12 +13,19 @@ def test_automation_is_an_expander_with_youtube_child_page():
 
 
 def test_navigation_highlights_only_the_exact_current_item():
-    assert 'type="primary" if current_page == target else "secondary"' in MAIN_SOURCE
+    assert 'type="primary" if is_nav_item_active(target) else "secondary"' in MAIN_SOURCE
+    assert 'return current_path == nav_paths.get(target)' in MAIN_SOURCE
     assert '[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#7c3aed !important;' in MAIN_SOURCE
     assert '[data-testid="stSidebar"] [data-testid="stExpander"] summary strong' not in MAIN_SOURCE
     assert 'expanded=current_page in child_targets' in MAIN_SOURCE
-    assert 'is_nav_target_active' not in MAIN_SOURCE
-    assert 'group_label = f"**{ui_text(label, ui_language)}**"' not in MAIN_SOURCE
+    assert 'startsWith' not in MAIN_SOURCE
+
+
+def test_navigation_assigns_distinct_paths_to_parent_and_child():
+    assert '"Automação": "/automacao"' in MAIN_SOURCE
+    assert '"Automação Youtube": "/automacao/youtube"' in MAIN_SOURCE
+    assert '"Pipeline Música": "/pipeline-musica"' in MAIN_SOURCE
+    assert '"Music Backlog": "/pipeline-musica/backlog"' in MAIN_SOURCE
 
 
 def test_youtube_navigation_labels_and_legacy_aliases_are_preserved():
