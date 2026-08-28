@@ -72,6 +72,14 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertEqual(get.call_args.args[0], expected_url)
 
+    def test_google_lyria_uses_model_metadata_without_generating_audio(self):
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_google_lyria_credentials("SECRET-KEY-123", "lyria-3-clip-preview")
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "https://generativelanguage.googleapis.com/v1beta/models/lyria-3-clip-preview")
+        self.assertEqual(get.call_args.kwargs["headers"], {"x-goog-api-key": "SECRET-KEY-123"})
+        self.assertNotIn("SECRET-KEY-123", str(result))
+
     def test_azure_uses_voice_listing_not_synthesis(self):
         with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
             result = api_key_tests.test_azure_speech_credentials("key", "eastus")

@@ -128,6 +128,20 @@ def test_nano_banana_credentials(api_key: str, model: str) -> dict[str, Any]:
     )
 
 
+def test_google_lyria_credentials(api_key: str, model: str) -> dict[str, Any]:
+    """Validate access to the selected Lyria model without requesting audio generation."""
+    api_key = str(api_key or "").strip()
+    model = str(model or "").strip()
+    if not api_key:
+        return _missing("Introduza a Google Lyria API key antes de testar.")
+    if not model:
+        return _result("missing", "Seleccione o modelo Google Lyria antes de testar.")
+    return _get(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{quote(model.removeprefix('models/'), safe='')}",
+        headers={"x-goog-api-key": api_key},
+    )
+
+
 def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     """Run a bounded, non-generative check for an image/video provider card."""
     source = dict(card) if isinstance(card, Mapping) else {}
@@ -318,6 +332,8 @@ def test_voice_provider(provider: str, settings: dict[str, Any]) -> dict[str, An
         return test_openai_compatible_voice_credentials("Sonilo", settings.get("sonilo_api_key", ""), settings.get("sonilo_base_url", ""))
     if provider == "suno":
         return test_suno_credentials(settings.get("suno_api_key", ""), settings.get("suno_api_base_url", ""), settings.get("suno_api_endpoint", ""))
+    if provider == "google_lyria":
+        return test_google_lyria_credentials(settings.get("lyria_api_key", ""), settings.get("lyria_model", ""))
     return _unsupported("Este provider de voz não tem diagnóstico remoto configurado.")
 
 
@@ -325,6 +341,7 @@ __all__ = [
     "test_apify_credentials",
     "test_azure_speech_credentials",
     "test_elevenlabs_credentials",
+    "test_google_lyria_credentials",
     "test_innertube_api_key",
     "test_kaggle_credentials",
     "test_influencer_database",
