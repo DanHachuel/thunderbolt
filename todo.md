@@ -46,3 +46,7 @@
 - [x] Corrigir o versionamento publicado para 0.4.00 e eliminar a numeração indevida 0.3.100 como versão actual.
 - [x] Registar no repositório a regra de transição de patch 99 para a próxima série minor.
 - [ ] Validar e publicar a correcção de versionamento 0.4.00.
+- [x] Adicionar X funcional para fechar o alerta verde de actualização na aba Início.
+- [x] Reposicionar o botão Actualizar Versão no topo indicado e limitar a largura do aviso de nova versão.
+- [x] Garantir e testar o botão Testar chamada API no cartão Google Lyria.
+- [ ] Validar e publicar os ajustes da aba Início e do cartão Google Lyria.

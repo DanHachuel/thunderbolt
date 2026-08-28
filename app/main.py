@@ -1281,9 +1281,9 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             st.rerun()
 
 
-def render_dashboard():
-    ui_language = current_ui_language()
-    update_area, version_area = st.columns([1.45, 4.55])
+def render_home_update_controls() -> None:
+    """Render the update controls only on the home page and keep notices dismissible."""
+    update_area, version_area, _ = st.columns([1.45, 2.55, 3.0])
     with update_area:
         st.markdown(
             """
@@ -1306,6 +1306,8 @@ def render_dashboard():
         if st.button("Atualizar Versão", key="home_update_version", use_container_width=True, type="primary", icon=":material/system_update:"):
             with st.spinner("A instalar a versão mais recente…"):
                 st.session_state["home_update_result"] = update_to_latest(APP_VERSION)
+                st.session_state["home_update_notice_dismissed"] = False
+                st.rerun()
     with version_area:
         cache_key = "home_update_version_check"
         checked_at_key = "home_update_version_checked_at"
@@ -1313,18 +1315,48 @@ def render_dashboard():
             st.session_state[cache_key] = check_version(APP_VERSION)
             st.session_state[checked_at_key] = time.monotonic()
         version_status = st.session_state[cache_key]
+        notice_signature = f"{version_status.latest_version}|{version_status.update_available}|{version_status.error}"
+        if st.session_state.get("home_update_notice_signature") != notice_signature:
+            st.session_state["home_update_notice_signature"] = notice_signature
+            st.session_state["home_update_notice_dismissed"] = False
         if version_status.update_available:
-            st.info(f"Nova versão disponível: {display_version(version_status.latest_version)}. A versão actual é {APP_VERSION_LABEL or 'desconhecida'}.")
+            notice_message = f"Nova versão disponível: {display_version(version_status.latest_version)}. A versão actual é {APP_VERSION_LABEL or 'desconhecida'}."
+            notice_kind = "info"
         elif version_status.error:
-            st.caption(f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · verificação de actualização indisponível.")
+            notice_message = f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · verificação de actualização indisponível."
+            notice_kind = "caption"
         else:
-            st.caption(f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · já está actualizada ({display_version(version_status.latest_version)}).")
+            notice_message = f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · já está actualizada ({display_version(version_status.latest_version)})."
+            notice_kind = "success"
+        if not st.session_state.get("home_update_notice_dismissed"):
+            notice_col, close_col = st.columns([8.5, 1])
+            with notice_col:
+                if notice_kind == "info":
+                    st.info(notice_message)
+                elif notice_kind == "success":
+                    st.success(notice_message)
+                else:
+                    st.caption(notice_message)
+            with close_col:
+                if st.button("×", key="home_update_notice_close", help="Fechar este aviso"):
+                    st.session_state["home_update_notice_dismissed"] = True
+                    st.rerun()
     update_result = st.session_state.get("home_update_result")
-    if update_result is not None:
-        if update_result.ok:
-            st.success(update_result.message)
-        else:
-            st.error(update_result.message)
+    if update_result is not None and not st.session_state.get("home_update_notice_dismissed"):
+        result_col, result_close_col = st.columns([8.5, 1])
+        with result_col:
+            if update_result.ok:
+                st.success(update_result.message)
+            else:
+                st.error(update_result.message)
+        with result_close_col:
+            if st.button("×", key="home_update_result_close", help="Fechar este resultado"):
+                st.session_state["home_update_notice_dismissed"] = True
+                st.rerun()
+
+
+def render_dashboard():
+    ui_language = current_ui_language()
     st.title("Thunderbolt")
     st.caption(ui_text("Interface local para operação e automação de conteúdo faceless", ui_language))
     summary = pipeline_summary()
@@ -7092,6 +7124,8 @@ def main():
         current_page = "Início"
     st.session_state["page"] = current_page
     ui_language = current_ui_language()
+    if current_page == "Início":
+        render_home_update_controls()
     render_ui_language_picker(ui_language)
 
     def navigate(target: str):
