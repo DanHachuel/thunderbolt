@@ -49,4 +49,4 @@
 - [x] Adicionar X funcional para fechar o alerta verde de actualização na aba Início.
 - [x] Reposicionar o botão Actualizar Versão no topo indicado e limitar a largura do aviso de nova versão.
 - [x] Garantir e testar o botão Testar chamada API no cartão Google Lyria.
-- [ ] Validar e publicar os ajustes da aba Início e do cartão Google Lyria.
+- [x] Validar e publicar os ajustes da aba Início e do cartão Google Lyria.
