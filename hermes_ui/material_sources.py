@@ -6,6 +6,7 @@ from uuid import uuid4
 
 MATERIAL_CARDS_KEY = "material_source_cards"
 MATERIAL_ACTIVE_CARD_KEY = "material_active_card_id"
+DEFAULT_MATERIAL_PRIORITY = 1
 
 MATERIAL_SOURCE_CATALOG: tuple[dict[str, str], ...] = (
     {"code": "pexels", "label": "Pexels", "description": "Banco de vídeos e imagens para materiais da pipeline.", "legacy_key": "pexels_api_keys"},
@@ -43,13 +44,27 @@ def material_source_definition(source: Any) -> dict[str, str] | None:
     return _SOURCE_BY_CODE.get(str(source or "").strip().lower())
 
 
-def _new_card(provider: str, api_key: str = "", *, card_id: str | None = None) -> dict[str, Any]:
+def _new_card(
+    provider: str,
+    api_key: str = "",
+    *,
+    card_id: str | None = None,
+    priority: int = DEFAULT_MATERIAL_PRIORITY,
+) -> dict[str, Any]:
     return {
         "id": card_id or f"material-{provider}-{uuid4().hex[:8]}",
         "provider": provider,
         "api_key": str(api_key or "").strip(),
         "enabled": True,
+        "priority": max(1, int(priority)),
     }
+
+
+def _normalise_priority(value: Any, fallback: int = DEFAULT_MATERIAL_PRIORITY) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return max(1, int(fallback or DEFAULT_MATERIAL_PRIORITY))
 
 
 def normalize_material_card(card: Any, index: int = 0) -> dict[str, Any]:
@@ -63,7 +78,23 @@ def normalize_material_card(card: Any, index: int = 0) -> dict[str, Any]:
         "provider": provider,
         "api_key": str(raw.get("api_key") or raw.get("key") or "").strip() if provider != "local" else "",
         "enabled": bool(raw.get("enabled", True)),
+        "priority": _normalise_priority(raw.get("priority", index + 1), index + 1),
     }
+
+
+def _ordered_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    indexed = [(index, normalize_material_card(card, index)) for index, card in enumerate(cards)]
+    indexed.sort(key=lambda pair: (pair[1].get("priority", pair[0] + 1), pair[0]))
+    return [card for _index, card in indexed]
+
+
+def material_source_cards(settings: dict[str, Any], *, enabled_only: bool = False) -> list[dict[str, Any]]:
+    """Return material providers in stable priority order for the MoviePy queue."""
+    migrated, _ = ensure_material_source_cards(settings)
+    cards = [dict(item) for item in migrated.get(MATERIAL_CARDS_KEY, [])]
+    if enabled_only:
+        cards = [card for card in cards if card.get("enabled", True)]
+    return cards
 
 
 def _cards_key_mapping(cards: list[dict[str, Any]]) -> dict[str, list[str]]:
@@ -94,12 +125,23 @@ def ensure_material_source_cards(settings: dict[str, Any]) -> tuple[dict[str, An
         cards: list[dict[str, Any]] = []
         for item in MATERIAL_SOURCE_CATALOG:
             for key in material_api_keys(settings, item["code"], _ignore_cards=True):
-                cards.append(_new_card(item["code"], key, card_id=f"material-{item['code']}-{len(cards)}"))
+                cards.append(
+                    _new_card(
+                        item["code"],
+                        key,
+                        card_id=f"material-{item['code']}-{len(cards)}",
+                        priority=len(cards) + 1,
+                    )
+                )
         if not cards:
             selected = selected_material_source(settings)
             cards.append(_new_card(selected if selected in _SOURCE_BY_CODE else "pexels", card_id="material-default-0"))
         changed = True
 
+    ordered_cards = _ordered_cards(cards)
+    if ordered_cards != cards:
+        changed = True
+    cards = ordered_cards
     settings[MATERIAL_CARDS_KEY] = cards
     active_id = str(settings.get(MATERIAL_ACTIVE_CARD_KEY) or "").strip()
     valid_ids = {str(card["id"]) for card in cards}
@@ -137,6 +179,7 @@ def apply_material_source_cards_to_settings(
     normalized_cards = [normalize_material_card(item, index) for index, item in enumerate(cards)]
     if not normalized_cards:
         normalized_cards = [_new_card("pexels", card_id="material-default-0")]
+    normalized_cards = _ordered_cards(normalized_cards)
     settings[MATERIAL_CARDS_KEY] = normalized_cards
     selected_card = next((card for card in normalized_cards if str(card["id"]) == str(active_card_id)), None)
     if selected_card is None:
