@@ -6752,6 +6752,22 @@ def render_supabase_tutorial():
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
 
+def render_google_oauth_tutorial():
+    """Render the Google OAuth setup guide supplied for Thunderbolt."""
+    tutorial_path = ROOT / "seed" / "references" / "tutorial-oauth-google.md"
+    st.title("Tutorial OAuth do Google")
+    st.caption("Guia completo para configurar a autenticação OAuth do Google e o acesso à YouTube Data API v3.")
+    st.markdown("[Abrir Google Cloud Console](https://console.cloud.google.com/)")
+    try:
+        tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        tutorial_content = ""
+    if not tutorial_content:
+        st.error("O conteúdo local do tutorial não está disponível. Consulte a documentação OAuth do Google.")
+        return
+    st.markdown(tutorial_content, unsafe_allow_html=False)
+
+
 def render_youtube_frontend_upload_tutorial():
     """Render the safe operational guide for the YouTube direct-upload workflow."""
     tutorial_path = ROOT / "seed" / "references" / "youtube-video-upload-frontend.md"
@@ -7076,6 +7092,7 @@ def main():
         ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
         ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
         ("Tutorial YouTube Video-Upload Frontend", ":material/video_library:", "Tutorial YouTube Video-Upload Frontend"),
+        ("Tutorial OAuth do Google", ":material/key:", "Tutorial OAuth do Google"),
     ]
     settings_items = [
         ("MCP", ":material/hub:", "MCP"),
@@ -7130,7 +7147,7 @@ def main():
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
-        "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend",
+        "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend", "Tutorial OAuth do Google": "/documentacao/oauth-google",
         "Configurações": "/configuracoes", "MCP": "/configuracoes/mcp", "Notificações": "/configuracoes/notificacoes", "Logs": "/configuracoes/logs", "Configuração API": "/configuracoes/api",
     }
 
@@ -7238,6 +7255,7 @@ def main():
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,
         "Tutorial YouTube Video-Upload Frontend": render_youtube_frontend_upload_tutorial,
+        "Tutorial OAuth do Google": render_google_oauth_tutorial,
         "Configurações": lambda: render_edit_placeholder("Configurações", "Seleccione uma opção no menu expansível."),
         "MCP": render_mcp,
         "Contas Google": render_google_accounts,
