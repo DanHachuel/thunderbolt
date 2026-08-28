@@ -328,6 +328,37 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
     return None
 
 
+def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:
+    """Queue a failed or blocked task without persisting API credentials or provider snapshots.
+
+    The pipeline reloads settings.json immediately before every execution, so a
+    retry always uses the currently saved API keys, active provider priorities,
+    and provider endpoints while retaining the task's completed artefacts.
+    """
+    tasks = read_json("tasks.json", [])
+    for task in tasks:
+        if task.get("id") != task_id:
+            continue
+        previous_state = str(task.get("state") or "")
+        if previous_state not in {"failed", "blocked"}:
+            raise ValueError("Apenas tarefas falhadas ou bloqueadas podem ser retomadas.")
+        try:
+            retry_count = int(task.get("retry_count") or 0)
+        except (TypeError, ValueError):
+            retry_count = 0
+        task["state"] = "to_do"
+        task["error"] = None
+        task["retry_count"] = retry_count + 1
+        task["retry_requested_at"] = now()
+        task["retry_config_source"] = "settings.json_at_execution"
+        for field in ("failure_api", "failure_provider", "failure_service", "failure_config_fields"):
+            task.pop(field, None)
+        task["updated_at"] = now()
+        write_json("tasks.json", tasks)
+        return task
+    return None
+
+
 def pipeline_summary() -> dict[str, Any]:
     tasks = read_json("tasks.json", [])
     channels = read_json("channels.json", [])

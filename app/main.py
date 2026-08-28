@@ -22,7 +22,7 @@ try:
 except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, set_channel_defaults, transition_task, update_channel, update_channel_video
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
@@ -4054,7 +4054,7 @@ def render_automation():
 
     st.divider()
     st.subheader("Vídeos cadastrados")
-    st.caption("Start retoma as etapas já concluídas e só gera novamente o que ainda não estiver pronto. Apagar remove o card da fila após confirmação e preserva os artefactos locais.")
+    st.caption("Start retoma as etapas já concluídas e só gera novamente o que ainda não estiver pronto. Em tarefas falhadas ou bloqueadas, a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas. Apagar remove o card da fila após confirmação e preserva os artefactos locais.")
     tasks = load_video_tasks_for_catalog()
     if not tasks:
         st.info("Ainda não existem vídeos cadastrados.")
@@ -4074,7 +4074,10 @@ def render_automation():
                 start_col, stop_col, delete_col = st.columns(3)
                 with start_col:
                     if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                        transition_task(task["id"], "doing")
+                        if state in {"failed", "blocked"}:
+                            retry_task_with_current_settings(task["id"])
+                        else:
+                            transition_task(task["id"], "doing")
                         st.rerun()
                 with stop_col:
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):

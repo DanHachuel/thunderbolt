@@ -13,8 +13,10 @@ class AutomationCardsTests(unittest.TestCase):
         self.assertIn('key=f"automation_delete_{task[\'id\']}"', MAIN_SOURCE)
         self.assertIn('delete_task(task["id"])', MAIN_SOURCE)
         self.assertIn('st.button("Apagar"', MAIN_SOURCE)
+        self.assertIn('retry_task_with_current_settings(task["id"])', MAIN_SOURCE)
         self.assertIn('transition_task(task["id"], "doing")', MAIN_SOURCE)
         self.assertIn('transition_task(task["id"], "blocked")', MAIN_SOURCE)
+        self.assertIn("a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas", MAIN_SOURCE)
 
     def test_automation_video_cards_do_not_render_channel_schedule(self):
         self.assertNotIn('st.caption("Horário do canal")', MAIN_SOURCE)
