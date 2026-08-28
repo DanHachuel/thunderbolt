@@ -1303,7 +1303,7 @@ def render_home_update_controls() -> None:
             """,
             unsafe_allow_html=True,
         )
-        if st.button("Atualizar Versão", key="home_update_version", use_container_width=True, type="primary", icon=":material/system_update:"):
+        if st.button("Atualizar Versão", key="home_update_version", type="primary", icon=":material/system_update:"):
             with st.spinner("A instalar a versão mais recente…"):
                 update_result = update_to_latest(APP_VERSION)
                 st.session_state["home_update_result"] = update_result

@@ -57,3 +57,5 @@
 - [x] Fazer o botão Atualizar Versão reiniciar a instância após uma actualização bem-sucedida.
 - [x] Garantir mensagem de estado e preservação do storage durante o reinício.
 - [x] Criar regressões e publicar o reinício automático do Thunderbolt.
+- [x] Tornar o botão system_update Atualizar Versão compacto, apenas com espaço para o ícone e o texto.
+- [ ] Validar e publicar o ajuste de largura do botão Actualizar Versão.

@@ -77,6 +77,7 @@ def test_home_is_the_only_page_that_renders_the_update_button():
     assert 'key="home_update_version"' in home_controls
     assert source.count('key="home_update_version"') == 1
     assert 'button[kind="primary"]' in home_controls
+    assert 'key="home_update_version", use_container_width=True' not in home_controls
     assert 'if current_page == "Início":\n        render_home_update_controls()' in source
     assert 'restart_current_process()' in home_controls
     assert 'update_result.ok and update_result.restart_required' in home_controls
