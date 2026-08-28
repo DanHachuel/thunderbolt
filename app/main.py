@@ -5617,7 +5617,7 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
             _render_credential_status("" if is_local else card.get("api_key"), local=is_local, required=not is_local)
         card_form = nullcontext() if embedded else st.form(f"material_source_card_form_{card_id}")
         with card_form:
-            content_cols = st.columns(2)
+            content_cols = st.columns([1.4, 1.25, 0.85])
             with content_cols[0]:
                 if is_local:
                     st.caption("Esta fonte não usa API key.")
@@ -5631,6 +5631,16 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
                     value=active_card_id == card_id,
                     key=f"material_card_{card_id}_selected",
                 )
+            with content_cols[2]:
+                priority = st.number_input(
+                    "Prioridade",
+                    min_value=1,
+                    max_value=999,
+                    value=max(1, int(card.get("priority", index + 1))),
+                    step=1,
+                    help="1 é o primeiro provider da fila. Em caso de falha elegível, os providers seguintes são considerados por ordem crescente.",
+                    key=f"material_card_{card_id}_priority",
+                )
             if not is_local:
                 _render_api_test_control(
                     settings,
@@ -5640,7 +5650,12 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
                 )
             save_card = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"material_card_{card_id}_save")
         if save_card:
-            cards[index] = {**card, "api_key": str(api_key or "").strip(), "enabled": bool(enabled)}
+            cards[index] = {
+                **card,
+                "api_key": str(api_key or "").strip(),
+                "enabled": bool(enabled),
+                "priority": max(1, int(priority)),
+            }
             selected_id = card_id if selected and enabled else active_card_id
             _persist_material_source_cards(settings, cards, selected_id)
             st.success(f"Fonte {definition['label']} guardada.")
@@ -5668,7 +5683,12 @@ def render_material_source_api_keys(settings: dict[str, Any], *, embedded: bool 
         )
         add_source_clicked = st.form_submit_button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card") if embedded else st.button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card")
         if add_source_clicked:
-            cards.append(new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
+            new_card = new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}")
+            new_card["priority"] = max(
+                (int(item.get("priority", index + 1)) for index, item in enumerate(cards)),
+                default=0,
+            ) + 1
+            cards.append(new_card)
             _persist_material_source_cards(settings, cards, str(settings.get("material_active_card_id") or ""))
             st.rerun()
 

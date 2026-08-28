@@ -7,6 +7,7 @@ from hermes_ui.material_sources import (
     apply_material_source_cards_to_settings,
     ensure_material_source_cards,
     material_api_keys,
+    material_source_cards,
     new_material_card,
 )
 
@@ -39,6 +40,34 @@ class MaterialSourceCardTests(unittest.TestCase):
         self.assertEqual(settings["material_active_card_id"], "pexels-secondary")
         self.assertEqual(material_api_keys(settings, "pexels"), ["one", "two"])
         self.assertEqual(material_api_keys(settings, "pixabay"), ["three"])
+
+    def test_priority_orders_material_cards_and_preserves_legacy_order_when_missing(self) -> None:
+        settings = {
+            MATERIAL_CARDS_KEY: [
+                {"id": "pixabay-card", "provider": "pixabay", "api_key": "two", "priority": 2},
+                {"id": "pexels-card", "provider": "pexels", "api_key": "one", "priority": 1},
+            ],
+            "material_active_card_id": "pexels-card",
+        }
+
+        cards, changed = ensure_material_source_cards(settings)
+
+        self.assertTrue(changed)
+        self.assertEqual([card["id"] for card in cards[MATERIAL_CARDS_KEY]], ["pexels-card", "pixabay-card"])
+        self.assertEqual([card["priority"] for card in cards[MATERIAL_CARDS_KEY]], [1, 2])
+        self.assertEqual([card["id"] for card in material_source_cards(settings)], ["pexels-card", "pixabay-card"])
+
+    def test_priority_is_persisted_and_invalid_values_use_position_fallback(self) -> None:
+        settings = {}
+        cards = [
+            new_material_card("pexels", card_id="pexels-low") | {"api_key": "one", "priority": 5},
+            new_material_card("pixabay", card_id="pixabay-invalid") | {"api_key": "two", "priority": "invalid"},
+        ]
+
+        apply_material_source_cards_to_settings(settings, cards, "pexels-low")
+
+        self.assertEqual([card["id"] for card in settings[MATERIAL_CARDS_KEY]], ["pixabay-invalid", "pexels-low"])
+        self.assertEqual([card["priority"] for card in settings[MATERIAL_CARDS_KEY]], [2, 5])
 
     def test_disabled_card_is_not_exported_and_new_card_rejects_unknown_provider(self) -> None:
         settings = {}
