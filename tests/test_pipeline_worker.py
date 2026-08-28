@@ -108,6 +108,53 @@ def test_run_task_reuses_prepared_title_and_thumbnail_without_full_creative_gene
     assert any(update.get("stage") == "upload" and update.get("state") == "done" for update in updates)
 
 
+def test_retried_video_uses_settings_reloaded_at_execution_time(tmp_path, monkeypatch):
+    """A tarefa preserva o conteúdo, mas entrega a configuração actual ao provider."""
+    _isolate_storage(tmp_path, monkeypatch)
+    task = {
+        "id": "video_retry_current_config",
+        "state": "to_do",
+        "stage": "video",
+        "progress": 56,
+        "topic": "Tema para retoma",
+        "topic_source": "manual",
+        "title": "Título pronto",
+        "tags": ["tema", "retoma"],
+        "style_wide": "full_ia",
+        "language": "pt-BR",
+        "generation_settings": {
+            "video_script": "Roteiro preservado",
+            "media_provider_priority": ["provider_antigo"],
+        },
+        "thumbnail_variant": {"image_prompt": "Thumbnail pronta", "overlay_text": "RETOMA"},
+        "artifacts": {},
+    }
+    current_settings = {"media_provider_priority": ["provider_actual"], "youtube_batch_accounts": []}
+    captured_settings = []
+    video_path = tmp_path / "current-provider-video.mp4"
+    video_path.write_bytes(b"mp4")
+    thumbnail_path = tmp_path / "current-provider-thumbnail.jpg"
+    thumbnail_path.write_bytes(b"jpg")
+
+    monkeypatch.setattr(pipeline_worker, "_settings", lambda: current_settings)
+    monkeypatch.setattr(pipeline_worker, "_channel_for_task", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "_blueprint_for_channel", lambda value: {})
+    monkeypatch.setattr(pipeline_worker, "_update", lambda task_id, **changes: {**task, **changes})
+    monkeypatch.setattr(pipeline_worker, "_save_json_artifact", lambda task_id, name, payload: f"{name}.json")
+    monkeypatch.setattr(
+        pipeline_worker,
+        "generate_video_from_pool",
+        lambda settings, *args, **kwargs: captured_settings.append(settings) or video_path,
+    )
+    monkeypatch.setattr(pipeline_worker, "_generate_pipeline_thumbnail", lambda *args, **kwargs: thumbnail_path)
+
+    result = pipeline_worker._run_task(task)
+
+    assert captured_settings == [current_settings]
+    assert captured_settings[0]["media_provider_priority"] == ["provider_actual"]
+    assert result["state"] == "done"
+
+
 def test_run_task_resumes_from_persisted_artifacts_without_regenerating_previous_stages(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     script_path = tmp_path / "roteiro-pronto.md"

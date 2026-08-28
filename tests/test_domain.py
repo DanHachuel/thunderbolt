@@ -29,6 +29,40 @@ def test_storage_and_batch_modes(tmp_path, monkeypatch):
     assert transition_task(task_id, "blocked")["state"] == "blocked"
 
 
+def test_retry_of_failed_task_clears_failure_without_storing_current_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import retry_task_with_current_settings
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    storage.write_json("tasks.json", [{
+        "id": "video_retry_current_settings",
+        "state": "failed",
+        "stage": "thumbnail",
+        "artifacts": {"video": "/tmp/ready.mp4"},
+        "error": "API/provider: Nano Banana",
+        "failure_api": "Nano Banana API",
+        "failure_provider": "nano_banana",
+        "failure_service": "Thumbnail",
+        "failure_config_fields": "gemini_image_api_key",
+    }])
+
+    retried = retry_task_with_current_settings("video_retry_current_settings")
+
+    assert retried is not None
+    assert retried["state"] == "to_do"
+    assert retried["stage"] == "thumbnail"
+    assert retried["artifacts"] == {"video": "/tmp/ready.mp4"}
+    assert retried["retry_count"] == 1
+    assert retried["retry_config_source"] == "settings.json_at_execution"
+    assert retried["error"] is None
+    assert all(field not in retried for field in ("failure_api", "failure_provider", "failure_service", "failure_config_fields"))
+    assert "api_key" not in retried
+
+
 def test_blueprint_json_is_readable(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage

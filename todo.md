@@ -24,3 +24,6 @@
 - [x] Remover do Music Backlog a leitura de progresso, worker e tarefas da pipeline de vídeo.
 - [x] Criar pool persistido exclusivo para geração de áudio por Suno AI ou Google Lyria.
 - [x] Testar e publicar a separação completa do Music Backlog.
+- [x] Garantir que Start em vídeos falhados da Automação YouTube recarrega as configurações e chaves de API actuais.
+- [x] Criar regressões para retoma de vídeo sem reutilizar credenciais ou providers obsoletos.
+- [x] Testar e publicar a correcção da retoma de tarefas falhadas.
