@@ -20,4 +20,4 @@
 - [x] Testar e publicar a correcção do campo DELEGATED_SESSION_ID por canal.
 - [x] Criar a aba Pipeline Música > Music Backlog com listagem de tarefas de música.
 - [x] Implementar acções de gestão, progresso e retoma para tarefas de música.
-- [ ] Testar e publicar a nova aba Music Backlog.
+- [x] Testar e publicar a nova aba Music Backlog.
