@@ -18,3 +18,6 @@
 - [x] Adicionar o campo individual DELEGATED_SESSION_ID em Upload directo — documento da conta deste canal.
 - [x] Sincronizar o identificador individual do canal no documento da conta Google sem o expor.
 - [x] Testar e publicar a correcção do campo DELEGATED_SESSION_ID por canal.
+- [x] Criar a aba Pipeline Música > Music Backlog com listagem de tarefas de música.
+- [x] Implementar acções de gestão, progresso e retoma para tarefas de música.
+- [ ] Testar e publicar a nova aba Music Backlog.
