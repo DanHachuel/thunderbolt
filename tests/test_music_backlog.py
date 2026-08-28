@@ -38,7 +38,14 @@ def test_music_creation_is_audio_only_and_supports_suno_and_lyria():
     creation = MAIN_SOURCE.split("def render_music_creation()", 1)[1].split("def render_scripts", 1)[0]
 
     assert 'st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"]' in creation
-    assert 'st.form_submit_button("Adicionar ao Music Backlog"' in creation
+    assert '"Idioma da letra/música"' in creation
+    assert 'st.selectbox("Género musical", list(MUSIC_GENRES)' in creation
+    assert 'st.selectbox("Vocal", list(MUSIC_VOCAL_OPTIONS)' in creation
+    assert '"Referências culturais, paisagens, clima ou artistas similares (opcional)"' in creation
+    assert 'st.button("Gerar campos musicais com IA"' in creation
+    assert 'st.button("Gerar Música"' in creation
+    assert 'st.session_state["music_task_generated_fields"] = generated' in creation
+    assert 'Adicionar ao Music Backlog' not in creation
     assert "MoneyPrinterTurbo" in creation
     assert "render_new_video" not in creation
     assert '"Google Lyria API key"' in MAIN_SOURCE

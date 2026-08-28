@@ -43,6 +43,7 @@ from hermes_ui.material_sources import apply_material_source_cards_to_settings, 
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_cards_for_pool, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
 from hermes_ui.music import create_music_task, list_music_files, list_music_tasks, materialize_suno_audio, request_suno_generation, run_music_task, store_music_file, store_voiceover_file, transition_music_task
+from hermes_ui.music_generation import MUSIC_GENRES, MUSIC_VOCAL_OPTIONS, generate_music_fields
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.influencers import BACKEND_OPTIONS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, backend_name, backend_status, get_repository, test_backend
@@ -2651,20 +2652,75 @@ def render_music_creation():
     st.title("Criação de Músicas")
     st.caption("Crie apenas áudio. Os pedidos desta página não criam vídeo, não usam o MoneyPrinterTurbo e não entram no Backlog Vídeos.")
     settings = read_json("settings.json", {})
-    with st.form("create_music_task_form"):
-        provider_label = st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"], key="music_task_provider")
-        title = st.text_input("Título da música", key="music_task_title")
-        prompt = st.text_area("Prompt musical", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="music_task_prompt", height=150)
-        lyria_model = ""
-        if provider_label == "Google Lyria":
-            models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]
-            configured = str(settings.get("lyria_model") or models[0])
-            lyria_model = st.selectbox("Modelo Lyria", models, index=models.index(configured) if configured in models else 0, key="music_task_lyria_model")
-        submitted = st.form_submit_button("Adicionar ao Music Backlog", type="primary", use_container_width=True)
-    if submitted:
+    generated_fields = st.session_state.pop("music_task_generated_fields", None)
+    if isinstance(generated_fields, dict):
+        for state_key, generated_key in (
+            ("music_task_title", "title"),
+            ("music_task_language", "language"),
+            ("music_task_genre", "genre"),
+            ("music_task_vocal", "vocal"),
+            ("music_task_references", "references"),
+            ("music_task_prompt", "prompt"),
+        ):
+            st.session_state[state_key] = str(generated_fields.get(generated_key) or "")
+    provider_label = st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"], key="music_task_provider")
+    theme = st.text_input("Tema / assunto principal", key="music_task_theme", placeholder="Ex.: uma viagem nocturna pela costa portuguesa")
+    title = st.text_input("Título da música", key="music_task_title")
+    language = st.selectbox(
+        "Idioma da letra/música",
+        list(LANGUAGE_CODES),
+        index=list(LANGUAGE_CODES).index(str(st.session_state.get("music_task_language") or "pt")) if str(st.session_state.get("music_task_language") or "pt") in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt"),
+        format_func=language_label,
+        key="music_task_language",
+    )
+    genre = st.selectbox("Género musical", list(MUSIC_GENRES), key="music_task_genre")
+    vocal = st.selectbox("Vocal", list(MUSIC_VOCAL_OPTIONS), key="music_task_vocal")
+    references = st.text_area(
+        "Referências culturais, paisagens, clima ou artistas similares (opcional)",
+        key="music_task_references",
+        placeholder="Ex.: pôr do sol mediterrânico, estrada molhada, nostalgia suave e arranjos acústicos contemporâneos",
+        height=90,
+    )
+    if st.button("Gerar campos musicais com IA", key="music_task_generate_fields", use_container_width=True, icon=":material/auto_awesome:"):
         try:
-            task = create_music_task(provider_label, prompt, title, lyria_model)
-            st.success(f"Música adicionada ao Music Backlog: {task['title']}")
+            with st.spinner("A criar título, letra e prompt musical originais…"):
+                generated = generate_music_fields(
+                    settings,
+                    theme=theme,
+                    language=language,
+                    genre=genre,
+                    vocal=vocal,
+                    references=references,
+                )
+            st.session_state["music_task_generated_fields"] = generated
+            st.rerun()
+        except CreativeGenerationError as exc:
+            st.error(str(exc))
+    prompt = st.text_area(
+        "Prompt musical",
+        placeholder="Use Gerar campos musicais com IA para criar letra e estilo completos, ou escreva um prompt próprio.",
+        key="music_task_prompt",
+        height=300,
+    )
+    lyria_model = ""
+    if provider_label == "Google Lyria":
+        models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]
+        configured = str(settings.get("lyria_model") or models[0])
+        lyria_model = st.selectbox("Modelo Lyria", models, index=models.index(configured) if configured in models else 0, key="music_task_lyria_model")
+    if st.button("Gerar Música", key="music_task_submit", type="primary", use_container_width=True, icon=":material/music_note:"):
+        try:
+            task = create_music_task(
+                provider_label,
+                prompt,
+                title,
+                lyria_model,
+                language=language,
+                genre=genre,
+                vocal=vocal,
+                references=references,
+                theme=theme,
+            )
+            st.success(f"Música criada no Music Backlog: {task['title']}")
             st.rerun()
         except ValueError as exc:
             st.error(str(exc))

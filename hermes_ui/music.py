@@ -97,7 +97,14 @@ def materialize_suno_audio(data: dict[str, Any], title: str = "suno-generated.mp
     return store_music_file(title, response.content)
 
 
-def request_suno_generation(settings: dict[str, Any], prompt: str, title: str = "", duration_seconds: int = 120) -> dict[str, Any]:
+def request_suno_generation(
+    settings: dict[str, Any],
+    prompt: str,
+    title: str = "",
+    duration_seconds: int = 120,
+    *,
+    make_instrumental: bool = True,
+) -> dict[str, Any]:
     """Request music from a configured Suno-compatible endpoint.
 
     Suno-compatible deployments expose different endpoint paths; the UI therefore
@@ -109,7 +116,12 @@ def request_suno_generation(settings: dict[str, Any], prompt: str, title: str = 
     if not api_key or not base_url:
         return {"ok": False, "message": "Configure Suno API Key e Suno API Base URL em Configurações antes de solicitar uma música.", "data": {}}
     url = endpoint if endpoint.startswith("http") else f"{base_url}/{endpoint.lstrip('/')}"
-    payload = {"prompt": prompt.strip(), "title": title.strip(), "duration": max(120, int(duration_seconds)), "make_instrumental": True}
+    payload = {
+        "prompt": prompt.strip(),
+        "title": title.strip(),
+        "duration": max(120, int(duration_seconds)),
+        "make_instrumental": bool(make_instrumental),
+    }
     try:
         response = requests.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, timeout=30)
         if response.status_code >= 400:
@@ -132,7 +144,18 @@ def _save_music_tasks(tasks: list[dict[str, Any]]) -> None:
     storage.write_json("music_tasks.json", tasks)
 
 
-def create_music_task(provider: str, prompt: str, title: str, model: str = "") -> dict[str, Any]:
+def create_music_task(
+    provider: str,
+    prompt: str,
+    title: str,
+    model: str = "",
+    *,
+    language: str = "",
+    genre: str = "",
+    vocal: str = "",
+    references: str = "",
+    theme: str = "",
+) -> dict[str, Any]:
     """Enqueue one audio-only generation; no video task or video worker is used."""
     cleaned_prompt = str(prompt or "").strip()
     if not cleaned_prompt:
@@ -145,6 +168,12 @@ def create_music_task(provider: str, prompt: str, title: str, model: str = "") -
         "model": str(model or "").strip(),
         "title": str(title or "Música sem título").strip() or "Música sem título",
         "prompt": cleaned_prompt,
+        "language": str(language or "").strip(),
+        "genre": str(genre or "").strip(),
+        "vocal": str(vocal or "").strip(),
+        "references": str(references or "").strip(),
+        "theme": str(theme or "").strip(),
+        "duration_seconds": 120,
         "state": "to_do",
         "stage": "music_generation",
         "progress": 0,
@@ -240,7 +269,13 @@ def run_music_task(task_id: str, settings: dict[str, Any]) -> dict[str, Any] | N
         result = request_lyria_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""), str(task.get("model") or ""))
         audio_path = str((result.get("data") or {}).get("audio_path") or "")
     else:
-        result = request_suno_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""))
+        result = request_suno_generation(
+            settings,
+            str(task.get("prompt") or ""),
+            str(task.get("title") or ""),
+            int(task.get("duration_seconds") or 120),
+            make_instrumental=not bool(str(task.get("vocal") or "").strip()),
+        )
         try:
             output = materialize_suno_audio(result.get("data") or {}, str(task.get("title") or "suno-generated.mp3")) if result.get("ok") else None
             audio_path = str(output or "")
