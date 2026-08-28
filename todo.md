@@ -54,3 +54,6 @@
 - [x] Validar e publicar a alteração do nome da aba Vozes Personalizadas.
 - [x] Mover Gerar campos musicais com IA para baixo do Prompt musical e acima de Gerar Música.
 - [x] Validar e publicar a nova ordem dos botões musicais.
+- [x] Fazer o botão Atualizar Versão reiniciar a instância após uma actualização bem-sucedida.
+- [x] Garantir mensagem de estado e preservação do storage durante o reinício.
+- [ ] Criar regressões e publicar o reinício automático do Thunderbolt.

@@ -62,7 +62,7 @@ from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_innertube_api_key, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
-from hermes_ui.update_manager import check_version, update_to_latest
+from hermes_ui.update_manager import check_version, restart_current_process, update_to_latest
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
@@ -1305,9 +1305,13 @@ def render_home_update_controls() -> None:
         )
         if st.button("Atualizar Versão", key="home_update_version", use_container_width=True, type="primary", icon=":material/system_update:"):
             with st.spinner("A instalar a versão mais recente…"):
-                st.session_state["home_update_result"] = update_to_latest(APP_VERSION)
+                update_result = update_to_latest(APP_VERSION)
+                st.session_state["home_update_result"] = update_result
                 st.session_state["home_update_notice_dismissed"] = False
-                st.rerun()
+                if update_result.ok and update_result.restart_required:
+                    st.success("Actualização concluída. A reiniciar o Thunderbolt para aplicar a nova versão…")
+                    time.sleep(0.8)
+                    restart_current_process()
     with version_area:
         cache_key = "home_update_version_check"
         checked_at_key = "home_update_version_checked_at"
