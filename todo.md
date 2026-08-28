@@ -30,3 +30,7 @@
 - [x] Adicionar na aba Início um botão colorido Atualizar Versão no topo, sem o mostrar nas outras abas.
 - [x] Implementar verificação e actualização segura para a versão NPM mais recente sem expor comandos ou credenciais.
 - [x] Testar e publicar o botão Actualizar Versão.
+- [x] Adicionar à Criação de Músicas campos de idioma, género musical, vocal e referências culturais/artísticas opcionais.
+- [x] Incorporar a lista de géneros fornecida e gerar título, idioma, género, vocal, referências e prompt musical por LLM.
+- [x] Renomear Adicionar ao Music Backlog para Gerar Música e preservar a fila musical independente.
+- [x] Criar regressões e publicar a ampliação da Criação de Músicas.
