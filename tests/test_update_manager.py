@@ -41,10 +41,21 @@ def test_update_uses_npx_install_without_passing_settings_or_secrets():
 
     assert result.ok is True
     assert result.latest_version == "0.3.97"
+    assert result.restart_required is True
     assert captured["command"][-2:] == ["@danhachuel/thunderbolt", "install"]
     assert "settings" not in " ".join(captured["command"]).lower()
     assert captured["kwargs"]["stdout"] is update_manager.subprocess.DEVNULL
     assert captured["kwargs"]["stderr"] is update_manager.subprocess.DEVNULL
+
+
+def test_restart_current_process_reexecutes_the_same_python_command(monkeypatch):
+    calls = []
+    monkeypatch.setattr(update_manager.sys, "executable", "/python")
+    monkeypatch.setattr(update_manager.sys, "argv", ["-m", "streamlit", "run", "app/main.py"])
+
+    update_manager.restart_current_process(exec_fn=lambda executable, argv: calls.append((executable, argv)))
+
+    assert calls == [("/python", ["/python", "-m", "streamlit", "run", "app/main.py"])]
 
 
 def test_update_does_not_run_when_the_package_is_already_current():
@@ -67,6 +78,8 @@ def test_home_is_the_only_page_that_renders_the_update_button():
     assert source.count('key="home_update_version"') == 1
     assert 'button[kind="primary"]' in home_controls
     assert 'if current_page == "Início":\n        render_home_update_controls()' in source
+    assert 'restart_current_process()' in home_controls
+    assert 'update_result.ok and update_result.restart_required' in home_controls
     assert 'key="home_update_version"' not in dashboard
 
 

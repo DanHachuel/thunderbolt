@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -39,6 +40,13 @@ class UpdateResult:
     ok: bool
     latest_version: str = ""
     message: str = ""
+    restart_required: bool = False
+
+
+def restart_current_process(*, exec_fn: Callable[..., Any] = os.execv) -> None:
+    """Replace the running Streamlit process with the same command line."""
+    executable = sys.executable
+    exec_fn(executable, [executable, *sys.argv])
 
 
 def latest_package_version(*, timeout: int = 8, get: Callable[..., Any] = requests.get) -> str:
@@ -101,6 +109,7 @@ def update_to_latest(
     return UpdateResult(
         True,
         latest_version=status.latest_version,
+        restart_required=True,
         message=(
             f"A versão {status.latest_version} foi instalada. Reinicie o Thunderbolt para abrir a versão nova; "
             "os dados e configurações locais foram preservados."
