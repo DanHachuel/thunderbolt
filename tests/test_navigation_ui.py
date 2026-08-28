@@ -14,6 +14,8 @@ def test_automation_is_an_expander_with_youtube_child_page():
 
 def test_navigation_highlights_only_the_exact_current_item():
     assert 'type="primary" if current_page == target else "secondary"' in MAIN_SOURCE
+    assert '[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#7c3aed !important;' in MAIN_SOURCE
+    assert '[data-testid="stSidebar"] [data-testid="stExpander"] summary strong' not in MAIN_SOURCE
     assert 'expanded=current_page in child_targets' in MAIN_SOURCE
     assert 'is_nav_target_active' not in MAIN_SOURCE
     assert 'group_label = f"**{ui_text(label, ui_language)}**"' not in MAIN_SOURCE
