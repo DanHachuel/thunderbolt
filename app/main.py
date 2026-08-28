@@ -41,7 +41,7 @@ from hermes_ui.mcp_server import server_status, start_server, stop_server
 from hermes_ui.material_sources import apply_material_source_cards_to_settings, ensure_material_source_cards, material_source_catalog, material_source_definition, new_material_card, normalize_material_card, selected_material_source
 from hermes_ui.llm_providers import LLM_CARDS_KEY, LLM_PROVIDER_CATALOG, apply_llm_cards_to_settings, ensure_llm_provider_cards, new_llm_card, normalize_llm_card, provider_definition, test_llm_provider_card, stamp_test_result
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, MEDIA_CARDS_KEY, MEDIA_IMAGE_ACTIVE_CARD_KEY, MEDIA_VIDEO_ACTIVE_CARD_KEY, apply_media_provider_cards_to_settings, ensure_media_provider_cards, media_cards_for_pool, media_provider_catalog, media_provider_definition, new_media_card, normalize_media_card
-from hermes_ui.music import list_music_files, materialize_suno_audio, request_suno_generation, store_music_file, store_voiceover_file
+from hermes_ui.music import create_music_task, list_music_files, list_music_tasks, materialize_suno_audio, request_suno_generation, run_music_task, store_music_file, store_voiceover_file, transition_music_task
 from hermes_ui.media_downloader import AUDIO_FORMATS, VIDEO_CONTAINERS, VIDEO_QUALITY_OPTIONS, MediaDownloadError, build_download_options, clear_media_download_history, dependency_status, download_media, list_media_downloads, media_download_file
 from hermes_ui.notifications import clear_notifications, list_notifications, mark_all_notifications_read, mark_notification_read, notification_event_catalog, notification_preferences, record_notification, reconcile_persisted_notifications, save_notification_preferences, unread_notification_count
 from hermes_ui.influencers import BACKEND_OPTIONS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, backend_name, backend_status, get_repository, test_backend
@@ -2603,8 +2603,27 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
 
 
 def render_music_creation():
-    """Expose the complete video-creation UI under the music-oriented navigation entry without changing the original page."""
-    render_new_video(page_title="Criação de Músicas", prefix="new_music")
+    """Create audio-only items for the independent Suno/Lyria Music Backlog."""
+    st.title("Criação de Músicas")
+    st.caption("Crie apenas áudio. Os pedidos desta página não criam vídeo, não usam o MoneyPrinterTurbo e não entram no Backlog Vídeos.")
+    settings = read_json("settings.json", {})
+    with st.form("create_music_task_form"):
+        provider_label = st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"], key="music_task_provider")
+        title = st.text_input("Título da música", key="music_task_title")
+        prompt = st.text_area("Prompt musical", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="music_task_prompt", height=150)
+        lyria_model = ""
+        if provider_label == "Google Lyria":
+            models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]
+            configured = str(settings.get("lyria_model") or models[0])
+            lyria_model = st.selectbox("Modelo Lyria", models, index=models.index(configured) if configured in models else 0, key="music_task_lyria_model")
+        submitted = st.form_submit_button("Adicionar ao Music Backlog", type="primary", use_container_width=True)
+    if submitted:
+        try:
+            task = create_music_task(provider_label, prompt, title, lyria_model)
+            st.success(f"Música adicionada ao Music Backlog: {task['title']}")
+            st.rerun()
+        except ValueError as exc:
+            st.error(str(exc))
 
 
 def render_scripts():
@@ -3637,7 +3656,7 @@ def render_videos():
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
     _render_pipeline_progress_panel()
-    tasks = load_standard_video_tasks_for_catalog()
+    tasks = load_video_tasks_for_catalog()
     if not tasks:
         st.info("Nenhum vídeo criado.")
         return
@@ -3697,12 +3716,14 @@ def render_videos():
 
 
 def render_music_backlog() -> None:
-    """Render the music-only counterpart of Backlog Videos with the same controls."""
+    """Render the independent audio-only queue; it never reads the video pipeline."""
     st.subheader("Music Backlog")
-    st.caption("Acompanhamento das músicas criadas, estados da pipeline e controlos de execução.")
+    st.caption("Fila independente de geração de áudio por Suno AI ou Google Lyria. Não inclui tarefas, worker ou progresso de vídeo.")
     st.caption(f"As músicas são guardadas em `{STORAGE / 'music'}`.")
-    _render_pipeline_progress_panel()
-    tasks = load_music_tasks_for_catalog()
+    tasks = list_music_tasks()
+    active = [task for task in tasks if str(task.get("state") or "") == "doing"]
+    if active:
+        st.info(f"Geração musical em execução · {len(active)} tarefa(s) de áudio.")
     if not tasks:
         st.info("Nenhuma música criada.")
         return
@@ -3715,10 +3736,10 @@ def render_music_backlog() -> None:
         with st.container(border=True):
             cols = st.columns([2.2, 1, 1, 1.2, 1.8])
             with cols[0]:
-                st.write(f"**{task.get('title') or task.get('topic', 'Sem título')}**")
-                st.caption(f"Música: {task.get('music_source') or 'rota musical'}")
-                st.caption(f"{task.get('channel_name')} · {task.get('id')}")
-                music_path = str(task.get("music_path") or (task.get("artifacts") or {}).get("music") or "").strip()
+                st.write(f"**{task.get('title') or 'Música sem título'}**")
+                st.caption(f"Provider: {'Google Lyria' if str(task.get('provider') or '').casefold() == 'lyria' else 'Suno AI'}")
+                st.caption(str(task.get('id') or ''))
+                music_path = str(task.get("audio_path") or "").strip()
                 if music_path and Path(music_path).is_file():
                     music_file = Path(music_path)
                     st.success("Música pronta; pode continuar para o destino configurado.")
@@ -3735,22 +3756,29 @@ def render_music_backlog() -> None:
                 else:
                     st.caption("A música será disponibilizada quando a etapa de geração terminar.")
             with cols[1]:
-                st.caption("Formato")
-                st.write(_video_task_format(task))
+                st.caption("Tipo")
+                st.write("Áudio")
             with cols[2]:
-                st.write(_pipeline_stage_label(task))
+                st.write({"music_generation": "Geração musical", "completed": "Concluída", "failed": "Falha"}.get(str(task.get("stage") or ""), "Na fila"))
             with cols[3]:
-                _render_video_task_state(task)
+                state = str(task.get("state") or "unknown").strip().lower()
+                progress = _video_task_progress(task)
+                st.caption("Estado")
+                st.write(state or "—")
+                st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
+                st.progress(progress, text=f"{progress}%")
+                if task.get("error"):
+                    st.error(str(task.get("error") or "")[:500])
             with cols[4]:
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
                     if st.button("Start", key=f"music_backlog_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                        transition_task(task["id"], "doing")
+                        run_music_task(str(task["id"]), read_json("settings.json", {}))
                         st.rerun()
                 with stop_col:
                     if st.button("Stop", key=f"music_backlog_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
-                        transition_task(task["id"], "blocked")
+                        transition_music_task(str(task["id"]), "blocked")
                         st.rerun()
 
 
@@ -6102,6 +6130,15 @@ def render_settings():
                             widget_key="api_test_voice_suno",
                         )
 
+                    with st.container(border=True):
+                        st.markdown("#### Google Lyria — geração musical")
+                        st.caption("Google Lyria gera apenas áudio através da API Gemini Interactions; não usa a pipeline de vídeo.")
+                        lyria_api_key = text_setting("Google Lyria API key", "lyria_api_key", secret=True, help_text="Chave da Gemini API com acesso ao modelo Lyria. O valor é guardado apenas localmente.")
+                        _render_credential_status(lyria_api_key)
+                        lyria_models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]
+                        saved_lyria_model = str(settings.get("lyria_model") or lyria_models[0])
+                        lyria_model = st.selectbox("Modelo Google Lyria", lyria_models, index=lyria_models.index(saved_lyria_model) if saved_lyria_model in lyria_models else 0, key="settings_lyria_model")
+
                 with st.expander("Publicação através do Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
@@ -6150,6 +6187,7 @@ def render_settings():
                         "elevenlabs_api_key": elevenlabs_api_key, "elevenlabs_model_id": elevenlabs_model_id,
                         "chatterbox_base_url": chatterbox_base_url, "chatterbox_api_key": chatterbox_api_key, "chatterbox_model_id": chatterbox_model_id,
                         "sonilo_api_key": sonilo_api_key, "sonilo_base_url": sonilo_base_url, "suno_api_key": suno_api_key, "suno_api_base_url": suno_api_base_url, "suno_api_endpoint": suno_api_endpoint,
+                        "lyria_api_key": lyria_api_key, "lyria_model": lyria_model,
                         "upload_post_enabled": upload_post_enabled, "upload_post_api_key": upload_post_api_key,
                         "upload_post_username": upload_post_username, "upload_post_platforms": upload_post_platforms,
                         "upload_post_auto_upload": upload_post_auto_upload,

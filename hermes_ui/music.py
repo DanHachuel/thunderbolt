@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import base64
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -115,3 +118,137 @@ def request_suno_generation(settings: dict[str, Any], prompt: str, title: str = 
         return {"ok": True, "message": "Pedido de música enviado ao endpoint Suno configurado.", "data": body if isinstance(body, dict) else {"response": body}}
     except (requests.RequestException, ValueError) as exc:
         return {"ok": False, "message": f"Não foi possível contactar o endpoint Suno configurado: {exc}", "data": {}}
+
+
+def list_music_tasks() -> list[dict[str, Any]]:
+    """Return only tasks created for the independent audio-generation queue."""
+    records = storage.read_json("music_tasks.json", [])
+    if not isinstance(records, list):
+        return []
+    return [dict(record) for record in records if isinstance(record, dict) and str(record.get("id") or "").strip()]
+
+
+def _save_music_tasks(tasks: list[dict[str, Any]]) -> None:
+    storage.write_json("music_tasks.json", tasks)
+
+
+def create_music_task(provider: str, prompt: str, title: str, model: str = "") -> dict[str, Any]:
+    """Enqueue one audio-only generation; no video task or video worker is used."""
+    cleaned_prompt = str(prompt or "").strip()
+    if not cleaned_prompt:
+        raise ValueError("Escreva um prompt musical antes de adicionar à fila.")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    task = {
+        "id": f"music_{uuid.uuid4().hex[:12]}",
+        "kind": "audio_generation",
+        "provider": "lyria" if str(provider).strip().casefold() == "google lyria" else "suno",
+        "model": str(model or "").strip(),
+        "title": str(title or "Música sem título").strip() or "Música sem título",
+        "prompt": cleaned_prompt,
+        "state": "to_do",
+        "stage": "music_generation",
+        "progress": 0,
+        "audio_path": "",
+        "error": "",
+        "created_at": now,
+        "updated_at": now,
+    }
+    tasks = list_music_tasks()
+    tasks.insert(0, task)
+    _save_music_tasks(tasks)
+    return task
+
+
+def _update_music_task(task_id: str, **changes: Any) -> dict[str, Any] | None:
+    tasks = list_music_tasks()
+    updated: dict[str, Any] | None = None
+    for task in tasks:
+        if str(task.get("id") or "") == str(task_id):
+            task.update(changes)
+            task["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            updated = dict(task)
+            break
+    if updated is not None:
+        _save_music_tasks(tasks)
+    return updated
+
+
+def transition_music_task(task_id: str, state: str) -> dict[str, Any] | None:
+    """Change only an independent audio queue state."""
+    if state not in {"to_do", "doing", "blocked", "done", "failed", "cancelled"}:
+        raise ValueError("Estado de música inválido.")
+    return _update_music_task(task_id, state=state)
+
+
+def _extract_lyria_audio(payload: dict[str, Any]) -> bytes:
+    """Extract a base64 audio block from Gemini Interactions without logging the payload."""
+    candidates: list[Any] = []
+    output_audio = payload.get("output_audio") if isinstance(payload, dict) else None
+    if isinstance(output_audio, dict):
+        candidates.append(output_audio.get("data"))
+    for step in payload.get("steps", []) if isinstance(payload, dict) else []:
+        if not isinstance(step, dict):
+            continue
+        content = step.get("content")
+        for block in content if isinstance(content, list) else []:
+            if isinstance(block, dict) and str(block.get("type") or "").casefold() == "audio":
+                candidates.append(block.get("data"))
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            try:
+                decoded = base64.b64decode(candidate, validate=True)
+            except (ValueError, TypeError):
+                continue
+            if decoded:
+                return decoded
+    return b""
+
+
+def request_lyria_generation(settings: dict[str, Any], prompt: str, title: str = "", model: str = "") -> dict[str, Any]:
+    """Generate audio through Google Lyria's Interactions API without invoking video tooling."""
+    api_key = str(settings.get("lyria_api_key") or settings.get("gemini_api_key") or "").strip()
+    selected_model = str(model or settings.get("lyria_model") or "lyria-3-clip-preview").strip()
+    if not api_key:
+        return {"ok": False, "message": "Configure a Google Lyria API key em Configurações antes de solicitar uma música.", "data": {}}
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json={"model": selected_model, "input": str(prompt or "").strip()},
+            timeout=180,
+        )
+        if response.status_code >= 400:
+            return {"ok": False, "message": f"Google Lyria devolveu HTTP {response.status_code}.", "data": {"status_code": response.status_code}}
+        body = response.json() if response.content else {}
+        audio = _extract_lyria_audio(body if isinstance(body, dict) else {})
+        if not audio:
+            return {"ok": False, "message": "Google Lyria não devolveu áudio na resposta.", "data": {}}
+        output = store_music_file(f"{title or 'lyria-generated'}.mp3", audio)
+        return {"ok": True, "message": "Música gerada por Google Lyria.", "data": {"audio_path": str(output), "model": selected_model}}
+    except (requests.RequestException, ValueError):
+        return {"ok": False, "message": "Não foi possível contactar Google Lyria.", "data": {}}
+
+
+def run_music_task(task_id: str, settings: dict[str, Any]) -> dict[str, Any] | None:
+    """Run exactly one queued audio generation and persist only its audio artefact."""
+    task = next((record for record in list_music_tasks() if str(record.get("id") or "") == str(task_id)), None)
+    if not task:
+        return None
+    _update_music_task(task_id, state="doing", stage="music_generation", progress=15, error="")
+    provider = str(task.get("provider") or "suno").casefold()
+    if provider == "lyria":
+        result = request_lyria_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""), str(task.get("model") or ""))
+        audio_path = str((result.get("data") or {}).get("audio_path") or "")
+    else:
+        result = request_suno_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""))
+        try:
+            output = materialize_suno_audio(result.get("data") or {}, str(task.get("title") or "suno-generated.mp3")) if result.get("ok") else None
+            audio_path = str(output or "")
+        except (OSError, requests.RequestException, ValueError):
+            audio_path = ""
+            result = {"ok": False, "message": "A música Suno foi solicitada, mas não foi possível guardar o áudio devolvido.", "data": {}}
+    if result.get("ok") and audio_path:
+        completed = _update_music_task(task_id, state="done", stage="completed", progress=100, audio_path=audio_path, error="")
+        record_notification("music_completed", f"Música concluída: {task.get('title') or 'Música'}", "Áudio guardado no Music Backlog.", metadata={"task_id": task_id, "provider": provider, "filename": Path(audio_path).name}, dedupe_key=f"music-task:{task_id}:{audio_path}")
+        return completed
+    return _update_music_task(task_id, state="failed", stage="failed", progress=100, error=str(result.get("message") or "A geração musical falhou.")[:500])
