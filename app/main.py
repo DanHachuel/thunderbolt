@@ -7101,6 +7101,19 @@ def main():
         "Documentação": documentation_items,
         "Configurações": settings_items,
     }
+    nav_paths = {
+        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube",
+        "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
+        "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload",
+        "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
+        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
+        "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
+        "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
+        "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
+        "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend",
+        "Configurações": "/configuracoes", "MCP": "/configuracoes/mcp", "Notificações": "/configuracoes/notificacoes", "Logs": "/configuracoes/logs", "Configuração API": "/configuracoes/api",
+    }
+
     aliases = {
         "Dashboard": "Início",
         "Novo vídeo": "Criação de Vídeos",
@@ -7126,6 +7139,12 @@ def main():
         current_page = "Início"
     st.session_state["page"] = current_page
     ui_language = current_ui_language()
+    current_path = nav_paths.get(current_page, "/inicio")
+
+    def is_nav_item_active(target: str) -> bool:
+        """Activate one item only when its own path equals the current path."""
+        return current_path == nav_paths.get(target)
+
     if current_page == "Início":
         render_home_update_controls()
     render_ui_language_picker(ui_language)
@@ -7136,7 +7155,7 @@ def main():
 
     def render_nav_button(target: str, icon: str, label: str, scope: str):
         display_label = ui_text(label, ui_language)
-        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if is_nav_item_active(target) else "secondary"):
             navigate(target)
 
     with st.sidebar:
