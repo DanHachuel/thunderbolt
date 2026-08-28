@@ -2771,7 +2771,7 @@ def render_music_creation():
 
 def render_custom_music_voices() -> None:
     """Reserved view for future reusable custom music-voice blueprints."""
-    st.title("Vozes Personalizadas, Funcionará como um Blueprint")
+    st.title("Vozes Personalizadas")
 
 
 def render_scripts():
@@ -7031,7 +7031,7 @@ def main():
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
         ("Music Backlog", ":material/queue_music:", "Music Backlog"),
-        ("Vozes Personalizadas, Funcionará como um Blueprint", ":material/record_voice_over:", "Vozes Personalizadas, Funcionará como um Blueprint"),
+        ("Vozes Personalizadas", ":material/record_voice_over:", "Vozes Personalizadas"),
         ("Upload Música", ":material/library_music:", "Upload Música"),
     ]
     models_ai_items = [
@@ -7157,7 +7157,7 @@ def main():
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
         "Music Backlog": render_music_backlog,
-        "Vozes Personalizadas, Funcionará como um Blueprint": render_custom_music_voices,
+        "Vozes Personalizadas": render_custom_music_voices,
         "Upload Música": render_music_upload,
         "Roteiros": render_scripts,
         "Thumbnails": render_thumbnails,

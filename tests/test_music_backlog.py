@@ -11,14 +11,14 @@ def test_music_backlog_is_registered_under_the_music_pipeline_menu():
 
     assert '("Music Backlog", ":material/queue_music:", "Music Backlog")' in music_items
     assert '"Music Backlog": render_music_backlog' in MAIN_SOURCE
-    assert '("Vozes Personalizadas, Funcionará como um Blueprint", ":material/record_voice_over:", "Vozes Personalizadas, Funcionará como um Blueprint")' in music_items
-    assert '"Vozes Personalizadas, Funcionará como um Blueprint": render_custom_music_voices' in MAIN_SOURCE
+    assert '("Vozes Personalizadas", ":material/record_voice_over:", "Vozes Personalizadas")' in music_items
+    assert '"Vozes Personalizadas": render_custom_music_voices' in MAIN_SOURCE
 
 
 def test_custom_music_voices_is_an_empty_reserved_blueprint_area():
     voices = MAIN_SOURCE.split("def render_custom_music_voices()", 1)[1].split("def render_scripts", 1)[0]
 
-    assert 'st.title("Vozes Personalizadas, Funcionará como um Blueprint")' in voices
+    assert 'st.title("Vozes Personalizadas")' in voices
     assert "st.text_input(" not in voices
     assert "st.file_uploader(" not in voices
 
