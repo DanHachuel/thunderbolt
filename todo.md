@@ -64,4 +64,4 @@
 - [x] Criar regressões e publicar a melhoria do estado activo da navegação.
 - [x] Desfazer o destaque roxo dos grupos pais da barra lateral.
 - [x] Fazer apenas o item correspondente à página actual ficar activo como Início.
-- [ ] Criar regressões e publicar a correcção do destaque individual.
+- [x] Criar regressões e publicar a correcção do destaque individual.
