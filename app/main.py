@@ -216,10 +216,8 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] { background:transparent; color:inherit; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:rgba(128,128,128,.08); border-color:rgba(128,128,128,.25); color:inherit; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover { background:color-mix(in srgb, currentColor 8%, transparent); border-color:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:rgba(128,128,128,.14); color:inherit; border-color:rgba(128,128,128,.30); }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:color-mix(in srgb, currentColor 12%, transparent); color:inherit; border-color:color-mix(in srgb, currentColor 22%, transparent); }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:rgba(128,128,128,.20); color:inherit; }
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:color-mix(in srgb, currentColor 18%, transparent); color:inherit; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] { background:#7c3aed !important; color:#ffffff !important; border-color:#8b5cf6 !important; }
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover { background:#6d28d9 !important; color:#ffffff !important; border-color:#a78bfa !important; }
 [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] span,
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span { color:inherit; }
 [data-testid="stSidebar"] [data-testid="stExpander"] { border:0 !important; background:transparent !important; margin:0.02rem 0 !important; }

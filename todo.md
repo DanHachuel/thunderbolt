@@ -65,3 +65,6 @@
 - [x] Desfazer o destaque roxo dos grupos pais da barra lateral.
 - [x] Fazer apenas o item correspondente à página actual ficar activo como Início.
 - [x] Criar regressões e publicar a correcção do destaque individual.
+- [x] Corrigir o fundo roxo efectivo dos itens activos fora de Início.
+- [x] Manter os grupos pais neutros e destacar apenas o botão do destino actual.
+- [ ] Testar visualmente e publicar a correcção efectiva da navegação.
