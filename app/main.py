@@ -1969,10 +1969,17 @@ def render_channels():
                 channel_account_ids.append(current_channel_account_id)
                 youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
             with st.expander("Upload directo — documento da conta deste canal", expanded=False):
-                st.caption("O DELEGATED_SESSION_ID deste canal é individual, mas fica apenas no documento JSON da conta Google. A UI não mostra nem edita esse valor; associe apenas o canal à conta que contém o documento.")
+                st.caption("O DELEGATED_SESSION_ID é individual deste canal. Guarde-o aqui; o valor fica no registo local do canal e não é copiado para o documento JSON partilhado da conta Google.")
                 with st.form(f"channel_direct_credentials_{channel_id}"):
                     channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel_id}")
-                    save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", use_container_width=True)
+                    channel_delegated_session_id = st.text_input(
+                        "DELEGATED_SESSION_ID deste canal",
+                        value=str(channel.get("delegated_session_id") or ""),
+                        type="password",
+                        key=f"channel_delegated_session_id_{channel_id}",
+                        help="Identificador individual usado pelo Upload directo deste canal. Não é partilhado com outros canais nem mostrado nos diagnósticos.",
+                    )
+                    save_channel_direct_credentials = st.form_submit_button("Guardar conta Google e DELEGATED_SESSION_ID", type="primary", use_container_width=True)
                 selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
                 if selected_channel_account:
                     selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
@@ -1992,8 +1999,15 @@ def render_channels():
                 else:
                     st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
                 if save_channel_direct_credentials:
-                    update_channel(channel_id, {"google_account_id": channel_account_id.strip(), "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", ""))})
-                    st.success("Conta Google associada ao canal. O DELEGATED_SESSION_ID continua exclusivamente no documento da conta.")
+                    update_channel(
+                        channel_id,
+                        {
+                            "google_account_id": channel_account_id.strip(),
+                            "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", "")),
+                            "delegated_session_id": channel_delegated_session_id.strip(),
+                        },
+                    )
+                    st.success("Conta Google e DELEGATED_SESSION_ID individual do canal guardados.")
                     st.rerun()
 
             render_channel_videos(channel)
