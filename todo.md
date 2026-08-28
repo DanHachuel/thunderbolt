@@ -14,4 +14,4 @@
 - [x] Adicionar Testar chamada API para a INNERTUBE_API_KEY global do YouTube.
 - [x] Adicionar Testar chamada API ao cartão Niche Finder — Kaggle.
 - [x] Adicionar Testar chamada API ao cartão Niche Finder — Apify.
-- [ ] Cobrir os três testes de credenciais com regressões e publicar a correcção.
+- [x] Cobrir os três testes de credenciais com regressões e publicar a correcção.
