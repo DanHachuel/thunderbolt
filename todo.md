@@ -27,3 +27,6 @@
 - [x] Garantir que Start em vídeos falhados da Automação YouTube recarrega as configurações e chaves de API actuais.
 - [x] Criar regressões para retoma de vídeo sem reutilizar credenciais ou providers obsoletos.
 - [x] Testar e publicar a correcção da retoma de tarefas falhadas.
+- [x] Adicionar na aba Início um botão colorido Atualizar Versão no topo, sem o mostrar nas outras abas.
+- [x] Implementar verificação e actualização segura para a versão NPM mais recente sem expor comandos ou credenciais.
+- [x] Testar e publicar o botão Actualizar Versão.

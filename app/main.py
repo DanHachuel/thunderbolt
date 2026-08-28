@@ -4,6 +4,7 @@ import hashlib
 import json
 import mimetypes
 import re
+import time
 from contextlib import nullcontext
 from datetime import date, datetime, timezone
 import sys
@@ -49,6 +50,7 @@ from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
 from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_innertube_api_key, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
+from hermes_ui.update_manager import check_version, update_to_latest
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
@@ -1269,6 +1271,48 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
 
 def render_dashboard():
     ui_language = current_ui_language()
+    update_area, version_area = st.columns([1.45, 4.55])
+    with update_area:
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stButton"] button[kind="primary"] {
+                background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+                color: #ffffff;
+                border: 1px solid #8b5cf6;
+                font-weight: 700;
+                box-shadow: 0 8px 20px rgba(79, 70, 229, 0.28);
+            }
+            div[data-testid="stButton"] button[kind="primary"]:hover {
+                border-color: #c4b5fd;
+                filter: brightness(1.08);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("Atualizar Versão", key="home_update_version", use_container_width=True, type="primary", icon=":material/system_update:"):
+            with st.spinner("A instalar a versão mais recente…"):
+                st.session_state["home_update_result"] = update_to_latest(APP_VERSION)
+    with version_area:
+        cache_key = "home_update_version_check"
+        checked_at_key = "home_update_version_checked_at"
+        if not st.session_state.get(cache_key) or time.monotonic() - float(st.session_state.get(checked_at_key, 0)) > 300:
+            st.session_state[cache_key] = check_version(APP_VERSION)
+            st.session_state[checked_at_key] = time.monotonic()
+        version_status = st.session_state[cache_key]
+        if version_status.update_available:
+            st.info(f"Nova versão disponível: {version_status.latest_version}. A versão actual é {APP_VERSION or 'desconhecida'}.")
+        elif version_status.error:
+            st.caption(f"Versão actual: {APP_VERSION or 'desconhecida'} · verificação de actualização indisponível.")
+        else:
+            st.caption(f"Versão actual: {APP_VERSION or 'desconhecida'} · já está actualizada ({version_status.latest_version}).")
+    update_result = st.session_state.get("home_update_result")
+    if update_result is not None:
+        if update_result.ok:
+            st.success(update_result.message)
+        else:
+            st.error(update_result.message)
     st.title("Thunderbolt")
     st.caption(ui_text("Interface local para operação e automação de conteúdo faceless", ui_language))
     summary = pipeline_summary()
