@@ -466,6 +466,79 @@ def test_video_helper_forwards_stock_source_and_moneyprinter_options(tmp_path, m
     assert config["app"]["pixabay_api_keys"] == ["pixabay-test-key", "pixabay-second-key"]
 
 
+def test_video_helper_falls_back_from_pexels_to_pixabay_by_priority(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    video_path = tmp_path / "pixabay-generated.mp4"
+    video_path.write_bytes(b"mp4")
+    storage.write_json(
+        "settings.json",
+        {
+            "moneyprinter_path": str(root),
+            "video_source": "pexels",
+            "material_source_cards": [
+                {"id": "pexels-primary", "provider": "pexels", "api_key": "pexels-broken", "enabled": True, "priority": 1},
+                {"id": "pixabay-fallback", "provider": "pixabay", "api_key": "pixabay-good", "enabled": True, "priority": 2},
+            ],
+            "material_active_card_id": "pexels-primary",
+        },
+    )
+    storage.write_json("tasks.json", [{"id": "video-stock-fallback", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
+    video_commands = []
+
+    def fake_popen(command, **kwargs):
+        video_commands.append((command, kwargs["env"]))
+        if len(video_commands) == 1:
+            return _FakePopen(["MPT_ERROR=Pexels request failed\n"], returncode=1)
+        return _FakePopen([f"VIDEO_FILE={video_path}\n"])
+
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", fake_popen)
+
+    result = pipeline_worker._run_video_helper({"id": "video-stock-fallback", "topic": "Tema", "material_source": "pexels"})
+
+    assert result == video_path
+    assert [command[command.index("--video-source") + 1] for command, _env in video_commands] == ["pexels", "pixabay"]
+    assert video_commands[0][1]["MPT_PEXELS_API_KEY"] == "pexels-broken"
+    assert video_commands[0][1].get("MPT_PIXABAY_API_KEY", "") == ""
+    assert video_commands[1][1]["MPT_PIXABAY_API_KEY"] == "pixabay-good"
+    assert video_commands[1][1].get("MPT_PEXELS_API_KEY", "") == ""
+
+
+def test_video_helper_does_not_fallback_when_moneyprinter_reports_llm_credentials(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    root = tmp_path / "MoneyPrinterTurbo"
+    root.mkdir()
+    (root / "cli.py").write_text("# fake", encoding="utf-8")
+    (root / "config.toml").write_text("[app]\n", encoding="utf-8")
+    storage.write_json(
+        "settings.json",
+        {
+            "moneyprinter_path": str(root),
+            "video_source": "pexels",
+            "material_source_cards": [
+                {"id": "pexels-primary", "provider": "pexels", "api_key": "pexels-good", "enabled": True, "priority": 1},
+                {"id": "pixabay-fallback", "provider": "pixabay", "api_key": "pixabay-good", "enabled": True, "priority": 2},
+            ],
+        },
+    )
+    storage.write_json("tasks.json", [{"id": "video-no-llm-fallback", "state": "doing", "stage": "video", "progress": 68, "topic": "Tema"}])
+    calls = []
+
+    def fake_popen(command, **kwargs):
+        calls.append(command)
+        return _FakePopen(["MPT_NEEDS_INPUT\n", "LLM_PROVIDER=openai\n", "MISSING=openai_api_key\n"], returncode=10)
+
+    monkeypatch.setattr(pipeline_worker.subprocess, "Popen", fake_popen)
+
+    with pytest.raises(pipeline_worker.PipelineError, match="OpenAI / NVIDIA NIM API"):
+        pipeline_worker._run_video_helper({"id": "video-no-llm-fallback", "topic": "Tema", "material_source": "pexels"})
+
+    assert len(calls) == 1
+
+
 def test_legacy_azure_tts_v1_uses_sdk_v2_when_credentials_are_configured():
     args = pipeline_worker._moneyprinter_cli_args(
         {
