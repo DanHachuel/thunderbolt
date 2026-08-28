@@ -148,6 +148,8 @@ Os dois cards mostram de forma consistente o estado técnico, o rótulo legível
 
 Em **Automação Youtube > Vídeos cadastrados**, o botão **Start** retoma a tarefa a partir dos artefactos persistidos. O worker reutiliza o roteiro, título/keywords, MP4, prompt de thumbnail e imagem já existentes; só volta a gerar uma etapa quando o respectivo resultado não está disponível, e repete o upload apenas quando ele ainda não foi concluído. O botão **Apagar** remove o vídeo da fila e de `tasks.json` após confirmação, preservando os ficheiros de artefactos; tarefas em execução devem ser paradas antes de serem removidas.
 
+**Não existe expiração automática de vídeos ou limpeza periódica da fila.** As actualizações normais não usam `--purge-data`, preservam o storage local e, quando encontram uma instalação antiga juntamente com um storage novo, unem as tarefas e filas por ID em vez de substituir a lista. Se `tasks.json` ficar corrompido, a aplicação preserva a cópia danificada e interrompe a leitura protegida para evitar apresentar uma fila vazia e gravá-la por cima dos dados existentes. A remoção de uma tarefa só ocorre por confirmação explícita em **Apagar** ou pela opção destrutiva `--purge-data`.
+
 ## Canais Youtube — edição por cartão e vídeos recentes
 
 A página **Canais Youtube** mantém o cadastro e a importação existentes, mas cada cartão agora tem o botão **Editar**. O editor permite alterar nome, URL, handle, idioma, estilo wide, **Nicho**, **Blueprint Padrão**, **Narrador/Voz Padrão**, conta Google do Upload directo, descrição e Automação ON/horário. O nicho aparece imediatamente abaixo do nome do canal no cartão; quando não existe, a UI mostra **SEM NICHO CONFIGURADO**.

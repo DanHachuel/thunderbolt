@@ -10,7 +10,7 @@ from typing import Any
 from .creative_generation import generate_thumbnail_prompt
 from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
-from .storage import STORAGE, now, read_json, write_json
+from .storage import STORAGE, now, read_json, update_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 
 
@@ -230,6 +230,18 @@ def _find_task(tasks: list[Any], task_id: str) -> tuple[dict[str, Any], dict[str
     raise ThumbnailGenerationError(f"A tarefa {task_id} não foi encontrada.")
 
 
+def _update_thumbnail_task(task_id: str, callback: Any) -> dict[str, Any]:
+    """Apply a thumbnail mutation to the latest task snapshot under the storage lock."""
+    def mutate(tasks: Any) -> dict[str, Any]:
+        if not isinstance(tasks, list):
+            raise ThumbnailGenerationError("O índice de tarefas não está disponível.")
+        task, record = _find_task(tasks, task_id)
+        callback(task, record)
+        return task
+
+    return update_json("tasks.json", [], mutate)
+
+
 def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple[dict[str, Any], Path]:
     """Generate an image from the task's current prompt and persist it on the task."""
     tasks = read_json("tasks.json", [])
@@ -247,9 +259,11 @@ def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple
         lettering_text=record.get("thumbnail_text") or "",
         lettering_prompt=record.get("lettering_prompt") or "",
     )
-    _persist_thumbnail_result(tasks, task, record, image_path)
-    write_json("tasks.json", tasks)
-    return task, image_path
+    updated = _update_thumbnail_task(
+        task_id,
+        lambda current_task, current_record: _persist_thumbnail_result([], current_task, current_record, image_path),
+    )
+    return updated, image_path
 
 
 def regenerate_thumbnail_prompt(
@@ -275,9 +289,11 @@ def regenerate_thumbnail_prompt(
         blueprint=blueprint,
         language=language,
     )
-    _persist_thumbnail_prompt_result(task, record, variant)
-    write_json("tasks.json", tasks)
-    return task, variant
+    updated = _update_thumbnail_task(
+        task_id,
+        lambda current_task, current_record: _persist_thumbnail_prompt_result(current_task, current_record, variant),
+    )
+    return updated, variant
 
 
 def regenerate_thumbnail_prompt_and_image(
@@ -302,9 +318,13 @@ def regenerate_thumbnail_prompt_and_image(
         lettering_text=str((variant or {}).get("overlay_text") or ""),
         lettering_prompt=str((variant or {}).get("lettering_prompt") or ""),
     )
-    _persist_thumbnail_result(tasks, task, record, image_path, variant=variant, source="prompt_regenerated")
-    write_json("tasks.json", tasks)
-    return task, image_path
+    updated = _update_thumbnail_task(
+        task_id,
+        lambda current_task, current_record: _persist_thumbnail_result(
+            [], current_task, current_record, image_path, variant=variant, source="prompt_regenerated"
+        ),
+    )
+    return updated, image_path
 
 
 def regenerate_thumbnail_lettering(
@@ -346,9 +366,13 @@ def regenerate_thumbnail_lettering(
     variant = _variant_for_record(record)
     variant["image_prompt"] = base_prompt
     variant["lettering_prompt"] = edit_prompt
-    _persist_thumbnail_result(tasks, task, record, image_path, variant=variant, source="lettering_regenerated", lettering_prompt=edit_prompt)
-    write_json("tasks.json", tasks)
-    return task, image_path
+    updated = _update_thumbnail_task(
+        task_id,
+        lambda current_task, current_record: _persist_thumbnail_result(
+            [], current_task, current_record, image_path, variant=variant, source="lettering_regenerated", lettering_prompt=edit_prompt
+        ),
+    )
+    return updated, image_path
 
 
 def upload_thumbnail_image(
@@ -387,9 +411,13 @@ def upload_thumbnail_image(
         if os.path.exists(temp_name):
             os.unlink(temp_name)
     variant = _variant_for_record(record)
-    _persist_thumbnail_result(tasks, task, record, destination, variant=variant, source="uploaded")
-    write_json("tasks.json", tasks)
-    return task, destination
+    updated = _update_thumbnail_task(
+        task_id,
+        lambda current_task, current_record: _persist_thumbnail_result(
+            [], current_task, current_record, destination, variant=variant, source="uploaded"
+        ),
+    )
+    return updated, destination
 
 
 def regenerate_thumbnail(task_id: str, settings: dict[str, Any]) -> tuple[dict[str, Any], Path]:

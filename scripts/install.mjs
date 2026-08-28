@@ -177,23 +177,27 @@ function legacyNpxPackageRoots() {
   for (const hashRoot of cacheHashes) {
     const candidate = resolve(hashRoot, "node_modules", "@danhachuel", "thunderbolt");
     if (candidate === root || roots.has(candidate)) continue;
-    if (existsSync(join(candidate, "storage", "state", "ai_influencers.db"))) roots.add(candidate);
+    const recoverableStateFiles = ["ai_influencers.db", "tasks.json", "channels.json", "batches.json", "queues.json"];
+    if (recoverableStateFiles.some((filename) => existsSync(join(candidate, "storage", "state", filename)))) roots.add(candidate);
   }
   return [...roots].sort((left, right) => {
-    try { return statSync(join(right, "storage", "state", "ai_influencers.db")).mtimeMs - statSync(join(left, "storage", "state", "ai_influencers.db")).mtimeMs; }
-    catch { return 0; }
+    const newestStateTime = (candidate) => Math.max(...["ai_influencers.db", "tasks.json", "channels.json", "batches.json", "queues.json"].map((filename) => {
+      try { return statSync(join(candidate, "storage", "state", filename)).mtimeMs; }
+      catch { return 0; }
+    }));
+    return newestStateTime(right) - newestStateTime(left);
   });
 }
 
 function migrateLegacyNpxStorage() {
   const targetStorage = join(thunderboltHome, "storage");
   const candidates = legacyNpxPackageRoots();
-  let copied = 0;
+  let mergedFiles = 0;
   for (const candidate of candidates) {
-    copied += copyMissingTree(join(candidate, "storage"), targetStorage);
-    if (existsSync(join(targetStorage, "state", "ai_influencers.db"))) break;
+    copyMissingTree(join(candidate, "storage"), targetStorage);
+    mergedFiles += mergeLegacyStorage(candidate);
   }
-  if (copied > 0) console.log(`Dados locais AI Influencers recuperados do cache npm para ${targetStorage}.`);
+  if (mergedFiles > 0) console.log(`Dados locais recuperados do cache npm para ${targetStorage} (${mergedFiles} ficheiro(s) unido(s)).`);
 }
 
 function copyOrMove(source, target, label) {
@@ -209,16 +213,86 @@ function copyOrMove(source, target, label) {
   return true;
 }
 
+function parseJsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function mergeUniqueArray(target, source) {
+  const merged = [...target];
+  const knownIds = new Set(merged.filter((item) => item && typeof item === "object" && item.id).map((item) => String(item.id)));
+  const knownValues = new Set(merged.map((item) => JSON.stringify(item)));
+  for (const item of source) {
+    const id = item && typeof item === "object" && item.id ? String(item.id) : "";
+    const value = JSON.stringify(item);
+    if ((id && knownIds.has(id)) || knownValues.has(value)) continue;
+    merged.push(item);
+    if (id) knownIds.add(id);
+    knownValues.add(value);
+  }
+  return merged;
+}
+
+function mergeJsonStateFile(source, target, filename) {
+  if (!existsSync(source) || !existsSync(target)) return false;
+  const sourceData = parseJsonFile(source);
+  const targetData = parseJsonFile(target);
+  if (sourceData === null) return false;
+  if (targetData === null) {
+    copyFileSync(target, `${target}.corrupt-${Date.now()}`);
+    writeFileSync(target, JSON.stringify(sourceData, null, 2) + "\n", "utf8");
+    return true;
+  }
+  let merged = targetData;
+  if (Array.isArray(sourceData) && Array.isArray(targetData)) {
+    merged = mergeUniqueArray(targetData, sourceData);
+  } else if (filename === "queues.json" && sourceData && targetData && typeof sourceData === "object" && typeof targetData === "object") {
+    merged = { ...targetData };
+    for (const [queueName, sourceItems] of Object.entries(sourceData)) {
+      if (!Array.isArray(sourceItems)) continue;
+      const targetItems = Array.isArray(merged[queueName]) ? merged[queueName] : [];
+      merged[queueName] = mergeUniqueArray(targetItems, sourceItems);
+    }
+  }
+  if (JSON.stringify(merged) === JSON.stringify(targetData)) return false;
+  writeFileSync(target, JSON.stringify(merged, null, 2) + "\n", "utf8");
+  return true;
+}
+
+function mergeLegacyStorage(legacyRoot) {
+  const sourceStorage = join(legacyRoot, "storage");
+  const targetStorage = join(thunderboltHome, "storage");
+  if (!existsSync(sourceStorage)) return 0;
+  mkdirSync(targetStorage, { recursive: true });
+  copyMissingTree(sourceStorage, targetStorage);
+  const sourceState = join(sourceStorage, "state");
+  const targetState = join(targetStorage, "state");
+  if (!existsSync(sourceState) || !existsSync(targetState)) return 0;
+  let mergedCount = 0;
+  for (const entry of readdirSync(sourceState, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    if (mergeJsonStateFile(join(sourceState, entry.name), join(targetState, entry.name), entry.name)) mergedCount += 1;
+  }
+  return mergedCount;
+}
+
 function migrateLegacyInstallation() {
   if (explicitThunderboltHome) return;
   const candidates = legacyRoots();
-  const legacy = candidates.find((candidate) => existsSync(join(candidate, "storage")) || existsSync(join(candidate, ".venv")) || existsSync(join(candidate, "MoneyPrinterTurbo")));
-  if (!legacy) return;
-  console.warn(`Foi encontrada uma instalação antiga em ${legacy}. O Thunderbolt usará ${thunderboltHome}.`);
-  copyOrMove(join(legacy, "storage"), join(thunderboltHome, "storage"), "storage legado");
-  copyOrMove(join(legacy, ".venv"), join(thunderboltHome, ".venv"), "ambiente Python legado");
-  copyOrMove(join(legacy, "MoneyPrinterTurbo"), join(thunderboltHome, "MoneyPrinterTurbo"), "MoneyPrinterTurbo legado");
-  console.log("A pasta legada não será usada pelo Thunderbolt; foi preservada quando a cópia foi necessária.");
+  let found = false;
+  for (const legacy of candidates) {
+    if (!existsSync(join(legacy, "storage")) && !existsSync(join(legacy, ".venv")) && !existsSync(join(legacy, "MoneyPrinterTurbo"))) continue;
+    found = true;
+    console.warn(`Foi encontrada uma instalação antiga em ${legacy}. O Thunderbolt usará ${thunderboltHome}.`);
+    const mergedFiles = mergeLegacyStorage(legacy);
+    if (mergedFiles > 0) console.log(`Dados de estado recuperados da instalação antiga (${mergedFiles} ficheiro(s) unido(s)).`);
+    copyOrMove(join(legacy, ".venv"), join(thunderboltHome, ".venv"), "ambiente Python legado");
+    copyOrMove(join(legacy, "MoneyPrinterTurbo"), join(thunderboltHome, "MoneyPrinterTurbo"), "MoneyPrinterTurbo legado");
+  }
+  if (found) console.log("A instalação antiga foi preservada; o Thunderbolt não elimina tarefas, filas ou artefactos durante a actualização.");
 }
 
 function removePath(path) {
