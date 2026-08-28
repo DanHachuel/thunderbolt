@@ -65,3 +65,11 @@ def test_home_is_the_only_page_that_renders_the_update_button():
     assert 'key="home_update_version"' in dashboard
     assert source.count('key="home_update_version"') == 1
     assert 'button[kind="primary"]' in dashboard
+
+
+def test_version_label_keeps_the_two_digit_patch_convention():
+    source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+
+    assert "def display_version(version: str)" in source
+    assert 'f"{int(parts[0])}.{int(parts[1])}.{int(parts[2]):02d}"' in source
+    assert "APP_VERSION_LABEL = display_version(APP_VERSION)" in source
