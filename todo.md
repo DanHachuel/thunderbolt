@@ -59,3 +59,6 @@
 - [x] Criar regressões e publicar o reinício automático do Thunderbolt.
 - [x] Tornar o botão system_update Atualizar Versão compacto, apenas com espaço para o ícone e o texto.
 - [x] Validar e publicar o ajuste de largura do botão Actualizar Versão.
+- [x] Fazer todos os itens da barra lateral reflectirem a página activa actual.
+- [x] Destacar adequadamente os pais quando um subitem estiver activo.
+- [ ] Criar regressões e publicar a melhoria do estado activo da navegação.
