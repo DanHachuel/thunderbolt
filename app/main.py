@@ -3576,6 +3576,21 @@ def load_video_tasks_for_catalog() -> list[dict[str, Any]]:
     return [task for task in saved if isinstance(task, dict) and str(task.get("id") or "").strip()]
 
 
+def _is_music_task(task: dict[str, Any]) -> bool:
+    """Identify music pipeline tasks without conflating them with ordinary video tasks."""
+    return bool(task.get("music_mode")) or str(task.get("style_wide") or task.get("style") or "").strip().casefold() in {"music", "música"}
+
+
+def load_music_tasks_for_catalog() -> list[dict[str, Any]]:
+    """Return persisted tasks that were explicitly created through a music route."""
+    return [task for task in load_video_tasks_for_catalog() if _is_music_task(task)]
+
+
+def load_standard_video_tasks_for_catalog() -> list[dict[str, Any]]:
+    """Keep video backlog free of tasks that belong to the dedicated music queue."""
+    return [task for task in load_video_tasks_for_catalog() if not _is_music_task(task)]
+
+
 def _video_task_format(task: dict[str, Any]) -> str:
     value = task.get("format") or task.get("style_wide") or task.get("style") or "wide"
     return str(value).strip() or "wide"
@@ -3622,7 +3637,7 @@ def render_videos():
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
     st.caption(f"Os vídeos são guardados em `{STORAGE / 'videos'}`.")
     _render_pipeline_progress_panel()
-    tasks = load_video_tasks_for_catalog()
+    tasks = load_standard_video_tasks_for_catalog()
     if not tasks:
         st.info("Nenhum vídeo criado.")
         return
@@ -3677,6 +3692,64 @@ def render_videos():
                         st.rerun()
                 with stop_col:
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                        transition_task(task["id"], "blocked")
+                        st.rerun()
+
+
+def render_music_backlog() -> None:
+    """Render the music-only counterpart of Backlog Videos with the same controls."""
+    st.subheader("Music Backlog")
+    st.caption("Acompanhamento das músicas criadas, estados da pipeline e controlos de execução.")
+    st.caption(f"As músicas são guardadas em `{STORAGE / 'music'}`.")
+    _render_pipeline_progress_panel()
+    tasks = load_music_tasks_for_catalog()
+    if not tasks:
+        st.info("Nenhuma música criada.")
+        return
+    known_states = ["to_do", "doing", "blocked", "done", "failed", "cancelled"]
+    extra_states = sorted({str(task.get("state") or "unknown") for task in tasks if str(task.get("state") or "unknown") not in known_states})
+    state_filter = st.selectbox("Filtrar por estado", ["Todos", *known_states, *extra_states], key="music_backlog_state_filter")
+    for task in tasks:
+        if state_filter != "Todos" and task.get("state") != state_filter:
+            continue
+        with st.container(border=True):
+            cols = st.columns([2.2, 1, 1, 1.2, 1.8])
+            with cols[0]:
+                st.write(f"**{task.get('title') or task.get('topic', 'Sem título')}**")
+                st.caption(f"Música: {task.get('music_source') or 'rota musical'}")
+                st.caption(f"{task.get('channel_name')} · {task.get('id')}")
+                music_path = str(task.get("music_path") or (task.get("artifacts") or {}).get("music") or "").strip()
+                if music_path and Path(music_path).is_file():
+                    music_file = Path(music_path)
+                    st.success("Música pronta; pode continuar para o destino configurado.")
+                    st.download_button(
+                        "Descarregar música pronta",
+                        data=music_file.read_bytes(),
+                        file_name=music_file.name,
+                        mime="audio/mpeg",
+                        key=f"music_backlog_download_{task['id']}",
+                        use_container_width=True,
+                    )
+                elif music_path:
+                    st.caption(f"Música registada: {music_path}")
+                else:
+                    st.caption("A música será disponibilizada quando a etapa de geração terminar.")
+            with cols[1]:
+                st.caption("Formato")
+                st.write(_video_task_format(task))
+            with cols[2]:
+                st.write(_pipeline_stage_label(task))
+            with cols[3]:
+                _render_video_task_state(task)
+            with cols[4]:
+                state = str(task.get("state") or "")
+                start_col, stop_col = st.columns(2)
+                with start_col:
+                    if st.button("Start", key=f"music_backlog_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                        transition_task(task["id"], "doing")
+                        st.rerun()
+                with stop_col:
+                    if st.button("Stop", key=f"music_backlog_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
                         transition_task(task["id"], "blocked")
                         st.rerun()
 
@@ -6745,6 +6818,7 @@ def main():
     ]
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
+        ("Music Backlog", ":material/queue_music:", "Music Backlog"),
         ("Upload Música", ":material/library_music:", "Upload Música"),
     ]
     models_ai_items = [
@@ -6867,6 +6941,7 @@ def main():
         "Criação de Vídeos": render_new_video,
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
+        "Music Backlog": render_music_backlog,
         "Upload Música": render_music_upload,
         "Roteiros": render_scripts,
         "Thumbnails": render_thumbnails,
