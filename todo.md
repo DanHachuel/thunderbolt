@@ -56,4 +56,4 @@
 - [x] Validar e publicar a nova ordem dos botões musicais.
 - [x] Fazer o botão Atualizar Versão reiniciar a instância após uma actualização bem-sucedida.
 - [x] Garantir mensagem de estado e preservação do storage durante o reinício.
-- [ ] Criar regressões e publicar o reinício automático do Thunderbolt.
+- [x] Criar regressões e publicar o reinício automático do Thunderbolt.
