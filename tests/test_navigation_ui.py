@@ -7,18 +7,16 @@ MAIN_SOURCE = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_tex
 def test_automation_is_an_expander_with_youtube_child_page():
     assert 'automation_items = [' in MAIN_SOURCE
     assert '("Automação Youtube", ":material/schedule:", "Automação Youtube")' in MAIN_SOURCE
-    assert 'group_active = is_nav_target_active(target)' in MAIN_SOURCE
-    assert 'group_label = f"**{ui_text(label, ui_language)}**" if group_active else ui_text(label, ui_language)' in MAIN_SOURCE
-    assert 'group_icon = ":material/radio_button_checked:" if group_active else icon' in MAIN_SOURCE
+    assert 'with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):' in MAIN_SOURCE
     assert '"Automação Youtube": render_automation' in MAIN_SOURCE
     assert 'st.title("Automação Youtube")' in MAIN_SOURCE
 
 
-def test_navigation_uses_current_page_for_every_item_and_parent_group():
-    assert 'def is_nav_target_active(target: str) -> bool:' in MAIN_SOURCE
-    assert 'return any(child[0] == current_page for child in groups.get(target, []))' in MAIN_SOURCE
-    assert 'type="primary" if is_nav_target_active(target) else "secondary"' in MAIN_SOURCE
+def test_navigation_highlights_only_the_exact_current_item():
+    assert 'type="primary" if current_page == target else "secondary"' in MAIN_SOURCE
     assert 'expanded=current_page in child_targets' in MAIN_SOURCE
+    assert 'is_nav_target_active' not in MAIN_SOURCE
+    assert 'group_label = f"**{ui_text(label, ui_language)}**"' not in MAIN_SOURCE
 
 
 def test_youtube_navigation_labels_and_legacy_aliases_are_preserved():
@@ -85,9 +83,7 @@ def test_tutorial_reference_is_packaged_and_contains_meta_setup_sections():
 
 def test_ai_influencers_is_visible_with_real_character_and_content_renderers():
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in MAIN_SOURCE
-    assert 'group_active = is_nav_target_active(target)' in MAIN_SOURCE
-    assert 'group_label = f"**{ui_text(label, ui_language)}**" if group_active else ui_text(label, ui_language)' in MAIN_SOURCE
-    assert 'group_icon = ":material/radio_button_checked:" if group_active else icon' in MAIN_SOURCE
+    assert 'with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):' in MAIN_SOURCE
     assert '"Personagens": lambda: render_ai_influencer_characters' in MAIN_SOURCE
     assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in MAIN_SOURCE
     assert '("Motion Control", ":material/motion_photos_on:", "Motion Control")' in MAIN_SOURCE

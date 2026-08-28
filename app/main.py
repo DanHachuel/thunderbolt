@@ -7136,29 +7136,12 @@ def main():
         st.session_state["page"] = target
         st.rerun()
 
-    def is_nav_target_active(target: str) -> bool:
-        """Return whether a menu target or one of its children is the current page."""
-        if current_page == target:
-            return True
-        return any(child[0] == current_page for child in groups.get(target, []))
-
     def render_nav_button(target: str, icon: str, label: str, scope: str):
         display_label = ui_text(label, ui_language)
-        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if is_nav_target_active(target) else "secondary"):
+        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
             navigate(target)
 
     with st.sidebar:
-        st.markdown(
-            """
-            <style>
-            section[data-testid="stSidebar"] [data-testid="stExpander"] summary strong {
-                color: #c4b5fd;
-                font-weight: 750;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
         version_markup = f'<span class="tb-brand-version">{APP_VERSION_LABEL}</span>' if APP_VERSION_LABEL else ""
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
         for target, icon, label in top_pages:
@@ -7167,10 +7150,7 @@ def main():
                 render_nav_button(target, icon, label, "top")
                 continue
             child_targets = {item[0] for item in children}
-            group_active = is_nav_target_active(target)
-            group_label = f"**{ui_text(label, ui_language)}**" if group_active else ui_text(label, ui_language)
-            group_icon = ":material/radio_button_checked:" if group_active else icon
-            with st.expander(group_label, expanded=current_page in child_targets, icon=group_icon):
+            with st.expander(ui_text(label, ui_language), expanded=current_page in child_targets, icon=icon):
                 for child_target, child_icon, child_label in children:
                     render_nav_button(child_target, child_icon, child_label, target)
 
