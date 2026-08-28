@@ -23,6 +23,17 @@ try:
 except (OSError, json.JSONDecodeError):
     APP_VERSION = ""
 
+
+def display_version(version: str) -> str:
+    """Keep the project version label in the two-digit patch convention."""
+    parts = str(version or "").strip().split(".")
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
+        return f"{int(parts[0])}.{int(parts[1])}.{int(parts[2]):02d}"
+    return str(version or "")
+
+
+APP_VERSION_LABEL = display_version(APP_VERSION)
+
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, transition_task, update_channel, update_channel_video
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
@@ -1303,11 +1314,11 @@ def render_dashboard():
             st.session_state[checked_at_key] = time.monotonic()
         version_status = st.session_state[cache_key]
         if version_status.update_available:
-            st.info(f"Nova versão disponível: {version_status.latest_version}. A versão actual é {APP_VERSION or 'desconhecida'}.")
+            st.info(f"Nova versão disponível: {display_version(version_status.latest_version)}. A versão actual é {APP_VERSION_LABEL or 'desconhecida'}.")
         elif version_status.error:
-            st.caption(f"Versão actual: {APP_VERSION or 'desconhecida'} · verificação de actualização indisponível.")
+            st.caption(f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · verificação de actualização indisponível.")
         else:
-            st.caption(f"Versão actual: {APP_VERSION or 'desconhecida'} · já está actualizada ({version_status.latest_version}).")
+            st.caption(f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · já está actualizada ({display_version(version_status.latest_version)}).")
     update_result = st.session_state.get("home_update_result")
     if update_result is not None:
         if update_result.ok:
@@ -7093,7 +7104,7 @@ def main():
             navigate(target)
 
     with st.sidebar:
-        version_markup = f'<span class="tb-brand-version">{APP_VERSION}</span>' if APP_VERSION else ""
+        version_markup = f'<span class="tb-brand-version">{APP_VERSION_LABEL}</span>' if APP_VERSION_LABEL else ""
         st.markdown(f'<div class="tb-brand"><span class="tb-brand-name">Thunderbolt</span>{version_markup}</div>', unsafe_allow_html=True)
         for target, icon, label in top_pages:
             children = groups.get(target)

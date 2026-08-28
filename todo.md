@@ -43,3 +43,6 @@
 - [x] Incluir Google Lyria API key e selecção de modelo em Voz, TTS e música.
 - [x] Adicionar teste seguro de chamada API para Google Lyria sem expor a chave.
 - [x] Criar regressões e publicar as configurações e navegação solicitadas.
+- [x] Corrigir o versionamento publicado para 0.4.00 e eliminar a numeração indevida 0.3.100 como versão actual.
+- [x] Registar no repositório a regra de transição de patch 99 para a próxima série minor.
+- [ ] Validar e publicar a correcção de versionamento 0.4.00.
