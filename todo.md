@@ -34,3 +34,8 @@
 - [x] Incorporar a lista de géneros fornecida e gerar título, idioma, género, vocal, referências e prompt musical por LLM.
 - [x] Renomear Adicionar ao Music Backlog para Gerar Música e preservar a fila musical independente.
 - [x] Criar regressões e publicar a ampliação da Criação de Músicas.
+- [x] Adicionar download local em cada card de thumbnail do Pipeline Vídeos.
+- [x] Adicionar download local em cada card do Music Backlog.
+- [x] Adicionar download local em cada card de imagens de AI Influencers.
+- [x] Adicionar download local em cada card de vídeos de AI Influencers.
+- [x] Criar regressões e publicar os botões de download de media.

@@ -98,6 +98,16 @@ def test_video_ui_uses_active_video_pool_instead_of_hardcoded_veo():
     assert 'Veo 3.1' not in UI
 
 
+def test_ai_content_history_renders_downloadable_cards_for_images_and_videos():
+    history = UI.split("def _render_content_history", 1)[1].split("def _store_uploaded_file", 1)[0]
+
+    assert "with st.container(border=True):" in history
+    assert 'if artifact.is_file() and content_type == "image"' in history
+    assert 'elif artifact.is_file() and content_type == "video"' in history
+    assert 'f"Descarregar {type_label.casefold()}"' in history
+    assert 'key=f"influencer_content_download_{content_type}_{content_id}"' in history
+
+
 def test_supabase_schema_contains_legacy_entities_and_content_indexes():
     for table in ("influencers", "influencer_assets", "influencer_weekly_plans", "influencer_content"):
         assert f"create table if not exists public.{table}" in SCHEMA

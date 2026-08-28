@@ -6,6 +6,7 @@ import base64
 import hashlib
 import io
 import json
+import mimetypes
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -294,24 +295,38 @@ def _render_content_history(repository: Any, influencer_id: str = "") -> None:
     if not records:
         return
     st.subheader("Conteúdos gerados")
-    rows = []
     for item in records:
-        rows.append({
-            "Tipo": str(item.get("content_type") or "").capitalize(),
-            "Estado": CONTENT_STATES.get(str(item.get("state") or ""), str(item.get("state") or "—")),
-            "Provider": f"{item.get('provider') or '—'} · {item.get('model') or '—'}",
-            "Plataforma": item.get("platform") or "—",
-            "Artefacto": item.get("artifact_path") or item.get("error") or "—",
-            "Criado": item.get("created_at") or "—",
-        })
-    st.dataframe(rows, use_container_width=True, hide_index=True)
-    latest = records[0]
-    artifact = Path(str(latest.get("artifact_path") or ""))
-    if artifact.is_file() and latest.get("state") == "completed":
-        if latest.get("content_type") == "image":
-            st.image(str(artifact), caption="Última imagem gerada", use_container_width=True)
-        elif latest.get("content_type") == "video":
-            st.video(str(artifact))
+        content_id = str(item.get("id") or "content")
+        content_type = str(item.get("content_type") or "").strip().lower()
+        artifact = Path(str(item.get("artifact_path") or ""))
+        state = str(item.get("state") or "")
+        type_label = "Imagem" if content_type == "image" else "Vídeo" if content_type == "video" else "Conteúdo"
+        with st.container(border=True):
+            preview_col, detail_col = st.columns([1.25, 2.75])
+            with preview_col:
+                if artifact.is_file() and content_type == "image":
+                    st.image(str(artifact), caption=f"{type_label} gerada", use_container_width=True)
+                elif artifact.is_file() and content_type == "video":
+                    st.video(str(artifact))
+                else:
+                    st.caption("Artefacto indisponível")
+            with detail_col:
+                st.write(f"**{type_label} · {CONTENT_STATES.get(state, state or '—')}**")
+                st.caption(f"Provider: {item.get('provider') or '—'} · {item.get('model') or '—'}")
+                st.caption(f"Plataforma: {item.get('platform') or '—'} · Criado: {item.get('created_at') or '—'}")
+                if item.get("error"):
+                    st.error(str(item.get("error") or "")[:700])
+                if artifact.is_file() and state == "completed" and content_type in {"image", "video"}:
+                    fallback_mime = "image/png" if content_type == "image" else "video/mp4"
+                    mime = mimetypes.guess_type(artifact.name)[0] or fallback_mime
+                    st.download_button(
+                        f"Descarregar {type_label.casefold()}",
+                        data=artifact.read_bytes(),
+                        file_name=artifact.name,
+                        mime=mime,
+                        key=f"influencer_content_download_{content_type}_{content_id}",
+                        use_container_width=True,
+                    )
 
 
 def _store_uploaded_file(uploaded: Any, folder: str) -> Path:
