@@ -20,7 +20,7 @@ def test_worker_uses_local_clock_and_creates_daily_batch(tmp_path, monkeypatch):
     from hermes_ui.automation_worker import run_once
     from hermes_ui.domain import create_channel
 
-    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: ("Tema específico de História", {"topic": "Tema específico de História", "topic_source": "llm", "title": "Título específico", "blueprint_id": "bp_worker", "blueprint_name": "Blueprint Worker", "voice": "pt-BR-FranciscaNeural-Female", "thumbnail_status": "prompt_ready"}))
+    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: (_ for _ in ()).throw(AssertionError("a criação agendada não deve bloquear no LLM")))
     local_now = datetime.now().astimezone().replace(hour=8, minute=30, second=0, microsecond=0)
     channel = create_channel(
         "Canal worker",
@@ -46,10 +46,32 @@ def test_worker_uses_local_clock_and_creates_daily_batch(tmp_path, monkeypatch):
     assert all(task["blueprint_id"] == "bp_worker" for task in tasks)
     assert all(task["voice"] == "pt-BR-FranciscaNeural-Female" for task in tasks)
     assert all(task["automation_time"] == "08:30" for task in tasks)
-    assert all(task["topic_source"] == "llm" for task in tasks)
-    assert all(task["title"] == "Título específico" for task in tasks)
+    assert all(task["topic_source"] == "llm_pending" for task in tasks)
+    assert all(task["stage"] == "topic" for task in tasks)
+    assert all(task["title"] == "" for task in tasks)
+    assert all(task["language"] == "pt" for task in tasks)
     assert all(task["thumbnail_variant"] == {} for task in tasks)
     assert all(task["thumbnail_prompt"] == "" for task in tasks)
+
+
+def test_worker_catches_up_a_missed_schedule_after_its_minute(tmp_path, monkeypatch):
+    storage = _use_temp_storage(tmp_path, monkeypatch)
+    from hermes_ui.automation_worker import run_once
+    from hermes_ui.domain import create_channel
+
+    local_now = datetime.now().astimezone().replace(hour=9, minute=17, second=30, microsecond=0)
+    channel = create_channel("Canal atrasado", metadata={"automation_on": True, "automation_time": "09:05", "language": "en"})
+
+    result = run_once(local_now)
+
+    assert result["ok"] is True
+    assert len(result["created"]) == 1
+    batch = result["created"][0]["batch"]
+    assert batch["options"]["automation_scheduled_at"].startswith(local_now.date().isoformat() + "T09:05")
+    task = storage.read_json("tasks.json", [])[0]
+    assert task["channel_id"] == channel["id"]
+    assert task["language"] == "en"
+    assert task["stage"] == "topic"
 
 
 def test_worker_does_not_duplicate_same_channel_on_same_day(tmp_path, monkeypatch):
@@ -72,7 +94,7 @@ def test_worker_does_not_duplicate_same_channel_on_same_day(tmp_path, monkeypatc
     assert len(storage.read_json("tasks.json", [])) == 1
 
 
-def test_worker_requires_active_channel_and_exact_local_hhmm(tmp_path, monkeypatch):
+def test_worker_does_not_create_before_scheduled_time(tmp_path, monkeypatch):
     storage = _use_temp_storage(tmp_path, monkeypatch)
     from hermes_ui.automation_worker import run_once
     from hermes_ui.domain import create_channel
@@ -89,20 +111,21 @@ def test_worker_requires_active_channel_and_exact_local_hhmm(tmp_path, monkeypat
     assert storage.read_json("tasks.json", []) == []
 
 
-def test_worker_does_not_create_placeholder_when_creative_generation_fails(tmp_path, monkeypatch):
+def test_worker_creates_pending_card_without_waiting_for_creative_generation(tmp_path, monkeypatch):
     storage = _use_temp_storage(tmp_path, monkeypatch)
-    from hermes_ui import automation_worker
     from hermes_ui.automation_worker import run_once
     from hermes_ui.domain import create_channel
 
-    monkeypatch.setattr(automation_worker, "_creative_payload", lambda channel: (_ for _ in ()).throw(RuntimeError("provider LLM não configurado")))
     local_now = datetime.now().astimezone().replace(hour=11, minute=0, second=0, microsecond=0)
-    create_channel("Canal sem provider", metadata={"automation_on": True, "automation_time": "11:00"})
+    create_channel("Canal sem provider", metadata={"automation_on": True, "automation_time": "11:00", "language": "en"})
 
     result = run_once(local_now)
 
-    assert result["ok"] is False
-    assert "provider LLM" in result["error"]
-    assert storage.read_json("batches.json", []) == []
-    assert storage.read_json("tasks.json", []) == []
-    assert "Geração automática" not in result["error"]
+    assert result["ok"] is True
+    assert result["created"]
+    tasks = storage.read_json("tasks.json", [])
+    assert len(tasks) == 1
+    assert tasks[0]["state"] == "to_do"
+    assert tasks[0]["stage"] == "topic"
+    assert tasks[0]["topic_source"] == "llm_pending"
+    assert tasks[0]["language"] == "en"

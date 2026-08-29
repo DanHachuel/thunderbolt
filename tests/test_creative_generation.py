@@ -40,6 +40,37 @@ def test_generate_topic_uses_structured_json(monkeypatch):
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
 
 
+def test_generate_topic_for_english_channel_requires_english_output(monkeypatch):
+    from hermes_ui import creative_generation
+
+    response = {"choices": [{"message": {"content": json.dumps({"topic": "How the U.S. Navy Tracks Russian Submarines", "angle": "Silent surveillance", "hook": "The Atlantic is being watched", "niche": "military history", "rationale": "English channel"})}}]}
+    captured = {}
+    channel = {**_channel(), "language": "en"}
+    monkeypatch.setattr(creative_generation.requests, "post", lambda url, **kwargs: captured.update({"system": kwargs["json"]["messages"][0]["content"], "user": kwargs["json"]["messages"][1]["content"]}) or _Response(response))
+
+    result = generate_topic_for_channel(_settings(), channel, {"id": "bp-history", "name": "History"})
+
+    assert result["topic"].startswith("How the U.S. Navy")
+    assert "English (en)" in captured["system"]
+    assert '"output_language": "English (en)"' in captured["user"]
+
+
+def test_generate_title_for_english_channel_requires_english_output(monkeypatch):
+    from hermes_ui import creative_generation
+
+    titles = [{"title": f"English title {index}", "formula": "list", "curiosity_score": 2, "specificity_score": 2, "emotional_score": 2} for index in range(20)]
+    response = {"choices": [{"message": {"content": json.dumps({"selected_title": "English title 3", "title_candidates": titles, "keywords": ["navy", "submarines"]})}}]}
+    captured = {}
+    channel = {**_channel(), "language": "en"}
+    monkeypatch.setattr(creative_generation.requests, "post", lambda url, **kwargs: captured.update({"system": kwargs["json"]["messages"][0]["content"], "user": kwargs["json"]["messages"][1]["content"]}) or _Response(response))
+
+    result = generate_title_and_keywords(_settings(), channel, "How the U.S. Navy Tracks Russian Submarines", {"id": "bp-history", "name": "History"})
+
+    assert result["title"] == "English title 3"
+    assert "English (en)" in captured["system"]
+    assert '"language": "en"' in captured["user"]
+
+
 def test_generate_title_and_keywords_excludes_thumbnail_fields(monkeypatch):
     from hermes_ui import creative_generation
 

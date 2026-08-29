@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .creative_generation import CreativeGenerationError, _chat_json, channel_context
+from .creative_generation import CreativeGenerationError, _chat_json, channel_context, target_language
 
 
 DOCUMENT_TYPES = {
@@ -38,6 +38,8 @@ def generate_script_document(
         raise CreativeGenerationError("Escreva um tema ou briefing antes de gerar o documento.")
 
     channel_context_value = channel_context(channel or {}, blueprint or {})
+    requested_language = language or channel_context_value["language"]
+    language_code, language_name = target_language(requested_language)
     blueprint_payload = blueprint or {}
     generation_settings_payload = generation_settings or {}
     if normalized_type == "video_script":
@@ -47,6 +49,7 @@ def generate_script_document(
         }
         system = (
             "És um roteirista editorial de vídeos faceless. Cria um roteiro original, natural e executável, "
+            f"escrevendo título, resumo e conteúdo integralmente em {language_name} ({language_code}). "
             "alinhado exclusivamente ao nicho e às regras do Blueprint fornecido. Não inventes factos sensíveis, "
             "não uses introduções genéricas, não escrevas comentários sobre IA e não incluas um CTA vazio. "
             "Responde apenas com JSON válido nas chaves title, summary e content."
@@ -58,6 +61,7 @@ def generate_script_document(
         }
         system = (
             "És um compositor de letras originais. Cria uma letra cantável, coerente com o tema, idioma, "
+            f"escrevendo título, resumo e conteúdo integralmente em {language_name} ({language_code}). "
             "Blueprint e direcção musical fornecidos. Não copies letras existentes, não cites artistas sem pedido "
             "e não acrescentes explicações dentro da letra. Responde apenas com JSON válido nas chaves title, summary e content."
         )
@@ -67,7 +71,8 @@ def generate_script_document(
             "document_type": normalized_type,
             "requested_title": title.strip(),
             "brief": brief.strip(),
-            "language": language.strip(),
+            "language": language_code,
+            "language_name": language_name,
             "channel": channel_context_value,
             "blueprint": blueprint_payload,
             "structure_notes": structure_notes.strip(),
@@ -85,7 +90,7 @@ def generate_script_document(
         "title": str(result.get("title") or title or brief).strip(),
         "summary": str(result.get("summary") or "").strip(),
         "content": content,
-        "language": language.strip(),
+        "language": language_code,
         "blueprint_id": str(blueprint_payload.get("id") or ""),
         "blueprint_name": str(blueprint_payload.get("name") or "SEM BLUEPRINT CONFIGURADO"),
         "channel_id": str((channel or {}).get("id") or ""),

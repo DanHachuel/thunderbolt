@@ -130,13 +130,19 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
         payload = payload if isinstance(payload, dict) else {}
         for index in range(count):
             default_topic = str(batch.get("topic") or "").strip()
+            topic_source = str(payload.get("topic_source") or options.get("topic_source") or "manual")
+            payload_topic = str(payload.get("topic") or "").strip()
             if count == 1:
-                topic = str(payload.get("topic") or default_topic).strip()
+                topic = payload_topic or default_topic
+            elif payload_topic or default_topic:
+                topic = payload_topic or f"{default_topic} — variação {index + 1}"
             else:
-                topic = str(payload.get("topic") or f"{default_topic} — variação {index + 1}").strip()
-            if not topic:
+                topic = ""
+            topic = topic.strip()
+            pending_creative = not topic and topic_source in {"auto", "llm_pending"}
+            if not topic and not pending_creative:
                 topic = f"Vídeo para {channel.get('name', 'Canal')}"
-            title = str(payload.get("title") or topic).strip()
+            title = str(payload.get("title") or ("" if pending_creative else topic)).strip()
             artifacts = dict(payload.get("artifacts") or {})
             thumbnail_variants = payload.get("thumbnail_variants") if isinstance(payload.get("thumbnail_variants"), list) else []
             thumbnail_variant = payload.get("thumbnail_variant") if isinstance(payload.get("thumbnail_variant"), dict) else {}
@@ -150,7 +156,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
             thumbnail_status = str(payload.get("thumbnail_status") or ("generated" if thumbnail_path else "not_generated"))
             if thumbnail_path:
                 artifacts.setdefault("thumbnail", thumbnail_path)
-            initial_stage = "topic" if not topic and str(payload.get("topic_source") or options.get("topic_source") or "manual") in {"auto", "llm_pending"} else "script"
+            initial_stage = "topic" if pending_creative else "script"
             task = {
                 "id": make_id("video"),
                 "batch_id": batch["id"],
@@ -159,7 +165,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "channel_name": channel.get("name", "Canal"),
                 "topic": topic,
                 "title": title,
-                "topic_source": str(payload.get("topic_source") or options.get("topic_source") or "manual"),
+                "topic_source": topic_source,
                 "language": payload.get("language", options.get("language", channel.get("language", "Português"))),
                 "format": payload.get("format", options.get("format", "wide")),
                 "style_wide": payload.get("style_wide", options.get("style_wide", channel.get("style_wide", "pexels"))),

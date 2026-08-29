@@ -8,6 +8,7 @@ import requests
 from pathlib import Path
 from typing import Any
 
+from .languages import LANGUAGE_BY_CODE, language_code
 from .llm_providers import active_llm_card, provider_definition
 from .provider_routing import ProviderRoutingError, route_llm_json
 
@@ -28,6 +29,23 @@ REFERENCE_FILES = {
 
 class CreativeGenerationError(RuntimeError):
     """Raised when a configured LLM cannot produce a valid creative package."""
+
+
+_TARGET_LANGUAGE_NAMES = {
+    code: str(item.get("ui_name") or item.get("name") or code)
+    for code, item in LANGUAGE_BY_CODE.items()
+}
+
+
+def target_language(value: Any, default: str = "pt") -> tuple[str, str]:
+    """Return a canonical video-language code and an unambiguous prompt label."""
+    code = language_code(value, default=default)
+    return code, _TARGET_LANGUAGE_NAMES.get(code, code)
+
+
+def _language_instruction(value: Any, default: str = "pt") -> str:
+    code, label = target_language(value, default=default)
+    return f"{label} ({code})"
 
 
 def _provider_config(settings: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -112,7 +130,8 @@ def channel_context(channel: dict[str, Any], blueprint: dict[str, Any] | None = 
         "channel_name": str(channel.get("name") or "Canal sem nome"),
         "handle": str(channel.get("handle") or ""),
         "description": str(channel.get("description") or ""),
-        "language": str(channel.get("language") or "Português"),
+        "language": language_code(channel.get("language") or "pt"),
+        "language_name": _TARGET_LANGUAGE_NAMES.get(language_code(channel.get("language") or "pt"), "Portuguese"),
         "style_wide": str(channel.get("style_wide") or "pexels"),
         "blueprint_id": str(blueprint.get("id") or channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
         "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
@@ -136,9 +155,12 @@ def generate_video_description(
     if not topic and not title:
         raise CreativeGenerationError("É necessário um tópico ou título antes de gerar a descrição do vídeo.")
     context = channel_context(channel)
+    requested_language = language or channel.get("language") or context["language"]
+    language_instruction = _language_instruction(requested_language)
     normalized_tags = [str(item).strip() for item in (tags or []) if str(item).strip()][:15]
     system = (
         "És um editor de metadados de YouTube. Cria uma descrição útil, clara e envolvente para o vídeo, "
+        f"e escreve todos os campos textuais de saída em {language_instruction}. "
         "sem alegações não verificadas, sem clickbait falso e sem mencionar que foi gerada por IA. "
         "Usa dois parágrafos curtos, inclui um convite natural para subscrever quando apropriado e devolve "
         "apenas JSON válido com a chave description."
@@ -146,7 +168,8 @@ def generate_video_description(
     user = json.dumps(
         {
             "channel": context,
-            "language": language or context["language"],
+            "language": target_language(requested_language)[0],
+            "language_name": target_language(requested_language)[1],
             "topic": topic,
             "title": title or topic,
             "tags": normalized_tags,
@@ -168,8 +191,10 @@ def generate_topic_for_channel(
     user_context: str = "",
 ) -> dict[str, Any]:
     context = channel_context(channel, blueprint)
+    language_instruction = _language_instruction(channel.get("language") or context["language"])
     system = (
         "És o estratega editorial de um canal faceless. Gera um briefing específico para este canal. "
+        f"Todos os campos textuais devolvidos devem estar em {language_instruction}. "
         "Não inventes factos sobre o canal. Se o contexto já tiver um tópico, desenvolve-o sem trocar o nicho. "
         "Escreve de forma natural, sem introduções artificiais, frases de IA, clickbait enganoso ou CTA genérico. "
         "Responde apenas com JSON válido com as chaves topic, angle, hook, niche e rationale."
@@ -177,6 +202,7 @@ def generate_topic_for_channel(
     user = json.dumps(
         {
             "channel": context,
+            "output_language": language_instruction,
             "user_context": user_context.strip(),
             "reference_rules": reference_bundle(),
             "requirements": [
@@ -294,8 +320,11 @@ def generate_thumbnail_prompt(
     if not topic:
         raise CreativeGenerationError("É necessário um tópico para refazer o prompt da thumbnail.")
     context = channel_context(channel, blueprint)
+    requested_language = language or channel.get("language") or context["language"]
+    language_instruction = _language_instruction(requested_language)
     system = (
         "És um director de arte de thumbnails para YouTube. Refaz um prompt de imagem forte e específico "
+        f"O overlay_text e todo o texto editorial devem estar em {language_instruction}; o image_prompt pode permanecer em inglês. "
         "para o tópico fornecido, mantendo a intenção visual quando já existir um prompt. "
         "Separa rigorosamente a imagem sem texto do lettering: image_prompt nunca deve pedir texto renderizado, "
         "enquanto overlay_text é obrigatório, deve ser curto, legível e ter entre três e quatro palavras. "
@@ -305,7 +334,8 @@ def generate_thumbnail_prompt(
     user = json.dumps(
         {
             "channel": context,
-            "language": language or context["language"],
+            "language": target_language(requested_language)[0],
+            "language_name": target_language(requested_language)[1],
             "topic": topic,
             "current_prompt": str(current_prompt or "").strip(),
             "reference_rules": reference_bundle(),
@@ -350,8 +380,11 @@ def generate_title_and_keywords(
     if not topic.strip():
         raise CreativeGenerationError("É necessário um tópico ou briefing antes de gerar título e keywords.")
     context = channel_context(channel, blueprint)
+    requested_language = language or channel.get("language") or context["language"]
+    language_instruction = _language_instruction(requested_language)
     system = (
         "És um director editorial para YouTube. Cria apenas o pacote editorial do vídeo: títulos candidatos e keywords SEO. "
+        f"Todos os títulos, fórmulas e campos editoriais textuais devem estar em {language_instruction}; as keywords podem permanecer em inglês para SEO. "
         "Não cries prompts, conceitos ou variantes de thumbnail. Gera exactamente pelo menos 20 títulos candidatos, "
         "um título seleccionado e entre 8 e 15 keywords curtas. O título deve carregar keywords no início, ter curiosidade, "
         "especificidade e emoção, sem clickbait falso. Responde apenas com JSON válido nas chaves selected_title, "
@@ -360,7 +393,8 @@ def generate_title_and_keywords(
     user = json.dumps(
         {
             "channel": context,
-            "language": language or context["language"],
+            "language": target_language(requested_language)[0],
+            "language_name": target_language(requested_language)[1],
             "topic": topic.strip(),
             "reference_rules": reference_bundle(),
             "keywords_schema": ["lista de 8 a 15 keywords SEO curtas, sem hashtags"],
@@ -419,8 +453,11 @@ def generate_creative_package(
     if not topic.strip():
         raise CreativeGenerationError("É necessário um tópico ou briefing antes de gerar título e thumbnail.")
     context = channel_context(channel, blueprint)
+    requested_language = language or channel.get("language") or context["language"]
+    language_instruction = _language_instruction(requested_language)
     system = (
         "És director editorial e de thumbnails para YouTube. Cria um pacote coerente de título e thumbnail "
+        f"Todos os títulos e textos visíveis da thumbnail devem estar em {language_instruction}; o image_prompt pode permanecer em inglês. "
         "para o tópico fornecido. Gera exactamente pelo menos 20 títulos candidatos e entre 3 e 5 variantes de thumbnail. "
         "O título deve carregar keywords no início, ter curiosidade, especificidade e emoção, sem clickbait falso. "
         "A thumbnail deve ter no máximo três elementos, alto contraste, uma composição clara e lettering obrigatório de 3 a 4 palavras, "
@@ -430,7 +467,8 @@ def generate_creative_package(
     user = json.dumps(
         {
             "channel": context,
-            "language": language or context["language"],
+            "language": target_language(requested_language)[0],
+            "language_name": target_language(requested_language)[1],
             "topic": topic.strip(),
             "reference_rules": reference_bundle(),
             "keywords_schema": ["lista de 8 a 15 keywords SEO curtas, sem hashtags"],
