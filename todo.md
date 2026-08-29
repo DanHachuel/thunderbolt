@@ -76,3 +76,6 @@
 - [x] Publicar a correcção Stoped by User na versão 0.4.18, após 0.4.17 já estar ocupada.
 - [x] Fazer cada roteiro gerado gravar no front matter o Blueprint efectivamente usado, substituindo “SEM BLUEPRINT CONFIGURADO”.
 - [x] Criar regressões para resolução do Blueprint por nome/ID e publicar a correcção.
+- [x] Criar a aba vazia Thumbnail Blueprints abaixo de Blueprints Youtube em Canais e Perfis de Vídeos.
+- [x] Mover Brandings para o nível principal, renomear para Brandings Youtube e manter a ordem solicitada.
+- [ ] Criar regressões, validar a navegação e publicar a nova organização das abas.

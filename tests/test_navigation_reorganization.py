@@ -48,7 +48,7 @@ class NavigationReorganizationTests(unittest.TestCase):
 
     def test_requested_groups_and_children_are_present(self):
         required = (
-            "Canais/Perfis (Vídeos)", "Canais YouTube", "Blueprints Youtube", "Contas TikTok", "Prompt Masters", "Facebook Pages",
+            "Canais/Perfis (Vídeos)", "Canais YouTube", "Blueprints Youtube", "Thumbnail Blueprints", "Brandings Youtube", "Contas TikTok", "Prompt Masters", "Facebook Pages",
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
             "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Redes Sociais",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
@@ -57,6 +57,25 @@ class NavigationReorganizationTests(unittest.TestCase):
         )
         for label in required:
             self.assertIn(f'"{label}"', MAIN_SOURCE)
+
+    def test_channel_profile_children_match_requested_order(self):
+        channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
+        expected_children = [
+            '("Canais YouTube",',
+            '("Blueprints Youtube",',
+            '("Thumbnail Blueprints",',
+            '("Brandings Youtube",',
+            '("Contas TikTok",',
+            '("Prompt Masters",',
+            '("Facebook Pages",',
+        ]
+        positions = [channel_block.index(item) for item in expected_children]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('"Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints"', MAIN_SOURCE)
+        self.assertIn('"Brandings Youtube": "/canais-perfis-videos/brandings-youtube"', MAIN_SOURCE)
+        self.assertIn('"Thumbnail Blueprints": render_thumbnail_blueprints', MAIN_SOURCE)
+        self.assertIn('"Brandings Youtube": render_youtube_brandings', MAIN_SOURCE)
+        self.assertIn('def render_thumbnail_blueprints():', MAIN_SOURCE)
 
     def test_video_backlog_is_not_nested_inside_video_creation(self):
         self.assertIn('tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title == "Criação de Vídeos" else [])', MAIN_SOURCE)
@@ -134,6 +153,8 @@ def test_confirmed_video_profiles_children_are_ordered_and_base_files_is_removed
     expected_children = [
         '("Canais YouTube",',
         '("Blueprints Youtube",',
+        '("Thumbnail Blueprints",',
+        '("Brandings Youtube",',
         '("Contas TikTok",',
         '("Prompt Masters",',
         '("Facebook Pages",',
