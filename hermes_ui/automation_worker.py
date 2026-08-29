@@ -10,6 +10,7 @@ from typing import Any
 from . import storage
 from .creative_generation import generate_title_and_keywords, generate_topic_for_channel
 from .domain import create_batch, create_tasks_for_batch
+from .languages import language_code
 from .material_sources import selected_material_source
 from .notifications import record_notification
 from integrations.session_info_health import check_all_accounts_session_info_health, emit_session_info_health_alerts
@@ -124,6 +125,15 @@ def _valid_schedule(value: Any) -> bool:
     return 0 <= hour <= 23 and 0 <= minute <= 59
 
 
+def _scheduled_time(current: datetime, value: Any) -> datetime | None:
+    """Return today's scheduled local time, allowing a late worker tick to catch up."""
+    text = str(value or "").strip()
+    if not _valid_schedule(text):
+        return None
+    hour, minute = (int(part) for part in text.split(":"))
+    return current.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
 def _daily_quantity(channel: dict[str, Any]) -> int:
     try:
         return max(1, min(100, int(channel.get("daily_limit", 1))))
@@ -198,14 +208,42 @@ def _tasks_for_batch(batch_id: str) -> list[dict[str, Any]]:
     return [task for task in tasks if isinstance(task, dict) and task.get("batch_id") == batch_id]
 
 
+def _pending_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Build the lightweight scheduled payload; creative work runs in the pipeline."""
+    settings = storage.read_json("settings.json", {})
+    blueprint = _blueprint_for_channel(channel)
+    style_wide = str(channel.get("style_wide") or "pexels").strip().casefold()
+    material_source = selected_material_source(settings) if style_wide in {"pexels", "pexels/pixabay", "stock"} else ""
+    language = language_code(channel.get("language") or "pt")
+    payload = {
+        "topic": "",
+        "topic_source": "llm_pending",
+        "title": "",
+        "title_candidates": [],
+        "thumbnail_variant": {},
+        "thumbnail_variants": [],
+        "thumbnail_prompt": "",
+        "thumbnail_text": "",
+        "thumbnail_status": "pending_prompt",
+        "language": language,
+        "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
+        "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
+        "material_source": material_source,
+        "generation_settings": {"material_source": material_source},
+        "ai_generation": {},
+    }
+    return "", payload
+
+
 def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, Any]:
     channel_id = str(channel["id"])
     date_key = when.date().isoformat()
     style_wide = str(channel.get("style_wide") or "pexels")
     music_mode = style_wide == "music"
-    topic, payload = _creative_payload(channel)
+    topic, payload = _pending_payload(channel)
     options = {
-        "language": channel.get("language") or "Português",
+        "language": payload.get("language") or channel.get("language") or "pt",
         "format": "wide",
         "style_wide": style_wide,
         "style_ia": channel.get("style_ia") or "",
@@ -214,7 +252,7 @@ def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, 
         "background_mode": "none" if music_mode else ("ai" if style_wide == "full_ia" else "stock"),
         "music_path": channel.get("music_path") or "",
         "music_source": channel.get("music_source") or "",
-        "topic_source": "llm",
+        "topic_source": payload.get("topic_source") or "llm_pending",
         "channel_payloads": {channel_id: payload},
         "automation_worker": True,
         "automation_date": date_key,
@@ -254,7 +292,8 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
             channel_id = str(channel.get("id") or "")
             if not channel_id or not bool(channel.get("active", True)) or not bool(channel.get("automation_on", False)):
                 continue
-            if not _valid_schedule(channel.get("automation_time")) or str(channel.get("automation_time")).strip() != current_minute:
+            scheduled_at = _scheduled_time(current, channel.get("automation_time"))
+            if scheduled_at is None or current < scheduled_at:
                 continue
             existing = _batch_for_day(channel_id, day)
             if existing:
@@ -263,12 +302,14 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
                     existing_tasks = create_tasks_for_batch(existing)
                 skipped.append(channel_id)
                 continue
-            created.append(_create_channel_batch(channel, current))
+            created.append(_create_channel_batch(channel, scheduled_at))
         for item in created:
             batch = item["batch"]
+            scheduled_at_value = str((batch.get("options") or {}).get("automation_scheduled_at") or "")
+            scheduled_time = scheduled_at_value[11:16] if len(scheduled_at_value) >= 16 else current_minute
             status["last_runs"][item["channel_id"]] = {
                 "date": day,
-                "time": current_minute,
+                "time": scheduled_time,
                 "batch_id": batch["id"],
                 "task_ids": [task["id"] for task in item["tasks"]],
             }
@@ -276,7 +317,7 @@ def run_once(when: datetime | None = None) -> dict[str, Any]:
                 "automation_completed",
                 "Automação concluída",
                 f"O lote agendado do canal {item['channel_id']} foi criado com sucesso.",
-                metadata={"channel_id": item["channel_id"], "batch_id": batch["id"], "time": current_minute},
+                metadata={"channel_id": item["channel_id"], "batch_id": batch["id"], "time": scheduled_time},
                 dedupe_key=f"automation:{batch['id']}",
             )
         _write_status(status)
