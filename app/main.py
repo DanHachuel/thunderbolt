@@ -34,7 +34,7 @@ def display_version(version: str) -> str:
 
 APP_VERSION_LABEL = display_version(APP_VERSION)
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, transition_task, update_channel, update_channel_video
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, stop_task_by_user, transition_task, update_channel, update_channel_video
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
@@ -3778,8 +3778,12 @@ def _render_video_task_state(task: dict[str, Any]) -> None:
     state = str(task.get("state") or "unknown").strip().lower()
     progress = _video_task_progress(task)
     st.caption("Estado")
-    st.write(state or "—")
-    st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
+    if state == "blocked" and task.get("stop_reason") == "user":
+        st.write("Stoped by User")
+        st.caption("Parado manualmente pelo utilizador.")
+    else:
+        st.write(state or "—")
+        st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
     st.progress(progress, text=f"{progress}%")
     helper_status = str(task.get("video_helper_status") or "").strip()
     if state == "doing" and helper_status:
@@ -4240,7 +4244,7 @@ def render_automation():
                         st.rerun()
                 with stop_col:
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
-                        transition_task(task["id"], "blocked")
+                        stop_task_by_user(task["id"])
                         st.rerun()
                 with delete_col:
                     confirm_delete_key = f"automation_confirm_delete_{task['id']}"

@@ -359,6 +359,8 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
             previous_state = str(task.get("state") or "")
             if state:
                 task["state"] = state
+                if state != "blocked":
+                    task.pop("stop_reason", None)
             if stage:
                 if stage not in STAGES and stage not in LEGACY_STAGES:
                     raise ValueError(f"Etapa inválida: {stage}")
@@ -373,6 +375,21 @@ def transition_task(task_id: str, state: str | None = None, stage: str | None = 
     if updated is not None:
         _notify_task_completion(updated, previous_state)
     return updated
+
+
+def stop_task_by_user(task_id: str) -> dict[str, Any] | None:
+    """Stop a running video task and retain the user-originated reason for the UI."""
+    task = transition_task(task_id, "blocked")
+    if task is None:
+        return None
+    tasks = read_json("tasks.json", [])
+    for persisted in tasks:
+        if persisted.get("id") == task_id:
+            persisted["stop_reason"] = "user"
+            persisted["updated_at"] = now()
+            write_json("tasks.json", tasks)
+            return persisted
+    return task
 
 
 def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:

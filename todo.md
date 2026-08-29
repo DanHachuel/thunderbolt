@@ -70,4 +70,6 @@
 - [x] Testar visualmente e publicar a correcção efectiva da navegação.
 - [x] Garantir comparação exacta entre a página interna actual e o destino de cada item da barra lateral.
 - [x] Impedir qualquer destaque herdado entre grupos pais e subitens.
-- [ ] Criar regressões para todos os destinos e publicar a correcção do active estrito.
+- [x] Criar regressões para todos os destinos e publicar a correcção do active estrito.
+- [x] Fazer vídeos parados manualmente em Automação Youtube apresentarem “Stoped by User” em vez de “blocked”.
+- [x] Criar regressão para distinguir paragem manual de bloqueio automático e publicar a correcção.
