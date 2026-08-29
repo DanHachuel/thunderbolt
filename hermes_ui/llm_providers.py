@@ -14,6 +14,7 @@ from integrations.openai_model_discovery import (
     OpenAICompatibleAPIError,
     fetch_openai_compatible_models,
     validate_openai_compatible_api_key,
+    validate_openrouter_api_key,
 )
 
 
@@ -420,7 +421,10 @@ def test_llm_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     if not model:
         return {"ok": False, "status": "error", "message": "Missing configuration — introduza o modelo antes do teste."}
     try:
-        validate_openai_compatible_api_key(api_key, base_url, model)
+        if normalized["provider"] == "openrouter":
+            validate_openrouter_api_key(api_key, base_url, model)
+        else:
+            validate_openai_compatible_api_key(api_key, base_url, model)
     except OpenAICompatibleAPIError as exc:
         return {
             "ok": False,
