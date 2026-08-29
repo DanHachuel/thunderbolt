@@ -15,8 +15,14 @@ class AutomationCardsTests(unittest.TestCase):
         self.assertIn('st.button("Apagar"', MAIN_SOURCE)
         self.assertIn('retry_task_with_current_settings(task["id"])', MAIN_SOURCE)
         self.assertIn('transition_task(task["id"], "doing")', MAIN_SOURCE)
-        self.assertIn('transition_task(task["id"], "blocked")', MAIN_SOURCE)
+        self.assertIn('stop_task_by_user(task["id"])', MAIN_SOURCE)
+        self.assertIn('Stoped by User', MAIN_SOURCE)
         self.assertIn("a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas", MAIN_SOURCE)
+
+    def test_manual_stop_has_distinct_user_label_and_preserves_internal_blocked_state(self):
+        self.assertIn('def stop_task_by_user(task_id: str)', (ROOT / "hermes_ui" / "domain.py").read_text(encoding="utf-8"))
+        self.assertIn('task.get("stop_reason") == "user"', MAIN_SOURCE)
+        self.assertIn('persisted["stop_reason"] = "user"', (ROOT / "hermes_ui" / "domain.py").read_text(encoding="utf-8"))
 
     def test_automation_video_cards_do_not_render_channel_schedule(self):
         self.assertNotIn('st.caption("Horário do canal")', MAIN_SOURCE)

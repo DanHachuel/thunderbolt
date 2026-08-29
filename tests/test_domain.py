@@ -63,6 +63,24 @@ def test_retry_of_failed_task_clears_failure_without_storing_current_credentials
     assert "api_key" not in retried
 
 
+def test_manual_stop_marks_user_reason_but_keeps_queue_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import stop_task_by_user
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    storage.write_json("tasks.json", [{"id": "video_manual_stop", "state": "doing", "topic": "Tema"}])
+
+    stopped = stop_task_by_user("video_manual_stop")
+
+    assert stopped["state"] == "blocked"
+    assert stopped["stop_reason"] == "user"
+    assert storage.read_json("tasks.json")[0]["stop_reason"] == "user"
+
+
 def test_blueprint_json_is_readable(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage
