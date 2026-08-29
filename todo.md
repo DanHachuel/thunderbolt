@@ -74,3 +74,5 @@
 - [x] Fazer vídeos parados manualmente em Automação Youtube apresentarem “Stoped by User” em vez de “blocked”.
 - [x] Criar regressão para distinguir paragem manual de bloqueio automático e publicar a correcção.
 - [x] Publicar a correcção Stoped by User na versão 0.4.18, após 0.4.17 já estar ocupada.
+- [x] Fazer cada roteiro gerado gravar no front matter o Blueprint efectivamente usado, substituindo “SEM BLUEPRINT CONFIGURADO”.
+- [x] Criar regressões para resolução do Blueprint por nome/ID e publicar a correcção.

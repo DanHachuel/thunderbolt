@@ -18,7 +18,7 @@ from integrations.upload_routing import upload_with_default_route
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_thumbnail_prompt, generate_topic_for_channel
 from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
-from hermes_ui.storage import STORAGE, atomic_write, ensure_storage, read_json, write_json
+from hermes_ui.storage import STORAGE, atomic_write, ensure_storage, get_display_name, list_blueprint_files, load_blueprint_file, read_json, write_json
 from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
@@ -273,11 +273,29 @@ def _channel_for_task(task: dict[str, Any]) -> dict[str, Any]:
 
 
 def _blueprint_for_channel(channel: dict[str, Any]) -> dict[str, Any]:
-    blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "")
-    blueprints = read_json("blueprints.json", [])
-    if not isinstance(blueprints, list):
+    """Resolve the Blueprint assigned to a channel from the persisted library files."""
+    blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
+    blueprint_name = ""
+    if not blueprint_id and not blueprint_name:
         return {}
-    return next((item for item in blueprints if isinstance(item, dict) and str(item.get("id")) == blueprint_id), {})
+    for path in list_blueprint_files():
+        try:
+            data = load_blueprint_file(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        display_name = get_display_name("blueprints", path, str(data.get("name") or data.get("title") or path.stem))
+        identifiers = {
+            str(data.get("id") or "").strip(),
+            path.stem,
+            str(data.get("name") or "").strip(),
+            display_name,
+        }
+        if blueprint_id in identifiers or blueprint_name in identifiers:
+            resolved = dict(data)
+            resolved.setdefault("id", blueprint_id or path.stem)
+            resolved["name"] = display_name
+            return resolved
+    return {"id": blueprint_id, "name": blueprint_name or blueprint_id}
 
 
 def _keywords(topic: str, title: str, niche: str = "") -> list[str]:
@@ -1209,6 +1227,8 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     channel = _channel_for_task(task)
     settings = _settings()
     blueprint = _blueprint_for_channel(channel)
+    if not blueprint and (task.get("blueprint_id") or task.get("blueprint_name")):
+        blueprint = {"id": str(task.get("blueprint_id") or ""), "name": str(task.get("blueprint_name") or task.get("blueprint_id") or "")}
     route = _normalise_video_route(task, settings)
     topic = str(task.get("topic") or "").strip()
     if route != "music" and (not topic or str(task.get("topic_source") or "") in {"auto", "llm_pending"}):
