@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -20,11 +21,23 @@ class OpenAICompatibleAPIError(ValueError):
     """Raised when an authenticated OpenAI-compatible API check fails."""
 
 
+def _normalise_http_base_url(base_url: str, *, error_type: type[Exception]) -> str:
+    """Keep only the HTTP origin/path used to build OpenAI-compatible endpoints."""
+    raw = str(base_url or "").strip()
+    if not raw:
+        raise error_type("Informe a Base URL antes da chamada.")
+    try:
+        parsed = urlsplit(raw)
+    except ValueError as exc:
+        raise error_type("A Base URL não é válida.") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise error_type("A Base URL deve começar por http:// ou https://.")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+
+
 def models_endpoint(base_url: str) -> str:
     """Return the ``/models`` endpoint for an OpenAI-compatible base URL."""
-    value = str(base_url or "").strip().rstrip("/")
-    if not value:
-        raise ModelDiscoveryError("Informe a Base URL antes de consultar os modelos.")
+    value = _normalise_http_base_url(base_url, error_type=ModelDiscoveryError)
     if value.endswith("/models"):
         return value
     return f"{value}/models"
@@ -32,11 +45,11 @@ def models_endpoint(base_url: str) -> str:
 
 def chat_completions_endpoint(base_url: str) -> str:
     """Return the Chat Completions endpoint for an OpenAI-compatible base URL."""
-    value = str(base_url or "").strip().rstrip("/")
-    if not value:
-        raise OpenAICompatibleAPIError("Informe a Base URL antes do teste.")
+    value = _normalise_http_base_url(base_url, error_type=OpenAICompatibleAPIError)
     if value.endswith("/chat/completions"):
         return value
+    if value.endswith("/models"):
+        value = value.removesuffix("/models")
     return f"{value}/chat/completions"
 
 
@@ -76,6 +89,13 @@ def validate_openai_compatible_api_key(
         if response.status_code in (401, 403):
             raise OpenAICompatibleAPIError(
                 f"O endpoint recusou a API key (HTTP {response.status_code}). Verifique a API key."
+            )
+        if response.status_code == 404 and "openrouter.ai" in str(urlsplit(base_url).netloc).casefold():
+            raise OpenAICompatibleAPIError(
+                "O OpenRouter devolveu HTTP 404. Confirme a Base URL "
+                "https://openrouter.ai/api/v1 e seleccione um modelo válido do catálogo "
+                "(por exemplo, openai/gpt-4o-mini). O teste envia POST para "
+                "https://openrouter.ai/api/v1/chat/completions."
             )
         raise OpenAICompatibleAPIError(f"O endpoint de teste devolveu HTTP {response.status_code}.")
 
