@@ -125,6 +125,24 @@ class LlmProviderCardTests(TestCase):
         self.assertEqual(success["message"], "API Key OK")
         validate_key.assert_called_once_with(secret, "https://api.groq.com/openai/v1", "model-a")
 
+    def test_openrouter_card_uses_key_and_catalog_diagnostic(self) -> None:
+        secret = "sk-openrouter-test"
+        with patch("hermes_ui.llm_providers.validate_openrouter_api_key") as validate_router:
+            result = test_llm_provider_card(
+                {
+                    "provider": "openrouter",
+                    "api_key": secret,
+                    "model": "google/gemini-3.7-flash",
+                }
+            )
+
+        self.assertTrue(result["ok"])
+        validate_router.assert_called_once_with(
+            secret,
+            "https://openrouter.ai/api/v1",
+            "google/gemini-3.7-flash",
+        )
+
     def test_provider_error_does_not_expose_api_key(self) -> None:
         secret = "sk-do-not-leak"
         with patch(

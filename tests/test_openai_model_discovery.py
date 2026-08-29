@@ -8,6 +8,7 @@ from integrations.openai_model_discovery import (
     chat_completions_endpoint,
     models_endpoint,
     validate_openai_compatible_api_key,
+    validate_openrouter_api_key,
 )
 
 
@@ -37,6 +38,45 @@ class OpenAICompatibleApiValidationTests(TestCase):
         self.assertIn("https://openrouter.ai/api/v1", str(raised.exception))
         self.assertIn("openai/gpt-4o-mini", str(raised.exception))
         self.assertIn("chat/completions", str(raised.exception))
+
+    def test_openrouter_validation_checks_key_and_model_catalog_without_chat_generation(self) -> None:
+        key_response = Mock(status_code=200)
+        models_response = Mock(status_code=200)
+        models_response.json.return_value = {"data": [{"id": "google/gemini-3.7-flash"}]}
+        with patch(
+            "integrations.openai_model_discovery.requests.get",
+            side_effect=[key_response, models_response],
+        ) as get:
+            validate_openrouter_api_key(
+                "sk-openrouter-test",
+                "https://openrouter.ai/api/v1",
+                "google/gemini-3.7-flash",
+            )
+
+        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_args_list[0].args[0], "https://openrouter.ai/api/v1/key")
+        self.assertEqual(get.call_args_list[1].args[0], "https://openrouter.ai/api/v1/models")
+        self.assertEqual(
+            get.call_args_list[0].kwargs["headers"]["Authorization"],
+            "Bearer sk-openrouter-test",
+        )
+
+    def test_openrouter_validation_reports_model_not_in_catalog(self) -> None:
+        key_response = Mock(status_code=200)
+        models_response = Mock(status_code=200)
+        models_response.json.return_value = {"data": [{"id": "google/gemini-3.7-flash"}]}
+        with patch(
+            "integrations.openai_model_discovery.requests.get",
+            side_effect=[key_response, models_response],
+        ):
+            with self.assertRaises(OpenAICompatibleAPIError) as raised:
+                validate_openrouter_api_key(
+                    "sk-openrouter-test",
+                    "https://openrouter.ai/api/v1?",
+                    "modelo-inexistente",
+                )
+
+        self.assertIn("catálogo actual", str(raised.exception))
 
     def test_validation_posts_minimal_authenticated_chat_request(self) -> None:
         response = Mock(status_code=200)

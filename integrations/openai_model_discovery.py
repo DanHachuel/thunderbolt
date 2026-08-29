@@ -53,6 +53,54 @@ def chat_completions_endpoint(base_url: str) -> str:
     return f"{value}/chat/completions"
 
 
+def validate_openrouter_api_key(
+    api_key: str,
+    base_url: str,
+    model: str,
+    *,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> None:
+    """Validate an OpenRouter key and model without spending credits on a chat call."""
+    token = str(api_key or "").strip()
+    model_id = str(model or "").strip()
+    if not token:
+        raise OpenAICompatibleAPIError("Informe a API key antes do teste.")
+    if not model_id:
+        raise OpenAICompatibleAPIError("Informe o modelo antes do teste.")
+
+    base = _normalise_http_base_url(base_url, error_type=OpenAICompatibleAPIError)
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    key_endpoint = f"{base}/key"
+    try:
+        key_response = requests.get(key_endpoint, headers=headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise OpenAICompatibleAPIError("Não foi possível contactar o OpenRouter para validar a API key.") from exc
+
+    if key_response.status_code in (401, 403):
+        raise OpenAICompatibleAPIError(
+            f"A API key do OpenRouter foi recusada (HTTP {key_response.status_code}). Verifique a credencial."
+        )
+    if key_response.status_code >= 400:
+        raise OpenAICompatibleAPIError(
+            f"O diagnóstico da API key do OpenRouter devolveu HTTP {key_response.status_code}."
+        )
+
+    try:
+        available_models = fetch_openai_compatible_models(token, base, timeout=timeout)
+    except ModelDiscoveryError as exc:
+        raise OpenAICompatibleAPIError(
+            "A API key foi aceite, mas não foi possível consultar o catálogo de modelos OpenRouter."
+        ) from exc
+    if model_id not in available_models:
+        raise OpenAICompatibleAPIError(
+            f"A API key OpenRouter foi validada, mas o modelo '{model_id}' não está no catálogo actual. "
+            "Clique em Consultar modelos e seleccione um modelo disponível."
+        )
+
+
 def validate_openai_compatible_api_key(
     api_key: str,
     base_url: str,
