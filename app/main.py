@@ -1405,7 +1405,7 @@ def render_dashboard():
 def render_blueprints():
     st.title("Blueprints Youtube")
     st.caption(f"Biblioteca local lida directamente de `{BLUEPRINTS}`")
-    blueprint_tab, branding_tab = render_localized_tabs(["Blueprints", "Brandings"])
+    blueprint_tab = st.container()
     with blueprint_tab:
         st.subheader("Criar blueprint a partir de link")
         with st.form("create_blueprint_from_link"):
@@ -1474,42 +1474,46 @@ def render_blueprints():
             except Exception as exc:
                 with st.expander(f"Inválido — {path.stem}"):
                     st.error(str(exc))
-    with branding_tab:
-        st.subheader("Brandings completos")
-        st.caption(f"Brandings gerados ou importados da pasta `{BLUEPRINTS / 'brandings'}`")
-        branding_upload = st.file_uploader("Subir Branding JSON", type=["json"], key="branding_upload")
-        if branding_upload and st.button("Guardar Branding", type="secondary"):
-            try:
-                data = json.loads(branding_upload.getvalue().decode("utf-8"))
-                if not isinstance(data, dict):
-                    raise ValueError("O JSON raiz deve ser um objecto.")
-                target = BLUEPRINTS / "brandings" / (Path(branding_upload.name).stem.replace(" ", "-") + ".json")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write(target, data)
-                record_notification("branding_completed", f"Branding guardado: {target.stem}", "O Branding importado foi guardado no storage local.", metadata={"name": target.stem}, dedupe_key=f"branding:{target}:{target.stat().st_mtime_ns}")
-                st.success(f"Branding guardado em {target}")
-                st.rerun()
-            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-                st.error(f"Branding JSON inválido: {exc}")
-        branding_files = list_branding_files()
-        st.write(f"{len(branding_files)} branding(s) encontrado(s)")
-        branding_search = st.text_input("Pesquisar brandings", key="branding_search")
-        if not branding_files:
-            st.info("Ainda não existem brandings na pasta local.")
-        for path in branding_files:
-            if branding_search and branding_search.lower() not in path.name.lower():
-                continue
-            try:
-                data = load_blueprint_file(path)
-                title = data.get("name") or data.get("identity", {}).get("channel_name") or path.stem
-                with st.expander(f"{title} — {path.name}"):
-                    st.caption(f"Blueprint associado: {data.get('blueprint_id') or 'não associado'}")
-                    st.json(data)
-            except Exception as exc:
-                with st.expander(f"Inválido — {path.stem}"):
-                    st.error(str(exc))
 
 
+def render_youtube_brandings():
+    st.title("Brandings Youtube")
+    st.caption(f"Brandings gerados ou importados da pasta `{BLUEPRINTS / 'brandings'}`")
+    branding_upload = st.file_uploader("Subir Branding JSON", type=["json"], key="branding_upload")
+    if branding_upload and st.button("Guardar Branding", type="secondary"):
+        try:
+            data = json.loads(branding_upload.getvalue().decode("utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("O JSON raiz deve ser um objecto.")
+            target = BLUEPRINTS / "brandings" / (Path(branding_upload.name).stem.replace(" ", "-") + ".json")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(target, data)
+            record_notification("branding_completed", f"Branding guardado: {target.stem}", "O Branding importado foi guardado no storage local.", metadata={"name": target.stem}, dedupe_key=f"branding:{target}:{target.stat().st_mtime_ns}")
+            st.success(f"Branding guardado em {target}")
+            st.rerun()
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            st.error(f"Branding JSON inválido: {exc}")
+    branding_files = list_branding_files()
+    st.write(f"{len(branding_files)} branding(s) encontrado(s)")
+    branding_search = st.text_input("Pesquisar brandings", key="branding_search")
+    if not branding_files:
+        st.info("Ainda não existem brandings na pasta local.")
+    for path in branding_files:
+        if branding_search and branding_search.lower() not in path.name.lower():
+            continue
+        try:
+            data = load_blueprint_file(path)
+            title = data.get("name") or data.get("identity", {}).get("channel_name") or path.stem
+            with st.expander(f"{title} — {path.name}"):
+                st.caption(f"Blueprint associado: {data.get('blueprint_id') or 'não associado'}")
+                st.json(data)
+        except Exception as exc:
+            with st.expander(f"Inválido — {path.stem}"):
+                st.error(str(exc))
+
+
+def render_thumbnail_blueprints():
+    st.title("Thumbnail Blueprints")
 def _tiktok_accounts_from_settings(settings: dict[str, Any]) -> list[dict[str, Any]]:
     raw_accounts = settings.get("tiktok_accounts")
     if not isinstance(raw_accounts, list) or not raw_accounts:
@@ -7067,6 +7071,8 @@ def main():
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
         ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
+        ("Thumbnail Blueprints", ":material/image:", "Thumbnail Blueprints"),
+        ("Brandings Youtube", ":material/brush:", "Brandings Youtube"),
         ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
         ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
         ("Facebook Pages", ":material/public:", "Facebook Pages"),
@@ -7148,7 +7154,7 @@ def main():
         "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
         "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
-        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
+        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
@@ -7226,6 +7232,8 @@ def main():
         "Thumbnails": render_thumbnails,
         "Upload": render_upload,
         "Blueprints Youtube": render_blueprints,
+        "Thumbnail Blueprints": render_thumbnail_blueprints,
+        "Brandings Youtube": render_youtube_brandings,
         "Prompt Masters": render_tiktok_prompt_masters,
         "Canais YouTube": render_channels,
         "Contas TikTok": render_tiktok_accounts,
