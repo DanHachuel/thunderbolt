@@ -1280,8 +1280,30 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
 
 
 def render_home_update_controls() -> None:
-    """Render the update controls only on the home page and keep notices dismissible."""
-    update_area, version_area, _ = st.columns([1.45, 2.55, 3.0])
+    """Render update controls and only show actionable or execution-related notices."""
+    cache_key = "home_update_version_check"
+    checked_at_key = "home_update_version_checked_at"
+    if not st.session_state.get(cache_key) or time.monotonic() - float(st.session_state.get(checked_at_key, 0)) > 300:
+        st.session_state[cache_key] = check_version(APP_VERSION)
+        st.session_state[checked_at_key] = time.monotonic()
+    version_status = st.session_state[cache_key]
+    notice_signature = f"{version_status.latest_version}|{version_status.update_available}|{version_status.error}"
+    if st.session_state.get("home_update_notice_signature") != notice_signature:
+        st.session_state["home_update_notice_signature"] = notice_signature
+        st.session_state["home_update_notice_dismissed"] = False
+
+    update_result = st.session_state.get("home_update_result")
+    notice_message = ""
+    notice_kind = ""
+    if update_result is not None and (not update_result.ok or update_result.restart_required):
+        notice_message = str(update_result.message or "").strip()
+        notice_kind = "success" if update_result.ok else "error"
+    elif version_status.update_available:
+        notice_message = f"Nova versão disponível: {display_version(version_status.latest_version)}. A versão actual é {APP_VERSION_LABEL or 'desconhecida'}."
+        notice_kind = "info"
+    notice_visible = bool(notice_message) and not st.session_state.get("home_update_notice_dismissed")
+
+    update_area, notice_area, close_area = st.columns([1.45, 3.55, 0.42], gap="small")
     with update_area:
         st.markdown(
             """
@@ -1297,6 +1319,18 @@ def render_home_update_controls() -> None:
                 border-color: #c4b5fd;
                 filter: brightness(1.08);
             }
+            div[data-testid="stAlert"] {
+                width: fit-content;
+                max-width: 100%;
+                min-height: 0;
+                padding: 0.45rem 0.75rem;
+                margin: 0.2rem 0 0;
+                display: inline-flex;
+                align-items: center;
+            }
+            div[data-testid="stAlert"] p {
+                margin: 0;
+            }
             </style>
             """,
             unsafe_allow_html=True,
@@ -1310,49 +1344,16 @@ def render_home_update_controls() -> None:
                     st.success("Actualização concluída. A reiniciar o Thunderbolt para aplicar a nova versão…")
                     time.sleep(0.8)
                     restart_current_process()
-    with version_area:
-        cache_key = "home_update_version_check"
-        checked_at_key = "home_update_version_checked_at"
-        if not st.session_state.get(cache_key) or time.monotonic() - float(st.session_state.get(checked_at_key, 0)) > 300:
-            st.session_state[cache_key] = check_version(APP_VERSION)
-            st.session_state[checked_at_key] = time.monotonic()
-        version_status = st.session_state[cache_key]
-        notice_signature = f"{version_status.latest_version}|{version_status.update_available}|{version_status.error}"
-        if st.session_state.get("home_update_notice_signature") != notice_signature:
-            st.session_state["home_update_notice_signature"] = notice_signature
-            st.session_state["home_update_notice_dismissed"] = False
-        if version_status.update_available:
-            notice_message = f"Nova versão disponível: {display_version(version_status.latest_version)}. A versão actual é {APP_VERSION_LABEL or 'desconhecida'}."
-            notice_kind = "info"
-        elif version_status.error:
-            notice_message = f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · verificação de actualização indisponível."
-            notice_kind = "caption"
-        else:
-            notice_message = f"Versão actual: {APP_VERSION_LABEL or 'desconhecida'} · já está actualizada ({display_version(version_status.latest_version)})."
-            notice_kind = "success"
-        if not st.session_state.get("home_update_notice_dismissed"):
-            notice_col, close_col = st.columns([8.5, 1])
-            with notice_col:
-                if notice_kind == "info":
-                    st.info(notice_message)
-                elif notice_kind == "success":
-                    st.success(notice_message)
-                else:
-                    st.caption(notice_message)
-            with close_col:
-                if st.button("×", key="home_update_notice_close", help="Fechar este aviso"):
-                    st.session_state["home_update_notice_dismissed"] = True
-                    st.rerun()
-    update_result = st.session_state.get("home_update_result")
-    if update_result is not None and not st.session_state.get("home_update_notice_dismissed"):
-        result_col, result_close_col = st.columns([8.5, 1])
-        with result_col:
-            if update_result.ok:
-                st.success(update_result.message)
+    if notice_visible:
+        with notice_area:
+            if notice_kind == "info":
+                st.info(notice_message)
+            elif notice_kind == "success":
+                st.success(notice_message)
             else:
-                st.error(update_result.message)
-        with result_close_col:
-            if st.button("×", key="home_update_result_close", help="Fechar este resultado"):
+                st.error(notice_message)
+        with close_area:
+            if st.button("×", key="home_update_notice_close", help="Fechar este aviso"):
                 st.session_state["home_update_notice_dismissed"] = True
                 st.rerun()
 
