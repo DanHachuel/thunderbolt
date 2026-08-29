@@ -84,15 +84,26 @@ def test_home_is_the_only_page_that_renders_the_update_button():
     assert 'key="home_update_version"' not in dashboard
 
 
-def test_home_update_notice_has_a_close_button_and_constrained_width():
+def test_home_update_notice_is_compact_and_next_to_the_update_button():
     source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
     home_controls = source.split("def render_home_update_controls() -> None:", 1)[1].split("def render_dashboard():", 1)[0]
 
-    assert 'st.columns([1.45, 2.55, 3.0])' in home_controls
-    assert 'st.columns([8.5, 1])' in home_controls
+    assert 'st.columns([1.45, 3.55, 0.42], gap="small")' in home_controls
+    assert 'width: fit-content;' in home_controls
+    assert 'max-width: 100%;' in home_controls
     assert 'key="home_update_notice_close"' in home_controls
     assert 'home_update_notice_dismissed' in home_controls
     assert 'help="Fechar este aviso"' in home_controls
+
+
+def test_home_update_notice_hides_no_update_status():
+    source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+    home_controls = source.split("def render_home_update_controls() -> None:", 1)[1].split("def render_dashboard():", 1)[0]
+
+    assert 'if update_result is not None and (not update_result.ok or update_result.restart_required):' in home_controls
+    assert 'elif version_status.update_available:' in home_controls
+    assert "já está actualizada" not in home_controls
+    assert "verificação de actualização indisponível" not in home_controls
 
 
 def test_version_label_keeps_the_two_digit_patch_convention():
