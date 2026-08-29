@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from hermes_ui.creative_generation import CreativeGenerationError
-from hermes_ui import script_documents, script_generation
+from hermes_ui import pipeline_worker, script_documents, script_generation
 
 
 def _settings():
@@ -73,6 +73,7 @@ def test_save_script_document_writes_markdown_and_history(tmp_path, monkeypatch)
             "summary": "Uma viagem interior",
             "content": "[Verso]\nVento sobre o mar",
             "language": "36 – Português (Brasil)",
+            "blueprint_id": "nature-vault",
             "blueprint_name": "Nature Vault",
             "channel_name": "Canal Musical",
         }
@@ -81,6 +82,23 @@ def test_save_script_document_writes_markdown_and_history(tmp_path, monkeypatch)
     path = Path(record["path"])
     assert path.parent == storage_root / "scripts"
     assert path.is_file()
-    assert "Canção do Norte" in path.read_text(encoding="utf-8")
+    markdown = path.read_text(encoding="utf-8")
+    assert "Canção do Norte" in markdown
+    assert "blueprint_id: nature-vault" in markdown
+    assert "blueprint: Nature Vault" in markdown
     assert history[0]["filename"] == path.name
     assert script_documents.read_script_document(record).endswith("Vento sobre o mar\n")
+
+
+def test_pipeline_resolves_blueprint_from_imported_file(monkeypatch, tmp_path):
+    blueprint_path = tmp_path / "BlueprintNatureVault.json"
+    blueprint_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(pipeline_worker, "list_blueprint_files", lambda: [blueprint_path])
+    monkeypatch.setattr(pipeline_worker, "load_blueprint_file", lambda _path: {"name": "Nature Vault", "target_niche": "natureza"})
+    monkeypatch.setattr(pipeline_worker, "get_display_name", lambda _kind, _path, fallback: fallback)
+
+    resolved = pipeline_worker._blueprint_for_channel({"default_blueprint_id": "BlueprintNatureVault"})
+
+    assert resolved["name"] == "Nature Vault"
+    assert resolved["id"] == "BlueprintNatureVault"
+    assert resolved["target_niche"] == "natureza"
