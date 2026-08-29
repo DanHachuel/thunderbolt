@@ -5,11 +5,39 @@ from unittest.mock import Mock, patch
 
 from integrations.openai_model_discovery import (
     OpenAICompatibleAPIError,
+    chat_completions_endpoint,
+    models_endpoint,
     validate_openai_compatible_api_key,
 )
 
 
 class OpenAICompatibleApiValidationTests(TestCase):
+    def test_openrouter_base_url_builds_official_endpoints_without_query_suffix(self) -> None:
+        base_url = "https://openrouter.ai/api/v1?"
+
+        self.assertEqual(
+            models_endpoint(base_url),
+            "https://openrouter.ai/api/v1/models",
+        )
+        self.assertEqual(
+            chat_completions_endpoint(base_url),
+            "https://openrouter.ai/api/v1/chat/completions",
+        )
+
+    def test_openrouter_404_explains_base_url_and_model_requirements(self) -> None:
+        response = Mock(status_code=404)
+        with patch("integrations.openai_model_discovery.requests.post", return_value=response):
+            with self.assertRaises(OpenAICompatibleAPIError) as raised:
+                validate_openai_compatible_api_key(
+                    "sk-openrouter-test",
+                    "https://openrouter.ai/api/v1",
+                    "modelo-inexistente",
+                )
+
+        self.assertIn("https://openrouter.ai/api/v1", str(raised.exception))
+        self.assertIn("openai/gpt-4o-mini", str(raised.exception))
+        self.assertIn("chat/completions", str(raised.exception))
+
     def test_validation_posts_minimal_authenticated_chat_request(self) -> None:
         response = Mock(status_code=200)
         with patch("integrations.openai_model_discovery.requests.post", return_value=response) as post:
