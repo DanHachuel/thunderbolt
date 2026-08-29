@@ -73,3 +73,4 @@
 - [x] Criar regressões para todos os destinos e publicar a correcção do active estrito.
 - [x] Fazer vídeos parados manualmente em Automação Youtube apresentarem “Stoped by User” em vez de “blocked”.
 - [x] Criar regressão para distinguir paragem manual de bloqueio automático e publicar a correcção.
+- [ ] Publicar a correcção Stoped by User na próxima versão disponível após 0.4.17.
