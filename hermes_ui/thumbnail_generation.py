@@ -168,8 +168,10 @@ def generate_thumbnail_image(
     )
 
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
-    aspect_ratio = str(settings.get("gemini_image_aspect_ratio") or DEFAULT_ASPECT_RATIO).strip()
-    image_size = str(settings.get("gemini_image_size") or DEFAULT_IMAGE_SIZE).strip()
+    # YouTube thumbnails are never square: do not allow a legacy/provider setting
+    # to override the required horizontal canvas.
+    aspect_ratio = DEFAULT_ASPECT_RATIO
+    image_size = DEFAULT_IMAGE_SIZE
     request_input: str | list[dict[str, str]] = effective_prompt
     if reference_image:
         request_input = [

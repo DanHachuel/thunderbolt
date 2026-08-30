@@ -235,8 +235,8 @@ def _image_request(card: dict[str, Any], prompt: str) -> Any:
     constrained_prompt = _append_generation_constraints(
         prompt,
         kind="image",
-        aspect_ratio=str(card.get("aspect_ratio") or ""),
-        size=str(card.get("image_size") or ""),
+        aspect_ratio="16:9",
+        size="1280x720 minimum",
     )
     if style == "cloudflare":
         return requests.post(endpoint, headers=_headers(card), json={"prompt": constrained_prompt}, timeout=180)
@@ -278,8 +278,8 @@ def generate_image_for_card(
                 _append_generation_constraints(
                     prompt,
                     kind="image",
-                    aspect_ratio=str(card.get("aspect_ratio") or ""),
-                    size=str(card.get("image_size") or ""),
+                    aspect_ratio="16:9",
+                    size="1280x720 minimum",
                 ),
                 topic=topic,
                 variant_index=variant_index,

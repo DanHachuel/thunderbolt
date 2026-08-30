@@ -97,6 +97,7 @@ def normalize_thumbnail_task(task: dict[str, Any]) -> dict[str, Any]:
         "channel_name": str(task.get("channel_name") or "Canal sem nome").strip(),
         "blueprint_id": str(task.get("blueprint_id") or "").strip(),
         "blueprint_name": str(task.get("blueprint_name") or "").strip(),
+        "thumbnail_blueprint_id": str(task.get("thumbnail_blueprint_id") or "").strip(),
         "status": str(task.get("thumbnail_status") or "not_generated"),
         "prompt": str(prompt or "").strip(),
         "image_path": _as_path(image_path),
@@ -242,7 +243,11 @@ def _update_thumbnail_task(task_id: str, callback: Any) -> dict[str, Any]:
     return update_json("tasks.json", [], mutate)
 
 
-def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple[dict[str, Any], Path]:
+def generate_thumbnail_for_task(
+    task_id: str,
+    settings: dict[str, Any],
+    thumbnail_blueprint: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], Path]:
     """Generate an image from the task's current prompt and persist it on the task."""
     tasks = read_json("tasks.json", [])
     if not isinstance(tasks, list):
@@ -251,9 +256,13 @@ def generate_thumbnail_for_task(task_id: str, settings: dict[str, Any]) -> tuple
     if not record["prompt"]:
         raise ThumbnailGenerationError("A thumbnail não tem um prompt de imagem para gerar.")
     _archive_image(str(task_id), record.get("image_path"))
+    visual_prompt = record["prompt"]
+    rules = str((thumbnail_blueprint or {}).get("content") or "").strip()
+    if rules:
+        visual_prompt = f"{visual_prompt}\n\nTHUMBNAIL BLUEPRINT — FOLLOW THESE VISUAL RULES:\n{rules}"
     image_path = _generate_image_with_pool(
         settings,
-        record["prompt"],
+        visual_prompt,
         topic=record["title"] or record["topic"],
         variant_index=record["variant_index"],
         lettering_text=record.get("thumbnail_text") or "",
@@ -435,4 +444,3 @@ __all__ = [
     "regenerate_thumbnail_prompt_and_image",
     "upload_thumbnail_image",
 ]
-
