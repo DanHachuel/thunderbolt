@@ -80,17 +80,28 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertEqual(output, Path("thumbnail.jpg"))
         self.assertEqual(generator.call_args.args[0]["gemini_image_api_key"], "secret")
         self.assertIn("16:9", generator.call_args.args[1])
-        self.assertIn("1K", generator.call_args.args[1])
+        self.assertIn("1280x720 minimum", generator.call_args.args[1])
         self.assertEqual(generator.call_args.kwargs["variant_index"], 2)
 
-    def test_image_request_keeps_size_and_aspect_ratio_inside_prompt(self):
+    def test_pollinations_image_request_uses_landscape_size_parameter(self):
+        response = Mock(status_code=200)
+        card = {"provider": "pollinations", "model": "flux", "base_url": "https://gen.pollinations.ai/v1", "api_style": "openai_compatible"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("16:9", prompt)
+        self.assertIn("1792x1024", prompt)
+        self.assertEqual(post.call_args.kwargs["json"]["size"], "1792x1024")
+        self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
+
+    def test_other_openai_compatible_image_request_does_not_receive_pollinations_size(self):
         response = Mock(status_code=200)
         card = {"provider": "huggingface", "model": "black-forest-labs/FLUX.1-dev", "base_url": "https://router.huggingface.co/v1", "api_style": "huggingface"}
         with patch.object(media_generation.requests, "post", return_value=response) as post:
             media_generation._image_request(card, "clean image")
         prompt = post.call_args.kwargs["json"]["prompt"]
         self.assertIn("16:9", prompt)
-        self.assertIn("1K", prompt)
+        self.assertIn("1280x720 minimum", prompt)
         self.assertNotIn("size", post.call_args.kwargs["json"])
         self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
 

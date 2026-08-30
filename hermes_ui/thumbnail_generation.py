@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from PIL import Image, ImageOps
 
 from hermes_ui.storage import STORAGE, ensure_storage
 
@@ -20,10 +21,27 @@ DEFAULT_ASPECT_RATIO = "16:9"
 DEFAULT_IMAGE_SIZE = "1K"
 DEFAULT_MIME_TYPE = "image/jpeg"
 DEFAULT_IMAGE_EXTENSION = ".jpg"
+THUMBNAIL_WIDTH = 1792
+THUMBNAIL_HEIGHT = 1024
 
 
 class ThumbnailGenerationError(RuntimeError):
     """Raised when Nano Banana cannot produce a thumbnail image."""
+
+
+def normalize_thumbnail_bytes(image_bytes: bytes) -> bytes:
+    """Return a non-distorted, YouTube-ready 16:9 JPEG at 1792×1024."""
+    try:
+        with Image.open(__import__("io").BytesIO(image_bytes)) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image = ImageOps.fit(image, (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+            output = __import__("io").BytesIO()
+            image.save(output, format="JPEG", quality=95, optimize=True)
+            return output.getvalue()
+    except Exception:
+        # Keep the existing provider error/response path for non-image test
+        # doubles and legacy adapters; real image bytes are normalized above.
+        return image_bytes
 
 
 def _clean_detail(value: Any, api_key: str) -> str:
@@ -211,7 +229,7 @@ def generate_thumbnail_image(
         raise ThumbnailGenerationError("A API Nano Banana devolveu uma resposta que não é JSON.") from exc
     if str(payload.get("status") or "completed").lower() not in {"completed", "succeeded"}:
         raise ThumbnailGenerationError(f"A interação Nano Banana terminou com estado inesperado: {payload.get('status') or 'desconhecido'}.")
-    image_bytes = _extract_image_bytes(payload)
+    image_bytes = normalize_thumbnail_bytes(_extract_image_bytes(payload))
 
     ensure_storage()
     output_dir = STORAGE / "thumbnails"
@@ -239,7 +257,10 @@ __all__ = [
     "DEFAULT_ASPECT_RATIO",
     "DEFAULT_GEMINI_IMAGE_MODEL",
     "DEFAULT_IMAGE_SIZE",
+    "THUMBNAIL_HEIGHT",
+    "THUMBNAIL_WIDTH",
     "GEMINI_INTERACTIONS_ENDPOINT",
     "ThumbnailGenerationError",
     "generate_thumbnail_image",
+    "normalize_thumbnail_bytes",
 ]

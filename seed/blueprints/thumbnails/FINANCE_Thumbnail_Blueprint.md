@@ -145,8 +145,9 @@ Mobile-first: Text is large enough to read on a smartphone screen. Character's f
 Aspect ratio:
 16:9
 
-Resolution:
-1280 × 720 minimum
+Size:
+1792 × 1024
+Landscape 16:9 output; use this explicit size only when supported by the image provider.
 
 Image style: 2D illustration / whiteboard animation style — flat colors, clean lines, no gradients or 3D rendering. The aesthetic should match "explainer video" illustration quality.
 
