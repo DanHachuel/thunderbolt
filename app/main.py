@@ -35,6 +35,7 @@ def display_version(version: str) -> str:
 APP_VERSION_LABEL = display_version(APP_VERSION)
 
 from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, stop_task_by_user, transition_task, update_channel, update_channel_video
+from hermes_ui.channel_import import build_channel_template_xlsx, channel_is_duplicate, find_duplicate_channel, parse_channel_workbook, resolve_blueprint, resolve_google_account, resolve_voice
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
@@ -1849,7 +1850,7 @@ def render_channels():
     youtube_account_labels = {"": "Sem conta Google associada"}
     youtube_account_labels.update({str(account["id"]): f"{account.get('label', 'Canais YouTube')} — {account.get('email', 'sem e-mail')}" for account in youtube_accounts})
     youtube_accounts_by_id = {str(account["id"]): account for account in youtube_accounts}
-    import_tab, batch_tab, manual_tab = render_localized_tabs(["Importar do YouTube", "Canais em lote gmail", "Cadastro manual"])
+    import_tab, spreadsheet_tab, batch_tab, manual_tab = render_localized_tabs(["Importar do YouTube", "Canais em lote Planilha", "Canais em lote gmail", "Cadastro manual"])
 
     with import_tab:
         st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
@@ -1942,6 +1943,142 @@ def render_channels():
                         st.rerun()
         else:
             st.info("Introduza um URL, handle ou ID e clique em Buscar no YouTube. Não é necessária API Key na opção pública.")
+
+    with spreadsheet_tab:
+        st.caption("Carregue uma planilha Excel (.xlsx ou .xls). Os cabeçalhos e valores são interpretados, normalizados e associados aos cadastros existentes antes da gravação.")
+        download_col, help_col = st.columns([1.35, 2.65])
+        with download_col:
+            st.download_button(
+                "Baixar planilha modelo",
+                data=build_channel_template_xlsx(),
+                file_name="modelo_canais_youtube.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="download_channel_spreadsheet_template",
+            )
+        with help_col:
+            st.caption("O modelo inclui as 15 colunas aceitas. Deixe campos não utilizados vazios; a Descrição será pesquisada publicamente pelo handle, URL ou nome quando estiver vazia.")
+
+        uploaded_sheet = st.file_uploader(
+            "Upload da planilha de canais",
+            type=["xlsx", "xls"],
+            key="channel_spreadsheet_upload",
+            help="Apenas a primeira aba do arquivo será importada. Linhas sem URL, nome e handle são ignoradas.",
+        )
+        if st.button("Ler e preparar planilha", type="primary", use_container_width=True, key="read_channel_spreadsheet"):
+            if uploaded_sheet is None:
+                st.error("Selecione um arquivo Excel antes de continuar.")
+            else:
+                try:
+                    spreadsheet_rows, spreadsheet_warnings = parse_channel_workbook(uploaded_sheet.getvalue(), uploaded_sheet.name)
+                    st.session_state["channel_spreadsheet_rows"] = spreadsheet_rows
+                    st.session_state["channel_spreadsheet_warnings"] = spreadsheet_warnings
+                    st.session_state.pop("channel_spreadsheet_result", None)
+                    if spreadsheet_rows:
+                        st.success(f"{len(spreadsheet_rows)} linha(s) de canal preparada(s) para revisão.")
+                    else:
+                        st.warning("A planilha não contém linhas com URL, nome ou handle de canal.")
+                except ValueError as exc:
+                    st.session_state.pop("channel_spreadsheet_rows", None)
+                    st.error(str(exc))
+
+        spreadsheet_warnings = st.session_state.get("channel_spreadsheet_warnings", [])
+        for spreadsheet_warning in spreadsheet_warnings:
+            st.warning(spreadsheet_warning)
+        spreadsheet_result = st.session_state.get("channel_spreadsheet_result")
+        if isinstance(spreadsheet_result, dict):
+            if spreadsheet_result.get("created"):
+                st.success(f"Canais cadastrados: {', '.join(spreadsheet_result['created'])}")
+            if spreadsheet_result.get("skipped"):
+                st.info(f"Já cadastrados e não duplicados: {', '.join(spreadsheet_result['skipped'])}")
+            for spreadsheet_error in spreadsheet_result.get("errors", []):
+                st.warning(spreadsheet_error)
+
+        spreadsheet_rows = st.session_state.get("channel_spreadsheet_rows", [])
+        if spreadsheet_rows:
+            blueprint_items = blueprint_catalog()
+            voice_options = voice_catalog()
+            spreadsheet_accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
+            existing_spreadsheet_channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict)]
+            preview_rows = []
+            for row in spreadsheet_rows:
+                resolved_blueprint = resolve_blueprint(row.get("blueprint"), blueprint_items)
+                resolved_voice = resolve_voice(row.get("voice"), voice_options)
+                resolved_account, _ = resolve_google_account(row.get("google_account"), spreadsheet_accounts)
+                preview_rows.append({
+                    "Linha": row.get("_source_row", "—"),
+                    "Nome": row.get("name") or "—",
+                    "Handle": row.get("handle") or "—",
+                    "Blueprint interpretado": resolved_blueprint or "—",
+                    "Voz interpretada": resolved_voice or "—",
+                    "Idioma": language_code(row.get("language")) if row.get("language") else "—",
+                    "Descrição": "Preencher via YouTube" if not row.get("description") else "Da planilha",
+                    "Estado": "Já cadastrado" if find_duplicate_channel({"name": row.get("name"), "handle": row.get("handle"), "url": row.get("url")}, existing_spreadsheet_channels) else "Novo",
+                })
+            st.dataframe(preview_rows, use_container_width=True, hide_index=True, height=min(420, 86 + 38 * len(preview_rows)))
+            st.caption("Blueprints e vozes são resolvidos pelos catálogos atuais. Por exemplo, `finanças`, `blueprint_finanças` e `Blueprint Canal Finanças` apontam para o mesmo Blueprint quando ele existe.")
+            if st.button("Cadastrar canais da planilha", type="primary", use_container_width=True, key="import_channel_spreadsheet"):
+                created_names: list[str] = []
+                skipped_names: list[str] = []
+                spreadsheet_errors: list[str] = []
+                current_channels = list(existing_spreadsheet_channels)
+                for row in spreadsheet_rows:
+                    row_label = str(row.get("name") or row.get("handle") or row.get("url") or f"Linha {row.get('_source_row', '?')}")
+                    candidate = {"name": row.get("name", ""), "handle": row.get("handle", ""), "url": row.get("url", "")}
+                    duplicate = find_duplicate_channel(candidate, current_channels)
+                    if duplicate:
+                        skipped_names.append(f"{row_label} (linha {row.get('_source_row', '?')})")
+                        continue
+                    automation_time = str(row.get("automation_time") or "").strip()
+                    if automation_time and not valid_hhmm(automation_time):
+                        spreadsheet_errors.append(f"{row_label} (linha {row.get('_source_row', '?')}): horário inválido; a linha não foi cadastrada.")
+                        continue
+                    try:
+                        resolved_blueprint = resolve_blueprint(row.get("blueprint"), blueprint_items)
+                        resolved_voice = resolve_voice(row.get("voice"), voice_options)
+                        google_account_id, google_account_email = resolve_google_account(row.get("google_account"), spreadsheet_accounts)
+                        description = str(row.get("description") or "").strip()
+                        description_status = "da planilha"
+                        if not description:
+                            lookup_source = str(row.get("handle") or row.get("url") or row.get("name") or "").strip()
+                            if lookup_source:
+                                description_result = youtube.fetch_channel_public(lookup_source)
+                                description = str(description_result.data.get("description") or "").strip()
+                                if not description and youtube.api_key:
+                                    api_description_result = youtube.fetch_channel(lookup_source)
+                                    description = str(api_description_result.data.get("description") or "").strip()
+                                description_status = "buscada no YouTube" if description else "não encontrada"
+                        style_value = str(row.get("style_wide") or "").strip()
+                        metadata = {
+                            "handle": str(row.get("handle") or "").strip(),
+                            "description": description,
+                            "niche": str(row.get("niche") or "").strip(),
+                            "reference_channels": [item.strip() for item in re.split(r"[,|]", str(row.get("niche") or "")) if item.strip()],
+                            "language": language_code(row.get("language")) if row.get("language") else "",
+                            "style_wide": style_value,
+                            "blueprint_id": resolved_blueprint,
+                            "default_blueprint_id": resolved_blueprint,
+                            "default_voice": resolved_voice,
+                            "voice": resolved_voice,
+                            "google_account_id": google_account_id,
+                            "google_account_email": google_account_email,
+                            "automation_on": bool(row.get("automation_on")) if row.get("automation_on") is not None else False,
+                            "automation_time": automation_time,
+                            "delegated_session_id": str(row.get("delegated_session_id") or "").strip(),
+                            "active": bool(row.get("active")) if row.get("active") is not None else True,
+                            "default_video_duration_minutes": row.get("duration_minutes"),
+                            "metrics_source": "spreadsheet",
+                            "import_source": "spreadsheet",
+                            "description_source": description_status,
+                        }
+                        created = create_channel(str(row.get("name") or "").strip(), str(row.get("url") or "").strip(), metadata)
+                        current_channels.append(created)
+                        created_names.append(row_label)
+                    except Exception as exc:
+                        spreadsheet_errors.append(f"{row_label} (linha {row.get('_source_row', '?')}): {exc}")
+                st.session_state["channel_spreadsheet_result"] = {"created": created_names, "skipped": skipped_names, "errors": spreadsheet_errors}
+                st.session_state.pop("channel_spreadsheet_rows", None)
+                st.rerun()
 
     with batch_tab:
         st.caption("Esta subaba usa a conta Google/YouTube seleccionada para listar os canais que ela gere. Não lê a caixa Gmail e não usa e-mails como pesquisa pública.")
@@ -2094,6 +2231,34 @@ def render_channels():
     if not channels:
         st.info("Nenhum canal cadastrado.")
         return
+    channel_rows = [
+        {
+            "Nome": str(channel.get("name") or ""),
+            "Handle": str(channel.get("handle") or ""),
+            "URL": str(channel.get("url") or ""),
+            "Nicho": channel_niche_label(channel),
+            "Descrição": str(channel.get("description") or ""),
+            "Origem": str(channel.get("import_source") or channel.get("metrics_source") or "manual"),
+            "Activo": "Sim" if channel.get("active", True) else "Não",
+        }
+        for channel in channels
+    ]
+    st.dataframe(
+        channel_rows,
+        use_container_width=True,
+        hide_index=True,
+        height=min(360, 76 + 38 * len(channel_rows)),
+        column_config={
+            "Nome": st.column_config.TextColumn("Nome", width=180),
+            "Handle": st.column_config.TextColumn("Handle", width=150),
+            "URL": st.column_config.LinkColumn("URL", width=220),
+            "Nicho": st.column_config.TextColumn("Nicho", width=160),
+            "Descrição": st.column_config.TextColumn("Descrição", width=360),
+            "Origem": st.column_config.TextColumn("Origem", width=130),
+            "Activo": st.column_config.TextColumn("Activo", width=80),
+        },
+    )
+    st.caption("Tabela de canais cadastrados. Os cartões abaixo mantêm as ações de edição, credenciais e vídeos publicados.")
     for channel in channels:
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
