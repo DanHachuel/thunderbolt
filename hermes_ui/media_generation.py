@@ -38,7 +38,7 @@ from .provider_routing import (
     route_json_request,
 )
 from .storage import STORAGE, ensure_storage
-from .thumbnail_generation import generate_thumbnail_image, normalize_thumbnail_bytes
+from .thumbnail_generation import _compose_thumbnail_prompt, generate_thumbnail_image, normalize_thumbnail_bytes
 
 
 class MediaGenerationError(RuntimeError):
@@ -232,13 +232,19 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de imagem configurado.")
 
 
-def _image_request(card: dict[str, Any], prompt: str) -> Any:
+def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "") -> Any:
     provider = str(card.get("provider") or "").strip().lower()
     style = str(card.get("api_style") or media_provider_definition(provider).api_style)
     endpoint = _image_endpoint(card)
+    image_prompt, _headline = _compose_thumbnail_prompt(
+        prompt,
+        topic=topic,
+        lettering_text=lettering_text,
+        lettering_prompt=lettering_prompt,
+    )
     requested_size = "1792x1024" if provider == "pollinations" else "1280x720 minimum"
     constrained_prompt = _append_generation_constraints(
-        prompt,
+        image_prompt,
         kind="image",
         aspect_ratio="16:9",
         size=requested_size,
@@ -301,7 +307,7 @@ def generate_image_for_card(
     destination = STORAGE / "thumbnails" / f"media-{provider}-{abs(hash((topic, prompt, variant_index))) & 0xffffffffffffffff:x}.jpg"
 
     def request(current: dict[str, Any]) -> Any:
-        return _image_request(current, prompt)
+        return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt)
 
     try:
         routed = route_json_request(settings, pool=POOL_IMAGE, cards=[card], request=request)
