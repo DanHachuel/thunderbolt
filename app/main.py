@@ -45,6 +45,7 @@ from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_d
 from app.modules.niche_finder.summarizer import summarize_items
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
+from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_channel
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
 from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
@@ -605,6 +606,17 @@ def render_channel_blueprint_panel(channel: dict, *, compact: bool = False) -> N
         st.info(f"**Blueprint utilizado pelo canal:** {summary['name']} · `{summary['id']}` · **Voz:** {voice} · **Idioma:** {video_language}")
 
 
+def render_channel_thumbnail_blueprint_panel(channel: dict, *, compact: bool = False) -> None:
+    document = thumbnail_blueprint_for_channel(channel)
+    name = str(document.get("name") or "SEM THUMBNAIL BLUEPRINT CONFIGURADO")
+    if name == "SEM THUMBNAIL BLUEPRINT CONFIGURADO":
+        st.warning("**SEM THUMBNAIL BLUEPRINT CONFIGURADO** · associe um Thumbnail Blueprint na aba Thumbnail Blueprints.")
+    elif compact:
+        st.caption(f"**Thumbnail Blueprint:** {name}")
+    else:
+        st.info(f"**Thumbnail Blueprint utilizado pelo canal:** {name} · apenas leitura")
+
+
 def creative_payload_from_result(channel: dict, topic: str, creative: dict, topic_source: str = "manual") -> dict[str, Any]:
     variant = creative.get("thumbnail_variant") or {}
     return {
@@ -620,6 +632,7 @@ def creative_payload_from_result(channel: dict, topic: str, creative: dict, topi
         "thumbnail_status": str(creative.get("thumbnail_status") or "prompt_ready"),
         "blueprint_id": str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
         "blueprint_name": str(channel_blueprint_summary(channel).get("name") or "SEM BLUEPRINT CONFIGURADO"),
+        "thumbnail_blueprint_id": str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or ""),
         "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
         "ai_generation": {"creative": creative},
     }
@@ -839,11 +852,15 @@ def generate_thumbnail_for_ui(
     topic = str(topic or "").strip()
     if not topic:
         raise CreativeGenerationError("É necessário um tópico antes de gerar a thumbnail.")
+    script_blueprint = blueprint_for_channel(channel)
+    visual_blueprint = thumbnail_blueprint_for_channel(channel)
+    if visual_blueprint.get("content"):
+        script_blueprint = {**script_blueprint, "thumbnail_blueprint_rules": visual_blueprint.get("content", "")}
     variant = generate_thumbnail_prompt(
         settings,
         channel,
         topic,
-        blueprint=blueprint_for_channel(channel),
+        blueprint=script_blueprint,
         language=str(channel.get("language") or "Português"),
     )
     return {
@@ -1514,6 +1531,75 @@ def render_youtube_brandings():
 
 def render_thumbnail_blueprints():
     st.title("Thumbnail Blueprints")
+    st.caption(f"Documentos de estilo visual por nicho · armazenamento em `{BLUEPRINTS / 'thumbnails'}`")
+    st.info("Crie uma regra visual reutilizável a partir das thumbnails públicas de um canal concorrente. O documento gerado é separado do Blueprint de roteiro e será aplicado automaticamente ao canal associado.")
+    with st.form("create_thumbnail_blueprint_from_link"):
+        source_url = st.text_input("Link do canal ou vídeo YouTube", placeholder="https://www.youtube.com/@canal ou https://youtu.be/video")
+        niche = st.text_input("Nicho (usado no nome do ficheiro)", placeholder="Ex.: Militar")
+        channel_name = st.text_input("Nome do canal concorrente (opcional)")
+        sample_limit = st.slider("Vídeos públicos para analisar", 3, 10, 10)
+        submitted = st.form_submit_button("Analisar e criar Thumbnail Blueprint", type="primary")
+    if submitted:
+        if not source_url.strip() or not niche.strip():
+            st.error("Informe o link do YouTube e o nicho antes de criar.")
+        else:
+            try:
+                public = fetch_channel_videos_public(source_url, limit=sample_limit)
+                if not public.ok and not public.data.get("videos"):
+                    raise ValueError(public.message)
+                document = generate_thumbnail_blueprint(read_json("settings.json", {}), source_url=source_url.strip(), niche=niche.strip(), channel_name=channel_name.strip(), videos=public.data.get("videos", []))
+                path = save_thumbnail_blueprint(document)
+                st.success(f"Thumbnail Blueprint criado: {path.name} · {len(document.get('sample_videos', []))} referência(s) analisada(s).")
+                st.rerun()
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))
+    st.divider()
+    st.subheader("Thumbnail Blueprints existentes")
+    search = st.text_input("Pesquisar Thumbnail Blueprints", key="thumbnail_blueprint_search")
+    documents = list_thumbnail_blueprint_documents()
+    if not documents:
+        st.info("Ainda não existem Thumbnail Blueprints. Use um link público do YouTube para criar o primeiro.")
+    for path in documents:
+        if search and search.casefold() not in path.name.casefold():
+            continue
+        with st.container(border=True):
+            st.markdown(f"### {path.stem}")
+            st.caption(f"Ficheiro: `{path.name}`")
+            pair_options = blueprint_catalog()
+            pair_ids = [item[0] for item in pair_options]
+            pair_labels = {item[0]: item[1] for item in pair_options}
+            pair = st.selectbox("Blueprint de roteiro associado", pair_ids, format_func=lambda item: pair_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_card_pair_{path.stem}")
+            if st.button("Guardar associação deste card", key=f"thumbnail_card_pair_save_{path.stem}"):
+                save_thumbnail_blueprint_pair(path.stem, pair)
+                st.success("Associação guardada; canais com esse Blueprint usarão esta thumbnail blueprint automaticamente.")
+            st.code(path.read_text(encoding="utf-8"), language="markdown")
+    st.divider()
+    st.subheader("Associar ao canal e ao Blueprint de roteiro")
+    channels = read_json("channels.json", [])
+    thumbnail_options = thumbnail_blueprint_catalog()
+    thumbnail_ids = [item[0] for item in thumbnail_options]
+    thumbnail_labels = {item[0]: item[1] for item in thumbnail_options}
+    blueprint_options = blueprint_catalog()
+    blueprint_ids = [item[0] for item in blueprint_options]
+    blueprint_labels = {item[0]: item[1] for item in blueprint_options}
+    for channel in channels:
+        channel_id = str(channel.get("id") or "")
+        if not channel_id:
+            continue
+        with st.container(border=True):
+            st.write(f"**{channel.get('name', 'Canal')}**")
+            cols = st.columns(3)
+            current_thumb = str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or "")
+            current_script = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "")
+            with cols[0]:
+                thumb = st.selectbox("Thumbnail Blueprint", thumbnail_ids, index=thumbnail_ids.index(current_thumb) if current_thumb in thumbnail_ids else 0, format_func=lambda item: thumbnail_labels.get(item, item), key=f"thumbnail_blueprint_channel_{channel_id}")
+            with cols[1]:
+                script = st.selectbox("Blueprint de roteiro associado", blueprint_ids, index=blueprint_ids.index(current_script) if current_script in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_script_blueprint_channel_{channel_id}")
+            with cols[2]:
+                if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", use_container_width=True):
+                    update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
+                    st.success("Par Blueprint de roteiro + Thumbnail Blueprint guardado.")
+                    st.rerun()
 def _tiktok_accounts_from_settings(settings: dict[str, Any]) -> list[dict[str, Any]]:
     raw_accounts = settings.get("tiktok_accounts")
     if not isinstance(raw_accounts, list) or not raw_accounts:
@@ -2038,6 +2124,7 @@ def render_channels():
                 render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
             else:
                 summary = channel_blueprint_summary(channel)
+                render_channel_thumbnail_blueprint_panel(channel, compact=True)
                 channel_language = language_label(channel.get("language") or "pt")
                 block_cols = st.columns(4, gap="small")
                 with block_cols[0]:
@@ -2374,6 +2461,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                     selected = [selected_one["id"]]
                     # Intentionally sits between Canal and the generation settings, as requested.
                     render_channel_blueprint_panel(selected_one)
+                    render_channel_thumbnail_blueprint_panel(selected_one)
                     generation_settings = render_video_generation_settings(
                         prefix,
                         current_language=str(st.session_state.get("video_language") or ""),
@@ -4183,7 +4271,11 @@ def render_automation():
             with header_cols[3]:
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
             blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            default_cols = st.columns([1.15, 1.15, 1.5, 1.7, 1.35], gap="small")
+            thumbnail_items = thumbnail_blueprint_catalog()
+            thumbnail_ids = [item[0] for item in thumbnail_items]
+            thumbnail_labels = {item[0]: item[1] for item in thumbnail_items}
+            current_thumbnail = str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or "")
+            default_cols = st.columns([1.0, 1.0, 1.35, 1.55, 1.55, 1.0], gap="small")
             with default_cols[0]:
                 st.markdown("**Idioma Padrão**")
                 st.caption(language_label(channel.get("language") or "pt"))
@@ -4207,6 +4299,14 @@ def render_automation():
                     key=f"automation_voice_{channel_id}",
                 )
             with default_cols[4]:
+                automation_thumbnail = st.selectbox(
+                    "Thumbnail Blueprint",
+                    thumbnail_ids,
+                    index=thumbnail_ids.index(current_thumbnail) if current_thumbnail in thumbnail_ids else 0,
+                    format_func=lambda item: thumbnail_labels.get(item, item or "Sem Thumbnail Blueprint"),
+                    key=f"automation_thumbnail_blueprint_{channel_id}",
+                )
+            with default_cols[5]:
                 if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
@@ -4216,6 +4316,7 @@ def render_automation():
                             "automation_time": schedule_time.strip(),
                         })
                         set_channel_defaults(channel_id, automation_blueprint, automation_voice)
+                        update_channel(channel_id, {"thumbnail_blueprint_id": automation_thumbnail, "default_thumbnail_blueprint_id": automation_thumbnail})
                         st.success("Agendamento guardado.")
                         st.rerun()
 
