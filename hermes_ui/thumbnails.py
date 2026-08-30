@@ -10,8 +10,9 @@ from typing import Any
 from .creative_generation import generate_thumbnail_prompt
 from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
-from .storage import STORAGE, now, read_json, update_json
+from .storage import STORAGE, ensure_storage, now, read_json, update_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from .thumbnail_blueprints import thumbnail_blueprint_for_channel
 
 
 def _generate_image_with_pool(
@@ -290,12 +291,19 @@ def regenerate_thumbnail_prompt(
     topic = record["topic"] or record["title"]
     if not topic:
         raise ThumbnailGenerationError("A tarefa não tem tópico para refazer o prompt da thumbnail.")
+    ensure_storage()
+    visual_blueprint = thumbnail_blueprint_for_channel(
+        {**(channel or {}), "thumbnail_blueprint_id": record.get("thumbnail_blueprint_id") or (channel or {}).get("thumbnail_blueprint_id", "")}
+    )
+    effective_blueprint = {**(blueprint or {})}
+    if visual_blueprint.get("content"):
+        effective_blueprint["thumbnail_blueprint_rules"] = visual_blueprint["content"]
     variant = generate_thumbnail_prompt(
         settings,
         channel or {},
         topic,
         current_prompt=record["prompt"],
-        blueprint=blueprint,
+        blueprint=effective_blueprint,
         language=language,
     )
     updated = _update_thumbnail_task(
