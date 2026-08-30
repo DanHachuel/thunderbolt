@@ -143,7 +143,17 @@ function copySeedBlueprints(storageRoot) {
   }
   const pairSource = join(seedRoot, "thumbnail_blueprint_pairs.json");
   const pairTarget = join(storageRoot, "blueprints", "thumbnail_blueprint_pairs.json");
-  if (existsSync(pairSource) && !existsSync(pairTarget)) copyFileSync(pairSource, pairTarget);
+  if (existsSync(pairSource)) {
+    try {
+      const seededPairs = JSON.parse(readFileSync(pairSource, "utf8"));
+      const currentPairs = existsSync(pairTarget) ? JSON.parse(readFileSync(pairTarget, "utf8")) : {};
+      if (seededPairs && currentPairs && typeof seededPairs === "object" && typeof currentPairs === "object") {
+        writeFileSync(pairTarget, JSON.stringify({ ...seededPairs, ...currentPairs }, null, 2) + "\n", "utf8");
+      }
+    } catch {
+      if (!existsSync(pairTarget)) copyFileSync(pairSource, pairTarget);
+    }
+  }
 }
 
 function copySeedPromptMasters(storageRoot) {

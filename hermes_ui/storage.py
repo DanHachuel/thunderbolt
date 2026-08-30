@@ -368,8 +368,17 @@ def seed_blueprints() -> None:
             shutil.copy2(source, target)
     pair_source = SEED_BLUEPRINTS / "thumbnail_blueprint_pairs.json"
     pair_target = BLUEPRINTS / "thumbnail_blueprint_pairs.json"
-    if pair_source.exists() and not pair_target.exists():
-        shutil.copy2(pair_source, pair_target)
+    if pair_source.exists():
+        try:
+            seeded_pairs = json.loads(pair_source.read_text(encoding="utf-8"))
+            current_pairs = json.loads(pair_target.read_text(encoding="utf-8")) if pair_target.exists() else {}
+            if isinstance(seeded_pairs, dict) and isinstance(current_pairs, dict):
+                merged_pairs = {**seeded_pairs, **current_pairs}
+                if merged_pairs != current_pairs:
+                    atomic_write(pair_target, merged_pairs)
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            if not pair_target.exists():
+                shutil.copy2(pair_source, pair_target)
 
 
 def seed_prompt_masters() -> None:
