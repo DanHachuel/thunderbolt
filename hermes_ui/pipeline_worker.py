@@ -24,6 +24,7 @@ from hermes_ui.media_generation import MediaGenerationError, _append_generation_
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
 from hermes_ui.material_sources import material_api_keys, material_source_cards, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from hermes_ui.thumbnail_blueprints import thumbnail_blueprint_for_channel
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
@@ -1229,6 +1230,9 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     blueprint = _blueprint_for_channel(channel)
     if not blueprint and (task.get("blueprint_id") or task.get("blueprint_name")):
         blueprint = {"id": str(task.get("blueprint_id") or ""), "name": str(task.get("blueprint_name") or task.get("blueprint_id") or "")}
+    visual_blueprint = thumbnail_blueprint_for_channel(channel)
+    if visual_blueprint.get("content"):
+        blueprint = {**blueprint, "thumbnail_blueprint_rules": visual_blueprint["content"]}
     route = _normalise_video_route(task, settings)
     topic = str(task.get("topic") or "").strip()
     if route != "music" and (not topic or str(task.get("topic_source") or "") in {"auto", "llm_pending"}):

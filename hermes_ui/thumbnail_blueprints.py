@@ -9,6 +9,9 @@ from typing import Any, Mapping
 from .provider_routing import route_llm_json
 from .storage import BLUEPRINTS, atomic_write, list_blueprint_files, load_blueprint_file
 
+GENERIC_THUMBNAIL_BLUEPRINT_ID = "Generic_Thumbnail_Blueprint"
+GENERIC_ASSOCIATION_ERROR = "Not Allowed to Associate, System Use Only"
+
 PROMPT_MASTER = '''You are a forensic YouTube thumbnail analyst. Build a reusable Thumbnail Blueprint from the reference channel videos below.
 The output must be a practical, locked visual system, not a script blueprint. Infer recurring composition, framing, lighting, color, typography, overlay text, symbols, emotional triggers, mobile readability, aspect ratio, quality and negative constraints. Use the exact Markdown structure of the requested reference: STYLE LOCK, FRAMING & POSE, BACKGROUND & LIGHTING, GEOPOLITICAL SYMBOLS when relevant, VISUAL ATTENTION ELEMENT, TEXT STYLE, TEXT PSYCHOLOGY, COMPOSITION RULES, FORMAT & QUALITY, FINAL OBJECTIVE, FINAL INPUT FORMAT and FINAL SYSTEM INSTRUCTION. Write the document in English. Do not invent channel analytics. The document must instruct future thumbnail generation and include a concise, ready-to-use image prompt template.'''
 
@@ -48,7 +51,7 @@ def thumbnail_blueprint_for_channel(channel: Mapping[str, Any]) -> dict[str, Any
         return resolve_thumbnail_blueprint(direct)
     script_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
     pairs = _pair_state()
-    return resolve_thumbnail_blueprint(pairs.get(script_id, ""))
+    return resolve_thumbnail_blueprint(pairs.get(script_id, "") or GENERIC_THUMBNAIL_BLUEPRINT_ID)
 
 
 def _pair_state() -> dict[str, str]:
@@ -61,6 +64,8 @@ def _pair_state() -> dict[str, str]:
 
 
 def save_thumbnail_blueprint_pair(thumbnail_id: str, blueprint_id: str) -> None:
+    if str(thumbnail_id) == GENERIC_THUMBNAIL_BLUEPRINT_ID and str(blueprint_id):
+        raise ValueError(GENERIC_ASSOCIATION_ERROR)
     pairs = _pair_state()
     if blueprint_id:
         pairs[str(blueprint_id)] = str(thumbnail_id)
