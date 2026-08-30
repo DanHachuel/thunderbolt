@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .creative_generation import generate_thumbnail_prompt
+from .creative_generation import _language_instruction, generate_thumbnail_prompt
 from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
 from .storage import STORAGE, ensure_storage, now, read_json, update_json
@@ -96,6 +96,7 @@ def normalize_thumbnail_task(task: dict[str, Any]) -> dict[str, Any]:
         "topic": str(task.get("topic") or "").strip(),
         "channel_id": str(task.get("channel_id") or "").strip(),
         "channel_name": str(task.get("channel_name") or "Canal sem nome").strip(),
+        "language": str(task.get("language") or "").strip(),
         "blueprint_id": str(task.get("blueprint_id") or "").strip(),
         "blueprint_name": str(task.get("blueprint_name") or "").strip(),
         "thumbnail_blueprint_id": str(task.get("thumbnail_blueprint_id") or "").strip(),
@@ -348,6 +349,7 @@ def regenerate_thumbnail_lettering(
     task_id: str,
     settings: dict[str, Any],
     lettering_prompt: str = "",
+    language: str = "",
 ) -> tuple[dict[str, Any], Path]:
     """Edit only the lettering while sending the existing image as a Nano Banana reference."""
     tasks = read_json("tasks.json", [])
@@ -357,9 +359,12 @@ def regenerate_thumbnail_lettering(
     previous_image = record.get("image_path")
     if not previous_image or not previous_image.is_file():
         raise ThumbnailGenerationError("A thumbnail precisa de uma imagem existente para refazer o lettering.")
+    requested_language = str(language or record.get("language") or "Português").strip()
+    language_instruction = _language_instruction(requested_language)
     base_prompt = record["prompt"] or "Cria uma thumbnail de YouTube cinematográfica e de alto contraste."
     edit_prompt = str(lettering_prompt or "").strip() or (
         f"Refaz apenas o lettering da thumbnail para o vídeo {record['title']!r}. "
+        f"Escreve obrigatoriamente em {language_instruction}. "
         "Escolhe uma frase curta e forte, com no máximo quatro palavras, relacionada com o título."
     )
     combined_prompt = (
@@ -368,6 +373,8 @@ def regenerate_thumbnail_lettering(
         f"{base_prompt}\n\n"
         "LETTERING EDIT LAYER — altera exclusivamente o texto/lettering visível da thumbnail. "
         "Mantém tudo o que pertence à BASE IMAGE LAYER pixelmente tão próximo quanto possível, sem mudar a imagem.\n"
+        f"LANGUAGE LOCK — todo o texto visível novo deve estar obrigatoriamente em {language_instruction}. "
+        "Não uses inglês nem traduzas para outro idioma.\n"
         f"{edit_prompt}\n"
         "Não adicionar logótipos, marcas de água ou outros elementos."
     )
