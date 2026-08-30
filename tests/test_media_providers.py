@@ -116,6 +116,15 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertNotIn("size", post.call_args.kwargs["json"])
         self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
 
+    def test_image_request_includes_mandatory_lettering_for_initial_generation(self):
+        response = Mock(status_code=200)
+        card = {"provider": "pollinations", "model": "flux", "base_url": "https://gen.pollinations.ai/v1", "api_style": "openai_compatible"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image", topic="A new topic", lettering_text="EXACT TEXT")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("MANDATORY LETTERING LAYER", prompt)
+        self.assertIn("EXACT HEADLINE TO RENDER: <<<EXACT TEXT>>>", prompt)
+
     def test_heygen_video_request_uses_v3_avatar_contract_and_api_key_header(self):
         response = Mock(status_code=200)
         card = {
