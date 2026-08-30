@@ -1575,7 +1575,8 @@ def render_thumbnail_blueprints():
                     st.success("Associação guardada; canais com esse Blueprint usarão esta thumbnail blueprint automaticamente.")
                 except ValueError as exc:
                     st.error(str(exc))
-            st.code(path.read_text(encoding="utf-8"), language="markdown")
+            with st.expander("Abrir documento completo", expanded=False):
+                st.code(path.read_text(encoding="utf-8"), language="markdown")
     st.divider()
     st.subheader("Associar ao canal e ao Blueprint de roteiro")
     channels = read_json("channels.json", [])
