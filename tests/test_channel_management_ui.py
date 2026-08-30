@@ -39,3 +39,15 @@ def test_manual_and_imported_channel_forms_have_niche_field():
     assert 'key="yt_import_niche"' in source
     assert 'key="manual_channel_niche"' in source
     assert '"reference_channels"' in source
+
+
+def test_registered_channels_table_is_only_in_spreadsheet_tab_and_scrollable():
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    spreadsheet_start = source.index("with spreadsheet_tab:")
+    batch_start = source.index("with batch_tab:")
+    spreadsheet_block = source[spreadsheet_start:batch_start]
+    assert 'st.subheader("Canais cadastrados")' in spreadsheet_block
+    assert 'registered_rows' in spreadsheet_block
+    assert 'height=420' in spreadsheet_block
+    assert 'Use a barra inferior para navegar horizontalmente' in spreadsheet_block
+    assert source.count('st.subheader("Canais cadastrados")') == 1

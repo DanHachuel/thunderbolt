@@ -2080,6 +2080,41 @@ def render_channels():
                 st.session_state.pop("channel_spreadsheet_rows", None)
                 st.rerun()
 
+        st.divider()
+        st.subheader("Canais cadastrados")
+        registered_channels = read_json("channels.json", [])
+        if not registered_channels:
+            st.info("Nenhum canal cadastrado.")
+        else:
+            registered_rows = [
+                {
+                    "Nome": str(channel.get("name") or ""),
+                    "Handle": str(channel.get("handle") or ""),
+                    "URL": str(channel.get("url") or ""),
+                    "Nicho": channel_niche_label(channel),
+                    "Descrição": str(channel.get("description") or ""),
+                    "Origem": str(channel.get("import_source") or channel.get("metrics_source") or "manual"),
+                    "Activo": "Sim" if channel.get("active", True) else "Não",
+                }
+                for channel in registered_channels
+            ]
+            st.dataframe(
+                registered_rows,
+                use_container_width=True,
+                hide_index=True,
+                height=420,
+                column_config={
+                    "Nome": st.column_config.TextColumn("Nome", width=180),
+                    "Handle": st.column_config.TextColumn("Handle", width=150),
+                    "URL": st.column_config.LinkColumn("URL", width=260),
+                    "Nicho": st.column_config.TextColumn("Nicho", width=180),
+                    "Descrição": st.column_config.TextColumn("Descrição", width=420),
+                    "Origem": st.column_config.TextColumn("Origem", width=150),
+                    "Activo": st.column_config.TextColumn("Activo", width=80),
+                },
+            )
+            st.caption("Tabela de canais cadastrados. Use a barra inferior para navegar horizontalmente e a barra lateral para percorrer os registos.")
+
     with batch_tab:
         st.caption("Esta subaba usa a conta Google/YouTube seleccionada para listar os canais que ela gere. Não lê a caixa Gmail e não usa e-mails como pesquisa pública.")
         accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
@@ -2226,39 +2261,9 @@ def render_channels():
                     st.success(f"Canal {channel['name']} guardado manualmente.")
                     st.rerun()
 
-    st.subheader("Canais cadastrados")
     channels = read_json("channels.json", [])
     if not channels:
-        st.info("Nenhum canal cadastrado.")
         return
-    channel_rows = [
-        {
-            "Nome": str(channel.get("name") or ""),
-            "Handle": str(channel.get("handle") or ""),
-            "URL": str(channel.get("url") or ""),
-            "Nicho": channel_niche_label(channel),
-            "Descrição": str(channel.get("description") or ""),
-            "Origem": str(channel.get("import_source") or channel.get("metrics_source") or "manual"),
-            "Activo": "Sim" if channel.get("active", True) else "Não",
-        }
-        for channel in channels
-    ]
-    st.dataframe(
-        channel_rows,
-        use_container_width=True,
-        hide_index=True,
-        height=min(360, 76 + 38 * len(channel_rows)),
-        column_config={
-            "Nome": st.column_config.TextColumn("Nome", width=180),
-            "Handle": st.column_config.TextColumn("Handle", width=150),
-            "URL": st.column_config.LinkColumn("URL", width=220),
-            "Nicho": st.column_config.TextColumn("Nicho", width=160),
-            "Descrição": st.column_config.TextColumn("Descrição", width=360),
-            "Origem": st.column_config.TextColumn("Origem", width=130),
-            "Activo": st.column_config.TextColumn("Activo", width=80),
-        },
-    )
-    st.caption("Tabela de canais cadastrados. Os cartões abaixo mantêm as ações de edição, credenciais e vídeos publicados.")
     for channel in channels:
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
