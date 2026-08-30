@@ -350,6 +350,7 @@ def regenerate_thumbnail_lettering(
     settings: dict[str, Any],
     lettering_prompt: str = "",
     language: str = "",
+    channel: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], Path]:
     """Edit only the lettering while sending the existing image as a Nano Banana reference."""
     tasks = read_json("tasks.json", [])
@@ -362,10 +363,31 @@ def regenerate_thumbnail_lettering(
     requested_language = str(language or record.get("language") or "Português").strip()
     language_instruction = _language_instruction(requested_language)
     base_prompt = record["prompt"] or "Cria uma thumbnail de YouTube cinematográfica e de alto contraste."
+    resolved_channel = dict(channel or {})
+    if not resolved_channel:
+        channels = read_json("channels.json", [])
+        channel_id = str(task.get("channel_id") or "").strip()
+        resolved_channel = next(
+            (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == channel_id),
+            {},
+        ) if isinstance(channels, list) else {}
+    try:
+        localized_variant = generate_thumbnail_prompt(
+            settings,
+            resolved_channel,
+            record["title"] or record["topic"],
+            current_prompt=base_prompt,
+            language=requested_language,
+        )
+        exact_headline = str(localized_variant.get("overlay_text") or "").strip()
+    except Exception:
+        exact_headline = str(record.get("thumbnail_text") or (record.get("variant") or {}).get("overlay_text") or "").strip()
+    if not exact_headline:
+        raise ThumbnailGenerationError("Não foi possível gerar o texto do lettering no idioma do canal.")
     edit_prompt = str(lettering_prompt or "").strip() or (
         f"Refaz apenas o lettering da thumbnail para o vídeo {record['title']!r}. "
         f"Escreve obrigatoriamente em {language_instruction}. "
-        "Escolhe uma frase curta e forte, com no máximo quatro palavras, relacionada com o título."
+        f"Usa exactamente este texto, sem alterar palavras, idioma ou acentuação: {exact_headline!r}."
     )
     combined_prompt = (
         "BASE IMAGE LAYER — preserva exactamente a composição, enquadramento, sujeitos, fundo, iluminação, "
@@ -375,6 +397,7 @@ def regenerate_thumbnail_lettering(
         "Mantém tudo o que pertence à BASE IMAGE LAYER pixelmente tão próximo quanto possível, sem mudar a imagem.\n"
         f"LANGUAGE LOCK — todo o texto visível novo deve estar obrigatoriamente em {language_instruction}. "
         "Não uses inglês nem traduzas para outro idioma.\n"
+        f"EXACT HEADLINE — renderiza somente este texto: <<<{exact_headline}>>>\n"
         f"{edit_prompt}\n"
         "Não adicionar logótipos, marcas de água ou outros elementos."
     )
@@ -385,10 +408,12 @@ def regenerate_thumbnail_lettering(
         topic=record["title"] or record["topic"],
         variant_index=record["variant_index"],
         reference_image=previous_image,
+        lettering_text=exact_headline,
         lettering_prompt=edit_prompt,
     )
     variant = _variant_for_record(record)
     variant["image_prompt"] = base_prompt
+    variant["overlay_text"] = exact_headline
     variant["lettering_prompt"] = edit_prompt
     updated = _update_thumbnail_task(
         task_id,

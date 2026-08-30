@@ -4205,6 +4205,7 @@ def render_thumbnails():
                                 settings,
                                 lettering_prompt=record.get("lettering_prompt") or "",
                                 language=str(record.get("language") or channel.get("language") or current_ui_language()),
+                                channel=channel,
                             )
                         record_notification(
                             "thumbnail_generation_completed",
