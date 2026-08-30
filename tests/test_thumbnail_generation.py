@@ -1,10 +1,12 @@
 import base64
 import json
 import tempfile
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from hermes_ui import thumbnail_generation
+from PIL import Image
 
 
 
@@ -57,3 +59,12 @@ def test_thumbnail_uses_interactions_api_and_saves_inline_image():
             assert "secret-key" not in json.dumps(request["json"])
         finally:
             thumbnail_generation.STORAGE = original_storage
+
+
+def test_square_provider_response_is_normalized_to_youtube_thumbnail_size():
+    source = BytesIO()
+    Image.new("RGB", (1024, 1024), (20, 40, 80)).save(source, format="PNG")
+    normalized = thumbnail_generation.normalize_thumbnail_bytes(source.getvalue())
+    with Image.open(BytesIO(normalized)) as image:
+        assert image.size == (1792, 1024)
+        assert image.format == "JPEG"

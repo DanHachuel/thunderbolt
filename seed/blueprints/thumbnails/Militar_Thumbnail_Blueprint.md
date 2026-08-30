@@ -185,8 +185,9 @@ High color contrast
 *Aspect ratio:
 16:9
 
-*Resolution:
-1280 × 720 minimum
+*Size:
+1792 × 1024
+Landscape 16:9 output; use this explicit size only when supported by the image provider.
 
 *Image style:
 Hyper-realistic military photography

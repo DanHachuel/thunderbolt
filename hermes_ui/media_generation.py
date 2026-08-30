@@ -38,7 +38,7 @@ from .provider_routing import (
     route_json_request,
 )
 from .storage import STORAGE, ensure_storage
-from .thumbnail_generation import generate_thumbnail_image
+from .thumbnail_generation import generate_thumbnail_image, normalize_thumbnail_bytes
 
 
 class MediaGenerationError(RuntimeError):
@@ -196,6 +196,10 @@ def _download_or_write(image_bytes: bytes | None, url: str, destination: Path, c
             raise MediaGenerationError(f"Não foi possível descarregar a imagem devolvida pelo provider: {exc}") from exc
     if not image_bytes:
         raise MediaGenerationError("O provider concluiu a chamada mas não devolveu uma imagem utilizável.")
+    try:
+        image_bytes = normalize_thumbnail_bytes(image_bytes)
+    except Exception as exc:
+        raise MediaGenerationError(str(exc)) from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(image_bytes)
     return destination
@@ -232,11 +236,12 @@ def _image_request(card: dict[str, Any], prompt: str) -> Any:
     provider = str(card.get("provider") or "").strip().lower()
     style = str(card.get("api_style") or media_provider_definition(provider).api_style)
     endpoint = _image_endpoint(card)
+    requested_size = "1792x1024" if provider == "pollinations" else "1280x720 minimum"
     constrained_prompt = _append_generation_constraints(
         prompt,
         kind="image",
         aspect_ratio="16:9",
-        size="1280x720 minimum",
+        size=requested_size,
     )
     if style == "cloudflare":
         return requests.post(endpoint, headers=_headers(card), json={"prompt": constrained_prompt}, timeout=180)
@@ -249,6 +254,8 @@ def _image_request(card: dict[str, Any], prompt: str) -> Any:
         body = {"version": _model(card), "input": {"prompt": constrained_prompt}}
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
+    if provider == "pollinations":
+        body["size"] = "1792x1024"
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
 
 

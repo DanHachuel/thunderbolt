@@ -74,8 +74,9 @@ Examples of observed words/phrases:
 *Aspect ratio:
 16:9
 
-*Resolution:
-1280 × 720 minimum
+*Size:
+1792 × 1024
+Landscape 16:9 output; use this explicit size only when supported by the image provider.
 
 *Image style:
 [Photorealistic / illustrated / mixed – describe level of realism]
@@ -111,4 +112,4 @@ Using the locked style defined above, generate a YouTube thumbnail that strictly
 
 Automatically extract 2–4 words from the provided VIDEO TITLE to serve as the headline, and place it according to the TEXT STYLE rules (including any banner structure).
 
-Output must be a ready‑to‑upload 16:9 thumbnail (minimum 1280×720) replicating the channel’s exact visual identity. [Specify if logo is to be included or not – e.g., "WITHOUT LOGO" or "INCLUDE CHANNEL LOGO in top‑left corner".]
+Output must be a ready‑to‑upload landscape 16:9 thumbnail at 1792×1024 when supported by the provider (otherwise use the provider’s native 16:9 size, never square), replicating the channel’s exact visual identity. [Specify if logo is to be included or not – e.g., "WITHOUT LOGO" or "INCLUDE CHANNEL LOGO in top‑left corner".]
