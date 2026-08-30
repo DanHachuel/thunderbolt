@@ -103,6 +103,7 @@ function ensureDirs() {
     join(storageRoot, "blueprints", "nichos"),
     join(storageRoot, "blueprints", "importados"),
     join(storageRoot, "blueprints", "brandings"),
+    join(storageRoot, "blueprints", "thumbnails"),
     join(storageRoot, "tiktok"),
     join(storageRoot, "tiktok", "prompts_master"),
     join(storageRoot, "metadata_cleaner"),
@@ -130,6 +131,19 @@ function copySeedBlueprints(storageRoot) {
     const target = join(destination, filename);
     if (!existsSync(target)) copyFileSync(source, target);
   }
+  const thumbnailSeedRoot = join(seedRoot, "thumbnails");
+  const thumbnailDestination = join(storageRoot, "blueprints", "thumbnails");
+  if (existsSync(thumbnailSeedRoot)) {
+    for (const thumbnailFilename of readdirSync(thumbnailSeedRoot)) {
+      if (!thumbnailFilename.endsWith(".md")) continue;
+      const source = join(thumbnailSeedRoot, thumbnailFilename);
+      const target = join(thumbnailDestination, thumbnailFilename);
+      if (!existsSync(target)) copyFileSync(source, target);
+    }
+  }
+  const pairSource = join(seedRoot, "thumbnail_blueprint_pairs.json");
+  const pairTarget = join(storageRoot, "blueprints", "thumbnail_blueprint_pairs.json");
+  if (existsSync(pairSource) && !existsSync(pairTarget)) copyFileSync(pairSource, pairTarget);
 }
 
 function copySeedPromptMasters(storageRoot) {

@@ -1,6 +1,6 @@
 {
   "name": "@danhachuel/thunderbolt",
-  "version": "0.4.21",
+  "version": "0.4.22",
   "description": "Thunderbolt — interface local para operação de canais faceless e motor MoneyPrinterTurbo",
   "license": "MIT",
   "main": "scripts/cli.mjs",
@@ -18,6 +18,7 @@
     "scripts/*.mjs",
     "seed/prompt_masters/**/*.md",
     "seed/blueprints/**/*.json",
+    "seed/blueprints/**/*.md",
     "seed/skills/*.md",
     "seed/skills/*.py",
     "seed/references/*.md",

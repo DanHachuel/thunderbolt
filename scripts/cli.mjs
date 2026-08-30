@@ -75,6 +75,7 @@ function ensureRuntimeStorage() {
     join(storageRoot, "blueprints", "nichos"),
     join(storageRoot, "blueprints", "importados"),
     join(storageRoot, "blueprints", "brandings"),
+    join(storageRoot, "blueprints", "thumbnails"),
     join(storageRoot, "metadata_cleaner"),
     join(storageRoot, "metadata_cleaner", "originals"),
     join(storageRoot, "metadata_cleaner", "outputs"),
@@ -93,6 +94,19 @@ function ensureRuntimeStorage() {
       const target = join(destination, filename);
       if (!existsSync(target)) copyFileSync(join(seedRoot, filename), target);
     }
+    const thumbnailSeedRoot = join(seedRoot, "thumbnails");
+    const thumbnailDestination = join(storageRoot, "blueprints", "thumbnails");
+    if (existsSync(thumbnailSeedRoot)) {
+      for (const filename of readdirSync(thumbnailSeedRoot)) {
+        if (filename.endsWith(".md")) {
+          const target = join(thumbnailDestination, filename);
+          if (!existsSync(target)) copyFileSync(join(thumbnailSeedRoot, filename), target);
+        }
+      }
+    }
+    const pairSeed = join(seedRoot, "thumbnail_blueprint_pairs.json");
+    const pairTarget = join(storageRoot, "blueprints", "thumbnail_blueprint_pairs.json");
+    if (existsSync(pairSeed) && !existsSync(pairTarget)) copyFileSync(pairSeed, pairTarget);
   }
 }
 
