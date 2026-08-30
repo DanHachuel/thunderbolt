@@ -54,6 +54,12 @@ def thumbnail_blueprint_for_channel(channel: Mapping[str, Any]) -> dict[str, Any
     return resolve_thumbnail_blueprint(pairs.get(script_id, "") or GENERIC_THUMBNAIL_BLUEPRINT_ID)
 
 
+def thumbnail_blueprint_for_blueprint(blueprint_id: Any) -> dict[str, Any]:
+    """Resolve the visual pair for a script Blueprint, falling back to Generic."""
+    paired_id = _pair_state().get(str(blueprint_id or "").strip(), "")
+    return resolve_thumbnail_blueprint(paired_id or GENERIC_THUMBNAIL_BLUEPRINT_ID)
+
+
 def _pair_state() -> dict[str, str]:
     path = BLUEPRINTS / "thumbnail_blueprint_pairs.json"
     try:
