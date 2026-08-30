@@ -1570,8 +1570,11 @@ def render_thumbnail_blueprints():
             pair_labels = {item[0]: item[1] for item in pair_options}
             pair = st.selectbox("Blueprint de roteiro associado", pair_ids, format_func=lambda item: pair_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_card_pair_{path.stem}")
             if st.button("Guardar associação deste card", key=f"thumbnail_card_pair_save_{path.stem}"):
-                save_thumbnail_blueprint_pair(path.stem, pair)
-                st.success("Associação guardada; canais com esse Blueprint usarão esta thumbnail blueprint automaticamente.")
+                try:
+                    save_thumbnail_blueprint_pair(path.stem, pair)
+                    st.success("Associação guardada; canais com esse Blueprint usarão esta thumbnail blueprint automaticamente.")
+                except ValueError as exc:
+                    st.error(str(exc))
             st.code(path.read_text(encoding="utf-8"), language="markdown")
     st.divider()
     st.subheader("Associar ao canal e ao Blueprint de roteiro")
@@ -1597,9 +1600,12 @@ def render_thumbnail_blueprints():
                 script = st.selectbox("Blueprint de roteiro associado", blueprint_ids, index=blueprint_ids.index(current_script) if current_script in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_script_blueprint_channel_{channel_id}")
             with cols[2]:
                 if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", use_container_width=True):
-                    update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
-                    st.success("Par Blueprint de roteiro + Thumbnail Blueprint guardado.")
-                    st.rerun()
+                    if thumb == "Generic_Thumbnail_Blueprint" and script:
+                        st.error("Not Allowed to Associate, System Use Only")
+                    else:
+                        update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
+                        st.success("Par Blueprint de roteiro + Thumbnail Blueprint guardado.")
+                        st.rerun()
 def _tiktok_accounts_from_settings(settings: dict[str, Any]) -> list[dict[str, Any]]:
     raw_accounts = settings.get("tiktok_accounts")
     if not isinstance(raw_accounts, list) or not raw_accounts:
