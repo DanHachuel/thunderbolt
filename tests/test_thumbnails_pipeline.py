@@ -231,6 +231,27 @@ class ThumbnailPipelineTests(unittest.TestCase):
         self.assertEqual(task["thumbnail_source"], "lettering_regenerated")
         self.assertEqual(task["thumbnail_variant"]["image_prompt"], "base image prompt")
 
+    def test_lettering_edit_locks_requested_language(self):
+        tasks = [{
+            "id": "video-language",
+            "title": "Título",
+            "topic": "Tema",
+            "language": "en",
+            "thumbnail_prompt": "base image prompt",
+            "thumbnail_variant": {"image_prompt": "base image prompt", "overlay_text": "Old"},
+            "artifacts": {"thumbnail": "/tmp/existing-language.jpg"},
+        }]
+        captured = {}
+        with tempfile.TemporaryDirectory() as directory:
+            existing = Path(directory) / "existing.jpg"
+            existing.write_bytes(b"image")
+            tasks[0]["artifacts"]["thumbnail"] = str(existing)
+            generated = Path(directory) / "generated.jpg"
+            with patch("hermes_ui.thumbnails.read_json", return_value=tasks), patch("hermes_ui.thumbnails.update_json", side_effect=lambda _name, _default, callback: callback(tasks)), patch("hermes_ui.thumbnails._archive_image"), patch("hermes_ui.thumbnails._generate_image_with_pool", side_effect=lambda _settings, prompt, **kwargs: captured.update({"prompt": prompt, "kwargs": kwargs}) or generated):
+                regenerate_thumbnail_lettering("video-language", {}, language="en")
+        self.assertIn("LANGUAGE LOCK", captured["prompt"])
+        self.assertIn("English (en)", captured["prompt"])
+
     def test_upload_image_persists_uploaded_source_and_preserves_other_artifacts(self):
         tasks = [{
             "id": "video-1",
@@ -257,4 +278,3 @@ class ThumbnailPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

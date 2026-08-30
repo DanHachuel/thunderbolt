@@ -4199,10 +4199,12 @@ def render_thumbnails():
                 ):
                     try:
                         with st.spinner("A refazer apenas o lettering…"):
+                            channel, _blueprint = _thumbnail_editor_context(record)
                             _task, generated_path = regenerate_thumbnail_lettering(
                                 task_id,
                                 settings,
                                 lettering_prompt=record.get("lettering_prompt") or "",
+                                language=str(record.get("language") or channel.get("language") or current_ui_language()),
                             )
                         record_notification(
                             "thumbnail_generation_completed",
