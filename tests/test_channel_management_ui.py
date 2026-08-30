@@ -51,3 +51,10 @@ def test_registered_channels_table_is_only_in_spreadsheet_tab_and_scrollable():
     assert 'height=420' in spreadsheet_block
     assert 'Use a barra inferior para navegar horizontalmente' in spreadsheet_block
     assert source.count('st.subheader("Canais cadastrados")') == 1
+    for column in (
+        "URL canal", "Nome canal", "Handle canal", "Narrador/ voz padrão", "Idioma", "Nicho",
+        "Blueprint Padrão", "Estilo Wide", "Activo", "Descrição",
+        "Conta Google do Documento deste Canal", "Automação Ligada", "Horário diário (HH:MM)",
+        "DELEGATED_SESSION_ID", "Duração Padrão Vídeos (Min)", "Origem",
+    ):
+        assert f'"{column}"' in spreadsheet_block
