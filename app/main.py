@@ -6135,6 +6135,25 @@ def _persist_media_cards(settings: dict[str, Any], cards: list[dict[str, Any]], 
     return updated
 
 
+def _fetch_media_models(card: dict[str, Any]) -> list[str]:
+    """Consultar modelos do provider, incluindo o catálogo nativo Gemini."""
+    provider = str(card.get("provider") or "").strip().lower()
+    if provider == "nano_banana":
+        base_url = str(card.get("base_url") or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+        response = requests.get(
+            f"{base_url}/models",
+            params={"key": str(card.get("api_key") or "").strip()},
+            headers={"Accept": "application/json"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        models = payload.get("models") if isinstance(payload, dict) else []
+        return sorted({str(item.get("name", "")).removeprefix("models/") for item in models if isinstance(item, dict) and item.get("name")}, key=str.casefold)
+    from integrations.openai_model_discovery import fetch_openai_compatible_models
+    return fetch_openai_compatible_models(str(card.get("api_key") or ""), str(card.get("base_url") or ""))
+
+
 def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, Any]], index: int, *, embedded: bool = False) -> None:
     card = normalize_media_card(cards[index], index)
     cards[index] = card
@@ -6160,7 +6179,23 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                     st.caption("Este provider não exige API key.")
                     api_key = ""
             with model_col:
-                model = st.text_input("Modelo", value=str(card.get("model") or ""), help="ID do modelo ou rota usada pelo provider.", key=f"media_card_{card_id}_model")
+                model_catalog = st.session_state.get(f"media_model_catalog_{card_id}", [])
+                if not isinstance(model_catalog, list):
+                    model_catalog = []
+                current_model = str(card.get("model") or "").strip()
+                discovered_models = [str(item).strip() for item in model_catalog if str(item).strip()]
+                options = ["__select_model__", *list(dict.fromkeys(discovered_models))]
+                if current_model and current_model not in options:
+                    options.insert(1, current_model)
+                selected_model = st.selectbox(
+                    "Modelo",
+                    options,
+                    index=options.index(current_model) if current_model in options else 0,
+                    format_func=lambda value: "Seleccione um modelo" if value == "__select_model__" else value,
+                    help="Consulte o catálogo do provider e seleccione um modelo disponível.",
+                    key=f"media_card_{card_id}_model_select",
+                )
+                model = "" if selected_model == "__select_model__" else selected_model
             base_url = st.text_input("Base URL", value=str(card.get("base_url") or definition.default_base_url), key=f"media_card_{card_id}_base_url")
             extra_values: dict[str, str] = {}
             if definition.extra_fields:
@@ -6177,17 +6212,26 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 supports_video = st.checkbox("Pool Vídeo", value=bool(card.get("supports_video", definition.supports_video)), key=f"media_card_{card_id}_video")
             with status_cols[3]:
                 priority = st.number_input("Prioridade", min_value=0, max_value=999, value=int(card.get("priority", index)), step=1, key=f"media_card_{card_id}_priority")
-            action_cols = st.columns(3)
+            action_cols = st.columns(4)
             with action_cols[0]:
-                test_clicked = st.form_submit_button("Testar Chamada API", use_container_width=True, key=f"media_card_{card_id}_test")
+                refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
             with action_cols[1]:
-                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"media_card_{card_id}_save")
+                test_clicked = st.form_submit_button("Testar Chamada API", use_container_width=True, key=f"media_card_{card_id}_test")
             with action_cols[2]:
+                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"media_card_{card_id}_save")
+            with action_cols[3]:
                 remove_clicked = st.form_submit_button("Remover provider", use_container_width=True, key=f"media_card_{card_id}_remove")
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "supports_image": bool(supports_image), "supports_video": bool(supports_video), "priority": int(priority), **extra_values})
         cards[index] = edited
-        if test_clicked:
+        if refresh_clicked:
+            try:
+                discovered = _fetch_media_models(edited)
+                st.session_state[f"media_model_catalog_{card_id}"] = discovered
+                st.success(f"{len(discovered)} modelo(s) disponíveis neste endpoint.")
+            except Exception:
+                st.error("Não foi possível consultar os modelos deste provider. Confirme a API key e a Base URL.")
+        elif test_clicked:
             result = test_media_provider_card(edited)
             edited["test_result"] = stamp_test_result(result)
             _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
