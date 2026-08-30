@@ -136,6 +136,7 @@ def channel_context(channel: dict[str, Any], blueprint: dict[str, Any] | None = 
         "blueprint_id": str(blueprint.get("id") or channel.get("default_blueprint_id") or channel.get("blueprint_id") or ""),
         "blueprint_name": str(blueprint.get("name") or "SEM BLUEPRINT CONFIGURADO"),
         "blueprint_niche": str(blueprint.get("target_niche") or blueprint.get("niche") or metadata.get("target_niche") or metadata.get("niche") or ""),
+        "thumbnail_blueprint_rules": str(blueprint.get("thumbnail_blueprint_rules") or "").strip(),
         "default_voice": str(channel.get("default_voice") or channel.get("voice") or ""),
     }
 
