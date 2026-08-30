@@ -17,7 +17,7 @@ The output must be a practical, locked visual system, not a script blueprint. In
 
 
 def _slug(value: Any) -> str:
-    text = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "").strip()).strip("_")
+    text = re.sub(r"[^A-Za-z0-9À-ÿ]+", "_", str(value or "").strip(), flags=re.UNICODE).strip("_")
     return text or "General"
 
 
@@ -120,7 +120,9 @@ def generate_thumbnail_blueprint(
 
 
 def save_thumbnail_blueprint(document: Mapping[str, Any]) -> Path:
-    name = _record_name(str(document.get("niche") or document.get("name") or "General").replace("_Thumbnail_Blueprint", ""))
+    raw_name = str(document.get("niche") or document.get("name") or "General").strip()
+    raw_name = re.sub(r"_Thumbnail_Blueprint$", "", raw_name, flags=re.IGNORECASE)
+    name = _record_name(raw_name)
     folder = BLUEPRINTS / "thumbnails"
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{name}.md"
