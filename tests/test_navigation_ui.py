@@ -28,6 +28,13 @@ def test_navigation_assigns_distinct_paths_to_parent_and_child():
     assert '"Music Backlog": "/pipeline-musica/backlog"' in MAIN_SOURCE
 
 
+def test_navigation_persists_active_page_in_query_params_across_refreshes():
+    assert 'query_page = str(st.query_params.get("page") or "").strip()' in MAIN_SOURCE
+    assert 'stored_page = query_page or str(st.session_state.get("page", "Início"))' in MAIN_SOURCE
+    assert 'st.query_params["page"] = current_page' in MAIN_SOURCE
+    assert 'st.query_params["page"] = target' in MAIN_SOURCE
+
+
 def test_youtube_navigation_labels_and_legacy_aliases_are_preserved():
     assert '("Canais YouTube", ":material/ondemand_video:", "Canais YouTube")' in MAIN_SOURCE
     assert '("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube")' in MAIN_SOURCE

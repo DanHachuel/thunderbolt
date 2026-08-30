@@ -7500,10 +7500,16 @@ def main():
     }
     all_children = [item for items in groups.values() for item in items]
     valid_targets = {item[0] for item in top_pages + all_children}
-    current_page = aliases.get(st.session_state.get("page", "Início"), st.session_state.get("page", "Início"))
+    # Session state is reset by a browser refresh or an application update. Keep
+    # the canonical page in the URL so the open section can be restored.
+    query_page = str(st.query_params.get("page") or "").strip()
+    stored_page = query_page or str(st.session_state.get("page", "Início"))
+    current_page = aliases.get(stored_page, stored_page)
     if current_page not in valid_targets:
         current_page = "Início"
     st.session_state["page"] = current_page
+    if str(st.query_params.get("page") or "") != current_page:
+        st.query_params["page"] = current_page
     ui_language = current_ui_language()
     current_path = nav_paths.get(current_page, "/inicio")
 
@@ -7517,6 +7523,7 @@ def main():
 
     def navigate(target: str):
         st.session_state["page"] = target
+        st.query_params["page"] = target
         st.rerun()
 
     def render_nav_button(target: str, icon: str, label: str, scope: str):
