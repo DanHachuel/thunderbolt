@@ -4055,6 +4055,9 @@ def _thumbnail_editor_context(record: dict[str, Any]) -> tuple[dict[str, Any], d
     blueprint = blueprint_for_channel(channel)
     if not blueprint and record.get("blueprint_id"):
         blueprint = {"id": record.get("blueprint_id"), "name": record.get("blueprint_name") or record.get("blueprint_id")}
+    thumbnail_blueprint = thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": record.get("thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id", "")})
+    if thumbnail_blueprint.get("content"):
+        blueprint = {**blueprint, "thumbnail_blueprint_rules": thumbnail_blueprint["content"]}
     return channel, blueprint
 
 
@@ -4141,7 +4144,9 @@ def render_thumbnails():
                 ):
                     try:
                         with st.spinner("A gerar a imagem com Nano Banana…"):
-                            _task, generated_path = generate_thumbnail_for_task(task_id, settings)
+                            channel, _blueprint = _thumbnail_editor_context(record)
+                            thumbnail_blueprint = thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": record.get("thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id", "")})
+                            _task, generated_path = generate_thumbnail_for_task(task_id, settings, thumbnail_blueprint=thumbnail_blueprint)
                         record_notification(
                             "thumbnail_generation_completed",
                             f"Thumbnail gerada: {record['title']}",
