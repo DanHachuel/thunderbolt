@@ -45,7 +45,7 @@ from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_d
 from app.modules.niche_finder.summarizer import summarize_items
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
-from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_channel
+from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
 from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
@@ -4277,18 +4277,14 @@ def render_automation():
             with header_cols[3]:
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
             blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            thumbnail_items = thumbnail_blueprint_catalog()
-            thumbnail_ids = [item[0] for item in thumbnail_items]
-            thumbnail_labels = {item[0]: item[1] for item in thumbnail_items}
-            current_thumbnail = str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or "")
-            default_cols = st.columns([1.0, 1.0, 1.35, 1.55, 1.55, 1.0], gap="small")
+            default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
             with default_cols[0]:
                 st.markdown("**Idioma Padrão**")
                 st.caption(language_label(channel.get("language") or "pt"))
             with default_cols[1]:
                 st.markdown("**Nicho Padrão**")
                 st.caption(channel_niche_label(channel))
-            with default_cols[2]:
+            with default_cols[3]:
                 automation_blueprint = st.selectbox(
                     "Blueprint Padrão",
                     blueprint_ids,
@@ -4296,21 +4292,17 @@ def render_automation():
                     format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
                     key=f"automation_blueprint_{channel_id}",
                 )
-            with default_cols[3]:
+            with default_cols[2]:
+                paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
+                st.markdown("**Thumbnail Blueprint**")
+                st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
+            with default_cols[4]:
                 automation_voice = st.selectbox(
                     "Narrador/Voz Padrão",
                     voice_options,
                     index=voice_options.index(current_voice) if current_voice in voice_options else 0,
                     format_func=lambda item: item or "Sem voz padrão",
                     key=f"automation_voice_{channel_id}",
-                )
-            with default_cols[4]:
-                automation_thumbnail = st.selectbox(
-                    "Thumbnail Blueprint",
-                    thumbnail_ids,
-                    index=thumbnail_ids.index(current_thumbnail) if current_thumbnail in thumbnail_ids else 0,
-                    format_func=lambda item: thumbnail_labels.get(item, item or "Sem Thumbnail Blueprint"),
-                    key=f"automation_thumbnail_blueprint_{channel_id}",
                 )
             with default_cols[5]:
                 if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
@@ -4322,7 +4314,8 @@ def render_automation():
                             "automation_time": schedule_time.strip(),
                         })
                         set_channel_defaults(channel_id, automation_blueprint, automation_voice)
-                        update_channel(channel_id, {"thumbnail_blueprint_id": automation_thumbnail, "default_thumbnail_blueprint_id": automation_thumbnail})
+                        paired_id = str(paired_thumbnail.get("id") or "Generic_Thumbnail_Blueprint")
+                        update_channel(channel_id, {"thumbnail_blueprint_id": paired_id, "default_thumbnail_blueprint_id": paired_id})
                         st.success("Agendamento guardado.")
                         st.rerun()
 
