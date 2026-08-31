@@ -149,6 +149,23 @@ class ProviderRoutingTests(unittest.TestCase):
             provider_routing.route_json_request(settings, pool=provider_routing.POOL_IMAGE, cards=cards, request=request, cooldown_seconds=0)
         self.assertEqual(used, ["one"])
 
+    def test_route_fails_over_on_http_402_quota(self):
+        settings = {"provider_max_attempts": 2, "provider_cooldown_seconds": 0}
+        cards = [
+            {"id": "one", "provider": "pollinations", "base_url": "https://one.example/v1", "model": "flux"},
+            {"id": "two", "provider": "huggingface", "base_url": "https://two.example/v1", "model": "flux"},
+        ]
+        responses = [FakeResponse(402, text="payment required"), FakeResponse(200, {"data": [{"url": "https://example/image.jpg"}]})]
+        used = []
+
+        def request(card):
+            used.append(card["id"])
+            return responses.pop(0)
+
+        routed = provider_routing.route_json_request(settings, pool=provider_routing.POOL_IMAGE, cards=cards, request=request, cooldown_seconds=0)
+        self.assertEqual(routed.card["id"], "two")
+        self.assertEqual(used, ["one", "two"])
+
     def test_route_skips_persisted_cooldown(self):
         settings = {"provider_max_attempts": 2, "provider_cooldown_seconds": 10}
         first = {"id": "one", "provider": "openai", "base_url": "https://one.example/v1", "api_key": "one", "model": "m"}

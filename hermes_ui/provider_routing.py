@@ -225,7 +225,7 @@ def acquire_nvidia_rpm_slot(
 
 
 def _status_category(status_code: int) -> tuple[str, bool]:
-    if status_code == 429:
+    if status_code in {402, 429}:
         return "quota", True
     if status_code in {408, 425} or status_code >= 500:
         return "transient", True
