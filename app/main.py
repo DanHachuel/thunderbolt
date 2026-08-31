@@ -1931,7 +1931,7 @@ def render_tiktok_channels():
                 description = st.text_area("Descrição", value=str(imported.get("bio") or ""), key="tiktok_import_description")
                 if st.form_submit_button("Cadastrar canal TikTok", type="primary"):
                     channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
-                    update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt})
+                    update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt, "avatar_url": imported.get("avatar_url") or imported.get("avatar") or "", "thumbnail_url": imported.get("avatar_url") or imported.get("avatar") or ""})
                     st.session_state.pop("tiktok_channel_import", None)
                     st.success(f"Canal {channel['name']} cadastrado.")
                     st.rerun()
@@ -4589,7 +4589,13 @@ def render_thumbnails():
 
 def render_tiktok_automation():
     st.title("Automação Tiktok")
-    st.caption("Fila exclusiva de Shorts TikTok em Portrait 9:16, usando Prompt Master em vez de Blueprint.")
+    st.caption("Agendamento diário da geração por canal. A fila TikTok usa Prompt Master e mantém exclusivamente o formato Portrait 9:16.")
+    worker_status = load_worker_status()
+    local_now = datetime.now().astimezone()
+    if worker_status.get("alive"):
+        st.success(f"Worker activo · relógio local: {local_now.strftime('%d/%m/%Y %H:%M:%S %Z')}")
+    else:
+        st.warning("Worker de automação não está activo. Inicie o Thunderbolt pelo launcher (`npx.cmd --yes @danhachuel/thunderbolt`) para activar as verificações horárias.")
     channels = _tiktok_channel_records()
     prompt_ids, prompt_labels = _tiktok_prompt_options()
     if not channels:
@@ -4598,18 +4604,43 @@ def render_tiktok_automation():
     for channel in channels:
         channel_id = str(channel["id"])
         with st.container(border=True):
-            st.write(f"**{channel.get('name', 'Sem nome')}** · {channel.get('handle', '')}")
-            enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
-            schedule_time = st.text_input("Horário diário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
-            prompt = st.selectbox("Prompt Master padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
-            st.caption("Formato da fila: Portrait 9:16 · Pool de vídeo: TikTok")
-            if st.button("Guardar automação TikTok", key=f"tiktok_automation_save_{channel_id}", type="primary"):
-                if not valid_hhmm(schedule_time):
-                    st.error("Use o formato HH:MM, por exemplo 08:30.")
+            header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
+            with header_cols[0]:
+                profile_image = channel.get("avatar_url") or channel.get("thumbnail_url")
+                if profile_image:
+                    st.image(profile_image, width=48)
                 else:
-                    update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16"})
-                    st.success("Automação TikTok guardada.")
-                    st.rerun()
+                    st.markdown("### TT")
+            with header_cols[1]:
+                st.write(f"**{channel.get('name', 'Sem nome')}**")
+                st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+            with header_cols[2]:
+                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
+            with header_cols[3]:
+                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
+            default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
+            with default_cols[0]:
+                st.markdown("**Idioma Padrão**")
+                st.caption(language_label(channel.get("language") or "pt"))
+            with default_cols[1]:
+                st.markdown("**Nicho Padrão**")
+                st.caption(channel_niche_label(channel))
+            with default_cols[2]:
+                st.markdown("**Formato da fila**")
+                st.caption("Portrait 9:16")
+            with default_cols[3]:
+                prompt = st.selectbox("Prompt Master Padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
+            with default_cols[4]:
+                st.markdown("**Pool de vídeos**")
+                st.caption("TikTok / Shorts")
+            with default_cols[5]:
+                if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
+                    if not valid_hhmm(schedule_time):
+                        st.error("Use o formato HH:MM, por exemplo 08:30.")
+                    else:
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16"})
+                        st.success("Automação TikTok guardada.")
+                        st.rerun()
 
 
 def render_automation():

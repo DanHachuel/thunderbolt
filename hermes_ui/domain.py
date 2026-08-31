@@ -39,6 +39,7 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "niche": "",
         "reference_channels": [],
         "thumbnail_url": "",
+        "avatar_url": "",
         "subscriber_count": None,
         "video_count": None,
         "view_count": None,
