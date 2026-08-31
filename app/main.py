@@ -1913,6 +1913,70 @@ def render_tiktok_channels():
                             update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait"})
                             st.success("Prompt Master do canal guardado.")
                             st.rerun()
+                    actions = st.columns([1.0, 1.0, 1.0, 1.0])
+                    with actions[0]:
+                        active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
+                        if active != bool(channel.get("active", True)):
+                            update_channel(channel_id, {"active": active})
+                            st.rerun()
+                    with actions[1]:
+                        if st.button("Editar", key=f"tiktok_import_card_edit_{channel_id}", use_container_width=True):
+                            st.session_state[f"tiktok_edit_{channel_id}"] = not st.session_state.get(f"tiktok_edit_{channel_id}", False)
+                            st.rerun()
+                    with actions[2]:
+                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}", use_container_width=True):
+                            st.session_state[f"tiktok_niche_{channel_id}"] = not st.session_state.get(f"tiktok_niche_{channel_id}", False)
+                            st.rerun()
+                    with actions[3]:
+                        if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}", use_container_width=True):
+                            st.session_state[f"tiktok_delete_{channel_id}"] = True
+                            st.rerun()
+                    if st.session_state.get(f"tiktok_delete_{channel_id}"):
+                        st.warning("Apagar este canal TikTok e os dados locais associados?")
+                        confirm_cols = st.columns(2)
+                        with confirm_cols[0]:
+                            if st.button("Confirmar apagar", type="primary", key=f"tiktok_confirm_delete_{channel_id}"):
+                                delete_channel(channel_id)
+                                st.session_state.pop(f"tiktok_delete_{channel_id}", None)
+                                st.rerun()
+                        with confirm_cols[1]:
+                            if st.button("Cancelar", key=f"tiktok_cancel_delete_{channel_id}"):
+                                st.session_state.pop(f"tiktok_delete_{channel_id}", None)
+                                st.rerun()
+                    if st.session_state.get(f"tiktok_niche_{channel_id}"):
+                        with st.form(f"tiktok_niche_form_{channel_id}"):
+                            niche_value = st.text_input("Nicho do canal", value=str(channel.get("niche") or ""))
+                            if st.form_submit_button("Guardar nicho", type="primary"):
+                                update_channel(channel_id, {"niche": niche_value.strip(), "reference_channels": [niche_value.strip()] if niche_value.strip() else []})
+                                st.session_state.pop(f"tiktok_niche_{channel_id}", None)
+                                st.rerun()
+                    if st.session_state.get(f"tiktok_edit_{channel_id}"):
+                        with st.form(f"tiktok_edit_form_{channel_id}"):
+                            edit_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
+                            edit_url = st.text_input("URL pública", value=str(channel.get("url") or ""))
+                            edit_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
+                            edit_language = st.selectbox("Idioma do canal", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index(language_code(channel.get("language") or "pt")), format_func=language_label)
+                            edit_description = st.text_area("Descrição", value=str(channel.get("description") or ""))
+                            if st.form_submit_button("Guardar edição", type="primary"):
+                                update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "description": edit_description.strip(), "platform": "tiktok"})
+                                st.session_state.pop(f"tiktok_edit_{channel_id}", None)
+                                st.rerun()
+                    with st.expander("Últimos 10 vídeos publicados", expanded=False):
+                        recent_videos = channel_videos_for(channel, limit=10)
+                        if not recent_videos:
+                            st.info("Ainda não existem vídeos públicos sincronizados para este canal TikTok.")
+                        for recent_video in recent_videos[:10]:
+                            video_cols = st.columns([0.7, 3.5, 1.2])
+                            with video_cols[0]:
+                                if recent_video.get("thumbnail_url"):
+                                    st.image(recent_video["thumbnail_url"], width=64)
+                                else:
+                                    st.markdown("### TT")
+                            with video_cols[1]:
+                                st.write(f"**{recent_video.get('title') or 'Vídeo sem título'}**")
+                                st.caption(f"{recent_video.get('published_at') or 'Sem data'} · {recent_video.get('url') or 'Sem URL'}")
+                            with video_cols[2]:
+                                st.caption(str(recent_video.get("status") or "publicado").title())
         else:
             st.info("Ainda não existem canais TikTok cadastrados. Use o campo abaixo para pesquisar e cadastrar um perfil público.")
         st.divider()
