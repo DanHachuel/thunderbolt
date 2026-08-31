@@ -7048,13 +7048,41 @@ def render_settings():
         with st.expander("Contas Google", expanded=False):
             render_google_accounts(include_innertube=False)
         with st.expander("API Innertube", expanded=False):
-            st.caption("INNERTUBE_API_KEY global usada pelo Upload directo para todas as contas Google/YouTube.")
-            upload_innertube = st.text_input("INNERTUBE_API_KEY", value=str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or ""), type="password", key="upload_api_innertube_key")
-            if st.button("Guardar INNERTUBE_API_KEY", type="primary", use_container_width=True, key="upload_save_innertube"):
+            st.markdown("### INNERTUBE_API_KEY")
+            st.caption("Esta é uma chave API global do YouTube: aplica-se a todas as contas Google/YouTube e a todo o sistema. Não é associada a uma conta específica, não faz parte dos documentos de cookies/credenciais e não é editada no separador API Keys.")
+            upload_batch_accounts = [item for item in settings.get("youtube_batch_accounts", []) if isinstance(item, dict) and item.get("id")]
+            current_upload_innertube = str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or "").strip()
+            if not current_upload_innertube:
+                for legacy_account in upload_batch_accounts:
+                    current_upload_innertube = str(legacy_account.get("innertube_api_key") or legacy_account.get("INNERTUBE_API_KEY") or "").strip()
+                    if current_upload_innertube:
+                        break
+                if current_upload_innertube:
+                    settings["direct_innertube_api_key"] = current_upload_innertube
+                    settings.pop("INNERTUBE_API_KEY", None)
+                    for legacy_account in upload_batch_accounts:
+                        legacy_account.pop("innertube_api_key", None)
+                        legacy_account.pop("INNERTUBE_API_KEY", None)
+                    settings["youtube_batch_accounts"] = upload_batch_accounts
+                    write_json("settings.json", settings)
+            innertube_upload_status = st.columns([3.2, 1.2])
+            with innertube_upload_status[0]:
+                st.caption("Estado da chave global")
+            with innertube_upload_status[1]:
+                _render_credential_status(current_upload_innertube)
+            with st.form("upload_innertube_api_key_form"):
+                upload_innertube = st.text_input("INNERTUBE_API_KEY", value=current_upload_innertube, type="password", key="upload_api_innertube_key", help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.")
+                _render_api_test_control(settings, "innertube_upload", lambda: test_innertube_api_key(upload_innertube), widget_key="api_test_innertube_upload")
+                save_upload_innertube = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
+            if save_upload_innertube:
                 settings["direct_innertube_api_key"] = upload_innertube.strip()
                 settings.pop("INNERTUBE_API_KEY", None)
+                for legacy_account in upload_batch_accounts:
+                    legacy_account.pop("innertube_api_key", None)
+                    legacy_account.pop("INNERTUBE_API_KEY", None)
+                settings["youtube_batch_accounts"] = upload_batch_accounts
                 write_json("settings.json", settings)
-                st.success("INNERTUBE_API_KEY guardada.")
+                st.success("INNERTUBE_API_KEY global guardada para todas as contas Google/YouTube e para todo o sistema.")
                 st.rerun()
         with st.expander("API Tiktok", expanded=False):
             render_tiktok_api_cards(settings)
