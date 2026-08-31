@@ -937,6 +937,7 @@ def render_video_generation_settings(
     *,
     current_language: str = "",
     channel: dict[str, Any] | None = None,
+    default_aspect_ratio: str = "Landscape 16:9",
     generate_content_callback: Any | None = None,
     save_draft_callback: Any | None = None,
     sections: set[str] | None = None,
@@ -1048,7 +1049,10 @@ def render_video_generation_settings(
                 settings["match_visuals_to_script_order"] = st.checkbox("Match Visuals to Script Order", value=False, key=f"{prefix}_match_visuals")
                 settings["video_transition_mode"] = st.selectbox("Video Transition Mode", VIDEO_TRANSITION_OPTIONS, key=f"{prefix}_video_transition")
             with video_cols[1]:
-                settings["video_aspect_ratio"] = st.selectbox("Video Aspect Ratio", ["Portrait 9:16", "Landscape 16:9", "Square 1:1"], key=f"{prefix}_video_aspect_ratio")
+                aspect_options = ["Portrait 9:16", "Landscape 16:9", "Square 1:1"]
+                if f"{prefix}_video_aspect_ratio" not in st.session_state:
+                    st.session_state[f"{prefix}_video_aspect_ratio"] = default_aspect_ratio
+                settings["video_aspect_ratio"] = st.selectbox("Proporção do vídeo", aspect_options, index=aspect_options.index(st.session_state[f"{prefix}_video_aspect_ratio"]) if st.session_state[f"{prefix}_video_aspect_ratio"] in aspect_options else 0, key=f"{prefix}_video_aspect_ratio")
                 settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
                 settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
                 settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")
@@ -1840,6 +1844,87 @@ def render_tiktok_prompt_masters():
                     st.error(str(exc))
 
 
+def _tiktok_channel_records() -> list[dict[str, Any]]:
+    return [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform") == "tiktok"]
+
+
+def _tiktok_prompt_options() -> tuple[list[str], dict[str, str]]:
+    files = list_prompt_master_files()
+    labels = {path.name: get_display_name("prompt_masters", path, path.stem) for path in files}
+    return [""] + [path.name for path in files], {"": "Sem Prompt Master padrão", **labels}
+
+
+def render_tiktok_channels():
+    st.title("Canais Tiktok")
+    st.caption("Canais de Shorts em formato Portrait 9:16. A pesquisa usa exclusivamente a página pública do TikTok, sem API.")
+    settings = read_json("settings.json", {})
+    channels = _tiktok_channel_records()
+    import_tab, spreadsheet_tab, manual_tab = render_localized_tabs(["Importar do Tiktok", "Canais em lote Planilha", "Cadastro manual"])
+    prompt_ids, prompt_labels = _tiktok_prompt_options()
+    with import_tab:
+        source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta", key="tiktok_channel_source")
+        if st.button("Buscar no Tiktok", type="primary", use_container_width=True, key="tiktok_channel_lookup"):
+            result = fetch_public_tiktok_profile(source)
+            st.session_state["tiktok_channel_import"] = {"ok": result.ok, "message": result.message, "data": result.data}
+        imported_state = st.session_state.get("tiktok_channel_import", {})
+        if imported_state.get("message"):
+            (st.success if imported_state.get("ok") else st.warning)(imported_state["message"])
+        imported = imported_state.get("data") if imported_state.get("ok") else {}
+        if imported:
+            with st.form("tiktok_channel_import_form"):
+                name = st.text_input("Nome canal", value=str(imported.get("name") or imported.get("username") or ""))
+                url = st.text_input("URL canal", value=str(imported.get("public_url") or imported.get("url") or ""))
+                handle = st.text_input("Handle canal", value=str(imported.get("handle") or ""))
+                language = st.selectbox("Idioma", list(LANGUAGE_CODES), format_func=language_label, key="tiktok_import_language")
+                niche = st.text_input("Nicho", key="tiktok_import_niche")
+                prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_import_prompt")
+                description = st.text_area("Descrição", value=str(imported.get("bio") or ""), key="tiktok_import_description")
+                if st.form_submit_button("Cadastrar canal TikTok", type="primary"):
+                    channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
+                    update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt})
+                    st.session_state.pop("tiktok_channel_import", None)
+                    st.success(f"Canal {channel['name']} cadastrado.")
+                    st.rerun()
+    with spreadsheet_tab:
+        uploaded = st.file_uploader("Upload da planilha de canais TikTok", type=["xlsx", "xls"], key="tiktok_channel_spreadsheet")
+        if uploaded and st.button("Ler e cadastrar planilha TikTok", type="primary", key="tiktok_read_sheet"):
+            rows, warnings = parse_channel_workbook(uploaded.getvalue(), uploaded.name)
+            for warning in warnings:
+                st.warning(warning)
+            created = 0
+            for row in rows:
+                candidate = {"name": row.get("name", ""), "handle": row.get("handle", ""), "url": row.get("url", "")}
+                if find_duplicate_channel(candidate, channels):
+                    continue
+                created_channel = create_channel(str(row.get("name") or row.get("handle") or "TikTok"), str(row.get("url") or ""), {"platform": "tiktok", "handle": row.get("handle", ""), "language": language_code(row.get("language") or "pt"), "niche": row.get("niche", ""), "description": row.get("description", ""), "default_prompt_master": row.get("prompt_master", ""), "prompt_master": row.get("prompt_master", ""), "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_time": row.get("automation_time") or "00:00"})
+                update_channel(created_channel["id"], {"platform": "tiktok"})
+                created += 1
+            st.success(f"{created} canal(is) TikTok cadastrado(s).")
+            st.rerun()
+        st.caption("A planilha usa os campos de URL, nome, handle, idioma, nicho, Prompt Master, descrição e horário.")
+    with manual_tab:
+        with st.form("tiktok_channel_manual_form"):
+            url = st.text_input("URL canal", placeholder="https://www.tiktok.com/@conta", key="tiktok_manual_channel_url")
+            name = st.text_input("Nome canal", key="tiktok_manual_channel_name")
+            handle = st.text_input("Handle canal", key="tiktok_manual_channel_handle")
+            language = st.selectbox("Idioma", list(LANGUAGE_CODES), format_func=language_label, key="tiktok_manual_channel_language")
+            niche = st.text_input("Nicho", key="tiktok_manual_channel_niche")
+            prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_manual_channel_prompt")
+            description = st.text_area("Descrição", key="tiktok_manual_channel_description")
+            if st.form_submit_button("Guardar canal manual", type="primary"):
+                reference = normalize_tiktok_reference(url or handle)
+                channel = create_channel(name.strip() or reference["username"], reference["url"], {"platform": "tiktok", "handle": reference["handle"], "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16"})
+                update_channel(channel["id"], {"platform": "tiktok"})
+                st.success("Canal TikTok cadastrado.")
+                st.rerun()
+    st.divider()
+    st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
+    if channels:
+        st.dataframe([{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels], use_container_width=True, hide_index=True, height=360)
+    else:
+        st.info("Ainda não existem canais TikTok cadastrados.")
+
+
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -2575,25 +2660,29 @@ def render_video_from_draft() -> None:
             st.success(f"Tarefa criada a partir de {record.get('title') or 'Roteiro sem título'}: {tasks[0].get('id') if tasks else '—'}.")
 
 
-def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "new_video"):
+def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "new_video", *, channel_platform: str = "youtube", fixed_aspect_ratio: str | None = None):
     st.title(page_title)
-    tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title == "Criação de Vídeos" else [])
+    tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title in {"Criação de Vídeos", "Criação de Shorts"} else [])
     tabs = render_localized_tabs(tab_labels)
     create_tab = tabs[0]
     draft_tab = tabs[1] if len(tabs) > 1 else None
     with create_tab:
-        all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict)]
+        all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict) and ((channel_platform == "tiktok" and c.get("platform") == "tiktok") or (channel_platform != "tiktok" and c.get("platform", "youtube") != "tiktok"))]
         active_channels = [c for c in all_channels if c.get("active", True)]
         if not all_channels:
             st.warning("Cadastre pelo menos um canal antes de criar vídeos.")
         else:
-            mode_label = st.radio(
-                "Modo de criação",
-                ["Canal específico", "Lote no mesmo canal", "Lote geral"],
-                horizontal=True,
-                key=f"{prefix}_mode",
-            )
-            mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
+            if fixed_aspect_ratio:
+                mode = "single"
+                st.info("Os Shorts são sempre criados para um canal TikTok específico e em formato Portrait 9:16.")
+            else:
+                mode_label = st.radio(
+                    "Modo de criação",
+                    ["Canal específico", "Lote no mesmo canal", "Lote geral"],
+                    horizontal=True,
+                    key=f"{prefix}_mode",
+                )
+                mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
             selected_one: dict[str, Any] | None = None
             legacy_language = st.session_state.get("video_language") or read_json("settings.json", {}).get("video_language")
             if str(legacy_language or "").strip().casefold() in {"music", "00 – apenas música de fundo (sem falas)", "00 - apenas música de fundo (sem falas)"}:
@@ -2644,6 +2733,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 generation_settings = render_video_generation_settings(
                     prefix,
                     current_language=str(st.session_state.get("video_language") or ""),
+                    default_aspect_ratio=fixed_aspect_ratio or "Landscape 16:9",
                     save_draft_callback=lambda: _save_pipeline_draft_callback(
                         prefix,
                         "music" if page_title == "Criação de Músicas" else "video",
@@ -2666,6 +2756,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         prefix,
                         current_language=str(st.session_state.get("video_language") or ""),
                         channel=selected_one,
+                        default_aspect_ratio=fixed_aspect_ratio or "Landscape 16:9",
                         generate_content_callback=lambda: _generate_video_content_callback(
                             prefix,
                             selected_one,
@@ -2684,6 +2775,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 generation_settings = render_video_generation_settings(
                     prefix,
                     current_language=str(st.session_state.get("video_language") or ""),
+                    default_aspect_ratio=fixed_aspect_ratio or "Landscape 16:9",
                     save_draft_callback=lambda: _save_pipeline_draft_callback(
                         prefix,
                         "music" if page_title == "Criação de Músicas" else "video",
@@ -4445,6 +4537,31 @@ def render_thumbnails():
                         st.error(str(exc))
 
 
+def render_tiktok_automation():
+    st.title("Automação Tiktok")
+    st.caption("Fila exclusiva de Shorts TikTok em Portrait 9:16, usando Prompt Master em vez de Blueprint.")
+    channels = _tiktok_channel_records()
+    prompt_ids, prompt_labels = _tiktok_prompt_options()
+    if not channels:
+        st.info("Cadastre primeiro um canal TikTok.")
+        return
+    for channel in channels:
+        channel_id = str(channel["id"])
+        with st.container(border=True):
+            st.write(f"**{channel.get('name', 'Sem nome')}** · {channel.get('handle', '')}")
+            enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
+            schedule_time = st.text_input("Horário diário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
+            prompt = st.selectbox("Prompt Master padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
+            st.caption("Formato da fila: Portrait 9:16 · Pool de vídeo: TikTok")
+            if st.button("Guardar automação TikTok", key=f"tiktok_automation_save_{channel_id}", type="primary"):
+                if not valid_hhmm(schedule_time):
+                    st.error("Use o formato HH:MM, por exemplo 08:30.")
+                else:
+                    update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16"})
+                    st.success("Automação TikTok guardada.")
+                    st.rerun()
+
+
 def render_automation():
     st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
@@ -4459,7 +4576,7 @@ def render_automation():
         st.caption(f"Última verificação do worker: {last_tick}")
     if worker_status.get("last_error"):
         st.error(f"Último erro do worker: {worker_status['last_error']}")
-    channels = read_json("channels.json", [])
+    channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform", "youtube") != "tiktok"]
     if not channels:
         st.info("Nenhum canal cadastrado para configurar.")
     for channel in channels:
@@ -7409,6 +7526,7 @@ def render_pipeline():
 def main():
     pipeline_video_items = [
         ("Criação de Vídeos", ":material/add_circle:", "Criação de Vídeos"),
+        ("Criação de Shorts", ":material/phone_android:", "Criação de Shorts"),
         ("Backlog Vídeos", ":material/video_library:", "Backlog Vídeos"),
         ("Roteiros", ":material/article:", "Roteiros"),
         ("Thumbnails", ":material/image:", "Thumbnails"),
@@ -7416,6 +7534,7 @@ def main():
     ]
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
+        ("Canais Tiktok", ":material/music_video:", "Canais Tiktok"),
         ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
         ("Thumbnail Blueprints", ":material/image:", "Thumbnail Blueprints"),
         ("Brandings Youtube", ":material/brush:", "Brandings Youtube"),
@@ -7463,6 +7582,7 @@ def main():
     ]
     automation_items = [
         ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
+        ("Automação Tiktok", ":material/schedule:", "Automação Tiktok"),
     ]
     edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
@@ -7496,11 +7616,11 @@ def main():
         "Configurações": settings_items,
     }
     nav_paths = {
-        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube",
+        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok",
         "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
-        "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload",
+        "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
-        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
+        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
@@ -7576,6 +7696,7 @@ def main():
         "Início": render_dashboard,
         "Pipeline Vídeos": render_pipeline,
         "Criação de Vídeos": render_new_video,
+        "Criação de Shorts": lambda: render_new_video("Criação de Shorts", "new_shorts", channel_platform="tiktok", fixed_aspect_ratio="Portrait 9:16"),
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
         "Music Backlog": render_music_backlog,
@@ -7589,9 +7710,11 @@ def main():
         "Brandings Youtube": render_youtube_brandings,
         "Prompt Masters": render_tiktok_prompt_masters,
         "Canais YouTube": render_channels,
+        "Canais Tiktok": render_tiktok_channels,
         "Contas TikTok": render_tiktok_accounts,
         "Facebook Pages": lambda: render_edit_placeholder("Facebook Pages", ""),
         "Automação Youtube": render_automation,
+        "Automação Tiktok": render_tiktok_automation,
         "Niche Finder Kaggle": render_niche_finder,
         "Tutorial Kaggle": lambda: render_niche_tutorial("kaggle"),
         "Niche Finder Apify": render_niche_finder_apify,

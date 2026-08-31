@@ -246,7 +246,9 @@ def _create_channel_batch(channel: dict[str, Any], when: datetime) -> dict[str, 
     topic, payload = _pending_payload(channel)
     options = {
         "language": payload.get("language") or channel.get("language") or "pt",
-        "format": "wide",
+        "format": "portrait" if channel.get("platform") == "tiktok" else "wide",
+        "platform": channel.get("platform", "youtube"),
+        "queue": "tiktok_shorts" if channel.get("platform") == "tiktok" else "youtube",
         "style_wide": style_wide,
         "style_ia": channel.get("style_ia") or "",
         "material_source": payload.get("material_source") or "",
