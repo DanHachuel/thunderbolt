@@ -294,6 +294,7 @@ DEFAULTS: dict[str, Any] = {
         "composio_toolkit": "",
         "composio_tool_slug": "",
         "composio_file_field": "file",
+        "composio_channel_field": "channel_id",
         "composio_arguments_json": "{}",
         "postiz_enabled": False,
         "postiz_api_key": "",
