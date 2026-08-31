@@ -106,6 +106,7 @@ def upload_with_default_route(
         try:
             composio_result = composio_publisher(
                 settings,
+                channel=channel,
                 video_path=video_path,
                 title=title,
                 description=description,
@@ -212,15 +213,30 @@ def upload_with_default_route(
     return IntegrationResult(False, "Nenhum método de envio conseguiu publicar o vídeo.", {"attempts": attempts, "route": "none"})
 
 
-def _composio_upload(settings: dict[str, Any], **kwargs: Any) -> IntegrationResult:
+def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwargs: Any) -> IntegrationResult:
+    channel_id = str(channel.get("youtube_channel_id") or "").strip()
+    if not channel_id:
+        return IntegrationResult(False, "Composio não foi executado: o canal da tarefa não tem um YouTube channel ID sincronizado.", {"missing": ["youtube_channel_id"]})
+    channel_field = str(settings.get("composio_channel_field") or "channel_id").strip()
+    if not channel_field:
+        return IntegrationResult(False, "Composio não foi executado: configure o campo de canal da ferramenta.", {"missing": ["composio_channel_field"]})
     try:
+        arguments = str(settings.get("composio_arguments_json") or "{}").strip() or "{}"
+        import json
+        parsed_arguments = json.loads(arguments)
+        if not isinstance(parsed_arguments, dict):
+            return IntegrationResult(False, "Composio não foi executado: os argumentos JSON devem ser um objecto.", {})
+        configured_channel = parsed_arguments.get(channel_field)
+        if configured_channel not in (None, "", channel_id):
+            return IntegrationResult(False, f"Composio bloqueado: o campo `{channel_field}` aponta para outro canal.", {"expected_channel_id": channel_id})
+        parsed_arguments[channel_field] = channel_id
         result = execute_upload(
             str(settings.get("composio_api_key") or ""),
             str(settings.get("composio_user_id") or ""),
             str(settings.get("composio_tool_slug") or ""),
             str(kwargs.get("video_path") or ""),
             str(settings.get("composio_file_field") or "file"),
-            str(settings.get("composio_arguments_json") or "{}"),
+            json.dumps(parsed_arguments, ensure_ascii=False),
         )
     except ComposioUploadError as exc:
         return IntegrationResult(False, str(exc), {})
