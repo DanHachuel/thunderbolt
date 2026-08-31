@@ -1844,6 +1844,15 @@ def render_tiktok_prompt_masters():
                     st.error(str(exc))
 
 
+def format_metric_number(value: Any) -> str:
+    if value in (None, ""):
+        return "—"
+    try:
+        return f"{int(value):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _tiktok_channel_records() -> list[dict[str, Any]]:
     return [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform") == "tiktok"]
 
@@ -1862,15 +1871,56 @@ def render_tiktok_channels():
     import_tab, spreadsheet_tab, manual_tab = render_localized_tabs(["Importar do Tiktok", "Canais em lote Planilha", "Cadastro manual"])
     prompt_ids, prompt_labels = _tiktok_prompt_options()
     with import_tab:
+        st.caption("A pesquisa consulta exclusivamente a página pública do TikTok. Não existe método alternativo nem utilização de API.")
         source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta", key="tiktok_channel_source")
-        if st.button("Buscar no Tiktok", type="primary", use_container_width=True, key="tiktok_channel_lookup"):
-            result = fetch_public_tiktok_profile(source)
-            st.session_state["tiktok_channel_import"] = {"ok": result.ok, "message": result.message, "data": result.data}
+        lookup_cols = st.columns([1, 1])
+        with lookup_cols[0]:
+            if st.button("Buscar no Tiktok", type="primary", use_container_width=True, key="tiktok_channel_lookup"):
+                result = fetch_public_tiktok_profile(source)
+                st.session_state["tiktok_channel_import"] = {"ok": result.ok, "message": result.message, "data": result.data}
+        with lookup_cols[1]:
+            if st.button("Limpar importação", use_container_width=True, key="tiktok_channel_clear"):
+                for key in ("tiktok_channel_import", "tiktok_import_language", "tiktok_import_niche", "tiktok_import_prompt", "tiktok_import_description"):
+                    st.session_state.pop(key, None)
+                st.rerun()
         imported_state = st.session_state.get("tiktok_channel_import", {})
         if imported_state.get("message"):
             (st.success if imported_state.get("ok") else st.warning)(imported_state["message"])
         imported = imported_state.get("data") if imported_state.get("ok") else {}
         if imported:
+            st.caption("Dados encontrados na página pública. Reveja os cartões e edite os campos antes de guardar.")
+            with st.container(border=True):
+                profile_cols = st.columns([0.8, 2.2, 1, 1, 1])
+                with profile_cols[0]:
+                    avatar = imported.get("avatar_url") or imported.get("avatar")
+                    if avatar:
+                        st.image(avatar, width=82)
+                    else:
+                        st.markdown("### TT")
+                with profile_cols[1]:
+                    st.markdown(f"### {imported.get('name') or imported.get('username') or 'Perfil TikTok'}")
+                    st.write(imported.get("handle") or f"@{imported.get('username', '')}")
+                    st.caption(imported.get("public_url") or imported.get("url") or "Página pública")
+                with profile_cols[2]:
+                    st.metric("Seguidores", format_metric_number(imported.get("subscriber_count")))
+                with profile_cols[3]:
+                    st.metric("Curtidas", format_metric_number(imported.get("likes_count")))
+                with profile_cols[4]:
+                    st.metric("Vídeos", format_metric_number(imported.get("video_count")))
+                if imported.get("bio"):
+                    st.caption(f"Descrição pública: {imported['bio']}")
+            with st.container(border=True):
+                st.markdown("**Dados do canal a cadastrar**")
+                data_cols = st.columns(3)
+                with data_cols[0]:
+                    st.write(f"**Nome:** {imported.get('name') or imported.get('username') or '—'}")
+                    st.write(f"**Handle:** {imported.get('handle') or '—'}")
+                with data_cols[1]:
+                    st.write(f"**URL:** {imported.get('public_url') or imported.get('url') or '—'}")
+                    st.write(f"**Origem:** {imported.get('metrics_source') or 'tiktok_public_page'}")
+                with data_cols[2]:
+                    st.write("**Formato:** Portrait 9:16")
+                    st.write("**Consulta:** Página pública")
             with st.form("tiktok_channel_import_form"):
                 name = st.text_input("Nome canal", value=str(imported.get("name") or imported.get("username") or ""))
                 url = st.text_input("URL canal", value=str(imported.get("public_url") or imported.get("url") or ""))
