@@ -6813,7 +6813,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])
+    api_keys_tab, upload_api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "API Keys Upload", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -7002,7 +7002,7 @@ def render_settings():
                             persist_callback=save_google_lyria,
                         )
 
-                with st.expander("Publicação através do Upload-Post", expanded=False):
+                with st.expander("Upload-Post", expanded=False):
                     upload_post_enabled = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)))
                     upload_post_api_key = text_setting("Upload-Post API key", "upload_post_api_key", secret=True)
                     _render_credential_status(upload_post_api_key)
@@ -7016,7 +7016,7 @@ def render_settings():
                         widget_key="api_test_upload_post",
                     )
 
-                with st.expander("Postiz — API key, integração e MCP", expanded=False):
+                with st.expander("Postiz", expanded=False):
                     st.caption("O Thunderbolt é o cliente. A API key é enviada exclusivamente ao servidor Postiz configurado; não é colocada em URLs, logs ou repositório.")
                     postiz_enabled = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)))
                     postiz_mode = st.selectbox("Modo de ligação", ["api", "mcp"], index=0 if settings.get("postiz_mode", "api") != "mcp" else 1, help="API é o modo determinístico de upload. MCP fica disponível para uma ligação compatível com Streamable HTTP.")
@@ -7067,14 +7067,65 @@ def render_settings():
                             st.success("Configurações guardadas localmente. Indique uma pasta válida do motor de vídeo para sincronizar config.toml.")
                     except Exception as exc:
                         st.warning(f"Configurações locais guardadas, mas não foi possível sincronizar config.toml: {exc}")
+    with upload_api_keys_tab:
+        st.subheader("API Keys Upload")
+        st.caption("Credenciais e integrações utilizadas pelos fluxos de publicação. Cada grupo fica separado para evitar misturar chaves de geração com chaves de upload.")
+        with st.expander("Contas Google", expanded=False):
+            google_accounts = [item for item in settings.get("youtube_batch_accounts", []) if isinstance(item, dict) and item.get("id")]
+            if google_accounts:
+                for account in google_accounts:
+                    st.markdown(f"**{account.get('label') or 'Conta Google'}** — {account.get('email') or 'sem e-mail'}")
+                st.info("Para editar documentos de cookies, OAuth e canais associados, abra a subaba Contas Google.")
+            else:
+                st.info("Ainda não existem Contas Google configuradas.")
+        with st.expander("API Innertube", expanded=False):
+            st.caption("INNERTUBE_API_KEY global usada pelo Upload directo para todas as contas Google/YouTube.")
+            upload_innertube = st.text_input("INNERTUBE_API_KEY", value=str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or ""), type="password", key="upload_api_innertube_key")
+            if st.button("Guardar INNERTUBE_API_KEY", type="primary", use_container_width=True, key="upload_save_innertube"):
+                settings["direct_innertube_api_key"] = upload_innertube.strip()
+                settings.pop("INNERTUBE_API_KEY", None)
+                write_json("settings.json", settings)
+                st.success("INNERTUBE_API_KEY guardada.")
+                st.rerun()
+        with st.expander("API Tiktok", expanded=False):
+            render_tiktok_api_cards(settings)
+        with st.expander("API Bilibili", expanded=False):
+            render_bilibili_api_cards(settings)
+        with st.expander("Composio", expanded=False):
+            st.info("Secção reservada para uma futura integração Composio.")
+        with st.expander("Upload-Post", expanded=False):
+            upload_post_enabled_upload = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)), key="upload_tab_upload_post_enabled")
+            upload_post_key_upload = st.text_input("Upload-Post API key", value=str(settings.get("upload_post_api_key") or ""), type="password", key="upload_tab_upload_post_key")
+            upload_post_user_upload = st.text_input("Upload-Post username", value=str(settings.get("upload_post_username") or ""), key="upload_tab_upload_post_user")
+            upload_post_platforms_upload = st.text_input("Plataformas Upload-Post", value=str(settings.get("upload_post_platforms") or "youtube,tiktok"), key="upload_tab_upload_post_platforms")
+            upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)), key="upload_tab_upload_post_auto")
+            if st.button("Guardar Upload-Post", type="primary", use_container_width=True, key="upload_tab_save_upload_post"):
+                settings.update({"upload_post_enabled": bool(upload_post_enabled_upload), "upload_post_api_key": upload_post_key_upload.strip(), "upload_post_username": upload_post_user_upload.strip(), "upload_post_platforms": upload_post_platforms_upload.strip(), "upload_post_auto_upload": bool(upload_post_auto_upload)})
+                write_json("settings.json", settings)
+                st.success("Upload-Post guardado.")
+                st.rerun()
+        with st.expander("Postiz", expanded=False):
+            postiz_enabled_upload = st.checkbox("Activar Postiz como fallback final", bool(settings.get("postiz_enabled", False)), key="upload_tab_postiz_enabled")
+            postiz_key_upload = st.text_input("Postiz API key", value=str(settings.get("postiz_api_key") or ""), type="password", key="upload_tab_postiz_key")
+            postiz_base_upload = st.text_input("Postiz Public API Base URL", value=str(settings.get("postiz_base_url") or "https://api.postiz.com/public/v1"), key="upload_tab_postiz_base")
+            postiz_mcp_upload = st.text_input("Postiz MCP URL", value=str(settings.get("postiz_mcp_url") or "https://api.postiz.com/mcp"), key="upload_tab_postiz_mcp")
+            postiz_integration_upload = st.text_input("Postiz integração padrão", value=str(settings.get("postiz_integration_id") or ""), key="upload_tab_postiz_integration")
+            postiz_auto_upload = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)), key="upload_tab_postiz_auto")
+            if st.button("Guardar Postiz", type="primary", use_container_width=True, key="upload_tab_save_postiz"):
+                settings.update({"postiz_enabled": bool(postiz_enabled_upload), "postiz_api_key": postiz_key_upload.strip(), "postiz_base_url": postiz_base_upload.strip(), "postiz_mcp_url": postiz_mcp_upload.strip(), "postiz_integration_id": postiz_integration_upload.strip(), "postiz_auto_publish": bool(postiz_auto_upload)})
+                write_json("settings.json", settings)
+                st.success("Postiz guardado.")
+                st.rerun()
     with google_accounts_tab:
         render_google_accounts()
 
     with tiktok_api_tab:
-        render_tiktok_api_cards(settings)
+        st.subheader("API Tiktok")
+        st.info("A configuração desta API foi reorganizada em Configuração API > API Keys Upload > API Tiktok.")
 
     with bilibili_api_tab:
-        render_bilibili_api_cards(settings)
+        st.subheader("API Bilibili")
+        st.info("A configuração desta API foi reorganizada em Configuração API > API Keys Upload > API Bilibili.")
     with ai_influencers_tab:
         st.subheader("AI Influencers")
         st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")
