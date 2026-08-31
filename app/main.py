@@ -80,10 +80,11 @@ from hermes_ui.thumbnails import (
     upload_thumbnail_image,
 )
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
-from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords
+from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords, generate_video_update_metadata
 from hermes_ui.media_generation import MediaGenerationError, generate_image_for_card, generate_video_for_card
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
+from integrations.youtube_update import YOUTUBE_UPDATE_VIDEO, YouTubeVideoUpdater
 from integrations.postiz import PostizAdapter
 from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPTIONS, normalize_upload_post_platforms
 from integrations.bilibili_upload import BilibiliApiAdapter, BILIBILI_DEFAULT_TID, BILIBILI_VIDEO_EXTENSIONS, normalise_bilibili_api_cards
@@ -7590,6 +7591,94 @@ def render_metadata_cleaner():
                 st.download_button("Descarregar", data=output.read_bytes(), file_name=output.name, mime="video/*", key=f"metadata_history_{record.get('id')}")
 
 
+def render_update_youtube_videos():
+    st.title("Update Youtube Vídeos")
+    st.caption("Actualize título, descrição e thumbnail de vídeos publicados sem alterar o ficheiro de vídeo.")
+    settings = read_json("settings.json", {})
+    channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform", "youtube") != "tiktok" and channel.get("active", True)]
+    if not channels:
+        st.info("Cadastre pelo menos um canal YouTube activo antes de actualizar vídeos.")
+        return
+    channel = st.selectbox("Canal YouTube", channels, format_func=lambda item: item.get("name") or item.get("url") or "Canal sem nome", key="update_youtube_channel")
+    updater = YouTubeVideoUpdater(settings, STORAGE)
+    refresh_key = f"update_youtube_loaded_{channel.get('id', '')}"
+    if st.button("Carregar vídeos do canal", type="primary", use_container_width=True, key="update_youtube_load") or refresh_key not in st.session_state:
+        with st.spinner("A carregar vídeos publicados…"):
+            result = updater.list_videos(channel, max_results=50)
+        st.session_state[refresh_key] = result.data if result.ok else {"error": result.message, "videos": []}
+    loaded = st.session_state.get(refresh_key, {})
+    if loaded.get("error"):
+        st.error(loaded["error"])
+        return
+    videos = loaded.get("videos", [])
+    st.caption(f"{len(videos)} vídeo(s) carregado(s). Operação: `{YOUTUBE_UPDATE_VIDEO}`")
+    if not videos:
+        st.info("Não foram encontrados vídeos publicados para este canal.")
+        return
+    tasks = load_video_tasks_for_catalog()
+    blueprint = blueprint_for_channel(channel)
+    for video in videos:
+        video_id = str(video.get("id") or "")
+        card_key = f"update_youtube_{video_id}"
+        with st.container(border=True):
+            top = st.columns([1.2, 3.8, 1.2])
+            with top[0]:
+                if video.get("thumbnail_url"):
+                    st.image(video["thumbnail_url"], use_container_width=True)
+            with top[1]:
+                st.markdown(f"**{video.get('title') or 'Sem título'}**")
+                st.caption(f"{video.get('published_at') or 'Data indisponível'} · {video.get('privacy_status') or 'estado desconhecido'} · `{video_id}`")
+                st.markdown(f"[Abrir no YouTube]({video.get('url')})")
+            with top[2]:
+                st.caption("Alteração")
+                st.write("Metadados")
+                st.write("Sem alteração do vídeo")
+            title_key, desc_key = f"{card_key}_title", f"{card_key}_description"
+            title = st.text_input("Título", value=st.session_state.get(title_key, video.get("title", "")), key=title_key, max_chars=100)
+            description = st.text_area("Descrição", value=st.session_state.get(desc_key, video.get("description", "")), key=desc_key, height=150)
+            ai_cols = st.columns(3)
+            script = next((str(task.get("script") or task.get("video_script") or "") for task in tasks if str(task.get("youtube_video_id") or task.get("video_id") or "") == video_id), "")
+            with ai_cols[0]:
+                if st.button("Gerar título", key=f"{card_key}_ai_title", use_container_width=True):
+                    try:
+                        generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="title")
+                        st.session_state[title_key] = generated["title"]
+                        st.rerun()
+                    except CreativeGenerationError as exc:
+                        st.error(str(exc))
+            with ai_cols[1]:
+                if st.button("Gerar descrição", key=f"{card_key}_ai_description", use_container_width=True):
+                    try:
+                        generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="description")
+                        st.session_state[desc_key] = generated["description"]
+                        st.rerun()
+                    except CreativeGenerationError as exc:
+                        st.error(str(exc))
+            with ai_cols[2]:
+                if st.button("Gerar título e descrição", key=f"{card_key}_ai_both", use_container_width=True):
+                    try:
+                        generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="both")
+                        st.session_state[title_key] = generated.get("title", title)
+                        st.session_state[desc_key] = generated.get("description", description)
+                        st.rerun()
+                    except CreativeGenerationError as exc:
+                        st.error(str(exc))
+            thumbnail = st.file_uploader("Trocar thumbnail (opcional)", type=["jpg", "jpeg", "png"], key=f"{card_key}_thumbnail")
+            if st.button("Actualizar no YouTube", type="primary", key=f"{card_key}_save", use_container_width=True):
+                thumbnail_path = None
+                if thumbnail is not None:
+                    thumbnail_path = STORAGE / "youtube_update" / f"{video_id}_{thumbnail.name}"
+                    thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+                    thumbnail_path.write_bytes(thumbnail.getvalue())
+                result = updater.update_video(video, title=title, description=description, thumbnail_path=thumbnail_path)
+                if result.ok:
+                    st.success(f"{result.message} Campos: {', '.join(result.data.get('changed') or []) or 'nenhum'}.")
+                    st.session_state.pop(refresh_key, None)
+                    st.rerun()
+                else:
+                    st.error(result.message)
+
+
 def render_pipeline():
     st.title("Pipeline Vídeos")
     st.caption("Estado das filas locais e dependências da cascata")
@@ -7612,6 +7701,7 @@ def main():
         ("Roteiros", ":material/article:", "Roteiros"),
         ("Thumbnails", ":material/image:", "Thumbnails"),
         ("Upload", ":material/cloud_upload:", "Upload"),
+        ("Update Youtube Vídeos", ":material/edit_note:", "Update Youtube Vídeos"),
     ]
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
@@ -7699,7 +7789,7 @@ def main():
     nav_paths = {
         "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok",
         "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
-        "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload",
+        "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload", "Update Youtube Vídeos": "/pipeline-videos/update-youtube",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
         "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
@@ -7786,6 +7876,7 @@ def main():
         "Roteiros": render_scripts,
         "Thumbnails": render_thumbnails,
         "Upload": render_upload,
+        "Update Youtube Vídeos": render_update_youtube_videos,
         "Blueprints Youtube": render_blueprints,
         "Thumbnail Blueprints": render_thumbnail_blueprints,
         "Brandings Youtube": render_youtube_brandings,

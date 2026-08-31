@@ -599,3 +599,44 @@ def generate_ugc_segment_prompts(settings: dict[str, Any], instructions: str) ->
     except CreativeGenerationError:
         pass
     return _ugc_fallback_prompts(clean)
+
+
+def generate_video_update_metadata(
+    settings: dict[str, Any],
+    channel: dict[str, Any],
+    video: dict[str, Any],
+    *,
+    script: str = "",
+    blueprint: dict[str, Any] | None = None,
+    mode: str = "both",
+) -> dict[str, str]:
+    """Generate reviewed metadata for an already-published YouTube video."""
+    context = channel_context(channel, blueprint)
+    language_instruction = _language_instruction(video.get("default_language") or channel.get("language") or context["language"])
+    fields = {"title": "title", "description": "description"} if mode == "both" else {mode: mode}
+    system = (
+        "És um editor de metadados de YouTube. Gera apenas os campos solicitados em JSON válido. "
+        f"Escreve todos os campos em {language_instruction}. Mantém o tema, o roteiro e o nicho do canal, "
+        "evita clickbait falso, alegações não verificadas e menções a IA. O título deve ser claro e ter no máximo 100 caracteres; "
+        "a descrição deve ser natural, informativa e preservar factos fornecidos no roteiro."
+    )
+    user = json.dumps({
+        "requested_fields": list(fields.values()),
+        "channel": context,
+        "video": {"id": video.get("id"), "title": video.get("title", ""), "description": video.get("description", ""), "language": video.get("default_language", "")},
+        "script": str(script or "")[:12000],
+        "requirements": {"title_max_characters": 100, "description_max_characters": 1800},
+    }, ensure_ascii=False)
+    result = _chat_json(settings, system, user)
+    output: dict[str, str] = {}
+    if "title" in fields:
+        title = str(result.get("title") or "").strip()[:100]
+        if not title:
+            raise CreativeGenerationError("O provider não devolveu um título válido.")
+        output["title"] = title
+    if "description" in fields:
+        description = str(result.get("description") or "").strip()[:1800]
+        if not description:
+            raise CreativeGenerationError("O provider não devolveu uma descrição válida.")
+        output["description"] = description
+    return output
