@@ -825,3 +825,13 @@ Na interface, uma tarefa em execução mostra a última actividade do helper e o
 A partir da versão 0.3.78, o card **Backlog Vídeos** mostra a causa terminal e disponibiliza **Ver diagnóstico completo**. As mensagens `Pexels key validation completed`, `installing or verifying project dependencies with uv` e `TASK_DIR` são apenas progresso ou metadados; não são, por si só, uma falha.
 
 Se o `uv` falhar, o erro inclui o detalhe seguro do resolver. Se a CLI do MoneyPrinterTurbo falhar, o resumo inclui `MPT_ERROR` e mantém `Log completo` e `Manifesto`. A interface não exibe chaves, cookies ou tokens. O tempo limite da verificação de dependências é de 15 minutos; a etapa é encerrada em vez de ficar indefinidamente sem resposta.
+
+## 18. Upload via Composio
+
+Em **Pipeline Vídeos > Upload > Upload via Composio**, o Thunderbolt permite descobrir ferramentas de upload disponíveis no projecto Composio Platform, seleccionar um toolkit e enviar um vídeo pronto da pipeline. Como cada provider expõe ferramentas e campos diferentes, o slug da ferramenta e o campo que recebe o vídeo são escolhidos explicitamente na interface; nenhum destino é assumido automaticamente.
+
+Configure primeiro **Configurações > Configuração API > API Keys Upload > Composio**. Active a integração, introduza a API key de projecto Composio Platform e defina um `user ID` estável para associar as contas conectadas. A chave permanece no storage local e não é incluída no histórico, nos logs nem no repositório. O botão de teste faz apenas descoberta read-only.
+
+Quando o provider ainda não estiver conectado, use **Autorizar toolkit no Composio**. O Thunderbolt apresenta o Connect Link devolvido pelo Composio; conclua a autorização nesse link e repita o envio. O Thunderbolt não implementa nem armazena um fluxo OAuth próprio.
+
+Antes de clicar em **Enviar vídeo via Composio**, confirme o vídeo, o toolkit, o slug da ferramenta, o campo do ficheiro e os argumentos JSON. O resultado guarda apenas um registo local mínimo com o estado e, quando devolvido, o `log_id` do Composio. URLs presigned, tokens, headers e a API key não são guardados no histórico.
