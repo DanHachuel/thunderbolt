@@ -1474,9 +1474,10 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         return _update(task_id, stage="upload", state="done", progress=100, artifacts=artifacts, video_ready=True, error=None)
 
     configured_account_id = str(channel.get("google_account_id") or "").strip()
+    configured_composio = bool(settings.get("composio_enabled", False)) and bool(settings.get("composio_auto_upload", True)) and bool(settings.get("composio_api_key")) and bool(settings.get("composio_tool_slug"))
     configured_upload_post = bool(settings.get("upload_post_enabled", False)) and bool(settings.get("upload_post_auto_upload", False))
     configured_postiz = bool(settings.get("postiz_enabled", False)) and bool(settings.get("postiz_auto_publish", False))
-    if not (configured_account_id or configured_upload_post or configured_postiz):
+    if not (configured_composio or configured_account_id or configured_upload_post or configured_postiz):
         artifacts["upload"] = {
             "route": "local",
             "status": "skipped",
