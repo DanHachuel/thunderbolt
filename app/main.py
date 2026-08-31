@@ -1907,29 +1907,25 @@ def render_tiktok_channels():
                         current_prompt = str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
                         selected_prompt = st.selectbox("Prompt Master", prompt_ids, index=prompt_ids.index(current_prompt) if current_prompt in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_import_card_prompt_{channel_id}")
                     with card_cols[5]:
-                        st.caption("Formato")
-                        st.write("Portrait 9:16")
-                        if st.button("Guardar", key=f"tiktok_import_card_save_{channel_id}", use_container_width=True, type="primary"):
-                            update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait"})
-                            st.success("Prompt Master do canal guardado.")
-                            st.rerun()
-                    actions = st.columns([1.0, 1.0, 1.0, 1.0])
-                    with actions[0]:
                         active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
                         if active != bool(channel.get("active", True)):
                             update_channel(channel_id, {"active": active})
                             st.rerun()
-                    with actions[1]:
                         if st.button("Editar", key=f"tiktok_import_card_edit_{channel_id}"):
                             st.session_state[f"tiktok_edit_{channel_id}"] = not st.session_state.get(f"tiktok_edit_{channel_id}", False)
                             st.rerun()
-                    with actions[2]:
-                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}"):
-                            st.session_state[f"tiktok_niche_{channel_id}"] = not st.session_state.get(f"tiktok_niche_{channel_id}", False)
-                            st.rerun()
-                    with actions[3]:
                         if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
+                            st.rerun()
+                        st.caption("Formato: Portrait 9:16")
+                        if st.button("Guardar", key=f"tiktok_import_card_save_{channel_id}", use_container_width=True, type="primary"):
+                            update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait"})
+                            st.success("Prompt Master do canal guardado.")
+                            st.rerun()
+                    niche_action = st.columns([1.0, 4.0])
+                    with niche_action[0]:
+                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}"):
+                            st.session_state[f"tiktok_niche_{channel_id}"] = not st.session_state.get(f"tiktok_niche_{channel_id}", False)
                             st.rerun()
                     if st.session_state.get(f"tiktok_delete_{channel_id}"):
                         st.warning("Apagar este canal TikTok e os dados locais associados?")
