@@ -116,7 +116,7 @@ function check() {
     console.error(`Python não encontrado. Execute: npx.cmd --yes @danhachuel/thunderbolt install`);
     process.exit(1);
   }
-  const requiredModules = ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "sklearn", "mlxtend", "plotly", "seaborn", "kagglehub"];
+  const requiredModules = ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "sklearn", "mlxtend", "plotly", "seaborn", "kagglehub", "composio"];
   const missing = requiredModules.filter((moduleName) => !moduleAvailable(moduleName));
   const ffmpeg = moduleAvailable("imageio_ffmpeg");
   const mptPath = configuredMoneyPrinterPath();

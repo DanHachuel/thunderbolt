@@ -98,6 +98,7 @@ from integrations.youtube_batch import account_key as youtube_batch_account_key,
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL
+from integrations.composio_upload import ComposioUploadError, authorize_toolkit, discover_tools, execute_upload, parse_arguments, test_configuration
 
 DEFAULT_UI_LANGUAGE = "en"
 
@@ -5302,7 +5303,7 @@ def render_music_upload() -> None:
 
 def render_upload():
     st.title("Upload")
-    upload_tab, direct_tab, postiz_tab, upload_post_tab = render_localized_tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post"])
+    upload_tab, direct_tab, postiz_tab, upload_post_tab, composio_tab = render_localized_tabs(["Upload convencional", "Upload directo", "Postiz", "Upload-Post", "Upload via Composio"])
     with direct_tab:
         render_upload_direct()
     with postiz_tab:
@@ -5311,6 +5312,81 @@ def render_upload():
         render_upload_post()
     with upload_tab:
         render_upload_conventional()
+    with composio_tab:
+        render_upload_composio()
+
+
+def render_upload_composio():
+    st.subheader("Upload via Composio")
+    st.caption("Descubra uma ferramenta de upload Composio, ligue a conta do provider quando necessário e envie um vídeo seleccionado. O slug e o campo do ficheiro são sempre escolhidos explicitamente.")
+    settings = read_json("settings.json", {})
+    api_key = str(settings.get("composio_api_key") or "").strip()
+    user_id = str(settings.get("composio_user_id") or "").strip()
+    if not settings.get("composio_enabled", False) or not api_key:
+        st.warning("Composio está desactivado ou sem API key. Configure-o em Configuração API > API Keys Upload > Composio.")
+        return
+    query = st.text_input("Pesquisar ferramenta Composio", value="upload a video file", key="composio_upload_query")
+    toolkit_filter = st.text_input("Toolkit preferido (opcional)", value=str(settings.get("composio_toolkit") or ""), key="composio_upload_toolkit")
+    if st.button("Descobrir ferramentas", key="composio_upload_discover", use_container_width=True):
+        try:
+            st.session_state["composio_upload_tools"] = discover_tools(api_key, user_id, query, toolkit_filter)
+            if not st.session_state["composio_upload_tools"]:
+                st.info("Nenhuma ferramenta encontrada. Tente uma pesquisa mais específica ou deixe o toolkit vazio.")
+            else:
+                st.success(f"{len(st.session_state['composio_upload_tools'])} ferramenta(s) encontrada(s).")
+        except ComposioUploadError as exc:
+            st.error(str(exc))
+    tools = [item for item in st.session_state.get("composio_upload_tools", []) if isinstance(item, dict) and item.get("slug")]
+    if not tools:
+        st.info("Clique em Descobrir ferramentas para carregar os destinos disponíveis na sua conta Composio.")
+        return
+    tool_slugs = [str(item["slug"]) for item in tools]
+    selected_slug = st.selectbox("Ferramenta de upload", tool_slugs, format_func=lambda slug: next((f"{item.get('name') or slug} — {item.get('toolkit') or 'toolkit desconhecido'}" for item in tools if item.get("slug") == slug), slug), key="composio_upload_slug")
+    selected_tool = next((item for item in tools if item.get("slug") == selected_slug), tools[0])
+    if selected_tool.get("description"):
+        st.caption(str(selected_tool["description"]))
+    schema = selected_tool.get("schema") or {}
+    with st.expander("Schema da ferramenta", expanded=False):
+        st.json(schema)
+    file_field = st.text_input("Campo que recebe o vídeo", value=str(st.session_state.get("composio_upload_file_field") or "file"), key="composio_upload_file_field")
+    arguments_json = st.text_area("Argumentos JSON adicionais", value=str(st.session_state.get("composio_upload_arguments") or "{}"), height=150, key="composio_upload_arguments")
+    if st.button("Autorizar toolkit no Composio", key="composio_upload_authorize", use_container_width=True):
+        try:
+            auth = authorize_toolkit(api_key, user_id, str(selected_tool.get("toolkit") or ""))
+            if auth.get("redirect_url"):
+                st.success("Connect Link criado. Abra o link para autorizar a conta e depois repita o envio.")
+                st.markdown(f"[Abrir Connect Link do Composio]({auth['redirect_url']})")
+            else:
+                st.info("O Composio não devolveu um Connect Link; confirme o estado da conta no dashboard.")
+        except ComposioUploadError as exc:
+            st.error(str(exc))
+    tasks = [task for task in read_json("tasks.json", []) if task.get("state") == "done" or task.get("artifacts", {}).get("video")]
+    if not tasks:
+        st.info("Não há vídeos prontos para enviar via Composio.")
+        return
+    task_options = {str(task.get("id")): task for task in tasks if task.get("id")}
+    selected_task_id = st.selectbox("Vídeo", list(task_options), format_func=lambda task_id: f"{task_options[task_id].get('topic') or 'Vídeo Thunderbolt'} — {task_options[task_id].get('artifacts', {}).get('video') or 'sem ficheiro'}", key="composio_upload_task")
+    task = task_options[selected_task_id]
+    video_path = str((task.get("artifacts", {}) or {}).get("video") or "")
+    st.caption(video_path or "Sem caminho de vídeo registado")
+    st.info(f"Resumo: `{selected_slug}` · toolkit `{selected_tool.get('toolkit') or 'não indicado'}` · campo `{file_field or 'não indicado'}`")
+    if st.button("Enviar vídeo via Composio", type="primary", key=f"composio_upload_send_{selected_task_id}", use_container_width=True):
+        try:
+            parse_arguments(arguments_json)
+            result = execute_upload(api_key, user_id, selected_slug, video_path, file_field, arguments_json)
+            record = {"id": uuid.uuid4().hex, "task_id": task.get("id"), "destination": "Composio", "target": {"toolkit": selected_tool.get("toolkit"), "slug": selected_slug, "file_field": file_field}, "status": "published" if result.get("successful") else "failed", "message": result.get("error") or "Upload Composio concluído.", "data": result.get("data") or {}, "log_id": result.get("log_id") or "", "created_at": now()}
+            uploads = read_json("uploads.json", [])
+            uploads.append(record)
+            write_json("uploads.json", uploads)
+            reconcile_persisted_notifications()
+            if result.get("successful"):
+                st.success(record["message"])
+            else:
+                st.error(record["message"])
+            if result.get("log_id"):
+                st.caption(f"Composio log ID: {result['log_id']}")
+        except ComposioUploadError as exc:
+            st.error(str(exc))
 
 
 def render_upload_postiz():
@@ -7089,7 +7165,29 @@ def render_settings():
         with st.expander("API Bilibili", expanded=False):
             render_bilibili_api_cards(settings)
         with st.expander("Composio", expanded=False):
-            st.info("Secção reservada para uma futura integração Composio.")
+            st.caption("A API key é guardada apenas no storage local. O slug da ferramenta e o provider são descobertos no Upload via Composio; a autenticação da conta é feita pelo Connect Link do Composio.")
+            composio_enabled = st.checkbox("Activar Composio", value=bool(settings.get("composio_enabled", False)), key="upload_composio_enabled")
+            composio_api_key = st.text_input("Composio API key", value=str(settings.get("composio_api_key") or ""), type="password", key="upload_composio_api_key", help="Use a API key de projecto do Composio Platform. Nunca coloque esta chave no GitHub, em URLs ou em mensagens.")
+            composio_user_id = st.text_input("Composio user ID", value=str(settings.get("composio_user_id") or "thunderbolt-local"), key="upload_composio_user_id", help="Identidade estável usada para associar as contas conectadas no Composio.")
+            composio_toolkit = st.text_input("Toolkit preferido (opcional)", value=str(settings.get("composio_toolkit") or ""), key="upload_composio_toolkit", help="Deixe vazio para descobrir ferramentas em todos os toolkits.")
+            _render_credential_status(composio_api_key)
+            composio_action_cols = st.columns(2)
+            with composio_action_cols[0]:
+                save_composio = st.button("Guardar Composio", type="primary", use_container_width=True, key="upload_composio_save")
+            with composio_action_cols[1]:
+                test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
+            if save_composio:
+                settings.update({"composio_enabled": bool(composio_enabled), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip()})
+                write_json("settings.json", settings)
+                st.success("Configuração Composio guardada.")
+                st.rerun()
+            if test_composio:
+                try:
+                    result = test_configuration(composio_api_key, composio_user_id)
+                    found = len((result.get("data") or {}).get("tools", []))
+                    st.success(f"Configuração Composio válida; {found} ferramenta(s) de upload encontradas.")
+                except ComposioUploadError as exc:
+                    st.error(str(exc))
         with st.expander("Upload-Post", expanded=False):
             upload_post_enabled_upload = st.checkbox("Activar Upload-Post", bool(settings.get("upload_post_enabled", False)), key="upload_tab_upload_post_enabled")
             upload_post_key_upload = st.text_input("Upload-Post API key", value=str(settings.get("upload_post_api_key") or ""), type="password", key="upload_tab_upload_post_key")
