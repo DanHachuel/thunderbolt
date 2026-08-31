@@ -219,6 +219,22 @@ class MediaProvidersTests(unittest.TestCase):
                 media_generation.generate_image_from_pool({}, "prompt")
         self.assertEqual(generate.call_count, 1)
 
+    def test_image_pool_reports_each_provider_failure_when_all_fail(self):
+        cards = [
+            {"id": "first", "provider": "agnes", "supports_image": True, "enabled": True},
+            {"id": "second", "provider": "nano_banana", "supports_image": True, "enabled": True},
+        ]
+        with patch.object(media_generation, "media_cards_for_pool", return_value=cards), patch.object(
+            media_generation,
+            "generate_image_for_card",
+            side_effect=[media_generation.MediaGenerationError("timeout"), media_generation.MediaGenerationError("HTTP 429 quota")],
+        ) as generate:
+            with self.assertRaises(media_generation.MediaGenerationError) as raised:
+                media_generation.generate_image_from_pool({}, "prompt")
+        self.assertIn("agnes: timeout", str(raised.exception))
+        self.assertIn("nano_banana: HTTP 429 quota", str(raised.exception))
+        self.assertEqual(generate.call_count, 2)
+
     def test_video_pool_fails_over_for_transient_provider_error(self):
         cards = [
             {"id": "first", "provider": "fal_ai", "supports_video": True, "enabled": True},
