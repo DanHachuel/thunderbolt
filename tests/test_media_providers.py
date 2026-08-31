@@ -94,6 +94,21 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertEqual(post.call_args.kwargs["json"]["size"], "1792x1024")
         self.assertNotIn("aspect_ratio", post.call_args.kwargs["json"])
 
+    def test_agnes_image_request_uses_documented_contract_and_timeout(self):
+        response = Mock(status_code=200)
+        card = {"provider": "agnes", "model": "agnes-image-2.1-flash", "base_url": "https://apihub.agnes-ai.com/v1", "api_style": "agnes"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image")
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(post.call_args.args[0], "https://apihub.agnes-ai.com/v1/images/generations")
+        self.assertEqual(body["model"], "agnes-image-2.1-flash")
+        self.assertEqual(body["size"], "1K")
+        self.assertEqual(body["ratio"], "16:9")
+        self.assertTrue(body["return_base64"])
+        self.assertEqual(body["extra_body"], {"response_format": "b64_json"})
+        self.assertNotIn("response_format", body)
+        self.assertEqual(post.call_args.kwargs["timeout"], media_generation.AGNES_IMAGE_TIMEOUT_SECONDS)
+
     def test_other_openai_compatible_image_request_does_not_receive_pollinations_size(self):
         response = Mock(status_code=200)
         card = {"provider": "huggingface", "model": "black-forest-labs/FLUX.1-dev", "base_url": "https://router.huggingface.co/v1", "api_style": "huggingface"}

@@ -228,7 +228,7 @@ def new_media_card(provider: Any, *, card_id: str | None = None) -> dict[str, An
         {
             "id": card_id or f"media-{code}-1",
             "provider": code,
-            "model": "gemini-3.1-flash-image" if code == "nano_banana" else "",
+            "model": "gemini-3.1-flash-image" if code == "nano_banana" else ("agnes-image-2.1-flash" if code == "agnes" else ""),
             "base_url": definition.default_base_url,
             "enabled": True,
         }
