@@ -1883,6 +1883,40 @@ def render_tiktok_channels():
     prompt_ids, prompt_labels = _tiktok_prompt_options()
     with import_tab:
         st.caption("A pesquisa consulta exclusivamente a página pública do TikTok. Não existe método alternativo nem utilização de API.")
+        st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
+        if channels:
+            for channel in channels:
+                channel_id = str(channel.get("id") or "")
+                with st.container(border=True):
+                    card_cols = st.columns([0.7, 2.3, 1.0, 1.0, 1.35, 1.25])
+                    with card_cols[0]:
+                        avatar_url = _tiktok_avatar_url(channel)
+                        if avatar_url:
+                            st.image(avatar_url, width=58)
+                        else:
+                            st.markdown("### TT")
+                    with card_cols[1]:
+                        st.markdown(f"**{channel.get('name') or 'Perfil TikTok'}**")
+                        st.caption(f"{channel.get('handle') or 'sem handle'} · {channel.get('url') or 'sem URL'}")
+                        st.caption(channel.get("description") or "Perfil carregado da página pública do TikTok.")
+                    with card_cols[2]:
+                        st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
+                    with card_cols[3]:
+                        st.metric("Curtidas", format_metric_number(channel.get("likes_count")))
+                    with card_cols[4]:
+                        current_prompt = str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
+                        selected_prompt = st.selectbox("Prompt Master", prompt_ids, index=prompt_ids.index(current_prompt) if current_prompt in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_import_card_prompt_{channel_id}")
+                    with card_cols[5]:
+                        st.caption("Formato")
+                        st.write("Portrait 9:16")
+                        if st.button("Guardar", key=f"tiktok_import_card_save_{channel_id}", use_container_width=True, type="primary"):
+                            update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait"})
+                            st.success("Prompt Master do canal guardado.")
+                            st.rerun()
+        else:
+            st.info("Ainda não existem canais TikTok cadastrados. Use o campo abaixo para pesquisar e cadastrar um perfil público.")
+        st.divider()
+        st.subheader("Importar novo canal pela página pública")
         source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta", key="tiktok_channel_source")
         lookup_cols = st.columns([1, 1])
         with lookup_cols[0]:
