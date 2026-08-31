@@ -5899,7 +5899,7 @@ def render_bilibili_api_cards(settings: dict[str, Any]) -> None:
         st.success("Novo card Bilibili criado.")
         st.rerun()
 
-def render_google_accounts():
+def render_google_accounts(*, include_innertube: bool = True):
     st.title("Contas Google")
     st.caption("Gestão das contas Google/YouTube, documentos de credenciais, canais em lote e credenciais globais do YouTube.")
     settings = read_json("settings.json", {})
@@ -6065,57 +6065,58 @@ def render_google_accounts():
     if youtube_accounts_missing_document:
         st.info("Contas que ainda precisam de dados no documento: " + ", ".join(youtube_accounts_missing_document))
 
-    st.divider()
-    st.markdown("### INNERTUBE_API_KEY")
-    st.caption("Esta é uma chave API global do YouTube: aplica-se a todas as contas Google/YouTube e a todo o sistema. Não é associada a uma conta específica, não faz parte dos documentos de cookies/credenciais e não é editada no separador API Keys.")
-    configured_global_innertube_api_key = str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or "").strip()
-    current_innertube_api_key = configured_global_innertube_api_key
-    if not current_innertube_api_key:
-        # Migrate values created by older releases, which incorrectly stored
-        # the key inside a selected Google account. The first legacy value is
-        # retained as the single global value and all account copies are removed.
-        for legacy_account in batch_accounts:
-            current_innertube_api_key = str(legacy_account.get("innertube_api_key") or legacy_account.get("INNERTUBE_API_KEY") or "").strip()
+    if include_innertube:
+        st.divider()
+        st.markdown("### INNERTUBE_API_KEY")
+        st.caption("Esta é uma chave API global do YouTube: aplica-se a todas as contas Google/YouTube e a todo o sistema. Não é associada a uma conta específica, não faz parte dos documentos de cookies/credenciais e não é editada no separador API Keys.")
+        configured_global_innertube_api_key = str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or "").strip()
+        current_innertube_api_key = configured_global_innertube_api_key
+        if not current_innertube_api_key:
+            # Migrate values created by older releases, which incorrectly stored
+            # the key inside a selected Google account. The first legacy value is
+            # retained as the single global value and all account copies are removed.
+            for legacy_account in batch_accounts:
+                current_innertube_api_key = str(legacy_account.get("innertube_api_key") or legacy_account.get("INNERTUBE_API_KEY") or "").strip()
+                if current_innertube_api_key:
+                    break
             if current_innertube_api_key:
-                break
-        if current_innertube_api_key:
-            settings["direct_innertube_api_key"] = current_innertube_api_key
+                settings["direct_innertube_api_key"] = current_innertube_api_key
+                settings.pop("INNERTUBE_API_KEY", None)
+                for legacy_account in batch_accounts:
+                    legacy_account.pop("innertube_api_key", None)
+                    legacy_account.pop("INNERTUBE_API_KEY", None)
+                settings["youtube_batch_accounts"] = batch_accounts
+                write_json("settings.json", settings)
+        innertube_status_cols = st.columns([3.2, 1.2])
+        with innertube_status_cols[0]:
+            st.caption("Estado da chave global")
+        with innertube_status_cols[1]:
+            _render_credential_status(current_innertube_api_key)
+        with st.form("innertube_api_key_form"):
+            innertube_api_key_value = st.text_input(
+                "INNERTUBE_API_KEY",
+                value=current_innertube_api_key,
+                type="password",
+                key="global_innertube_api_key",
+                help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.",
+            )
+            _render_api_test_control(
+                settings,
+                "innertube",
+                lambda: test_innertube_api_key(innertube_api_key_value),
+                widget_key="api_test_innertube",
+            )
+            save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
+        if save_innertube_api_key:
+            settings["direct_innertube_api_key"] = innertube_api_key_value.strip()
             settings.pop("INNERTUBE_API_KEY", None)
             for legacy_account in batch_accounts:
                 legacy_account.pop("innertube_api_key", None)
                 legacy_account.pop("INNERTUBE_API_KEY", None)
             settings["youtube_batch_accounts"] = batch_accounts
             write_json("settings.json", settings)
-    innertube_status_cols = st.columns([3.2, 1.2])
-    with innertube_status_cols[0]:
-        st.caption("Estado da chave global")
-    with innertube_status_cols[1]:
-        _render_credential_status(current_innertube_api_key)
-    with st.form("innertube_api_key_form"):
-        innertube_api_key_value = st.text_input(
-            "INNERTUBE_API_KEY",
-            value=current_innertube_api_key,
-            type="password",
-            key="global_innertube_api_key",
-            help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.",
-        )
-        _render_api_test_control(
-            settings,
-            "innertube",
-            lambda: test_innertube_api_key(innertube_api_key_value),
-            widget_key="api_test_innertube",
-        )
-        save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
-    if save_innertube_api_key:
-        settings["direct_innertube_api_key"] = innertube_api_key_value.strip()
-        settings.pop("INNERTUBE_API_KEY", None)
-        for legacy_account in batch_accounts:
-            legacy_account.pop("innertube_api_key", None)
-            legacy_account.pop("INNERTUBE_API_KEY", None)
-        settings["youtube_batch_accounts"] = batch_accounts
-        write_json("settings.json", settings)
-        st.success("INNERTUBE_API_KEY global guardada para todas as contas Google/YouTube e para todo o sistema.")
-        st.rerun()
+            st.success("INNERTUBE_API_KEY global guardada para todas as contas Google/YouTube e para todo o sistema.")
+            st.rerun()
 
     st.divider()
     st.markdown("### Adicionar outra conta Gmail")
@@ -7044,7 +7045,7 @@ def render_settings():
         st.subheader("API Keys Upload")
         st.caption("Credenciais e integrações utilizadas pelos fluxos de publicação. Cada grupo fica separado para evitar misturar chaves de geração com chaves de upload.")
         with st.expander("Contas Google", expanded=False):
-            render_google_accounts()
+            render_google_accounts(include_innertube=False)
         with st.expander("API Innertube", expanded=False):
             st.caption("INNERTUBE_API_KEY global usada pelo Upload directo para todas as contas Google/YouTube.")
             upload_innertube = st.text_input("INNERTUBE_API_KEY", value=str(settings.get("direct_innertube_api_key") or settings.get("INNERTUBE_API_KEY") or ""), type="password", key="upload_api_innertube_key")
