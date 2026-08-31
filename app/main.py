@@ -1920,15 +1920,15 @@ def render_tiktok_channels():
                             update_channel(channel_id, {"active": active})
                             st.rerun()
                     with actions[1]:
-                        if st.button("Editar", key=f"tiktok_import_card_edit_{channel_id}", use_container_width=True):
+                        if st.button("Editar", key=f"tiktok_import_card_edit_{channel_id}"):
                             st.session_state[f"tiktok_edit_{channel_id}"] = not st.session_state.get(f"tiktok_edit_{channel_id}", False)
                             st.rerun()
                     with actions[2]:
-                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}", use_container_width=True):
+                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}"):
                             st.session_state[f"tiktok_niche_{channel_id}"] = not st.session_state.get(f"tiktok_niche_{channel_id}", False)
                             st.rerun()
                     with actions[3]:
-                        if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}", use_container_width=True):
+                        if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
                             st.rerun()
                     if st.session_state.get(f"tiktok_delete_{channel_id}"):
