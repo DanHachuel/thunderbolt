@@ -326,7 +326,7 @@ def _is_retryable_media_error(exc: BaseException) -> bool:
     text = str(exc).lower()
     if any(marker in text for marker in ("http 400", "http 401", "http 403", "http 404", "invalid request", "missing", "não tem endpoint")):
         return False
-    return any(marker in text for marker in ("http 408", "http 425", "http 429", "http 500", "http 502", "http 503", "http 504", "timeout", "timed out", "connection", "temporarily", "cooldown"))
+    return any(marker in text for marker in ("http 402", "http 408", "http 425", "http 429", "http 500", "http 502", "http 503", "http 504", "timeout", "timed out", "connection", "temporarily", "cooldown"))
 
 
 def generate_image_from_pool(

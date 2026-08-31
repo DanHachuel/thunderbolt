@@ -176,6 +176,20 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertEqual(output, Path("fallback.jpg"))
         self.assertEqual(generate.call_count, 2)
 
+    def test_image_pool_fails_over_for_http_402_quota_error(self):
+        cards = [
+            {"id": "first", "provider": "pollinations", "supports_image": True, "enabled": True},
+            {"id": "second", "provider": "huggingface", "supports_image": True, "enabled": True},
+        ]
+        with patch.object(media_generation, "media_cards_for_pool", return_value=cards), patch.object(
+            media_generation,
+            "generate_image_for_card",
+            side_effect=[media_generation.MediaGenerationError("Provider devolveu HTTP 402"), Path("fallback.jpg")],
+        ) as generate:
+            output = media_generation.generate_image_from_pool({}, "prompt")
+        self.assertEqual(output, Path("fallback.jpg"))
+        self.assertEqual(generate.call_count, 2)
+
     def test_image_pool_does_not_fail_over_for_invalid_payload(self):
         cards = [
             {"id": "first", "provider": "huggingface", "supports_image": True, "enabled": True},
