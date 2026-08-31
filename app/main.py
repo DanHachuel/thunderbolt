@@ -6666,6 +6666,19 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
                 llm_rpm_limit = st.number_input("Pedidos por janela", min_value=1, max_value=1000, value=int(settings.get("llm_rpm_limit", 40)), step=1, key="settings_llm_rpm_limit")
             with rpm_cols[2]:
                 llm_rpm_window_seconds = st.number_input("Janela (segundos)", min_value=1, max_value=3600, value=int(settings.get("llm_rpm_window_seconds", 60)), step=1, key="settings_llm_rpm_window_seconds")
+            save_llm_rpm_clicked = (
+                st.form_submit_button("Guardar limite LLM NVIDIA NIM", type="primary", use_container_width=True, key="save_llm_rpm_limit")
+                if embedded
+                else st.button("Guardar limite LLM NVIDIA NIM", type="primary", use_container_width=True, key="save_llm_rpm_limit")
+            )
+            if save_llm_rpm_clicked:
+                settings.update({
+                    "llm_rpm_limit_enabled": bool(llm_rpm_limit_enabled),
+                    "llm_rpm_limit": int(llm_rpm_limit),
+                    "llm_rpm_window_seconds": int(llm_rpm_window_seconds),
+                })
+                write_json("settings.json", settings)
+                st.success("Limite LLM NVIDIA NIM guardado.")
         for index in range(len(cards)):
             _render_llm_card(settings, cards, index, embedded=embedded)
         st.divider()
