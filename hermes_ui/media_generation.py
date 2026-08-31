@@ -45,6 +45,10 @@ class MediaGenerationError(RuntimeError):
     """Raised when an image/video adapter cannot produce a usable artifact."""
 
 
+AGNES_IMAGE_MODEL = "agnes-image-2.1-flash"
+AGNES_IMAGE_TIMEOUT_SECONDS = 120
+
+
 def _api_key(card: Mapping[str, Any]) -> str:
     return str(card.get("api_key") or "").strip()
 
@@ -259,6 +263,16 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
     if style == "replicate":
         body = {"version": _model(card), "input": {"prompt": constrained_prompt}}
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
+    if provider == "agnes":
+        body = {
+            "model": _model(card) or AGNES_IMAGE_MODEL,
+            "prompt": constrained_prompt,
+            "size": "1K",
+            "ratio": "16:9",
+            "return_base64": True,
+            "extra_body": {"response_format": "b64_json"},
+        }
+        return requests.post(endpoint, headers=_headers(card), json=body, timeout=AGNES_IMAGE_TIMEOUT_SECONDS)
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     if provider == "pollinations":
         body["size"] = "1792x1024"
