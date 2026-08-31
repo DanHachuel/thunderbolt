@@ -1858,6 +1858,16 @@ def _tiktok_channel_records() -> list[dict[str, Any]]:
     return [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform") == "tiktok"]
 
 
+def _tiktok_avatar_url(value: dict[str, Any]) -> str:
+    for key in ("avatar_url", "thumbnail_url", "profile_image_url", "avatar", "image_url"):
+        candidate = value.get(key)
+        if isinstance(candidate, dict):
+            candidate = candidate.get("url") or candidate.get("src")
+        if str(candidate or "").strip():
+            return str(candidate).strip()
+    return ""
+
+
 def _tiktok_prompt_options() -> tuple[list[str], dict[str, str]]:
     files = list_prompt_master_files()
     labels = {path.name: get_display_name("prompt_masters", path, path.stem) for path in files}
@@ -1893,7 +1903,7 @@ def render_tiktok_channels():
             with st.container(border=True):
                 profile_cols = st.columns([0.8, 2.2, 1, 1, 1])
                 with profile_cols[0]:
-                    avatar = imported.get("avatar_url") or imported.get("avatar")
+                    avatar = _tiktok_avatar_url(imported)
                     if avatar:
                         st.image(avatar, width=82)
                     else:
@@ -1932,7 +1942,8 @@ def render_tiktok_channels():
                 description = st.text_area("Descrição", value=str(imported.get("bio") or ""), key="tiktok_import_description")
                 if st.form_submit_button("Cadastrar canal TikTok", type="primary"):
                     channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
-                    update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt, "avatar_url": imported.get("avatar_url") or imported.get("avatar") or "", "thumbnail_url": imported.get("avatar_url") or imported.get("avatar") or ""})
+                    avatar_url = _tiktok_avatar_url(imported)
+                    update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt, "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                     st.session_state.pop("tiktok_channel_import", None)
                     st.success(f"Canal {channel['name']} cadastrado.")
                     st.rerun()
@@ -1953,6 +1964,17 @@ def render_tiktok_channels():
             st.success(f"{created} canal(is) TikTok cadastrado(s).")
             st.rerun()
         st.caption("A planilha usa os campos de URL, nome, handle, idioma, nicho, Prompt Master, descrição e horário.")
+        st.divider()
+        st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
+        if channels:
+            st.dataframe(
+                [{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels],
+                use_container_width=True,
+                hide_index=True,
+                height=360,
+            )
+        else:
+            st.info("Ainda não existem canais TikTok cadastrados.")
     with manual_tab:
         with st.form("tiktok_channel_manual_form"):
             url = st.text_input("URL canal", placeholder="https://www.tiktok.com/@conta", key="tiktok_manual_channel_url")
@@ -1968,14 +1990,6 @@ def render_tiktok_channels():
                 update_channel(channel["id"], {"platform": "tiktok"})
                 st.success("Canal TikTok cadastrado.")
                 st.rerun()
-    st.divider()
-    st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
-    if channels:
-        st.dataframe([{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels], use_container_width=True, hide_index=True, height=360)
-    else:
-        st.info("Ainda não existem canais TikTok cadastrados.")
-
-
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -4607,7 +4621,7 @@ def render_tiktok_automation():
         with st.container(border=True):
             header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
             with header_cols[0]:
-                profile_image = channel.get("avatar_url") or channel.get("thumbnail_url")
+                profile_image = _tiktok_avatar_url(channel)
                 if profile_image:
                     st.image(profile_image, width=48)
                 else:
@@ -4639,7 +4653,8 @@ def render_tiktok_automation():
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16"})
+                        avatar_url = _tiktok_avatar_url(channel)
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
 
