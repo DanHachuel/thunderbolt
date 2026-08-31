@@ -44,6 +44,10 @@ from .thumbnail_generation import _compose_thumbnail_prompt, generate_thumbnail_
 class MediaGenerationError(RuntimeError):
     """Raised when an image/video adapter cannot produce a usable artifact."""
 
+    def __init__(self, message: str, *, provider_errors: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.provider_errors = list(provider_errors or [])
+
 
 AGNES_IMAGE_MODEL = "agnes-image-2.1-flash"
 AGNES_IMAGE_TIMEOUT_SECONDS = 120
@@ -374,7 +378,11 @@ def generate_image_from_pool(
             errors.append(f"{card.get('provider')}: {str(exc)[:180]}")
             if not _is_retryable_media_error(exc):
                 raise
-    raise MediaGenerationError("Todos os providers do pool de imagem falharam: " + " | ".join(errors))
+    details = "\n".join(f"- {item}" for item in errors) if errors else "- Nenhum detalhe foi devolvido pelos providers."
+    raise MediaGenerationError(
+        "Todos os providers do pool de imagem falharam. Tentativas realizadas:\n" + details,
+        provider_errors=errors,
+    )
 
 
 def _video_endpoint(card: Mapping[str, Any]) -> str:
