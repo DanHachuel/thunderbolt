@@ -835,3 +835,5 @@ Configure primeiro **Configurações > Configuração API > API Keys Upload > Co
 Quando o provider ainda não estiver conectado, use **Autorizar toolkit no Composio**. O Thunderbolt apresenta o Connect Link devolvido pelo Composio; conclua a autorização nesse link e repita o envio. O Thunderbolt não implementa nem armazena um fluxo OAuth próprio.
 
 Antes de clicar em **Enviar vídeo via Composio**, confirme o vídeo, o toolkit, o slug da ferramenta, o campo do ficheiro e os argumentos JSON. O resultado guarda apenas um registo local mínimo com o estado e, quando devolvido, o `log_id` do Composio. URLs presigned, tokens, headers e a API key não são guardados no histórico.
+
+Na **Automação Youtube**, Composio é a rota padrão quando a integração está activa e tem API key, slug da ferramenta e campo do ficheiro configurados. A ordem automática passa a ser **Composio → API Oficial → Upload directo → Postiz**. Se Composio falhar ou não estiver configurado, o worker tenta os fallbacks disponíveis e mantém o comportamento de publicação existente.

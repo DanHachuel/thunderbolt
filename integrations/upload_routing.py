@@ -1,9 +1,10 @@
 """Ordered YouTube upload routing for Thunderbolt.
 
 The route is intentionally deterministic:
-1. Official YouTube API, up to five successful sends per Google account/day.
-2. Internal browser-session upload, when the account document is complete.
-3. Postiz, when configured with an API key and integration ID.
+1. Composio, when the configured upload tool is available.
+2. Official YouTube API, up to five successful sends per Google account/day.
+3. Internal browser-session upload, when the account document is complete.
+4. Postiz, when configured with an API key and integration ID.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from integrations.postiz import PostizAdapter
 from integrations.session_info_health import check_account_session_info_health, emit_session_info_health_alerts
 from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
+from integrations.composio_upload import ComposioUploadError, execute_upload
 from hermes_ui.storage import read_json, write_json
 
 OFFICIAL_DAILY_LIMIT = 5
@@ -91,8 +93,32 @@ def upload_with_default_route(
     official_uploader: Callable[..., IntegrationResult] | None = None,
     direct_uploader: Callable[..., IntegrationResult] | None = None,
     postiz_publisher: Callable[..., IntegrationResult] | None = None,
+    composio_publisher: Callable[..., IntegrationResult] | None = None,
 ) -> IntegrationResult:
     attempts: list[dict[str, Any]] = []
+    composio_enabled = bool(settings.get("composio_enabled", False)) and bool(settings.get("composio_auto_upload", True))
+    composio_ready = composio_enabled and bool(settings.get("composio_api_key")) and bool(settings.get("composio_tool_slug"))
+    if composio_enabled and not composio_ready:
+        composio_result = IntegrationResult(False, "Composio está activo, mas falta API key ou slug da ferramenta de upload.", {})
+        attempts.append(_attempt_record("Composio", composio_result, skipped=True))
+    elif composio_ready:
+        composio_publisher = composio_publisher or _composio_upload
+        try:
+            composio_result = composio_publisher(
+                settings,
+                video_path=video_path,
+                title=title,
+                description=description,
+                tags=tags or [],
+                thumbnail_path=thumbnail_path,
+                captions_path=captions_path,
+            )
+        except Exception as exc:
+            composio_result = IntegrationResult(False, f"Composio falhou: {type(exc).__name__}: {exc}", {})
+        attempts.append(_attempt_record("Composio", composio_result))
+        if composio_result.ok:
+            return _result_with_attempts(composio_result, attempts, "Composio")
+
     quota_count = official_upload_count(channel, account)
     if quota_count >= OFFICIAL_DAILY_LIMIT:
         quota_result = IntegrationResult(False, f"Limite local de {OFFICIAL_DAILY_LIMIT} envios oficiais por conta Google atingido hoje; a tentar o próximo método.", {"count": quota_count, "limit": OFFICIAL_DAILY_LIMIT})
@@ -184,3 +210,22 @@ def upload_with_default_route(
             return _result_with_attempts(postiz_result, attempts, "Postiz")
 
     return IntegrationResult(False, "Nenhum método de envio conseguiu publicar o vídeo.", {"attempts": attempts, "route": "none"})
+
+
+def _composio_upload(settings: dict[str, Any], **kwargs: Any) -> IntegrationResult:
+    try:
+        result = execute_upload(
+            str(settings.get("composio_api_key") or ""),
+            str(settings.get("composio_user_id") or ""),
+            str(settings.get("composio_tool_slug") or ""),
+            str(kwargs.get("video_path") or ""),
+            str(settings.get("composio_file_field") or "file"),
+            str(settings.get("composio_arguments_json") or "{}"),
+        )
+    except ComposioUploadError as exc:
+        return IntegrationResult(False, str(exc), {})
+    return IntegrationResult(
+        bool(result.get("successful")),
+        str(result.get("error") or "Upload via Composio concluído."),
+        {"composio_data": result.get("data") or {}, "log_id": result.get("log_id") or ""},
+    )

@@ -7167,9 +7167,13 @@ def render_settings():
         with st.expander("Composio", expanded=False):
             st.caption("A API key é guardada apenas no storage local. O slug da ferramenta e o provider são descobertos no Upload via Composio; a autenticação da conta é feita pelo Connect Link do Composio.")
             composio_enabled = st.checkbox("Activar Composio", value=bool(settings.get("composio_enabled", False)), key="upload_composio_enabled")
+            composio_auto_upload = st.checkbox("Usar Composio por defeito na Automação Youtube", value=bool(settings.get("composio_auto_upload", True)), key="upload_composio_auto_upload", help="Quando estiver configurado, Composio é tentado antes da API Oficial, Upload directo e Postiz.")
             composio_api_key = st.text_input("Composio API key", value=str(settings.get("composio_api_key") or ""), type="password", key="upload_composio_api_key", help="Use a API key de projecto do Composio Platform. Nunca coloque esta chave no GitHub, em URLs ou em mensagens.")
             composio_user_id = st.text_input("Composio user ID", value=str(settings.get("composio_user_id") or "thunderbolt-local"), key="upload_composio_user_id", help="Identidade estável usada para associar as contas conectadas no Composio.")
             composio_toolkit = st.text_input("Toolkit preferido (opcional)", value=str(settings.get("composio_toolkit") or ""), key="upload_composio_toolkit", help="Deixe vazio para descobrir ferramentas em todos os toolkits.")
+            composio_tool_slug = st.text_input("Slug da ferramenta para Automação Youtube", value=str(settings.get("composio_tool_slug") or ""), key="upload_composio_tool_slug", help="Depois de descobrir uma ferramenta em Upload via Composio, copie aqui o slug para a Automação Youtube.")
+            composio_file_field = st.text_input("Campo do ficheiro na ferramenta", value=str(settings.get("composio_file_field") or "file"), key="upload_composio_file_field")
+            composio_arguments_json = st.text_area("Argumentos JSON da Automação Youtube", value=str(settings.get("composio_arguments_json") or "{}"), key="upload_composio_arguments_json", height=120)
             _render_credential_status(composio_api_key)
             composio_action_cols = st.columns(2)
             with composio_action_cols[0]:
@@ -7177,7 +7181,7 @@ def render_settings():
             with composio_action_cols[1]:
                 test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
             if save_composio:
-                settings.update({"composio_enabled": bool(composio_enabled), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip()})
+                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip(), "composio_tool_slug": composio_tool_slug.strip(), "composio_file_field": composio_file_field.strip() or "file", "composio_arguments_json": composio_arguments_json.strip() or "{}"})
                 write_json("settings.json", settings)
                 st.success("Configuração Composio guardada.")
                 st.rerun()
