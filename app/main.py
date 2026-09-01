@@ -4371,6 +4371,22 @@ def _task_thumbnail_path(task: dict[str, Any]) -> Path | None:
     return None
 
 
+def _task_artifact_path(task: dict[str, Any], *names: str) -> Path | None:
+    """Resolve um artefacto local, incluindo caminhos relativos e legados."""
+    artifacts = task.get("artifacts") if isinstance(task.get("artifacts"), dict) else {}
+    for name in names:
+        raw = str(artifacts.get(name) or "").strip()
+        if not raw or raw.startswith(("http://", "https://")):
+            continue
+        candidates = [Path(raw)]
+        if not Path(raw).is_absolute():
+            candidates.extend([STORAGE / raw, STORAGE / "videos" / raw])
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
+    return None
+
+
 def _is_music_task(task: dict[str, Any]) -> bool:
     """Identify music pipeline tasks without conflating them with ordinary video tasks."""
     return bool(task.get("music_mode")) or str(task.get("style_wide") or task.get("style") or "").strip().casefold() in {"music", "música"}
@@ -4921,15 +4937,41 @@ def render_automation():
         st.info("Ainda não existem vídeos cadastrados.")
     for task in tasks:
         with st.container(border=True):
-            task_cols = st.columns([2.25, 1.65, 1.15, 1.85])
+            task_cols = st.columns([2.25, 1.55, 1.05, 2.15], gap="small")
+            script_path = _task_artifact_path(task, "script")
+            video_path = _task_artifact_path(task, "video")
+            thumbnail_path = _task_thumbnail_path(task)
+            thumbnail_prompt_path = _task_artifact_path(task, "thumbnail_prompt_json")
+            thumbnail_prompt = str(task.get("thumbnail_prompt") or "").strip()
             with task_cols[0]:
-                thumbnail_path = _task_thumbnail_path(task)
                 if thumbnail_path:
-                    st.image(thumbnail_path, width=180, caption="Thumbnail")
+                    st.image(str(thumbnail_path), width=180, caption="Thumbnail")
                 else:
                     st.caption("Thumbnail ainda não pronta")
                 st.write(f"**{task.get('topic', 'Sem tópico')}**")
                 st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
+                thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
+                with thumbnail_download_col:
+                    st.download_button(
+                        "Baixar Thumbnail",
+                        data=thumbnail_path.read_bytes() if thumbnail_path else b"",
+                        file_name=thumbnail_path.name if thumbnail_path else "thumbnail.png",
+                        mime="image/png",
+                        key=f"automation_download_thumbnail_{task['id']}",
+                        use_container_width=True,
+                        disabled=thumbnail_path is None,
+                    )
+                with prompt_download_col:
+                    prompt_data = thumbnail_prompt_path.read_bytes() if thumbnail_prompt_path else thumbnail_prompt.encode("utf-8")
+                    st.download_button(
+                        "Baixar Thumbnail Prompt",
+                        data=prompt_data,
+                        file_name=thumbnail_prompt_path.name if thumbnail_prompt_path else "thumbnail-prompt.txt",
+                        mime="application/json" if thumbnail_prompt_path else "text/plain",
+                        key=f"automation_download_thumbnail_prompt_{task['id']}",
+                        use_container_width=True,
+                        disabled=thumbnail_prompt_path is None and not thumbnail_prompt,
+                    )
             with task_cols[1]:
                 _render_video_task_state(task)
             with task_cols[2]:
@@ -4949,6 +4991,27 @@ def render_automation():
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
                         stop_task_by_user(task["id"])
                         st.rerun()
+                script_download_col, video_download_col = st.columns(2, gap="small")
+                with script_download_col:
+                    st.download_button(
+                        "Baixar Roteiro",
+                        data=script_path.read_bytes() if script_path else b"",
+                        file_name=script_path.name if script_path else "roteiro.md",
+                        mime="text/markdown",
+                        key=f"automation_download_script_{task['id']}",
+                        use_container_width=True,
+                        disabled=script_path is None,
+                    )
+                with video_download_col:
+                    st.download_button(
+                        "Baixar Vídeo",
+                        data=video_path.read_bytes() if video_path else b"",
+                        file_name=video_path.name if video_path else "video.mp4",
+                        mime="video/mp4",
+                        key=f"automation_download_video_{task['id']}",
+                        use_container_width=True,
+                        disabled=video_path is None,
+                    )
                 with delete_col:
                     confirm_delete_key = f"automation_confirm_delete_{task['id']}"
                     if st.button("Apagar", key=f"automation_delete_{task['id']}", use_container_width=True, disabled=state == "doing"):
