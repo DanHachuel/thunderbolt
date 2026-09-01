@@ -60,13 +60,11 @@ def test_restart_current_process_reexecutes_the_same_python_command(monkeypatch)
 
 def test_restart_current_process_requests_launcher_restart(monkeypatch):
     monkeypatch.setenv("THUNDERBOLT_LAUNCHER_RESTART", "1")
+    exit_codes = []
 
-    try:
-        update_manager.restart_current_process()
-    except SystemExit as exc:
-        assert exc.code == update_manager.LAUNCHER_RESTART_EXIT_CODE
-    else:
-        raise AssertionError("o processo deveria devolver o código de reinício ao launcher")
+    update_manager.restart_current_process(exit_fn=exit_codes.append)
+
+    assert exit_codes == [update_manager.LAUNCHER_RESTART_EXIT_CODE]
 
 
 def test_update_does_not_run_when_the_package_is_already_current():

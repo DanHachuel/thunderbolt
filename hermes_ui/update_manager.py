@@ -44,10 +44,11 @@ class UpdateResult:
     restart_required: bool = False
 
 
-def restart_current_process(*, exec_fn: Callable[..., Any] = os.execv) -> None:
+def restart_current_process(*, exec_fn: Callable[..., Any] = os.execv, exit_fn: Callable[[int], Any] = os._exit) -> None:
     """Ask the launcher to restart Streamlit, or re-exec standalone callers."""
     if os.environ.get("THUNDERBOLT_LAUNCHER_RESTART") == "1":
-        raise SystemExit(LAUNCHER_RESTART_EXIT_CODE)
+        exit_fn(LAUNCHER_RESTART_EXIT_CODE)
+        return
     executable = sys.executable
     exec_fn(executable, [executable, *sys.argv])
 
