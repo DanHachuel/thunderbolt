@@ -2109,15 +2109,29 @@ def render_channels():
         col1, col2 = st.columns([1, 1])
         with col1:
             if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
-                if lookup_mode.startswith("Página pública"):
-                    result = youtube.fetch_channel_public(source)
-                elif not youtube.api_key:
-                    result = IntegrationResult(False, "A YouTube Data API Key não está configurada. Escolha a opção Página pública — sem API Key ou configure a chave em Configurações > Contas Google.", {"status": "api_key_not_configured"})
+                search_source = str(source or "").strip()
+                st.session_state.pop("yt_import", None)
+                st.session_state.pop("yt_message", None)
+                st.session_state.pop("yt_ok", None)
+                if not search_source:
+                    st.session_state["yt_message"] = "Introduza um URL youtube.com, um handle @nome ou um ID de canal UC... antes de pesquisar."
+                    st.session_state["yt_ok"] = False
                 else:
-                    result = youtube.fetch_channel(source)
-                st.session_state["yt_import"] = result.data
-                st.session_state["yt_message"] = result.message
-                st.session_state["yt_ok"] = result.ok
+                    try:
+                        with st.spinner("A pesquisar o canal no YouTube…"):
+                            if lookup_mode.startswith("Página pública"):
+                                result = youtube.fetch_channel_public(search_source)
+                            elif not youtube.api_key:
+                                result = IntegrationResult(False, "A YouTube Data API Key não está configurada. Escolha a opção Página pública — sem API Key ou configure a chave em Configurações > Contas Google.", {"status": "api_key_not_configured"})
+                            else:
+                                result = youtube.fetch_channel(search_source)
+                        st.session_state["yt_import"] = result.data if isinstance(result.data, dict) else {}
+                        st.session_state["yt_message"] = result.message
+                        st.session_state["yt_ok"] = result.ok
+                    except Exception as exc:
+                        st.session_state["yt_import"] = {}
+                        st.session_state["yt_message"] = f"A pesquisa do YouTube falhou ({type(exc).__name__}). Confirme o URL/handle e tente novamente. Detalhe: {str(exc)[:240]}"
+                        st.session_state["yt_ok"] = False
         with col2:
             if st.button("Limpar importação", use_container_width=True, key="youtube_channel_clear"):
                 for key in ("yt_import", "yt_message", "yt_ok"):
