@@ -20,6 +20,7 @@ from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.composio_upload import ComposioUploadError, execute_upload
 from hermes_ui.storage import read_json, write_json
+from hermes_ui.languages import language_locale
 
 OFFICIAL_DAILY_LIMIT = 5
 QUOTA_FILENAME = "official_upload_quota.json"
@@ -108,6 +109,9 @@ def upload_with_default_route(
                 settings,
                 channel=channel,
                 video_path=video_path,
+                category_id=category_id,
+                language=language or channel.get("language") or "pt-BR",
+                privacy_status=privacy_status or "unlisted",
                 title=title,
                 description=description,
                 tags=tags or [],
@@ -226,10 +230,21 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
         parsed_arguments = json.loads(arguments)
         if not isinstance(parsed_arguments, dict):
             return IntegrationResult(False, "Composio não foi executado: os argumentos JSON devem ser um objecto.", {})
-        configured_channel = parsed_arguments.get(channel_field)
-        if configured_channel not in (None, "", channel_id):
-            return IntegrationResult(False, f"Composio bloqueado: o campo `{channel_field}` aponta para outro canal.", {"expected_channel_id": channel_id})
-        parsed_arguments[channel_field] = channel_id
+        locked_values = {
+            channel_field: channel_id,
+            str(settings.get("composio_privacy_field") or "privacy_status").strip(): str(kwargs.get("privacy_status") or "unlisted"),
+            str(settings.get("composio_category_field") or "category_id").strip(): str(kwargs.get("category_id") or "22"),
+            str(settings.get("composio_language_field") or "language").strip(): language_locale(kwargs.get("language") or channel.get("language") or "pt"),
+        }
+        for field, expected in locked_values.items():
+            if not field:
+                return IntegrationResult(False, "Composio não foi executado: existe um campo obrigatório vazio na configuração.", {})
+            configured_value = parsed_arguments.get(field)
+            if configured_value not in (None, "", expected):
+                if field == channel_field:
+                    return IntegrationResult(False, f"Composio bloqueado: o campo `{field}` aponta para outro canal.", {"field": field, "expected": expected})
+                return IntegrationResult(False, f"Composio bloqueado: o campo `{field}` tem um valor diferente do upload oficial ({expected}).", {"field": field, "expected": expected})
+            parsed_arguments[field] = expected
         result = execute_upload(
             str(settings.get("composio_api_key") or ""),
             str(settings.get("composio_user_id") or ""),
