@@ -242,23 +242,49 @@ const pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
   env: runtimeEnv,
   windowsHide: false,
 });
-const child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
-  cwd: root,
-  stdio: "ignore",
-  env: runtimeEnv,
-  windowsHide: false,
-});
+const restartExitCode = 75;
+let shuttingDown = false;
+let child;
+
+function startStreamlit() {
+  child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
+    cwd: root,
+    stdio: "ignore",
+    env: { ...runtimeEnv, THUNDERBOLT_LAUNCHER_RESTART: "1" },
+    windowsHide: false,
+  });
+  child.on("exit", (code, signal) => {
+    if (shuttingDown) {
+      stopWorker();
+      process.exit(code ?? (signal ? 1 : 0));
+    }
+    if (code === restartExitCode) {
+      const executable = platform() === "win32" ? "npx.cmd" : "npx";
+      const replacement = spawn(executable, ["--yes", "--prefer-online", "@danhachuel/thunderbolt"], {
+        cwd: userHome,
+        env: process.env,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+      replacement.unref();
+      stopWorker();
+      process.exit(0);
+    }
+    stopWorker();
+    process.exit(code ?? (signal ? 1 : 0));
+  });
+}
+
+startStreamlit();
 
 const stopWorker = () => {
+  shuttingDown = true;
   proxy.close();
   if (!worker.killed) worker.kill();
   if (!pipelineWorker.killed) pipelineWorker.kill();
 };
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
-child.on("exit", (code, signal) => {
-  stopWorker();
-  process.exit(code ?? (signal ? 1 : 0));
-});
 worker.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
 pipelineWorker.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));

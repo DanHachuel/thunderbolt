@@ -58,6 +58,17 @@ def test_restart_current_process_reexecutes_the_same_python_command(monkeypatch)
     assert calls == [("/python", ["/python", "-m", "streamlit", "run", "app/main.py"])]
 
 
+def test_restart_current_process_requests_launcher_restart(monkeypatch):
+    monkeypatch.setenv("THUNDERBOLT_LAUNCHER_RESTART", "1")
+
+    try:
+        update_manager.restart_current_process()
+    except SystemExit as exc:
+        assert exc.code == update_manager.LAUNCHER_RESTART_EXIT_CODE
+    else:
+        raise AssertionError("o processo deveria devolver o código de reinício ao launcher")
+
+
 def test_update_does_not_run_when_the_package_is_already_current():
     result = update_manager.update_to_latest(
         "0.3.97",
@@ -112,3 +123,12 @@ def test_version_label_keeps_the_two_digit_patch_convention():
     assert "def display_version(version: str)" in source
     assert 'f"{int(parts[0])}.{int(parts[1])}.{int(parts[2]):02d}"' in source
     assert "APP_VERSION_LABEL = display_version(APP_VERSION)" in source
+
+
+def test_launcher_restarts_from_the_new_npm_package_after_update():
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+    assert 'THUNDERBOLT_LAUNCHER_RESTART: "1"' in source
+    assert "const restartExitCode = 75;" in source
+    assert '"--prefer-online", "@danhachuel/thunderbolt"' in source
+    assert "detached: true" in source
+    assert "replacement.unref()" in source
