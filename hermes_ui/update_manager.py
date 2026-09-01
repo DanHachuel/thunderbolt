@@ -18,6 +18,7 @@ import requests
 PACKAGE_NAME = "@danhachuel/thunderbolt"
 REGISTRY_URL = "https://registry.npmjs.org/@danhachuel/thunderbolt/latest"
 UPDATE_TIMEOUT_SECONDS = 20 * 60
+LAUNCHER_RESTART_EXIT_CODE = 75
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,9 @@ class UpdateResult:
 
 
 def restart_current_process(*, exec_fn: Callable[..., Any] = os.execv) -> None:
-    """Replace the running Streamlit process with the same command line."""
+    """Ask the launcher to restart Streamlit, or re-exec standalone callers."""
+    if os.environ.get("THUNDERBOLT_LAUNCHER_RESTART") == "1":
+        raise SystemExit(LAUNCHER_RESTART_EXIT_CODE)
     executable = sys.executable
     exec_fn(executable, [executable, *sys.argv])
 
