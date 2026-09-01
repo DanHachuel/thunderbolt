@@ -13,9 +13,11 @@ def test_youtube_channel_delete_ui_has_confirmation_and_persistence_call():
     assert 'st.rerun()' in block
 
 
-def test_youtube_channel_page_does_not_render_unfiltered_channel_records():
+def test_youtube_channel_page_filters_both_table_and_card_loops():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
     start = source.index('def render_channels():')
     end = source.index('def render_', start + 20)
     block = source[start:end]
-    assert 'channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]' in block
+    expected = 'is_youtube_channel_record(channel)'
+    assert block.count(expected) >= 2
+    assert '\n    channels = read_json("channels.json", [])' not in block
