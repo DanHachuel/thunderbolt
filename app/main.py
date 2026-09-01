@@ -2328,7 +2328,10 @@ def render_channels():
 
         st.divider()
         st.subheader("Canais cadastrados")
-        registered_channels = read_json("channels.json", [])
+        registered_channels = [
+            channel for channel in read_json("channels.json", [])
+            if isinstance(channel, dict) and str(channel.get("platform") or "youtube").strip().lower() != "tiktok"
+        ]
         if not registered_channels:
             st.info("Nenhum canal cadastrado.")
         else:
