@@ -2565,7 +2565,7 @@ def render_channels():
                     st.success(f"Canal {channel['name']} guardado manualmente.")
                     st.rerun()
 
-    channels = read_json("channels.json", [])
+    channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
     if not channels:
         return
     for channel in channels:
@@ -2600,6 +2600,22 @@ def render_channels():
                     delete_key = f"delete_pending_{channel_id}"
                     if st.button("Apagar", key=f"delete_{channel_id}", use_container_width=True):
                         st.session_state[delete_key] = True
+                        st.rerun()
+            if st.session_state.get(delete_key):
+                st.warning("Apagar este canal YouTube e os dados locais associados?")
+                confirm_cols = st.columns(2)
+                with confirm_cols[0]:
+                    if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_{channel_id}"):
+                        removed = delete_channel(channel_id)
+                        st.session_state.pop(delete_key, None)
+                        if removed is None:
+                            st.error("O canal já não existe ou não pôde ser removido.")
+                        else:
+                            st.success(f"Canal {removed.get('name') or channel_id} apagado.")
+                            st.rerun()
+                with confirm_cols[1]:
+                    if st.button("Cancelar", key=f"cancel_delete_{channel_id}"):
+                        st.session_state.pop(delete_key, None)
                         st.rerun()
             if st.session_state.get(edit_key):
                 render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
