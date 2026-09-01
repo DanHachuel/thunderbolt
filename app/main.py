@@ -2091,15 +2091,17 @@ def is_youtube_channel_record(channel: Any) -> bool:
     if not isinstance(channel, dict):
         return False
     platform = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
-    if platform in {"tiktok", "tik-tok"}:
+    if "tiktok" in platform or platform in {"tik-tok", "tt"}:
         return False
-    for field in ("url", "profile_url", "source_url", "import_source", "metrics_source", "provider", "network"):
-        value = str(channel.get(field) or "").strip().casefold()
-        if "tiktok.com" in value or value.startswith("tiktok") or value == "tik-tok":
-            return False
-    for field in ("tiktok_id", "tiktok_username", "tiktok_handle", "tiktok_user_id", "tiktok_open_id"):
-        if str(channel.get(field) or "").strip():
-            return False
+    def contains_tiktok_marker(value: Any) -> bool:
+        if isinstance(value, dict):
+            return any(contains_tiktok_marker(key) or contains_tiktok_marker(item) for key, item in value.items())
+        if isinstance(value, (list, tuple, set)):
+            return any(contains_tiktok_marker(item) for item in value)
+        return "tiktok" in str(value or "").strip().casefold().replace(" ", "") or str(value or "").strip().casefold() == "tik-tok"
+
+    if contains_tiktok_marker(channel):
+        return False
     return True
 
 
