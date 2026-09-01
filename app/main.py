@@ -2086,6 +2086,23 @@ def render_tiktok_channels():
                 update_channel(channel["id"], {"platform": "tiktok"})
                 st.success("Canal TikTok cadastrado.")
                 st.rerun()
+def is_youtube_channel_record(channel: Any) -> bool:
+    """Return whether a persisted channel belongs in the YouTube UI."""
+    if not isinstance(channel, dict):
+        return False
+    platform = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
+    if platform in {"tiktok", "tik-tok"}:
+        return False
+    for field in ("url", "profile_url", "source_url", "import_source", "metrics_source", "provider", "network"):
+        value = str(channel.get(field) or "").strip().casefold()
+        if "tiktok.com" in value or value.startswith("tiktok") or value == "tik-tok":
+            return False
+    for field in ("tiktok_id", "tiktok_username", "tiktok_handle", "tiktok_user_id", "tiktok_open_id"):
+        if str(channel.get(field) or "").strip():
+            return False
+    return True
+
+
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -2342,10 +2359,7 @@ def render_channels():
 
         st.divider()
         st.subheader("Canais cadastrados")
-        registered_channels = [
-            channel for channel in read_json("channels.json", [])
-            if isinstance(channel, dict) and str(channel.get("platform") or "youtube").strip().lower() != "tiktok"
-        ]
+        registered_channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
         if not registered_channels:
             st.info("Nenhum canal cadastrado.")
         else:
