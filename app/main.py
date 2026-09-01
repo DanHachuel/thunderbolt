@@ -1856,7 +1856,7 @@ def format_metric_number(value: Any) -> str:
 
 
 def classify_channel_platform(channel: Any) -> str:
-    """Return the persisted platform, or unknown when it is not explicit."""
+    """Classify channels while keeping legacy YouTube records visible."""
     if not isinstance(channel, dict):
         return "unknown"
     value = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
@@ -1864,7 +1864,14 @@ def classify_channel_platform(channel: Any) -> str:
         return "youtube"
     if value in {"tiktok", "tik-tok", "tt"}:
         return "tiktok"
-    return "unknown"
+    def has_tiktok_marker(item: Any) -> bool:
+        if isinstance(item, dict):
+            return any(has_tiktok_marker(key) or has_tiktok_marker(value) for key, value in item.items())
+        if isinstance(item, (list, tuple, set)):
+            return any(has_tiktok_marker(value) for value in item)
+        normalized = str(item or "").strip().casefold().replace(" ", "")
+        return "tiktok" in normalized or normalized == "tik-tok"
+    return "tiktok" if has_tiktok_marker(channel) else "youtube"
 
 
 def _tiktok_channel_records() -> list[dict[str, Any]]:
