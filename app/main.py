@@ -81,7 +81,7 @@ from hermes_ui.thumbnails import (
 )
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords, generate_video_update_metadata
-from hermes_ui.media_generation import MediaGenerationError, generate_image_for_card, generate_video_for_card
+from hermes_ui.media_generation import MediaGenerationError, format_media_generation_error, generate_image_for_card, generate_video_for_card
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.youtube_update import YOUTUBE_UPDATE_VIDEO, YouTubeVideoUpdater
@@ -4662,6 +4662,8 @@ def render_thumbnails():
                         )
                         st.success("Lettering refeito; a imagem original foi usada como base.")
                         st.rerun()
+                    except MediaGenerationError as exc:
+                        st.error(format_media_generation_error(exc, operation="refazer o lettering da thumbnail"))
                     except ThumbnailGenerationError as exc:
                         st.error(str(exc))
 

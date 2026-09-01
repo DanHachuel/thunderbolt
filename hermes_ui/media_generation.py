@@ -12,6 +12,7 @@ import binascii
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -47,6 +48,35 @@ class MediaGenerationError(RuntimeError):
     def __init__(self, message: str, *, provider_errors: list[str] | None = None) -> None:
         super().__init__(message)
         self.provider_errors = list(provider_errors or [])
+
+
+def format_media_generation_error(exc: MediaGenerationError, *, operation: str = "gerar a imagem") -> str:
+    """Return a concise Portuguese diagnostic instead of exposing only a traceback."""
+    text = str(exc or "").strip()
+    errors = list(exc.provider_errors or [])
+    if errors:
+        status_codes = [int(match.group(1)) for item in errors for match in [re.search(r"\bHTTP\s+(\d{3})\b", str(item), re.IGNORECASE)] if match]
+        if any(code in {401, 403} for code in status_codes):
+            code = f"IMG_AUTH_HTTP_{next(code for code in status_codes if code in {401, 403})}"
+            cause = "a API key está ausente, inválida ou sem permissão para este provider"
+            action = "confirme a API key, o endpoint e as permissões em Configurações > Configuração API > API Keys"
+        elif any(code == 402 for code in status_codes):
+            code, cause, action = "IMG_QUOTA_HTTP_402", "o provider recusou a chamada por quota, créditos ou facturação", "confirme o saldo/plano do provider ou seleccione outro provider activo"
+        elif any(code == 404 for code in status_codes):
+            code, cause, action = "IMG_ENDPOINT_HTTP_404", "o endpoint ou modelo configurado não existe", "confirme a Base URL e o Modelo no cartão do provider"
+        elif any(code in {408, 429} for code in status_codes):
+            code = f"IMG_RATE_LIMIT_HTTP_{next(code for code in status_codes if code in {408, 429})}"
+            cause = "o provider está limitado ou não respondeu dentro do tempo permitido"
+            action = "aguarde alguns instantes, reduza a frequência ou use outro provider activo"
+        elif any(code >= 500 for code in status_codes):
+            code, cause, action = "IMG_PROVIDER_HTTP_5XX", "o serviço do provider devolveu um erro temporário", "tente novamente mais tarde ou use outro provider activo"
+        else:
+            code, cause, action = "IMG_PROVIDER_REQUEST_FAILED", "o provider rejeitou a chamada", "confirme o modelo, endpoint, formato da API key e os campos obrigatórios"
+        details = "; ".join(str(item)[:220] for item in errors)
+        return f"Não foi possível {operation}. Código: {code}. Causa provável: {cause}. Acção: {action}. Detalhes: {details}"
+    if "Não existem providers activos" in text:
+        return f"Não foi possível {operation}. Código: IMG_NO_ACTIVE_PROVIDER. Causa provável: não existe nenhum provider activo no pool de imagem. Acção: active um cartão em Configurações > Configuração API > LLM — providers e modelos / Imagem e Video IA."
+    return f"Não foi possível {operation}. Código: IMG_GENERATION_FAILED. Causa: {text or 'o provider não devolveu uma imagem utilizável'}. Acção: confirme a configuração do provider e tente novamente."
 
 
 AGNES_IMAGE_MODEL = "agnes-image-2.1-flash"
@@ -330,7 +360,15 @@ def generate_image_for_card(
     try:
         routed = route_json_request(settings, pool=POOL_IMAGE, cards=[card], request=request)
     except ProviderRoutingError as exc:
-        raise MediaGenerationError(str(exc)) from exc
+        attempts = list(getattr(exc, "attempts", []) or [])
+        provider_errors = []
+        for attempt in attempts:
+            provider = str(attempt.get("provider") or "provider")
+            status_code = attempt.get("status_code")
+            error = str(attempt.get("error") or "falha sem detalhe")
+            prefix = f"HTTP {int(status_code)}: " if status_code else ""
+            provider_errors.append(f"{provider}: {prefix}{error[:180]}")
+        raise MediaGenerationError(str(exc), provider_errors=provider_errors) from exc
     image_bytes, url = _image_value(routed.payload)
     if not image_bytes and not url:
         request_id = _image_request_id(routed.payload)
