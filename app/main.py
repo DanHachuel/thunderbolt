@@ -4349,6 +4349,28 @@ def load_video_tasks_for_catalog() -> list[dict[str, Any]]:
     return [task for task in saved if isinstance(task, dict) and str(task.get("id") or "").strip()]
 
 
+def _task_thumbnail_path(task: dict[str, Any]) -> Path | None:
+    """Resolve a generated thumbnail from current and legacy task fields."""
+    artifacts = task.get("artifacts") if isinstance(task.get("artifacts"), dict) else {}
+    candidates = [
+        artifacts.get("thumbnail"),
+        artifacts.get("cover"),
+        task.get("thumbnail_path"),
+        task.get("thumbnail_url"),
+    ]
+    for candidate in candidates:
+        raw = str(candidate or "").strip()
+        if not raw or raw.startswith(("http://", "https://")):
+            continue
+        paths = [Path(raw)]
+        if not Path(raw).is_absolute():
+            paths.extend([STORAGE / raw, STORAGE / "videos" / raw])
+        for path in paths:
+            if path.is_file():
+                return path
+    return None
+
+
 def _is_music_task(task: dict[str, Any]) -> bool:
     """Identify music pipeline tasks without conflating them with ordinary video tasks."""
     return bool(task.get("music_mode")) or str(task.get("style_wide") or task.get("style") or "").strip().casefold() in {"music", "música"}
@@ -4901,6 +4923,11 @@ def render_automation():
         with st.container(border=True):
             task_cols = st.columns([2.25, 1.65, 1.15, 1.85])
             with task_cols[0]:
+                thumbnail_path = _task_thumbnail_path(task)
+                if thumbnail_path:
+                    st.image(thumbnail_path, width=180, caption="Thumbnail")
+                else:
+                    st.caption("Thumbnail ainda não pronta")
                 st.write(f"**{task.get('topic', 'Sem tópico')}**")
                 st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
             with task_cols[1]:
