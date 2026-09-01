@@ -7206,6 +7206,9 @@ def render_settings():
             composio_tool_slug = st.text_input("Slug da ferramenta para Automação Youtube", value=str(settings.get("composio_tool_slug") or ""), key="upload_composio_tool_slug", help="Depois de descobrir uma ferramenta em Upload via Composio, copie aqui o slug para a Automação Youtube.")
             composio_file_field = st.text_input("Campo do ficheiro na ferramenta", value=str(settings.get("composio_file_field") or "file"), key="upload_composio_file_field")
             composio_channel_field = st.text_input("Campo do canal na ferramenta", value=str(settings.get("composio_channel_field") or "channel_id"), key="upload_composio_channel_field", help="O worker substitui este campo pelo YouTube channel ID do canal da tarefa, impedindo o envio para outro canal.")
+            composio_privacy_field = st.text_input("Campo de privacidade", value=str(settings.get("composio_privacy_field") or "privacy_status"), key="upload_composio_privacy_field", help="Recebe sempre `unlisted` (Não listado), como no upload oficial.")
+            composio_category_field = st.text_input("Campo de categoria", value=str(settings.get("composio_category_field") or "category_id"), key="upload_composio_category_field", help="Recebe sempre `22`, categoria Pessoas e blogs, como no upload oficial.")
+            composio_language_field = st.text_input("Campo de idioma", value=str(settings.get("composio_language_field") or "language"), key="upload_composio_language_field", help="Recebe o locale do idioma do vídeo/canal, por exemplo `pt-BR`.")
             composio_arguments_json = st.text_area("Argumentos JSON da Automação Youtube", value=str(settings.get("composio_arguments_json") or "{}"), key="upload_composio_arguments_json", height=120)
             _render_credential_status(composio_api_key)
             composio_action_cols = st.columns(2)
@@ -7214,7 +7217,7 @@ def render_settings():
             with composio_action_cols[1]:
                 test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
             if save_composio:
-                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip(), "composio_tool_slug": composio_tool_slug.strip(), "composio_file_field": composio_file_field.strip() or "file", "composio_channel_field": composio_channel_field.strip() or "channel_id", "composio_arguments_json": composio_arguments_json.strip() or "{}"})
+                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip(), "composio_tool_slug": composio_tool_slug.strip(), "composio_file_field": composio_file_field.strip() or "file", "composio_channel_field": composio_channel_field.strip() or "channel_id", "composio_privacy_field": composio_privacy_field.strip() or "privacy_status", "composio_category_field": composio_category_field.strip() or "category_id", "composio_language_field": composio_language_field.strip() or "language", "composio_arguments_json": composio_arguments_json.strip() or "{}"})
                 write_json("settings.json", settings)
                 st.success("Configuração Composio guardada.")
                 st.rerun()

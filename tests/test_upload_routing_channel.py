@@ -37,7 +37,13 @@ def test_default_composio_route_injects_task_youtube_channel_id(monkeypatch, tmp
     )
     assert result.ok
     assert result.data["route"] == "Composio"
-    assert captured["arguments"] == {"title": "Demo", "channel_id": "UC-CORRECT"}
+    assert captured["arguments"] == {
+        "title": "Demo",
+        "channel_id": "UC-CORRECT",
+        "privacy_status": "unlisted",
+        "category_id": "22",
+        "language": "pt-BR",
+    }
     assert captured["file_field"] == "video"
 
 
