@@ -1855,8 +1855,20 @@ def format_metric_number(value: Any) -> str:
         return str(value)
 
 
+def classify_channel_platform(channel: Any) -> str:
+    """Return the persisted platform, or unknown when it is not explicit."""
+    if not isinstance(channel, dict):
+        return "unknown"
+    value = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
+    if value in {"youtube", "yt"}:
+        return "youtube"
+    if value in {"tiktok", "tik-tok", "tt"}:
+        return "tiktok"
+    return "unknown"
+
+
 def _tiktok_channel_records() -> list[dict[str, Any]]:
-    return [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform") == "tiktok"]
+    return [channel for channel in read_json("channels.json", []) if classify_channel_platform(channel) == "tiktok"]
 
 
 def _tiktok_avatar_url(value: dict[str, Any]) -> str:
@@ -2087,18 +2099,8 @@ def render_tiktok_channels():
                 st.success("Canal TikTok cadastrado.")
                 st.rerun()
 def is_youtube_channel_record(channel: Any) -> bool:
-    """Return whether a persisted channel is positively identified as YouTube."""
-    if not isinstance(channel, dict):
-        return False
-    platform = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
-    if platform == "youtube":
-        return True
-    if platform:
-        return False
-    youtube_id = str(channel.get("youtube_id") or channel.get("youtube_channel_id") or "").strip()
-    youtube_url = str(channel.get("url") or channel.get("profile_url") or channel.get("source_url") or "").strip().casefold()
-    source = str(channel.get("metrics_source") or channel.get("import_source") or "").strip().casefold()
-    return bool(youtube_id or "youtube.com" in youtube_url or source.startswith("youtube"))
+    """Return whether a persisted channel is explicitly identified as YouTube."""
+    return classify_channel_platform(channel) == "youtube"
 
 
 def render_channels():
@@ -2861,7 +2863,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
     create_tab = tabs[0]
     draft_tab = tabs[1] if len(tabs) > 1 else None
     with create_tab:
-        all_channels = [c for c in read_json("channels.json", []) if isinstance(c, dict) and ((channel_platform == "tiktok" and c.get("platform") == "tiktok") or (channel_platform != "tiktok" and c.get("platform", "youtube") != "tiktok"))]
+        all_channels = [c for c in read_json("channels.json", []) if classify_channel_platform(c) == channel_platform]
         active_channels = [c for c in all_channels if c.get("active", True)]
         if not all_channels:
             st.warning("Cadastre pelo menos um canal antes de criar vídeos.")
@@ -4804,7 +4806,7 @@ def render_automation():
         st.caption(f"Última verificação do worker: {last_tick}")
     if worker_status.get("last_error"):
         st.error(f"Último erro do worker: {worker_status['last_error']}")
-    channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform", "youtube") != "tiktok"]
+    channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
     if not channels:
         st.info("Nenhum canal cadastrado para configurar.")
     for channel in channels:
@@ -7900,7 +7902,7 @@ def render_update_youtube_videos():
     st.title("Update Youtube Vídeos")
     st.caption("Actualize título, descrição e thumbnail de vídeos publicados sem alterar o ficheiro de vídeo.")
     settings = read_json("settings.json", {})
-    channels = [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and channel.get("platform", "youtube") != "tiktok" and channel.get("active", True)]
+    channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel) and channel.get("active", True)]
     if not channels:
         st.info("Cadastre pelo menos um canal YouTube activo antes de actualizar vídeos.")
         return
