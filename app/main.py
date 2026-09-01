@@ -2087,22 +2087,18 @@ def render_tiktok_channels():
                 st.success("Canal TikTok cadastrado.")
                 st.rerun()
 def is_youtube_channel_record(channel: Any) -> bool:
-    """Return whether a persisted channel belongs in the YouTube UI."""
+    """Return whether a persisted channel is positively identified as YouTube."""
     if not isinstance(channel, dict):
         return False
     platform = str(channel.get("platform") or "").strip().casefold().replace(" ", "")
-    if "tiktok" in platform or platform in {"tik-tok", "tt"}:
+    if platform == "youtube":
+        return True
+    if platform:
         return False
-    def contains_tiktok_marker(value: Any) -> bool:
-        if isinstance(value, dict):
-            return any(contains_tiktok_marker(key) or contains_tiktok_marker(item) for key, item in value.items())
-        if isinstance(value, (list, tuple, set)):
-            return any(contains_tiktok_marker(item) for item in value)
-        return "tiktok" in str(value or "").strip().casefold().replace(" ", "") or str(value or "").strip().casefold() == "tik-tok"
-
-    if contains_tiktok_marker(channel):
-        return False
-    return True
+    youtube_id = str(channel.get("youtube_id") or channel.get("youtube_channel_id") or "").strip()
+    youtube_url = str(channel.get("url") or channel.get("profile_url") or channel.get("source_url") or "").strip().casefold()
+    source = str(channel.get("metrics_source") or channel.get("import_source") or "").strip().casefold()
+    return bool(youtube_id or "youtube.com" in youtube_url or source.startswith("youtube"))
 
 
 def render_channels():
@@ -2216,6 +2212,7 @@ def render_channels():
                             "video_count": int(video_count) or None,
                             "view_count": int(view_count) or None,
                             "metrics_source": imported.get("metrics_source", "youtube_public_page"),
+                            "platform": "youtube",
                         }
                         channel = create_channel(name, url, metadata)
                         st.success(f"Canal {channel['name']} guardado.")
@@ -2349,6 +2346,7 @@ def render_channels():
                             "metrics_source": "spreadsheet",
                             "import_source": "spreadsheet",
                             "description_source": description_status,
+                            "platform": "youtube",
                         }
                         created = create_channel(str(row.get("name") or "").strip(), str(row.get("url") or "").strip(), metadata)
                         current_channels.append(created)
@@ -2496,6 +2494,7 @@ def render_channels():
                                 "language": batch_language,
                                 "style_wide": style_value,
                                 "last_youtube_sync": now(),
+                                "platform": "youtube",
                             })
                             created_names.append(data.get("name", channel_id))
                         except Exception as exc:
@@ -2559,6 +2558,7 @@ def render_channels():
                         "video_count": int(video_count) or None,
                         "view_count": int(view_count) or None,
                         "metrics_source": "manual",
+                        "platform": "youtube",
                     })
                     st.success(f"Canal {channel['name']} guardado manualmente.")
                     st.rerun()
