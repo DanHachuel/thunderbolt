@@ -46,3 +46,18 @@ def test_canva_is_thumbnail_only_and_never_video():
     assert card in media_cards_for_pool({"media_provider_cards": [card]}, "image", thumbnail_only=True)
     assert card not in media_cards_for_pool({"media_provider_cards": [card]}, "image")
     assert media_cards_for_pool({"media_provider_cards": [card]}, "video") == []
+
+
+def test_canva_export_defaults_and_combined_dimensions_are_normalized():
+    card = normalize_media_card({"provider": "canva", "thumbnail_width": "1792 x 1024", "export_quality": "regular", "export_format": "unknown"})
+    assert card["export_quality"] == "medium"
+    assert card["export_format"] == "png"
+    assert card["thumbnail_width"] == "1792"
+    assert card["thumbnail_height"] == "1024"
+
+
+def test_canva_export_defaults_are_medium_png_1280x720():
+    card = normalize_media_card({"provider": "canva"})
+    assert card["export_quality"] == "medium"
+    assert card["export_format"] == "png"
+    assert (card["thumbnail_width"], card["thumbnail_height"]) == ("1280", "720")
