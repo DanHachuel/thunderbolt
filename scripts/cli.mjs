@@ -26,12 +26,13 @@ const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe
 const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));
 const main = resolve(root, "app", "main.py");
 const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
+const pythonEnvironment = { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" };
 
 function run(command, commandArgs, label = "comando", environment = process.env) {
   console.log(`Thunderbolt: a iniciar ${label}...`);
   const result = spawnSync(command, commandArgs, {
     stdio: "inherit",
-    env: environment,
+    env: { ...pythonEnvironment, ...environment, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
     cwd: root,
     windowsHide: false,
   });
@@ -47,12 +48,12 @@ function run(command, commandArgs, label = "comando", environment = process.env)
 }
 
 function pythonVersion() {
-  return spawnSync(python, ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"], { encoding: "utf8" });
+  return spawnSync(python, ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"], { encoding: "utf8", env: pythonEnvironment });
 }
 
 function moduleAvailable(moduleName) {
   const code = `import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(${JSON.stringify(moduleName)}) else 1)`;
-  return spawnSync(python, ["-c", code], { stdio: "ignore" }).status === 0;
+  return spawnSync(python, ["-c", code], { stdio: "ignore", env: pythonEnvironment }).status === 0;
 }
 
 function configuredMoneyPrinterPath() {
@@ -152,6 +153,8 @@ ensureRuntimeStorage();
 const storageDir = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
 const runtimeEnv = {
   ...process.env,
+  PYTHONIOENCODING: "utf-8",
+  PYTHONUTF8: "1",
   THUNDERBOLT_STORAGE_DIR: storageDir,
   STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false",
   STREAMLIT_SERVER_HEADLESS: "true",
@@ -254,7 +257,7 @@ function startStreamlit() {
   child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
     cwd: root,
     stdio: "inherit",
-    env: { ...runtimeEnv, THUNDERBOLT_LAUNCHER_RESTART: "1" },
+    env: { ...runtimeEnv, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1", THUNDERBOLT_LAUNCHER_RESTART: "1" },
     windowsHide: false,
   });
   child.on("error", (error) => {

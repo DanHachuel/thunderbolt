@@ -42,6 +42,7 @@ const defaultMpt = process.env.MONEYPRINTER_PATH || join(thunderboltHome, "Money
 const dependencyStatePath = join(thunderboltHome, "storage", "state", "install-state.json");
 const forceDeps = args.includes("--force-deps");
 const refreshMoneyPrinter = args.includes("--refresh-moneyprinter");
+const pythonEnvironment = { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" };
 
 function legacyRoots() {
   const userProfile = process.env.USERPROFILE || home;
@@ -63,12 +64,12 @@ function commandExists(command) {
 
 function run(command, commandArgs, options = {}) {
   console.log(`\n> ${command} ${commandArgs.join(" ")}`);
-  const result = spawnSync(command, commandArgs, { stdio: "inherit", ...options });
+  const result = spawnSync(command, commandArgs, { stdio: "inherit", env: pythonEnvironment, ...options, env: { ...pythonEnvironment, ...(options.env || {}) } });
   if (result.status !== 0) process.exit(result.status || 1);
 }
 
 function probePython(command, commandArgs = []) {
-  const result = spawnSync(command, [...commandArgs, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"], { encoding: "utf8" });
+  const result = spawnSync(command, [...commandArgs, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"], { encoding: "utf8", env: pythonEnvironment });
   if (result.status !== 0) return null;
   const versionText = result.stdout.trim();
   const version = versionText.split(".").map(Number);
