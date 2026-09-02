@@ -201,7 +201,16 @@ const proxy = http.createServer((request, response) => {
     path: `${requestUrl.pathname}${requestUrl.search}`,
     headers: { ...request.headers, host: `127.0.0.1:${backendPort}` },
   }, (upstreamResponse) => {
-    response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
+    const responseHeaders = { ...upstreamResponse.headers };
+    // Streamlit entrega HTML/JS de uma instância local que pode mudar após
+    // uma atualização via npx. Não permitir que o browser reaproveite uma
+    // página ou bundle da instância anterior.
+    delete responseHeaders.etag;
+    delete responseHeaders["last-modified"];
+    responseHeaders["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0";
+    responseHeaders.pragma = "no-cache";
+    responseHeaders.expires = "0";
+    response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
     upstreamResponse.pipe(response);
   });
   upstream.on("error", (error) => {

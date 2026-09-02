@@ -130,3 +130,10 @@ def test_launcher_restarts_from_the_new_npm_package_after_update():
     assert '"--prefer-online", "@danhachuel/thunderbolt"' in source
     assert "detached: true" in source
     assert "replacement.unref()" in source
+
+
+def test_launcher_disables_browser_cache_for_streamlit_proxy_responses():
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+    assert 'responseHeaders["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0"' in source
+    assert "delete responseHeaders.etag" in source
+    assert 'delete responseHeaders["last-modified"]' in source
