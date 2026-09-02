@@ -39,6 +39,14 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('args[0] === "worker"', source)
         self.assertIn('"3030"', source)
 
+    def test_streamlit_uses_preimport_encoding_bootstrap(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "scripts" / "streamlit_bootstrap.py").read_text(encoding="utf-8")
+        self.assertIn('const streamlitBootstrap = resolve(root, "scripts", "streamlit_bootstrap.py");', source)
+        self.assertIn('[streamlitBootstrap, "run", main', source)
+        self.assertIn('from streamlit.web.cli import main', bootstrap)
+        self.assertLess(bootstrap.index('os.environ["PYTHONIOENCODING"]'), bootstrap.index('from streamlit.web.cli import main'))
+
 
 if __name__ == "__main__":
     unittest.main()
