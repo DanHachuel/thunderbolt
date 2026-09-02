@@ -1,12 +1,14 @@
 import os
 import sys
+import io
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+_original_stdout, _original_stderr = sys.stdout, sys.stderr
+if getattr(sys.stdout, "buffer", None) is not None and str(getattr(sys.stdout, "encoding", "") or "").lower().replace("-", "_") != "utf_8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+if getattr(sys.stderr, "buffer", None) is not None and str(getattr(sys.stderr, "encoding", "") or "").lower().replace("-", "_") != "utf_8":
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
 
 import json
 import queue

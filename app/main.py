@@ -1,12 +1,20 @@
 import os
 import sys
+import io
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+def _force_utf8_stream(stream: object) -> object:
+    buffer = getattr(stream, "buffer", None)
+    encoding = str(getattr(stream, "encoding", "") or "").lower().replace("-", "_")
+    if buffer is not None and encoding != "utf_8":
+        return io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    return stream
+
+_original_stdout, _original_stderr = sys.stdout, sys.stderr
+sys.stdout = _force_utf8_stream(sys.stdout)
+sys.stderr = _force_utf8_stream(sys.stderr)
 
 import hashlib
 import json
