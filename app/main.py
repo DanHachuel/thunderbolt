@@ -7,6 +7,8 @@ os.environ["PYTHONUTF8"] = "1"
 os.environ["CLICK_NO_WIN_CONSOLE"] = "1"
 
 def _force_utf8_stream(stream: object) -> object:
+    if os.name != "nt":
+        return stream
     buffer = getattr(stream, "buffer", None)
     if buffer is not None and not getattr(stream, "_thunderbolt_utf8", False):
         wrapped = io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
@@ -104,6 +106,7 @@ from hermes_ui.thumbnails import (
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords, generate_video_update_metadata
 from hermes_ui.media_generation import MediaGenerationError, format_media_generation_error, generate_image_for_card, generate_video_for_card
+from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
 from integrations.youtube_update import YOUTUBE_UPDATE_VIDEO, YouTubeVideoUpdater
@@ -7062,7 +7065,7 @@ def _media_card_config_status(card: dict[str, Any]) -> tuple[str, str]:
         return "missing", "Missing key"
     if not str(card.get("base_url") or "").strip():
         return "missing", "Missing Base URL"
-    if not str(card.get("model") or "").strip() and card.get("supports_image") and card.get("provider") not in {"cloudflare_workers_ai"}:
+    if not str(card.get("model") or "").strip() and card.get("supports_image") and card.get("provider") not in {"cloudflare_workers_ai", "canva"}:
         return "missing", "Missing model"
     return "ready", "Configured"
 
@@ -7098,6 +7101,26 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
     cards[index] = card
     card_id = str(card["id"])
     definition = media_provider_definition(card.get("provider"))
+    if card.get("provider") == "canva":
+        callback_code = str(st.query_params.get("code") or "").strip()
+        callback_state = str(st.query_params.get("state") or "").strip()
+        pending_state = str(st.session_state.get(f"canva_state_{card_id}") or "")
+        if callback_code:
+            if callback_state != pending_state:
+                st.error("Canva OAuth rejeitado: state inválido. Inicie a autorização novamente.")
+            else:
+                try:
+                    token = exchange_code(str(card.get("client_id") or ""), str(card.get("client_secret") or ""), callback_code, str(card.get("redirect_uri") or ""), str(st.session_state.get(f"canva_verifier_{card_id}") or ""))
+                    card["oauth_token"] = token
+                    cards[index] = card
+                    _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
+                    st.session_state.pop(f"canva_state_{card_id}", None)
+                    st.session_state.pop(f"canva_verifier_{card_id}", None)
+                    st.query_params.clear()
+                    st.success("Canva autorizada com sucesso.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível autorizar a Canva: {str(exc)[:240]}")
     with st.container(border=True):
         header_cols = st.columns([3.2, 1.2])
         with header_cols[0]:
@@ -7141,14 +7164,29 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 extra_cols = st.columns(len(definition.extra_fields))
                 for extra_col, field_name in zip(extra_cols, definition.extra_fields):
                     with extra_col:
-                        extra_values[field_name] = st.text_input(field_name.replace("_", " ").title(), value=str(card.get(field_name) or ""), key=f"media_card_{card_id}_{field_name}")
+                        extra_values[field_name] = st.text_input(field_name.replace("_", " ").title(), value=str(card.get(field_name) or ""), type="password" if field_name == "client_secret" else "default", key=f"media_card_{card_id}_{field_name}")
+            if definition.code == "canva":
+                supports_image = True
+                supports_video = False
+                st.caption("Canva Connect é usado exclusivamente para thumbnails no Pool de Imagem. Não é provider de vídeo.")
+                redirect_uri = str(card.get("redirect_uri") or "").strip()
+                if not redirect_uri:
+                    st.info("Defina o Redirect URI no Developer Portal Canva e repita-o neste card antes de autorizar.")
+                elif str(card.get("client_id") or "").strip() and str(card.get("client_secret") or "").strip():
+                    if st.button("Autorizar Canva", key=f"media_card_{card_id}_authorize"):
+                        verifier, challenge = create_pkce_pair()
+                        state = create_state()
+                        st.session_state[f"canva_verifier_{card_id}"] = verifier
+                        st.session_state[f"canva_state_{card_id}"] = state
+                        st.link_button("Abrir autorização Canva", authorization_url(str(card.get("client_id")), redirect_uri, "design:content:read design:content:write", state, challenge), use_container_width=True)
+                st.caption("Estado OAuth: autorizado" if (card.get("oauth_token") or {}).get("access_token") else "Estado OAuth: não autorizado")
             status_cols = st.columns(4)
             with status_cols[0]:
                 enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"media_card_{card_id}_enabled")
             with status_cols[1]:
                 supports_image = st.checkbox("Pool Imagem", value=bool(card.get("supports_image", definition.supports_image)), key=f"media_card_{card_id}_image")
             with status_cols[2]:
-                supports_video = st.checkbox("Pool Vídeo", value=bool(card.get("supports_video", definition.supports_video)), key=f"media_card_{card_id}_video")
+                supports_video = False if definition.code == "canva" else st.checkbox("Pool Vídeo", value=bool(card.get("supports_video", definition.supports_video)), key=f"media_card_{card_id}_video")
             with status_cols[3]:
                 priority = st.number_input("Prioridade", min_value=0, max_value=999, value=int(card.get("priority", index)), step=1, key=f"media_card_{card_id}_priority")
             action_cols = st.columns(4)

@@ -56,6 +56,17 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
         description="Geração de imagem nativa Gemini para thumbnails e artes.",
     ),
     MediaProviderDefinition(
+        "canva",
+        "Canva Connect",
+        default_base_url="https://api.canva.com/rest/v1",
+        requires_api_key=False,
+        supports_image=True,
+        supports_video=False,
+        api_style="canva_connect",
+        extra_fields=("client_id", "client_secret", "redirect_uri", "export_quality", "export_format", "thumbnail_width", "thumbnail_height"),
+        description="Canva Connect para criação e exportação de thumbnails; não é usado no pool de vídeo.",
+    ),
+    MediaProviderDefinition(
         "pollinations",
         "Pollinations.ai",
         default_base_url="https://gen.pollinations.ai/v1",
@@ -203,9 +214,12 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
         "supports_text": bool(source.get("supports_text", definition.supports_text)),
         "api_style": definition.api_style,
         "local": definition.local,
+        "thumbnail_only": provider == "canva",
     }
     for field in definition.extra_fields:
         result[field] = str(source.get(field) or "").strip()
+    if provider == "canva":
+        result["oauth_token"] = dict(source.get("oauth_token") or {}) if isinstance(source.get("oauth_token"), Mapping) else {}
     if provider == "nano_banana":
         result["aspect_ratio"] = str(source.get("aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO).strip()
         result["image_size"] = str(source.get("image_size") or INTERNAL_IMAGE_SIZE).strip()
@@ -311,12 +325,14 @@ def apply_media_provider_cards_to_settings(settings: Mapping[str, Any], cards: l
     return result
 
 
-def media_cards_for_pool(settings: Mapping[str, Any], pool: str) -> list[dict[str, Any]]:
+def media_cards_for_pool(settings: Mapping[str, Any], pool: str, *, thumbnail_only: bool = False) -> list[dict[str, Any]]:
     migrated, _ = ensure_media_provider_cards(settings)
     capability = "supports_image" if pool == "image" else "supports_video" if pool == "video" else "supports_text"
     active_key = MEDIA_IMAGE_ACTIVE_CARD_KEY if pool == "image" else MEDIA_VIDEO_ACTIVE_CARD_KEY if pool == "video" else ""
     active_id = str(migrated.get(active_key) or "")
     cards = [dict(item) for item in migrated.get(MEDIA_CARDS_KEY, []) if item.get("enabled", True) and item.get(capability)]
+    if pool == "image" and not thumbnail_only:
+        cards = [card for card in cards if not card.get("thumbnail_only")]
     # A prioridade é o contrato principal do failover. O cartão activo legado
     # só serve de desempate entre cartões com a mesma prioridade, para não
     # ignorar uma escolha explícita do utilizador por causa de estado antigo.
