@@ -61,3 +61,12 @@ def test_canva_export_defaults_are_medium_png_1280x720():
     assert card["export_quality"] == "medium"
     assert card["export_format"] == "png"
     assert (card["thumbnail_width"], card["thumbnail_height"]) == ("1280", "720")
+
+
+def test_canva_authorization_uses_form_submit_button_when_embedded():
+    source = Path("app/main.py").read_text(encoding="utf-8")
+    start = source.index('def _render_media_provider_card')
+    end = source.index('def render_media_provider_cards', start)
+    canva_block = source[start:end]
+    assert 'authorize_clicked = st.form_submit_button' in canva_block
+    assert 'st.link_button("Abrir autorização Canva"' not in canva_block

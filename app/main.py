@@ -7193,7 +7193,8 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 if not has_credentials:
                     st.info("Preencha Client Id, Client Secret e Redirect Uri para iniciar a autorização.")
                 else:
-                    if st.button("Iniciar autorização", key=f"media_card_{card_id}_authorize"):
+                    authorize_clicked = st.form_submit_button("Iniciar autorização", use_container_width=True, key=f"media_card_{card_id}_authorize") if embedded else st.button("Iniciar autorização", key=f"media_card_{card_id}_authorize")
+                    if authorize_clicked:
                         verifier, challenge = create_pkce_pair()
                         state = create_state()
                         st.session_state[f"canva_verifier_{card_id}"] = verifier
@@ -7201,7 +7202,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                         st.session_state[f"canva_authorization_url_{card_id}"] = authorization_url(client_id, redirect_uri, "design:content:read design:content:write", state, challenge)
                     authorization_link = str(st.session_state.get(f"canva_authorization_url_{card_id}") or "")
                     if authorization_link:
-                        st.link_button("Abrir autorização Canva", authorization_link, use_container_width=True)
+                        st.markdown(f"[Abrir autorização Canva]({authorization_link})")
                 with st.expander("Opções de exportação e dimensões", expanded=False):
                     export_quality = st.selectbox("Export Quality", ["High", "Medium", "Low"], index=["high", "medium", "low"].index(str(card.get("export_quality") or "medium").lower()), key=f"media_card_{card_id}_export_quality")
                     export_format = st.selectbox("Export Format", ["PNG", "JPG", "PDF"], index=["png", "jpg", "pdf"].index(str(card.get("export_format") or "png").lower()), key=f"media_card_{card_id}_export_format")
