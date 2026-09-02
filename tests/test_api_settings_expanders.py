@@ -108,7 +108,7 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertIn('endpoint_col, action_col = st.columns([1.65, 1.05])', MAIN_SOURCE)
         self.assertIn('action_buttons = st.columns(2)', MAIN_SOURCE)
         self.assertIn('status_cols = st.columns(3)', MAIN_SOURCE)
-        self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
+        self.assertIn('save_clicked = st.form_submit_button("Salvar", type="primary", width='stretch', key=f"llm_card_{card_id}_save")', MAIN_SOURCE)
 
     def test_api_keys_use_direct_tabs_and_material_sources_are_inside_api_keys(self):
         tabs_position = MAIN_SOURCE.index('api_keys_tab, google_accounts_tab, tiktok_api_tab, bilibili_api_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "Contas Google", "API Tiktok", "API Bilibili", "AI Influencers", "Teste de Voz"])')

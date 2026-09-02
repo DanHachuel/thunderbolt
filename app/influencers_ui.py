@@ -191,7 +191,7 @@ def render_ai_influencer_characters(
                 key="influencer_new_assets",
                 help="Pode seleccionar várias imagens e ficheiros .md/.json no mesmo upload.",
             )
-            create = st.form_submit_button("Guardar personagem", type="primary", use_container_width=True)
+            create = st.form_submit_button("Guardar personagem", type="primary", width='stretch')
         if create:
             try:
                 record = repository.create_influencer({"name": name, "bio": bio, "language": language, "instagram_business_id": instagram_id})
@@ -250,7 +250,7 @@ def render_ai_influencer_characters(
                     accept_multiple_files=True,
                     key=f"influencer_append_assets_{selected_id}",
                 )
-                append_assets = st.form_submit_button("Adicionar assets ao personagem", use_container_width=True)
+                append_assets = st.form_submit_button("Adicionar assets ao personagem", width='stretch')
             if append_assets:
                 try:
                     saved_assets = 0
@@ -276,7 +276,7 @@ def render_ai_influencer_characters(
                         st.caption(_asset_label(asset))
                         path = _local_asset_path(asset)
                         if str(asset.get("asset_type") or "") == "image" and path:
-                            st.image(str(path), use_container_width=True)
+                            st.image(str(path), width='stretch')
                         elif str(asset.get("asset_type") or "") == "document":
                             raw = str(asset.get("document_json") or "")
                             try:
@@ -305,7 +305,7 @@ def _render_content_history(repository: Any, influencer_id: str = "") -> None:
             preview_col, detail_col = st.columns([1.25, 2.75])
             with preview_col:
                 if artifact.is_file() and content_type == "image":
-                    st.image(str(artifact), caption=f"{type_label} gerada", use_container_width=True)
+                    st.image(str(artifact), caption=f"{type_label} gerada", width='stretch')
                 elif artifact.is_file() and content_type == "video":
                     st.video(str(artifact))
                 else:
@@ -325,7 +325,7 @@ def _render_content_history(repository: Any, influencer_id: str = "") -> None:
                         file_name=artifact.name,
                         mime=mime,
                         key=f"influencer_content_download_{content_type}_{content_id}",
-                        use_container_width=True,
+                        width='stretch',
                     )
 
 
@@ -370,7 +370,7 @@ def render_motion_control(settings: dict[str, Any]) -> None:
         image_upload = st.file_uploader("Imagem de referência", type=["jpg", "jpeg", "png"], key="motion_control_image")
         prompt = st.text_area("Prompt (opcional)", height=120, max_chars=2500, placeholder="Descreva como preservar a identidade da imagem e aplicar o movimento…", key="motion_control_prompt")
         provider_id = st.selectbox("Provider / modelo", card_options, format_func=lambda value: _provider_label(next(card for card in cards if str(card.get("id")) == value)), key="motion_control_provider")
-        generate = st.form_submit_button("Gerar Motion Control", type="primary", use_container_width=True)
+        generate = st.form_submit_button("Gerar Motion Control", type="primary", width='stretch')
     if generate:
         if video_upload is None or image_upload is None:
             st.error("Seleccione o vídeo original e a imagem de referência.")
@@ -445,7 +445,7 @@ def render_ugc_products(settings: dict[str, Any]) -> None:
             st.info("Não existe um provider activo no pool de imagem; será usada a imagem original.")
         card_options = [str(card.get("id") or "") for card in video_cards]
         provider_id = st.selectbox("Provider VEO3", card_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider")
-        generate = st.form_submit_button("Gerar UGC Product", type="primary", use_container_width=True)
+        generate = st.form_submit_button("Gerar UGC Product", type="primary", width='stretch')
     if generate:
         if product_upload is None:
             st.error("Seleccione a imagem do produto.")
@@ -526,7 +526,7 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
                 caption = st.text_area("Legenda/caption (opcional)", height=90, key="content_image_caption")
                 platforms = st.multiselect("Redes sociais de destino", PLATFORM_OPTIONS, default=["Instagram"], key="content_image_platforms")
                 provider_id = st.selectbox("Provider / modelo", provider_options, format_func=lambda value: _provider_label(next(card for card in cards if str(card.get("id")) == value)), key="content_image_provider") if cards else ""
-                generate = st.form_submit_button("Gerar imagem", type="primary", use_container_width=True)
+                generate = st.form_submit_button("Gerar imagem", type="primary", width='stretch')
             if generate:
                 if not prompt.strip():
                     st.error("Informe o prompt da imagem.")
@@ -574,7 +574,7 @@ def render_ai_influencer_content(settings: dict[str, Any]) -> None:
                 caption = st.text_area("Legenda/caption (opcional)", height=90, key="content_video_caption")
                 platforms = st.multiselect("Redes sociais de destino", PLATFORM_OPTIONS, default=["Instagram", "TikTok"], key="content_video_platforms")
                 provider_id = st.selectbox("Provider / modelo de vídeo", provider_options, format_func=lambda value: _provider_label(next(card for card in cards if str(card.get("id")) == value)), key="content_video_provider") if cards else ""
-                generate = st.form_submit_button("Gerar vídeo", type="primary", use_container_width=True)
+                generate = st.form_submit_button("Gerar vídeo", type="primary", width='stretch')
             if generate:
                 if not prompt.strip():
                     st.error("Informe o prompt de movimento.")

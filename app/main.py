@@ -555,9 +555,9 @@ def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str
             edited_name = st.text_input("Nome de apresentação", value=current_name, max_chars=120, key=f"{edit_key}_input")
             save_col, cancel_col = st.columns(2)
             with save_col:
-                save_name = st.form_submit_button("Guardar nome", type="primary", use_container_width=True)
+                save_name = st.form_submit_button("Guardar nome", type="primary", width='stretch')
             with cancel_col:
-                cancel_name = st.form_submit_button("Cancelar", use_container_width=True)
+                cancel_name = st.form_submit_button("Cancelar", width='stretch')
         if save_name:
             try:
                 set_display_name(kind, path, edited_name)
@@ -573,7 +573,7 @@ def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str
 
 
 def _render_card_pencil(edit_key: str) -> None:
-    if st.button("✏️", help="Editar nome de apresentação", key=f"pencil_{edit_key}", type="tertiary", use_container_width=True):
+    if st.button("✏️", help="Editar nome de apresentação", key=f"pencil_{edit_key}", type="tertiary", width='stretch'):
         st.session_state[edit_key] = True
         st.rerun()
 
@@ -1040,7 +1040,7 @@ def render_video_generation_settings(
             st.button(
                 "Gerar tópico, roteiro e palavras-chave com IA",
                 key=f"{prefix}_generate_video_content",
-                use_container_width=True,
+                width='stretch',
                 type="secondary",
                 icon=":material/auto_awesome:",
                 on_click=generate_content_callback,
@@ -1053,7 +1053,7 @@ def render_video_generation_settings(
             st.button(
                 "Salvar rascunho",
                 key=f"{prefix}_save_draft",
-                use_container_width=True,
+                width='stretch',
                 type="secondary",
                 icon=":material/save:",
                 on_click=save_draft_callback,
@@ -1112,7 +1112,7 @@ def render_video_generation_settings(
                         type=["mp3", "wav", "m4a", "aac", "flac", "ogg"],
                         key=f"{prefix}_voiceover_upload",
                     )
-                    if uploaded_voiceover is not None and st.button("Guardar áudio de narração", key=f"{prefix}_voiceover_store", use_container_width=True):
+                    if uploaded_voiceover is not None and st.button("Guardar áudio de narração", key=f"{prefix}_voiceover_store", width='stretch'):
                         try:
                             stored_voiceover = store_voiceover_file(uploaded_voiceover.name, uploaded_voiceover.getvalue())
                             st.session_state[f"{prefix}_voiceover_file"] = str(stored_voiceover)
@@ -1244,7 +1244,7 @@ def channel_videos_for(channel: dict, limit: int = 10) -> list[dict[str, Any]]:
 def render_channel_video_editor(video: dict, channel_id: str) -> None:
     video_id = str(video.get("id") or "")
     edit_key = f"channel_video_edit_{video_id}"
-    if st.button("Editar vídeo", key=f"edit_channel_video_{video_id}", use_container_width=True):
+    if st.button("Editar vídeo", key=f"edit_channel_video_{video_id}", width='stretch'):
         st.session_state[edit_key] = True
         st.rerun()
     if st.session_state.get(edit_key):
@@ -1268,7 +1268,7 @@ def render_channel_videos(channel: dict) -> None:
         st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
         refresh_col = st.columns(1)[0]
         with refresh_col:
-            if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
+            if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", width='stretch'):
                 result = fetch_channel_videos_public(channel, limit=10)
                 if result.ok:
                     videos = _merge_channel_videos(channel_id, result.data.get("videos", []))
@@ -1325,7 +1325,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             edited_description = st.text_area("Descrição", value=str(channel.get("description") or ""), height=100)
             edited_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"edit_automation_{channel_id}")
             edited_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
-        save_channel = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
+        save_channel = st.form_submit_button("Guardar alterações", type="primary", width='stretch')
         cancel_edit = st.form_submit_button("Cancelar edição")
     if cancel_edit:
         st.session_state.pop(f"edit_channel_{channel_id}", None)
@@ -1654,7 +1654,7 @@ def render_thumbnail_blueprints():
             with cols[1]:
                 script = st.selectbox("Blueprint de roteiro associado", blueprint_ids, index=blueprint_ids.index(current_script) if current_script in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_script_blueprint_channel_{channel_id}")
             with cols[2]:
-                if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", use_container_width=True):
+                if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", width='stretch'):
                     if thumb == "Generic_Thumbnail_Blueprint" and script:
                         st.error("Not Allowed to Associate, System Use Only")
                     else:
@@ -1727,7 +1727,7 @@ def render_tiktok_accounts():
         st.info("A pesquisa consulta apenas a página pública do perfil e pode devolver dados incompletos. Se o TikTok bloquear a consulta, utilize o cadastro manual.")
         with st.form("tiktok_public_lookup_form"):
             lookup_source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta ou @conta", key="tiktok_public_lookup_source")
-            lookup_submitted = st.form_submit_button("Pesquisar perfil público", type="primary", use_container_width=True)
+            lookup_submitted = st.form_submit_button("Pesquisar perfil público", type="primary", width='stretch')
         if lookup_submitted:
             result = fetch_public_tiktok_profile(lookup_source)
             st.session_state["tiktok_public_lookup"] = {"ok": result.ok, "message": result.message, "data": result.data}
@@ -1747,7 +1747,7 @@ def render_tiktok_accounts():
                 with metric_cols[3]: st.metric("Vídeos", lookup_data.get("video_count") if lookup_data.get("video_count") is not None else "—")
                 display_name = st.text_input("Nome da conta", value=str(lookup_data.get("name") or lookup_data.get("username") or ""), key="tiktok_lookup_display_name")
                 notes = st.text_area("Observações internas", value=str(lookup_data.get("notes") or ""), key="tiktok_lookup_notes", height=80)
-                if st.button("Cadastrar conta TikTok", type="primary", use_container_width=True, key="tiktok_register_public_account"):
+                if st.button("Cadastrar conta TikTok", type="primary", width='stretch', key="tiktok_register_public_account"):
                     try:
                         stored = {**lookup_data, "name": display_name.strip() or lookup_data.get("username", ""), "notes": notes.strip(), "source": "public_lookup"}
                         _upsert_tiktok_account(stored)
@@ -1763,7 +1763,7 @@ def render_tiktok_accounts():
             manual_source = st.text_input("@handle ou URL pública", placeholder="@minhaconta", key="tiktok_manual_source")
             manual_name = st.text_input("Nome da conta", placeholder="Nome de apresentação", key="tiktok_manual_name")
             manual_notes = st.text_area("Observações internas", height=90, key="tiktok_manual_notes")
-            manual_submitted = st.form_submit_button("Guardar cadastro manual", type="primary", use_container_width=True)
+            manual_submitted = st.form_submit_button("Guardar cadastro manual", type="primary", width='stretch')
         if manual_submitted:
             try:
                 reference = normalize_tiktok_reference(manual_source)
@@ -1802,7 +1802,7 @@ def render_tiktok_accounts():
                         edited_name = st.text_input("Nome da conta", value=str(account.get("name") or account.get("username") or ""), key=f"edit_tiktok_name_{account_id}")
                         edited_source = st.text_input("@handle ou URL pública", value=str(account.get("public_url") or account.get("url") or account.get("handle") or ""), key=f"edit_tiktok_source_{account_id}")
                         edited_notes = st.text_area("Observações internas", value=str(account.get("notes") or ""), key=f"edit_tiktok_notes_{account_id}", height=80)
-                        edit_submitted = st.form_submit_button("Guardar conta", type="primary", use_container_width=True)
+                        edit_submitted = st.form_submit_button("Guardar conta", type="primary", width='stretch')
                     if edit_submitted:
                         try:
                             reference = normalize_tiktok_reference(edited_source)
@@ -1827,7 +1827,7 @@ def render_tiktok_prompt_masters():
             uploaded_name = Path(uploaded_prompt.name).stem
             prompt_name = st.text_input("Nome do Prompt Master", value=uploaded_name, key="tiktok_prompt_master_name")
             replace_prompt = st.checkbox("Permitir substituir um ficheiro existente", key="tiktok_prompt_master_replace")
-            if st.button("Guardar Prompt Master", type="primary", use_container_width=True, key="save_tiktok_prompt_master"):
+            if st.button("Guardar Prompt Master", type="primary", width='stretch', key="save_tiktok_prompt_master"):
                 safe_stem = re.sub(r"[^A-Za-z0-9À-ÿ._-]+", "-", prompt_name.strip() or uploaded_name).strip(".-") or "prompt-master"
                 destination = TIKTOK_PROMPT_MASTERS / f"{safe_stem}.md"
                 if destination.exists() and not replace_prompt:
@@ -1873,14 +1873,14 @@ def render_tiktok_prompt_masters():
                         edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
                         prompt_cols = st.columns(3)
                         with prompt_cols[0]:
-                            if st.button("Guardar alterações", type="primary", use_container_width=True, key=f"save_prompt_master_{path.stem}"):
+                            if st.button("Guardar alterações", type="primary", width='stretch', key=f"save_prompt_master_{path.stem}"):
                                 path.write_text(edited_content.rstrip() + "\n", encoding="utf-8")
                                 st.success("Prompt Master actualizado.")
                                 st.rerun()
                         with prompt_cols[1]:
-                            st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"download_prompt_master_{path.stem}")
+                            st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", width='stretch', key=f"download_prompt_master_{path.stem}")
                         with prompt_cols[2]:
-                            if st.button("Apagar", use_container_width=True, key=f"delete_prompt_master_{path.stem}"):
+                            if st.button("Apagar", width='stretch', key=f"delete_prompt_master_{path.stem}"):
                                 path.unlink(missing_ok=True)
                                 st.success("Prompt Master removido da biblioteca TikTok.")
                                 st.rerun()
@@ -1956,11 +1956,11 @@ def render_tiktok_channels():
         source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta", key="tiktok_channel_source")
         lookup_cols = st.columns([1, 1])
         with lookup_cols[0]:
-            if st.button("Buscar no Tiktok", type="primary", use_container_width=True, key="tiktok_channel_lookup"):
+            if st.button("Buscar no Tiktok", type="primary", width='stretch', key="tiktok_channel_lookup"):
                 result = fetch_public_tiktok_profile(source)
                 st.session_state["tiktok_channel_import"] = {"ok": result.ok, "message": result.message, "data": result.data}
         with lookup_cols[1]:
-            if st.button("Limpar importação", use_container_width=True, key="tiktok_channel_clear"):
+            if st.button("Limpar importação", width='stretch', key="tiktok_channel_clear"):
                 for key in ("tiktok_channel_import", "tiktok_import_language", "tiktok_import_niche", "tiktok_import_prompt", "tiktok_import_description"):
                     st.session_state.pop(key, None)
                 st.rerun()
@@ -2145,7 +2145,7 @@ def render_tiktok_channels():
         if channels:
             st.dataframe(
                 [{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Narrador/Voz Padrão": "default_voice", "Estilo wide": "style_wide", "Automação ligada": "automation_on", "Horário diário (HH:MM)": "automation_time", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 height=360,
             )
@@ -2202,7 +2202,7 @@ def render_channels():
             st.caption("Os canais cadastrados são apresentados apenas em lista.")
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
+            if st.button("Buscar no YouTube", type="primary", width='stretch', key="youtube_channel_lookup"):
                 search_source = str(source or "").strip()
                 st.session_state.pop("yt_import", None)
                 st.session_state.pop("yt_message", None)
@@ -2227,7 +2227,7 @@ def render_channels():
                         st.session_state["yt_message"] = f"A pesquisa do YouTube falhou ({type(exc).__name__}). Confirme o URL/handle e tente novamente. Detalhe: {str(exc)[:240]}"
                         st.session_state["yt_ok"] = False
         with col2:
-            if st.button("Limpar importação", use_container_width=True, key="youtube_channel_clear"):
+            if st.button("Limpar importação", width='stretch', key="youtube_channel_clear"):
                 for key in ("yt_import", "yt_message", "yt_ok"):
                     st.session_state.pop(key, None)
                 st.rerun()
@@ -2309,7 +2309,7 @@ def render_channels():
                 data=build_channel_template_xlsx(),
                 file_name="modelo_canais_youtube.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width='stretch',
                 key="download_channel_spreadsheet_template",
             )
         with help_col:
@@ -2321,7 +2321,7 @@ def render_channels():
             key="channel_spreadsheet_upload",
             help="Apenas a primeira aba do arquivo será importada. Linhas sem URL, nome e handle são ignoradas.",
         )
-        if st.button("Ler e preparar planilha", type="primary", use_container_width=True, key="read_channel_spreadsheet"):
+        if st.button("Ler e preparar planilha", type="primary", width='stretch', key="read_channel_spreadsheet"):
             if uploaded_sheet is None:
                 st.error("Selecione um arquivo Excel antes de continuar.")
             else:
@@ -2371,9 +2371,9 @@ def render_channels():
                     "Descrição": "Preencher via YouTube" if not row.get("description") else "Da planilha",
                     "Estado": "Já cadastrado" if find_duplicate_channel({"name": row.get("name"), "handle": row.get("handle"), "url": row.get("url")}, existing_spreadsheet_channels) else "Novo",
                 })
-            st.dataframe(preview_rows, use_container_width=True, hide_index=True, height=min(420, 86 + 38 * len(preview_rows)))
+            st.dataframe(preview_rows, width='stretch', hide_index=True, height=min(420, 86 + 38 * len(preview_rows)))
             st.caption("Blueprints e vozes são resolvidos pelos catálogos atuais. Por exemplo, `finanças`, `blueprint_finanças` e `Blueprint Canal Finanças` apontam para o mesmo Blueprint quando ele existe.")
-            if st.button("Cadastrar canais da planilha", type="primary", use_container_width=True, key="import_channel_spreadsheet"):
+            if st.button("Cadastrar canais da planilha", type="primary", width='stretch', key="import_channel_spreadsheet"):
                 created_names: list[str] = []
                 skipped_names: list[str] = []
                 spreadsheet_errors: list[str] = []
@@ -2471,7 +2471,7 @@ def render_channels():
             ]
             st.dataframe(
                 registered_rows,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 height=420,
                 column_config={
@@ -2512,7 +2512,7 @@ def render_channels():
             (st.success if account_status.ok else st.warning)(account_status.message)
             auth_cols = st.columns([1, 2])
             with auth_cols[0]:
-                if st.button("Autorizar conta Google", type="secondary", use_container_width=True, key="batch_authorize_account"):
+                if st.button("Autorizar conta Google", type="secondary", width='stretch', key="batch_authorize_account"):
                     result = authorize_youtube_batch_account(selected_account, STORAGE)
                     (st.success if result.ok else st.error)(result.message)
                     if result.ok:
@@ -2520,7 +2520,7 @@ def render_channels():
             with auth_cols[1]:
                 st.caption("A autorização é feita no browser do sistema e fica guardada separadamente para esta conta.")
             batch_key = f"youtube_batch_channels_{selected_account_id}"
-            if st.button("Listar canais desta conta", type="primary", use_container_width=True, key="batch_list_channels"):
+            if st.button("Listar canais desta conta", type="primary", width='stretch', key="batch_list_channels"):
                 result = list_youtube_batch_channels(selected_account, STORAGE)
                 st.session_state[batch_key] = result.data.get("channels", []) if result.ok else []
                 st.session_state[f"{batch_key}_message"] = result.message
@@ -2550,7 +2550,7 @@ def render_channels():
                         batch_language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="batch_channel_language")
                     with defaults_cols[3]:
                         batch_style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], key="batch_channel_style")
-                    import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", use_container_width=True)
+                    import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", width='stretch')
                 if import_selected:
                     created_names = []
                     skipped_names = []
@@ -2671,12 +2671,12 @@ def render_channels():
                     st.rerun()
                 action_cols = st.columns(2)
                 with action_cols[0]:
-                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", use_container_width=True):
+                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with action_cols[1]:
                     delete_key = f"delete_pending_{channel_id}"
-                    if st.button("Apagar", key=f"delete_{channel_id}", use_container_width=True):
+                    if st.button("Apagar", key=f"delete_{channel_id}", width='stretch'):
                         st.session_state[delete_key] = True
                         st.rerun()
             if st.session_state.get(delete_key):
@@ -2704,17 +2704,17 @@ def render_channels():
                 block_cols = st.columns(4, gap="small")
                 with block_cols[0]:
                     st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
-                    if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", use_container_width=True):
+                    if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[1]:
                     st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
-                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", use_container_width=True):
+                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[2]:
                     st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
-                    if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", use_container_width=True):
+                    if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[3]:
@@ -2736,7 +2736,7 @@ def render_channels():
                         key=f"channel_delegated_session_id_{channel_id}",
                         help="Identificador individual usado pelo Upload directo deste canal. Não é partilhado com outros canais nem mostrado nos diagnósticos.",
                     )
-                    save_channel_direct_credentials = st.form_submit_button("Guardar conta Google e DELEGATED_SESSION_ID", type="primary", use_container_width=True)
+                    save_channel_direct_credentials = st.form_submit_button("Guardar conta Google e DELEGATED_SESSION_ID", type="primary", width='stretch')
                 selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
                 if selected_channel_account:
                     selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
@@ -2940,7 +2940,7 @@ def render_video_from_draft() -> None:
         st.caption(f"Faltam: {', '.join(still_missing)}")
     elif not missing_sections:
         st.caption("Este roteiro será usado directamente, sem regenerar o conteúdo editorial guardado.")
-    if st.button(action_label, type="primary", use_container_width=True, key="new_video_resume_submit", icon=":material/movie:"):
+    if st.button(action_label, type="primary", width='stretch', key="new_video_resume_submit", icon=":material/movie:"):
         if still_missing:
             st.error(f"Complete as configurações seleccionadas: {', '.join(still_missing)}.")
         elif not selected_channel.get("id"):
@@ -2995,7 +2995,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                     key=f"{prefix}_general_context",
                     placeholder="Opcional: campanha, época, evento ou restrição editorial comum. O tema final será individual por canal.",
                 )
-                if st.button("Gerar tópicos individuais para todos os canais", key=f"{prefix}_generate_general_topics", use_container_width=True):
+                if st.button("Gerar tópicos individuais para todos os canais", key=f"{prefix}_generate_general_topics", width='stretch'):
                     settings = read_json("settings.json", {})
                     generated_topics: dict[str, dict[str, Any]] = {}
                     errors: list[str] = []
@@ -3096,7 +3096,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                         st.warning("Ainda não existem músicas em storage/music. Escolha Carregar ficheiro ou Criar via Suno API.")
                 elif music_source == "Carregar ficheiro":
                     uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key=f"{prefix}_music_upload")
-                    if uploaded_music and st.button("Guardar música local", key=f"{prefix}_music_store", use_container_width=True):
+                    if uploaded_music and st.button("Guardar música local", key=f"{prefix}_music_store", width='stretch'):
                         try:
                             stored_music = store_music_file(uploaded_music.name, uploaded_music.getvalue())
                             st.session_state[f"{prefix}_music_path"] = str(stored_music)
@@ -3107,7 +3107,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 else:
                     suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key=f"{prefix}_suno_prompt")
                     suno_title = st.text_input("Título da música", value=st.session_state.get(f"{prefix}_topic") or "Thunderbolt music", key=f"{prefix}_suno_title")
-                    if st.button("Solicitar música no Suno", key=f"{prefix}_suno_request", use_container_width=True):
+                    if st.button("Solicitar música no Suno", key=f"{prefix}_suno_request", width='stretch'):
                         suno_result = request_suno_generation(read_json("settings.json", {}), suno_prompt, suno_title)
                         (st.success if suno_result["ok"] else st.error)(suno_result["message"])
                         if suno_result["ok"]:
@@ -3128,7 +3128,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 existing_topics = st.session_state.get(f"{prefix}_general_topics", {})
                 payloads = dict(st.session_state.get(f"{prefix}_general_payloads", {}))
                 with st.expander("Gerar Thumbnail com IA", expanded=False):
-                    if st.button("Gerar Thumbnail com IA para todos os vídeos", key=f"{prefix}_generate_general_creative", use_container_width=True):
+                    if st.button("Gerar Thumbnail com IA para todos os vídeos", key=f"{prefix}_generate_general_creative", width='stretch'):
                         settings = read_json("settings.json", {})
                         new_payloads: dict[str, dict[str, Any]] = {}
                         errors: list[str] = []
@@ -3169,7 +3169,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             payload["thumbnail_text"] = variant.get("overlay_text", "")
                             st.caption(f"{variant.get('composition', '')} · {variant.get('color_palette', '')}")
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                            if st.button("Gerar imagem com Nano Banana", key=f"{prefix}_general_generate_thumbnail_{channel['id']}", use_container_width=True):
+                            if st.button("Gerar imagem com Nano Banana", key=f"{prefix}_general_generate_thumbnail_{channel['id']}", width='stretch'):
                                 try:
                                     thumbnail_path = str(
                                         generate_thumbnail_image(
@@ -3191,7 +3191,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 except ThumbnailGenerationError as exc:
                                     st.error(str(exc))
                             if thumbnail_path and Path(thumbnail_path).is_file():
-                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", width='stretch')
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
                             else:
@@ -3200,7 +3200,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
             else:
                 with st.expander("Gerar Thumbnail com IA", expanded=False):
                     topic_for_thumbnail = str(generation_settings.get("video_subject") or "").strip()
-                    if st.button("Gerar Thumbnail com IA", key=f"{prefix}_generate_creative", use_container_width=True):
+                    if st.button("Gerar Thumbnail com IA", key=f"{prefix}_generate_creative", width='stretch'):
                         if selected_one is None:
                             st.error("Seleccione primeiro um canal.")
                         elif not topic_for_thumbnail:
@@ -3235,7 +3235,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key=f"{prefix}_title_choice")
                             payload["title"] = selected_title
                             with st.expander(f"Ver {len(title_options)} candidatos de título"):
-                                st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
+                                st.dataframe(payload.get("title_candidates", []), width='stretch', hide_index=True)
                         variants = payload.get("thumbnail_variants", [])
                         if variants:
                             labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
@@ -3248,7 +3248,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                             st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
                             st.code(variant.get("image_prompt", ""), language="text")
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                            if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", use_container_width=True):
+                            if st.button("Gerar imagem da thumbnail com Nano Banana", key=f"{prefix}_generate_thumbnail_image", width='stretch'):
                                 try:
                                     thumbnail_path = str(
                                         generate_thumbnail_image(
@@ -3270,7 +3270,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 except ThumbnailGenerationError as exc:
                                     st.error(str(exc))
                             if thumbnail_path and Path(thumbnail_path).is_file():
-                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", width='stretch')
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
                             else:
@@ -3427,7 +3427,7 @@ def render_music_creation():
         key="music_task_prompt",
         height=300,
     )
-    if st.button("Gerar campos musicais com IA", key="music_task_generate_fields", use_container_width=True, icon=":material/auto_awesome:"):
+    if st.button("Gerar campos musicais com IA", key="music_task_generate_fields", width='stretch', icon=":material/auto_awesome:"):
         try:
             with st.spinner("A criar título, letra e prompt musical originais…"):
                 generated = generate_music_fields(
@@ -3447,7 +3447,7 @@ def render_music_creation():
         models = ["lyria-3-clip-preview", "lyria-3-pro-preview"]
         configured = str(settings.get("lyria_model") or models[0])
         lyria_model = st.selectbox("Modelo Lyria", models, index=models.index(configured) if configured in models else 0, key="music_task_lyria_model")
-    if st.button("Gerar Música", key="music_task_submit", type="primary", use_container_width=True, icon=":material/music_note:"):
+    if st.button("Gerar Música", key="music_task_submit", type="primary", width='stretch', icon=":material/music_note:"):
         try:
             task = create_music_task(
                 provider_label,
@@ -3475,7 +3475,7 @@ def render_custom_music_voices() -> None:
     settings = read_json("settings.json", {})
     refresh_col, cache_col = st.columns([1, 2])
     with refresh_col:
-        refresh = st.button("Actualizar vozes", type="primary", use_container_width=True, key="elevenlabs_refresh_voices")
+        refresh = st.button("Actualizar vozes", type="primary", width='stretch', key="elevenlabs_refresh_voices")
     try:
         voices, metadata = fetch_personal_voices(settings, force=refresh)
         if metadata.get("source") == "cache":
@@ -3506,7 +3506,7 @@ def render_custom_music_voices() -> None:
                 st.caption("Categoria: personal")
                 st.caption("Labels: " + (", ".join(f"{key}: {value}" for key, value in labels.items()) if labels else "não disponíveis"))
             with voice_cols[2]:
-                if st.button("Testar voz", key=f"elevenlabs_test_voice_{voice['voice_id']}", use_container_width=True):
+                if st.button("Testar voz", key=f"elevenlabs_test_voice_{voice['voice_id']}", width='stretch'):
                     try:
                         preview = synthesize_preview(test_text, "elevenlabs", voice["voice_id"], settings)
                         st.audio(str(preview), format="audio/mpeg")
@@ -3587,9 +3587,9 @@ def render_scripts():
         brief = str(script_settings.get("video_script") or "").strip() or title
         generate_col, clear_col = st.columns([1.4, 1])
         with generate_col:
-            generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", use_container_width=True, key="generate_script_document")
+            generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", width='stretch', key="generate_script_document")
         with clear_col:
-            clear_clicked = st.button("Limpar rascunho", use_container_width=True, key="clear_script_document")
+            clear_clicked = st.button("Limpar rascunho", width='stretch', key="clear_script_document")
         if clear_clicked:
             for key in ("script_draft", "script_draft_title", "script_draft_content", "script_draft_summary", "script_draft_keywords"):
                 st.session_state.pop(key, None)
@@ -3642,7 +3642,7 @@ def render_scripts():
             draft_summary = st.text_input("Resumo", key="script_draft_summary")
             draft_keywords = st.text_area("Palavras-chave", height=90, key="script_draft_keywords")
             draft_content = st.text_area("Conteúdo guardado", height=460, key="script_draft_content")
-            if st.button("Guardar documento no storage", type="primary", use_container_width=True, key="save_script_document"):
+            if st.button("Guardar documento no storage", type="primary", width='stretch', key="save_script_document"):
                 try:
                     record = save_script_document(
                         {
@@ -3716,7 +3716,7 @@ def render_niche_finder():
                 start_date = st.date_input("Data inicial", value=default_start, min_value=date(2020, 1, 1), max_value=default_end, key="niche_start_date")
                 end_date = st.date_input("Data final", value=default_end, min_value=date(2020, 1, 1), max_value=default_end, key="niche_end_date")
             tags_text = st.text_input("Tags opcionais", key="niche_tags_text", placeholder="Ex.: history, facts, documentary")
-            analyse = st.form_submit_button("Analisar Nichos", type="primary", use_container_width=True)
+            analyse = st.form_submit_button("Analisar Nichos", type="primary", width='stretch')
 
     current_parameters = {
         "n_clusters": n_clusters,
@@ -3778,7 +3778,7 @@ def render_niche_finder():
         cluster_table = cluster_table[cluster_table["palavras"].str.contains(keyword.strip(), case=False, na=False)]
     tab_clusters, tab_rules, tab_data = render_localized_tabs(["Clusters encontrados", "Regras de associação", "Dados analisados"])
     with tab_clusters:
-        st.dataframe(cluster_table, use_container_width=True, hide_index=True)
+        st.dataframe(cluster_table, width='stretch', hide_index=True)
         if not points.empty:
             try:
                 import plotly.express as px
@@ -3786,19 +3786,19 @@ def render_niche_finder():
                 hover = [column for column in ["title", "channel_name", "country", "view_count", "engagement_rate"] if column in points.columns]
                 figure = px.scatter(points, x="x", y="y", color="cluster", hover_data=hover, title="Distribuição dos clusters")
                 figure.update_layout(legend_title_text="Cluster")
-                st.plotly_chart(figure, use_container_width=True)
+                st.plotly_chart(figure, width='stretch')
             except ImportError:
                 st.error("A visualização da análise não está disponível nesta instalação.")
     with tab_rules:
         if rules_table.empty:
             st.info("Não foram encontradas regras com os filtros actuais. Reduza o suporte mínimo ou escolha outro filtro.")
         else:
-            st.dataframe(rules_table, use_container_width=True, hide_index=True)
+            st.dataframe(rules_table, width='stretch', hide_index=True)
         if not items_table.empty:
             st.subheader("Itemsets frequentes")
-            st.dataframe(items_table, use_container_width=True, hide_index=True)
+            st.dataframe(items_table, width='stretch', hide_index=True)
     with tab_data:
-        st.dataframe(results["raw_data"], use_container_width=True, hide_index=True)
+        st.dataframe(results["raw_data"], width='stretch', hide_index=True)
 
 
 def render_niche_finder_apify():
@@ -3847,7 +3847,7 @@ def render_niche_finder_apify():
                 download_subtitles = st.checkbox("Descarregar legendas", value=True, key="niche_apify_download_subtitles")
             with filter_cols[3]:
                 has_cc = st.checkbox("Apenas vídeos com CC", value=False, key="niche_apify_has_cc")
-            analyse_apify = st.form_submit_button("Pesquisar no Apify", type="primary", use_container_width=True)
+            analyse_apify = st.form_submit_button("Pesquisar no Apify", type="primary", width='stretch')
 
     if analyse_apify:
         try:
@@ -3921,17 +3921,17 @@ def render_niche_finder_apify():
         result_frame = pd.DataFrame(visible_results)
         display_columns = ["title", "channel_name", "duration", "view_count", "subscriber_count", "comments_count", "vsc_ratio", "url", "transcript_status", "summary_status", "summary"]
         display_columns = [column for column in display_columns if column in result_frame.columns]
-        st.dataframe(result_frame[display_columns], use_container_width=True, hide_index=True)
+        st.dataframe(result_frame[display_columns], width='stretch', hide_index=True)
         export_frame = result_frame.drop(columns=["transcript"], errors="ignore")
         export_json = export_frame.to_json(orient="records", force_ascii=False, indent=2)
         export_csv = export_frame.to_csv(index=False).encode("utf-8")
         export_cols = st.columns(2)
         with export_cols[0]:
-            st.download_button("Exportar JSON", data=export_json, file_name="niche-finder-apify-results.json", mime="application/json", use_container_width=True, key="niche_apify_export_json")
+            st.download_button("Exportar JSON", data=export_json, file_name="niche-finder-apify-results.json", mime="application/json", width='stretch', key="niche_apify_export_json")
         with export_cols[1]:
-            st.download_button("Exportar CSV", data=export_csv, file_name="niche-finder-apify-results.csv", mime="text/csv", use_container_width=True, key="niche_apify_export_csv")
+            st.download_button("Exportar CSV", data=export_csv, file_name="niche-finder-apify-results.csv", mime="text/csv", width='stretch', key="niche_apify_export_csv")
     except ImportError:
-        st.dataframe(visible_results, use_container_width=True, hide_index=True)
+        st.dataframe(visible_results, width='stretch', hide_index=True)
 
     last_run = st.session_state.get("niche_apify_last_run", {})
     if last_run:
@@ -3973,7 +3973,7 @@ def render_media_download():
         with option_cols[2]:
             embed_metadata = st.checkbox("Incorporar metadados", value=False, key="media_download_embed_metadata")
             st.caption("Playlist desactivada por padrão para evitar downloads acidentais em massa.")
-        start_download = st.form_submit_button("Iniciar download", type="primary", use_container_width=True)
+        start_download = st.form_submit_button("Iniciar download", type="primary", width='stretch')
 
     if start_download:
         progress = st.progress(0, text="A preparar o download…")
@@ -4087,7 +4087,7 @@ def render_cuts():
     with url_tab:
         url_value = st.text_input("URL directa do vídeo", placeholder="https://exemplo.com/video.mp4", key="cuts_video_url")
         st.caption("A URL deve apontar directamente para um ficheiro de vídeo HTTP/HTTPS. O download só ocorre depois de clicar no botão.")
-        if st.button("Descarregar vídeo", key="cuts_download_url", use_container_width=True):
+        if st.button("Descarregar vídeo", key="cuts_download_url", width='stretch'):
             try:
                 source_path = download_direct_video_url(url_value)
                 st.session_state["cuts_source_path"] = str(source_path)
@@ -4102,7 +4102,7 @@ def render_cuts():
         else:
             generated_labels = [f"{path.name} — {path}" for path in generated_paths]
             selected_generated = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: generated_labels[index], key="cuts_generated_index")
-            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", use_container_width=True):
+            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", width='stretch'):
                 source_path = generated_paths[selected_generated]
                 st.session_state["cuts_source_path"] = str(source_path)
                 st.session_state["cuts_source_label"] = f"Pipeline · {source_path.name}"
@@ -4114,7 +4114,7 @@ def render_cuts():
         else:
             folder_labels = [f"{path.name} — {path}" for path in folder_paths]
             selected_folder = st.selectbox("Vídeo da pasta", range(len(folder_paths)), format_func=lambda index: folder_labels[index], key="cuts_folder_index")
-            if st.button("Usar vídeo da pasta", key="cuts_use_folder", use_container_width=True):
+            if st.button("Usar vídeo da pasta", key="cuts_use_folder", width='stretch'):
                 source_path = folder_paths[selected_folder]
                 st.session_state["cuts_source_path"] = str(source_path)
                 st.session_state["cuts_source_label"] = f"Pasta local · {source_path.name}"
@@ -4173,7 +4173,7 @@ def render_cuts():
         generate_button = st.button(
             "Gerar Clips",
             type="primary",
-            use_container_width=True,
+            width='stretch',
             disabled=not (source_path and source_path.is_file() and rights_confirmed),
             key="cuts_generate_button",
         )
@@ -4222,13 +4222,13 @@ def render_cuts():
                         with st.container(border=True):
                             st.caption(f"Clip {clip.get('index', '—')} · {float(clip.get('duration', 0)):.1f}s")
                             st.video(str(clip["path"]))
-                            st.download_button("Descarregar clip", data=Path(clip["path"]).read_bytes(), file_name=clip["name"], mime="video/mp4", key=f"cuts_download_{last_run['id']}_{clip['index']}", use_container_width=True)
+                            st.download_button("Descarregar clip", data=Path(clip["path"]).read_bytes(), file_name=clip["name"], mime="video/mp4", key=f"cuts_download_{last_run['id']}_{clip['index']}", width='stretch')
             try:
                 _, archive_bytes = zip_cut_run(last_run)
-                st.download_button("Descarregar todos os clips (ZIP)", data=archive_bytes, file_name=f"{last_run['id']}.zip", mime="application/zip", key=f"cuts_download_zip_{last_run['id']}", use_container_width=True)
+                st.download_button("Descarregar todos os clips (ZIP)", data=archive_bytes, file_name=f"{last_run['id']}.zip", mime="application/zip", key=f"cuts_download_zip_{last_run['id']}", width='stretch')
             except CutsError as exc:
                 st.warning(str(exc))
-            st.download_button("Descarregar manifesto JSON", data=cut_manifest_bytes(last_run), file_name=f"{last_run['id']}.json", mime="application/json", key=f"cuts_download_manifest_{last_run['id']}", use_container_width=True)
+            st.download_button("Descarregar manifesto JSON", data=cut_manifest_bytes(last_run), file_name=f"{last_run['id']}.json", mime="application/json", key=f"cuts_download_manifest_{last_run['id']}", width='stretch')
         elif last_run.get("error"):
             st.error(last_run["error"])
 
@@ -4237,7 +4237,7 @@ def render_cuts():
         with st.expander("Histórico do Clip Generator"):
             st.dataframe(
                 [{"Data": run.get("created_at", "—"), "Fonte": run.get("source_name", "—"), "Formato": run.get("output_format", "—"), "Clips": len(run.get("clips", [])), "Estado": run.get("status", "—")} for run in runs[:20]],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
 
@@ -4308,7 +4308,7 @@ def render_python_editor():
                         width = st.number_input("Largura", min_value=16, max_value=7680, value=1280, step=2, key="python_editor_width")
                     with resize_cols[1]:
                         height = st.number_input("Altura", min_value=16, max_value=7680, value=720, step=2, key="python_editor_height")
-                apply_operation = st.form_submit_button(f"Aplicar: {operation}", type="primary", use_container_width=True)
+                apply_operation = st.form_submit_button(f"Aplicar: {operation}", type="primary", width='stretch')
             if apply_operation:
                 try:
                     ffmpeg_path = read_json("settings.json", {}).get("ffmpeg_path", "")
@@ -4344,7 +4344,7 @@ def render_python_editor():
         records = list_python_editor_records()
         if records:
             with st.expander("Histórico do Editor Python"):
-                st.dataframe([{key: record.get(key, "") for key in ("created_at", "operation", "source_name", "output_name")} for record in records[:20]], use_container_width=True, hide_index=True)
+                st.dataframe([{key: record.get(key, "") for key in ("created_at", "operation", "source_name", "output_name")} for record in records[:20]], width='stretch', hide_index=True)
 
     with code_tab:
         st.subheader("Scripts Python locais")
@@ -4642,7 +4642,7 @@ def render_videos():
                         file_name=video_file.name,
                         mime='video/mp4',
                         key=f"pipeline_video_download_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                     )
                 elif video_path:
                     st.caption(f'Vídeo registado: {video_path}')
@@ -4658,11 +4658,11 @@ def render_videos():
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
-                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                    if st.button("Start", key=f"automation_start_{task['id']}", width='stretch', disabled=state not in {"to_do", "blocked", "failed"}):
                         transition_task(task["id"], "doing")
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                    if st.button("Stop", key=f"automation_stop_{task['id']}", width='stretch', disabled=state != "doing"):
                         transition_task(task["id"], "blocked")
                         st.rerun()
 
@@ -4701,7 +4701,7 @@ def render_music_backlog() -> None:
                         file_name=music_file.name,
                         mime="audio/mpeg",
                         key=f"music_backlog_download_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                     )
                 elif music_path:
                     st.caption(f"Música registada: {music_path}")
@@ -4725,11 +4725,11 @@ def render_music_backlog() -> None:
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
-                    if st.button("Start", key=f"music_backlog_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                    if st.button("Start", key=f"music_backlog_start_{task['id']}", width='stretch', disabled=state not in {"to_do", "blocked", "failed"}):
                         run_music_task(str(task["id"]), read_json("settings.json", {}))
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"music_backlog_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                    if st.button("Stop", key=f"music_backlog_stop_{task['id']}", width='stretch', disabled=state != "doing"):
                         transition_music_task(str(task["id"]), "blocked")
                         st.rerun()
 
@@ -4775,14 +4775,14 @@ def render_thumbnails():
             with image_col:
                 image_path = record.get("image_path")
                 if image_path and image_path.is_file():
-                    st.image(str(image_path), use_container_width=True)
+                    st.image(str(image_path), width='stretch')
                     st.download_button(
                         "Descarregar thumbnail",
                         data=image_path.read_bytes(),
                         file_name=image_path.name,
                         mime="image/jpeg" if image_path.suffix.lower() in {".jpg", ".jpeg"} else "image/png",
                         key=f"thumbnail_download_{task_id}_{record['variant_index']}",
-                        use_container_width=True,
+                        width='stretch',
                     )
                 else:
                     st.markdown("### Sem imagem")
@@ -4802,7 +4802,7 @@ def render_thumbnails():
                     "Refazer Prompt Thumb",
                     key=f"regenerate_thumbnail_{task_id}",
                     icon=":material/refresh:",
-                    use_container_width=True,
+                    width='stretch',
                     disabled=not bool(record["title"] or record["topic"]),
                 ):
                     try:
@@ -4837,7 +4837,7 @@ def render_thumbnails():
                     "Gerar Imagem",
                     key=f"generate_thumbnail_image_{task_id}",
                     icon=":material/image:",
-                    use_container_width=True,
+                    width='stretch',
                     disabled=not bool(record["prompt"]),
                 ):
                     try:
@@ -4861,7 +4861,7 @@ def render_thumbnails():
                     "Refazer Prompt e Gerar Imagem",
                     key=f"regenerate_thumbnail_prompt_{task_id}",
                     icon=":material/auto_awesome:",
-                    use_container_width=True,
+                    width='stretch',
                     disabled=not bool(record["title"] or record["topic"]),
                 ):
                     try:
@@ -4892,7 +4892,7 @@ def render_thumbnails():
                     "Refazer Lettering",
                     key=f"regenerate_thumbnail_lettering_{task_id}",
                     icon=":material/title:",
-                    use_container_width=True,
+                    width='stretch',
                     disabled=not bool(record.get("image_path") and record["image_path"].is_file()),
                 ):
                     try:
@@ -5002,7 +5002,7 @@ def render_tiktok_automation():
             with default_cols[4]:
                 automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1, key=f"tiktok_automation_format_{channel_id}")
             with default_cols[5]:
-                if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
+                if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", width='stretch', type="primary"):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
@@ -5034,10 +5034,10 @@ def render_tiktok_automation():
                 st.caption("Portrait 9:16")
             with cols[3]:
                 state = str(task.get("state") or "")
-                if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
+                if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, width='stretch'):
                     retry_task_with_current_settings(task_id) if state in {"blocked", "failed"} else transition_task(task_id, "doing")
                     st.rerun()
-                if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
+                if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", width='stretch'):
                     stop_task_by_user(task_id)
                     st.rerun()
 
@@ -5112,7 +5112,7 @@ def render_automation():
                     key=f"automation_voice_{channel_id}",
                 )
             with default_cols[5]:
-                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
+                if st.button("Guardar", key=f"automation_save_{channel_id}", width='stretch'):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
@@ -5156,7 +5156,7 @@ def render_automation():
                         file_name=thumbnail_path.name if thumbnail_path else "thumbnail.png",
                         mime="image/png",
                         key=f"automation_download_thumbnail_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                         disabled=thumbnail_path is None,
                     )
                 with prompt_download_col:
@@ -5167,7 +5167,7 @@ def render_automation():
                         file_name=thumbnail_prompt_path.name if thumbnail_prompt_path else "thumbnail-prompt.txt",
                         mime="application/json" if thumbnail_prompt_path else "text/plain",
                         key=f"automation_download_thumbnail_prompt_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                         disabled=thumbnail_prompt_path is None and not thumbnail_prompt,
                     )
             with task_cols[1]:
@@ -5179,14 +5179,14 @@ def render_automation():
                 state = str(task.get("state") or "")
                 start_col, stop_col, delete_col = st.columns(3)
                 with start_col:
-                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                    if st.button("Start", key=f"automation_start_{task['id']}", width='stretch', disabled=state not in {"to_do", "blocked", "failed"}):
                         if state in {"failed", "blocked"}:
                             retry_task_with_current_settings(task["id"])
                         else:
                             transition_task(task["id"], "doing")
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                    if st.button("Stop", key=f"automation_stop_{task['id']}", width='stretch', disabled=state != "doing"):
                         stop_task_by_user(task["id"])
                         st.rerun()
                 script_download_col, video_download_col = st.columns(2, gap="small")
@@ -5197,7 +5197,7 @@ def render_automation():
                         file_name=script_path.name if script_path else "roteiro.md",
                         mime="text/markdown",
                         key=f"automation_download_script_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                         disabled=script_path is None,
                     )
                 with video_download_col:
@@ -5207,19 +5207,19 @@ def render_automation():
                         file_name=video_path.name if video_path else "video.mp4",
                         mime="video/mp4",
                         key=f"automation_download_video_{task['id']}",
-                        use_container_width=True,
+                        width='stretch',
                         disabled=video_path is None,
                     )
                 with delete_col:
                     confirm_delete_key = f"automation_confirm_delete_{task['id']}"
-                    if st.button("Apagar", key=f"automation_delete_{task['id']}", use_container_width=True, disabled=state == "doing"):
+                    if st.button("Apagar", key=f"automation_delete_{task['id']}", width='stretch', disabled=state == "doing"):
                         st.session_state[confirm_delete_key] = True
                         st.rerun()
                     if st.session_state.get(confirm_delete_key):
                         st.warning("Remover este vídeo da fila? Os ficheiros de artefactos serão preservados.")
                         confirm_col, cancel_col = st.columns(2)
                         with confirm_col:
-                            if st.button("Confirmar", key=f"automation_confirm_delete_button_{task['id']}", use_container_width=True, type="primary"):
+                            if st.button("Confirmar", key=f"automation_confirm_delete_button_{task['id']}", width='stretch', type="primary"):
                                 try:
                                     delete_task(task["id"])
                                     st.session_state.pop(confirm_delete_key, None)
@@ -5227,7 +5227,7 @@ def render_automation():
                                 except ValueError as exc:
                                     st.error(str(exc))
                         with cancel_col:
-                            if st.button("Cancelar", key=f"automation_cancel_delete_{task['id']}", use_container_width=True):
+                            if st.button("Cancelar", key=f"automation_cancel_delete_{task['id']}", width='stretch'):
                                 st.session_state.pop(confirm_delete_key, None)
                                 st.rerun()
 
@@ -5326,7 +5326,7 @@ def _render_music_source(prefix: str, extensions: set[str]) -> str:
             type=sorted(extension.lstrip(".") for extension in extensions),
             key=f"{prefix}_music_file_upload",
         )
-        if uploaded is not None and st.button("Guardar música no storage local", key=f"{prefix}_music_store", use_container_width=True):
+        if uploaded is not None and st.button("Guardar música no storage local", key=f"{prefix}_music_store", width='stretch'):
             try:
                 stored = store_music_file(uploaded.name, uploaded.getvalue())
                 selected_path = str(stored)
@@ -5399,7 +5399,7 @@ def _render_jewelmusic_upload_tab() -> None:
         base_url = st.text_input("Base URL", value=str(settings.get("jewelmusic_base_url") or "https://api.jewelmusic.com"))
         proxy_url = st.text_input("Proxy opcional", value=str(settings.get("jewelmusic_proxy_url") or ""), placeholder="http://127.0.0.1:8080")
         timeout_seconds = st.number_input("Timeout (segundos)", min_value=5, max_value=900, value=int(settings.get("jewelmusic_timeout_seconds", 120)), step=5)
-        save = st.form_submit_button("Guardar configuração JewelMusic", type="primary", use_container_width=True)
+        save = st.form_submit_button("Guardar configuração JewelMusic", type="primary", width='stretch')
     if save:
         settings = _persist_music_upload_settings({
             "jewelmusic_enabled": bool(enabled),
@@ -5410,7 +5410,7 @@ def _render_jewelmusic_upload_tab() -> None:
         })
         st.success("Configuração JewelMusic guardada no storage local.")
     adapter = JewelMusicAdapter(settings)
-    if st.button("Testar conexão JewelMusic", key="jewelmusic_test", use_container_width=True):
+    if st.button("Testar conexão JewelMusic", key="jewelmusic_test", width='stretch'):
         test_result = adapter.test_connection()
         (st.success if test_result.ok else st.error)(test_result.message)
     music_path = _render_music_source("jewelmusic", MUSIC_UPLOAD_EXTENSIONS)
@@ -5424,7 +5424,7 @@ def _render_jewelmusic_upload_tab() -> None:
     with metadata_cols[3]:
         year = st.text_input("Ano", key="jewelmusic_year")
     genre = st.text_input("Género", key="jewelmusic_genre")
-    if st.button("Enviar música para JewelMusic", type="primary", key="jewelmusic_upload", use_container_width=True, disabled=not bool(music_path)):
+    if st.button("Enviar música para JewelMusic", type="primary", key="jewelmusic_upload", width='stretch', disabled=not bool(music_path)):
         result = JewelMusicAdapter(read_json("settings.json", {})).upload_track(music_path, title=title, artist=artist, album=album, year=year, genre=genre)
         _record_music_upload("JewelMusic", result, music_path=music_path, target={"artist": artist, "title": title})
         (st.success if result.ok else st.error)(result.message)
@@ -5459,7 +5459,7 @@ def _render_pushtunes_upload_tab() -> None:
         spotify_client_secret = st.text_input("Spotify Client Secret", value=str(settings.get("pushtunes_spotify_client_secret") or ""), type="password")
         spotify_redirect_uri = st.text_input("Spotify Redirect URI", value=str(settings.get("pushtunes_spotify_redirect_uri") or ""))
         timeout_seconds = st.number_input("Timeout Pushtunes (segundos)", min_value=30, max_value=3600, value=int(settings.get("pushtunes_timeout_seconds", 1800)), step=30)
-        save = st.form_submit_button("Guardar configuração Pushtunes", type="primary", use_container_width=True)
+        save = st.form_submit_button("Guardar configuração Pushtunes", type="primary", width='stretch')
     if save:
         settings = _persist_music_upload_settings({
             "pushtunes_enabled": bool(enabled),
@@ -5483,17 +5483,17 @@ def _render_pushtunes_upload_tab() -> None:
     if source == "csv":
         st.caption("Pode carregar o CSV nesta página e usar o caminho guardado como origem Pushtunes.")
         csv_upload = st.file_uploader("Carregar CSV de origem Pushtunes", type=["csv"], key="pushtunes_csv_upload")
-        if csv_upload is not None and st.button("Guardar CSV Pushtunes no storage", key="pushtunes_csv_store", use_container_width=True):
+        if csv_upload is not None and st.button("Guardar CSV Pushtunes no storage", key="pushtunes_csv_store", width='stretch'):
             stored_csv = _store_pushtunes_csv(csv_upload)
             settings = _persist_music_upload_settings({"pushtunes_csv_file": stored_csv})
             st.success(f"CSV guardado em `{stored_csv}`.")
     adapter = PushtunesAdapter(read_json("settings.json", {}))
     status = adapter.status()
     (st.success if status.ok else st.warning)(status.message)
-    if st.button("Validar instalação e configuração Pushtunes", key="pushtunes_test", use_container_width=True):
+    if st.button("Validar instalação e configuração Pushtunes", key="pushtunes_test", width='stretch'):
         check = PushtunesAdapter(read_json("settings.json", {})).status()
         (st.success if check.ok else st.error)(check.message)
-    if st.button("Executar sincronização Pushtunes", type="primary", key="pushtunes_sync", use_container_width=True, disabled=not status.ok):
+    if st.button("Executar sincronização Pushtunes", type="primary", key="pushtunes_sync", width='stretch', disabled=not status.ok):
         result = PushtunesAdapter(read_json("settings.json", {})).sync()
         _record_music_upload(f"Pushtunes ({adapter.source} → {adapter.target})", result, target={"source": adapter.source, "target": adapter.target, "operation": adapter.operation})
         (st.success if result.ok else st.error)(result.message)
@@ -5521,7 +5521,7 @@ def _render_ytmusicapi_upload_tab() -> None:
         auth_file = st.text_input("Caminho do browser.json", value=str(settings.get("ytmusicapi_auth_file") or ""))
         proxy_url = st.text_input("Proxy opcional", value=str(settings.get("ytmusicapi_proxy_url") or ""), placeholder="http://127.0.0.1:8080")
         timeout_seconds = st.number_input("Timeout (segundos)", min_value=30, max_value=900, value=int(settings.get("ytmusicapi_timeout_seconds", 240)), step=10)
-        save = st.form_submit_button("Guardar configuração ytmusicapi", type="primary", use_container_width=True)
+        save = st.form_submit_button("Guardar configuração ytmusicapi", type="primary", width='stretch')
     if save:
         settings = _persist_music_upload_settings({
             "ytmusicapi_enabled": bool(enabled),
@@ -5531,18 +5531,18 @@ def _render_ytmusicapi_upload_tab() -> None:
         })
         st.success("Configuração ytmusicapi guardada no storage local.")
     auth_upload = st.file_uploader("Carregar browser.json", type=["json"], key="ytmusicapi_auth_upload")
-    if auth_upload is not None and st.button("Guardar browser.json no storage local", key="ytmusicapi_auth_store", use_container_width=True):
+    if auth_upload is not None and st.button("Guardar browser.json no storage local", key="ytmusicapi_auth_store", width='stretch'):
         stored_auth = _store_ytmusicapi_auth(auth_upload)
         settings = _persist_music_upload_settings({"ytmusicapi_auth_file": stored_auth, "ytmusicapi_enabled": True})
         st.success(f"Ficheiro de autenticação guardado em `{stored_auth}`.")
     adapter = YTMusicApiAdapter(read_json("settings.json", {}))
     status = adapter.status()
     (st.success if status.ok else st.warning)(status.message)
-    if st.button("Testar autenticação ytmusicapi", key="ytmusicapi_test", use_container_width=True):
+    if st.button("Testar autenticação ytmusicapi", key="ytmusicapi_test", width='stretch'):
         result = YTMusicApiAdapter(read_json("settings.json", {})).test_connection()
         (st.success if result.ok else st.error)(result.message)
     music_path = _render_music_source("ytmusicapi", YT_MUSIC_UPLOAD_EXTENSIONS)
-    if st.button("Enviar música para YouTube Music", type="primary", key="ytmusicapi_upload", use_container_width=True, disabled=not bool(music_path) or not status.ok):
+    if st.button("Enviar música para YouTube Music", type="primary", key="ytmusicapi_upload", width='stretch', disabled=not bool(music_path) or not status.ok):
         result = YTMusicApiAdapter(read_json("settings.json", {})).upload_song(music_path)
         _record_music_upload("ytmusicapi / YouTube Music", result, music_path=music_path, target={"service": "youtube_music"})
         (st.success if result.ok else st.error)(result.message)
@@ -5574,7 +5574,7 @@ def _render_distrokid_upload_tab() -> None:
             last_name = st.text_input("Apelido", value=str(settings.get("distrokid_last_name") or ""))
             record_label = st.text_input("Record label", value=str(settings.get("distrokid_record_label") or ""))
             genre = st.text_input("Género principal", value=str(settings.get("distrokid_genre") or ""), help="O género deve corresponder a uma opção aceite pelo formulário DistroKid.")
-        save = st.form_submit_button("Guardar configuração DistroKid", type="primary", use_container_width=True)
+        save = st.form_submit_button("Guardar configuração DistroKid", type="primary", width='stretch')
     if save:
         _persist_music_upload_settings({
             "distrokid_enabled": bool(enabled), "distrokid_cookie": cookie.strip(), "distrokid_account": account.strip(),
@@ -5586,11 +5586,11 @@ def _render_distrokid_upload_tab() -> None:
     adapter = DistroKidAdapter(settings)
     status = adapter.status()
     (st.success if status.ok else st.warning)(status.message)
-    if st.button("Testar sessão DistroKid", key="distrokid_test", use_container_width=True):
+    if st.button("Testar sessão DistroKid", key="distrokid_test", width='stretch'):
         result = DistroKidAdapter(read_json("settings.json", {})).test_connection()
         (st.success if result.ok else st.error)(result.message)
     uploaded_tracks = st.file_uploader("Faixas para o lançamento", type=sorted(extension.lstrip(".") for extension in DISTROKID_AUDIO_EXTENSIONS), accept_multiple_files=True, key="distrokid_track_upload")
-    if uploaded_tracks and st.button("Guardar faixas no storage local", key="distrokid_store_tracks", use_container_width=True):
+    if uploaded_tracks and st.button("Guardar faixas no storage local", key="distrokid_store_tracks", width='stretch'):
         stored_paths: list[str] = []
         for uploaded in uploaded_tracks:
             try:
@@ -5609,7 +5609,7 @@ def _render_distrokid_upload_tab() -> None:
             instrumental = st.checkbox("Instrumental", value=False, key=f"distrokid_track_instrumental_{index}")
             track_rows.append({"path": path, "title": track_title.strip() or Path(path).stem, "instrumental": instrumental})
     cover_upload = st.file_uploader("Capa do lançamento (opcional)", type=sorted(extension.lstrip(".") for extension in DISTROKID_COVER_EXTENSIONS), key="distrokid_cover_upload")
-    if cover_upload and st.button("Guardar capa no storage local", key="distrokid_store_cover", use_container_width=True):
+    if cover_upload and st.button("Guardar capa no storage local", key="distrokid_store_cover", width='stretch'):
         try:
             st.session_state["distrokid_cover_path"] = _store_distrokid_cover(cover_upload)
             st.success("Capa guardada no storage local.")
@@ -5619,11 +5619,11 @@ def _render_distrokid_upload_tab() -> None:
     if cover_path and Path(cover_path).is_file():
         st.caption(f"Capa seleccionada: `{cover_path}`")
     session_id = str(st.session_state.get("distrokid_session_id") or "")
-    if session_id and st.button("Fechar browser DistroKid", key="distrokid_close_browser", use_container_width=True):
+    if session_id and st.button("Fechar browser DistroKid", key="distrokid_close_browser", width='stretch'):
         result = close_distrokid_session(session_id)
         (st.success if result.ok else st.warning)(result.message)
         st.session_state.pop("distrokid_session_id", None)
-    if st.button("Abrir formulário e carregar para DistroKid", type="primary", key="distrokid_prepare_upload", use_container_width=True, disabled=not status.ok or not track_rows):
+    if st.button("Abrir formulário e carregar para DistroKid", type="primary", key="distrokid_prepare_upload", width='stretch', disabled=not status.ok or not track_rows):
         current = read_json("settings.json", {})
         result = DistroKidAdapter(current).prepare_upload(
             track_rows, artist=str(current.get("distrokid_artist") or ""), release_title=str(current.get("distrokid_release_title") or ""),
@@ -5675,7 +5675,7 @@ def render_upload_composio():
         return
     query = st.text_input("Pesquisar ferramenta Composio", value="upload a video file", key="composio_upload_query")
     toolkit_filter = st.text_input("Toolkit preferido (opcional)", value=str(settings.get("composio_toolkit") or ""), key="composio_upload_toolkit")
-    if st.button("Descobrir ferramentas", key="composio_upload_discover", use_container_width=True):
+    if st.button("Descobrir ferramentas", key="composio_upload_discover", width='stretch'):
         try:
             st.session_state["composio_upload_tools"] = discover_tools(api_key, user_id, query, toolkit_filter)
             if not st.session_state["composio_upload_tools"]:
@@ -5698,7 +5698,7 @@ def render_upload_composio():
         st.json(schema)
     file_field = st.text_input("Campo que recebe o vídeo", value=str(st.session_state.get("composio_upload_file_field") or "file"), key="composio_upload_file_field")
     arguments_json = st.text_area("Argumentos JSON adicionais", value=str(st.session_state.get("composio_upload_arguments") or "{}"), height=150, key="composio_upload_arguments")
-    if st.button("Autorizar toolkit no Composio", key="composio_upload_authorize", use_container_width=True):
+    if st.button("Autorizar toolkit no Composio", key="composio_upload_authorize", width='stretch'):
         try:
             auth = authorize_toolkit(api_key, user_id, str(selected_tool.get("toolkit") or ""))
             if auth.get("redirect_url"):
@@ -5718,7 +5718,7 @@ def render_upload_composio():
     video_path = str((task.get("artifacts", {}) or {}).get("video") or "")
     st.caption(video_path or "Sem caminho de vídeo registado")
     st.info(f"Resumo: `{selected_slug}` · toolkit `{selected_tool.get('toolkit') or 'não indicado'}` · campo `{file_field or 'não indicado'}`")
-    if st.button("Enviar vídeo via Composio", type="primary", key=f"composio_upload_send_{selected_task_id}", use_container_width=True):
+    if st.button("Enviar vídeo via Composio", type="primary", key=f"composio_upload_send_{selected_task_id}", width='stretch'):
         try:
             parse_arguments(arguments_json)
             result = execute_upload(api_key, user_id, selected_slug, video_path, file_field, arguments_json)
@@ -5991,14 +5991,14 @@ def render_upload_conventional():
         status_cols = st.columns(2)
         with status_cols[0]:
             (st.success if status["agent"].ok else st.warning)(f"Agente: {status['agent'].message}")
-            if st.button("Autorizar agente YouTube", key="youtube_authorize_agent", use_container_width=True):
+            if st.button("Autorizar agente YouTube", key="youtube_authorize_agent", width='stretch'):
                 result = youtube.authorize_agent()
                 (st.success if result.ok else st.error)(result.message)
                 if result.ok:
                     st.rerun()
         with status_cols[1]:
             (st.info if status["fallback"].ok else st.caption)(f"Fallback OAuth: {status['fallback'].message}")
-            if st.button("Autorizar fallback OAuth", key="youtube_authorize_fallback", use_container_width=True):
+            if st.button("Autorizar fallback OAuth", key="youtube_authorize_fallback", width='stretch'):
                 result = youtube.authorize_fallback()
                 (st.success if result.ok else st.error)(result.message)
                 if result.ok:
@@ -6051,7 +6051,7 @@ def render_upload_conventional():
                         st.session_state.pop(description_error_key, None)
 
                 description = st.text_area("Descrição", value=task.get("description", ""), key=description_state_key, height=100)
-                st.button("Gerar descrição com IA", key=f"yt_description_ai_{task['id']}", use_container_width=False, on_click=generate_upload_description_callback)
+                st.button("Gerar descrição com IA", key=f"yt_description_ai_{task['id']}", width='content', on_click=generate_upload_description_callback)
                 if description_error := str(st.session_state.get(description_error_key) or "").strip():
                     st.error(f"Não foi possível gerar a descrição: {description_error}")
                 tags_raw = st.text_input("Tags separadas por vírgula", value=task.get("tags", "") if isinstance(task.get("tags", ""), str) else ", ".join(task.get("tags", [])), key=f"yt_tags_{task['id']}")
@@ -6219,11 +6219,11 @@ def render_tiktok_api_cards(settings: dict[str, Any]) -> None:
                 client_secret = st.text_input("TikTok Client Secret", value=card["client_secret"], type="password", key=f"tiktok_api_{card_id}_client_secret")
                 action_cols = st.columns(3)
                 with action_cols[0]:
-                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                    test_clicked = st.form_submit_button("Testar chamada API", width='stretch')
                 with action_cols[1]:
-                    save_clicked = st.form_submit_button("Guardar card", type="primary", use_container_width=True)
+                    save_clicked = st.form_submit_button("Guardar card", type="primary", width='stretch')
                 with action_cols[2]:
-                    delete_clicked = st.form_submit_button("Apagar card", use_container_width=True)
+                    delete_clicked = st.form_submit_button("Apagar card", width='stretch')
             edited = {"id": card_id, "client_id": client_id.strip(), "client_secret": client_secret.strip()}
             if test_clicked:
                 cards[index] = edited
@@ -6245,7 +6245,7 @@ def render_tiktok_api_cards(settings: dict[str, Any]) -> None:
                 _persist_tiktok_api_cards(settings, cards)
                 st.success("Card TikTok apagado.")
                 st.rerun()
-    if st.button("Adicionar nova API", type="primary", use_container_width=True, key="add_tiktok_api_card"):
+    if st.button("Adicionar nova API", type="primary", width='stretch', key="add_tiktok_api_card"):
         cards.append({"id": f"tiktok-api-{uuid.uuid4().hex[:10]}", "client_id": "", "client_secret": ""})
         _persist_tiktok_api_cards(settings, cards)
         st.success("Novo card TikTok criado.")
@@ -6297,11 +6297,11 @@ def render_bilibili_api_cards(settings: dict[str, Any]) -> None:
                     proxy = st.text_input("Proxy opcional", value=str(card.get("proxy") or ""), key=f"bilibili_api_{card_id}_proxy", placeholder="http://127.0.0.1:8080")
                 action_cols = st.columns(3)
                 with action_cols[0]:
-                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                    test_clicked = st.form_submit_button("Testar chamada API", width='stretch')
                 with action_cols[1]:
-                    save_clicked = st.form_submit_button("Guardar card", type="primary", use_container_width=True)
+                    save_clicked = st.form_submit_button("Guardar card", type="primary", width='stretch')
                 with action_cols[2]:
-                    delete_clicked = st.form_submit_button("Apagar card", use_container_width=True)
+                    delete_clicked = st.form_submit_button("Apagar card", width='stretch')
             edited = {"id": card_id, "label": label.strip() or f"Conta Bilibili {index + 1}", "active": bool(active), "sessdata": sessdata.strip(), "bili_jct": bili_jct.strip(), "buvid3": buvid3.strip(), "buvid4": buvid4.strip(), "dedeuserid": dedeuserid.strip(), "ac_time_value": ac_time_value.strip(), "proxy": proxy.strip()}
             if test_clicked:
                 cards[index] = edited
@@ -6318,7 +6318,7 @@ def render_bilibili_api_cards(settings: dict[str, Any]) -> None:
                 _persist_bilibili_api_cards(settings, cards)
                 st.success("Card Bilibili apagado.")
                 st.rerun()
-    if st.button("Adicionar nova API", type="primary", use_container_width=True, key="add_bilibili_api_card"):
+    if st.button("Adicionar nova API", type="primary", width='stretch', key="add_bilibili_api_card"):
         cards.append({"id": f"bilibili-api-{uuid.uuid4().hex[:10]}", "label": f"Conta Bilibili {len(cards) + 1}", "active": True, "sessdata": "", "bili_jct": "", "buvid3": "", "buvid4": "", "dedeuserid": "", "ac_time_value": "", "proxy": ""})
         _persist_bilibili_api_cards(settings, cards)
         st.success("Novo card Bilibili criado.")
@@ -6402,7 +6402,7 @@ def render_google_accounts(*, include_innertube: bool = True):
                             key=f"batch_session_info_captured_at_{account_id}",
                             help="Data em que o sessionInfo token foi capturado. É usada para calcular o alerta de expiração e não revela o token.",
                         )
-                    save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
+                    save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", width='stretch')
 
                 st.markdown("**Documento de cookies/credenciais desta conta Google**")
                 st.caption("O documento padrão é criado automaticamente. Suba um JSON completo ou apenas o documento de cookies; os valores preenchidos são incorporados e mantidos em credentials.json.")
@@ -6417,20 +6417,20 @@ def render_google_accounts(*, include_innertube: bool = True):
                 else:
                     st.success("Documento completo para a conta Google")
                 st.caption(f"Documento guardado em: {direct_status['document_file']}")
-                document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", use_container_width=True)
+                document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", width='stretch')
 
                 account_status = youtube_batch_account_status(batch_account, STORAGE)
                 status_cols = st.columns(3)
                 with status_cols[0]:
                     (st.success if account_status.ok else st.warning)(account_status.message)
                 with status_cols[1]:
-                    if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
+                    if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", width='stretch'):
                         result = authorize_youtube_batch_account(batch_account, STORAGE)
                         (st.success if result.ok else st.error)(result.message)
                         if result.ok:
                             st.rerun()
                 with status_cols[2]:
-                    if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                    if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", width='stretch'):
                         delete_youtube_batch_token(batch_account, STORAGE)
                         delete_credentials_document(STORAGE, batch_account)
                         remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
@@ -6531,7 +6531,7 @@ def render_google_accounts(*, include_innertube: bool = True):
                 lambda: test_innertube_api_key(innertube_api_key_value),
                 widget_key="api_test_innertube",
             )
-            save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
+            save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", width='stretch')
         if save_innertube_api_key:
             settings["direct_innertube_api_key"] = innertube_api_key_value.strip()
             settings.pop("INNERTUBE_API_KEY", None)
@@ -6556,7 +6556,7 @@ def render_google_accounts(*, include_innertube: bool = True):
             new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
             new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
             new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
-        add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
+        add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", width='stretch')
     if add_account:
         document_error = ""
         if "@" not in new_account_email.strip():
@@ -6616,7 +6616,7 @@ def render_google_accounts(*, include_innertube: bool = True):
             key="google_page_youtube_api_key",
             help="Credencial Google Cloud separada, usada apenas para métricas oficiais da YouTube Data API.",
         )
-        save_google_global = st.form_submit_button("Guardar configuração global do YouTube", type="primary", use_container_width=True)
+        save_google_global = st.form_submit_button("Guardar configuração global do YouTube", type="primary", width='stretch')
     if save_google_global:
         settings.update({
             "youtube_client_id": youtube_client_id.strip(),
@@ -6693,7 +6693,7 @@ def _render_material_source_card(settings: dict[str, Any], cards: list[dict[str,
                     lambda: test_material_source_credentials(provider, api_key),
                     widget_key=f"api_test_material_{card_id}",
                 )
-            save_card = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"material_card_{card_id}_save")
+            save_card = st.form_submit_button("Salvar", type="primary", width='stretch', key=f"material_card_{card_id}_save")
         if save_card:
             cards[index] = {
                 **card,
@@ -6726,7 +6726,7 @@ def render_material_source_api_keys(settings: dict[str, Any], *, embedded: bool 
             format_func=lambda value: _material_source_card_definition(value)["label"],
             key="material_new_provider_choice",
         )
-        add_source_clicked = st.form_submit_button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card") if embedded else st.button("Configurar Nova Fonte de Materiais", type="primary", use_container_width=True, key="add_material_source_card")
+        add_source_clicked = st.form_submit_button("Configurar Nova Fonte de Materiais", type="primary", width='stretch', key="add_material_source_card") if embedded else st.button("Configurar Nova Fonte de Materiais", type="primary", width='stretch', key="add_material_source_card")
         if add_source_clicked:
             new_card = new_material_card(provider_to_add, card_id=f"material-{provider_to_add}-{uuid.uuid4().hex[:8]}")
             new_card["priority"] = max(
@@ -6817,7 +6817,7 @@ def _render_api_test_control(
     consistent: testing it must not appear successful while its values remain
     only in the browser session.
     """
-    if st.form_submit_button("Testar chamada API", use_container_width=True, key=widget_key):
+    if st.form_submit_button("Testar chamada API", width='stretch', key=widget_key):
         with st.spinner(ui_text("A testar chamada API…", current_ui_language())):
             try:
                 if persist_callback is not None:
@@ -6917,9 +6917,9 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             with action_col:
                 action_buttons = st.columns(2)
                 with action_buttons[0]:
-                    refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True, key=f"llm_card_{card_id}_refresh")
+                    refresh_clicked = st.form_submit_button("Consultar modelos", width='stretch', key=f"llm_card_{card_id}_refresh")
                 with action_buttons[1]:
-                    test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True, key=f"llm_card_{card_id}_test")
+                    test_clicked = st.form_submit_button("Testar chamada API", width='stretch', key=f"llm_card_{card_id}_test")
 
             extra_values: dict[str, str] = {}
             if definition.extra_fields:
@@ -6956,10 +6956,10 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                 if telegram_llm:
                     st.caption("Exclusivo para Notificações de Telegram — prioridade ignorada no pool LLM.")
 
-            save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"llm_card_{card_id}_save")
+            save_clicked = st.form_submit_button("Salvar", type="primary", width='stretch', key=f"llm_card_{card_id}_save")
             remove_clicked = False
             if definition.code != "openai":
-                remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True, key=f"llm_card_{card_id}_remove")
+                remove_clicked = st.form_submit_button("Remover cartão", width='stretch', key=f"llm_card_{card_id}_remove")
 
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "priority": max(1, int(priority)), "telegram_llm": bool(telegram_llm), **extra_values})
@@ -7015,9 +7015,9 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
             with rpm_cols[2]:
                 llm_rpm_window_seconds = st.number_input("Janela (segundos)", min_value=1, max_value=3600, value=int(settings.get("llm_rpm_window_seconds", 60)), step=1, key="settings_llm_rpm_window_seconds")
             save_llm_rpm_clicked = (
-                st.form_submit_button("Guardar limite LLM NVIDIA NIM", type="primary", use_container_width=True, key="save_llm_rpm_limit")
+                st.form_submit_button("Guardar limite LLM NVIDIA NIM", type="primary", width='stretch', key="save_llm_rpm_limit")
                 if embedded
-                else st.button("Guardar limite LLM NVIDIA NIM", type="primary", use_container_width=True, key="save_llm_rpm_limit")
+                else st.button("Guardar limite LLM NVIDIA NIM", type="primary", width='stretch', key="save_llm_rpm_limit")
             )
             if save_llm_rpm_clicked:
                 settings.update({
@@ -7039,9 +7039,9 @@ def render_llm_provider_cards(settings: dict[str, Any], *, embedded: bool = Fals
             key="llm_new_provider_choice",
         )
         add_provider_clicked = (
-            st.form_submit_button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card")
+            st.form_submit_button("Configurar Novo Provedor LLM", type="primary", width='stretch', key="add_llm_provider_card")
             if embedded
-            else st.button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card")
+            else st.button("Configurar Novo Provedor LLM", type="primary", width='stretch', key="add_llm_provider_card")
         )
         if add_provider_clicked:
             new_card = new_llm_card(provider_to_add, card_id=f"llm-{provider_to_add}-{uuid.uuid4().hex[:8]}")
@@ -7161,7 +7161,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 )
                 model = "" if selected_model == "__select_model__" else selected_model
                 if definition.code == "canva":
-                    refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
+                    refresh_clicked = st.form_submit_button("Consultar Modelos", width='stretch', key=f"media_card_{card_id}_refresh")
             if definition.code == "canva":
                 base_url = definition.default_base_url
                 st.text_input("Base URL", value=base_url, disabled=True, key=f"media_card_{card_id}_base_url_display")
@@ -7193,7 +7193,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 if not has_credentials:
                     st.info("Preencha Client Id, Client Secret e Redirect Uri para iniciar a autorização.")
                 else:
-                    authorize_clicked = st.form_submit_button("Iniciar autorização", use_container_width=True, key=f"media_card_{card_id}_authorize") if embedded else st.button("Iniciar autorização", key=f"media_card_{card_id}_authorize")
+                    authorize_clicked = st.form_submit_button("Iniciar autorização", width='stretch', key=f"media_card_{card_id}_authorize") if embedded else st.button("Iniciar autorização", key=f"media_card_{card_id}_authorize")
                     if authorize_clicked:
                         verifier, challenge = create_pkce_pair()
                         state = create_state()
@@ -7221,13 +7221,13 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
             action_cols = st.columns(4)
             with action_cols[0]:
                 if definition.code != "canva":
-                    refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
+                    refresh_clicked = st.form_submit_button("Consultar Modelos", width='stretch', key=f"media_card_{card_id}_refresh")
             with action_cols[1]:
-                test_clicked = st.form_submit_button("Testar Chamada API", use_container_width=True, key=f"media_card_{card_id}_test")
+                test_clicked = st.form_submit_button("Testar Chamada API", width='stretch', key=f"media_card_{card_id}_test")
             with action_cols[2]:
-                save_clicked = st.form_submit_button("Salvar", type="primary", use_container_width=True, key=f"media_card_{card_id}_save")
+                save_clicked = st.form_submit_button("Salvar", type="primary", width='stretch', key=f"media_card_{card_id}_save")
             with action_cols[3]:
-                remove_clicked = st.form_submit_button("Remover provider", use_container_width=True, key=f"media_card_{card_id}_remove")
+                remove_clicked = st.form_submit_button("Remover provider", width='stretch', key=f"media_card_{card_id}_remove")
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "supports_image": bool(supports_image), "supports_video": bool(supports_video), "priority": int(priority), **extra_values})
         cards[index] = edited
@@ -7279,7 +7279,7 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
             video_active_id = st.selectbox("Provider principal de vídeo", video_options, index=video_options.index(str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "")) if str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "") in video_options else 0, format_func=lambda value: "Não usar pool externo" if not value else next((media_provider_definition(card.get("provider")).label for card in video_cards if str(card.get("id")) == value), value), key="media_video_active_selector")
         with selector_cols[2]:
             video_pool_enabled = st.checkbox("Usar pool de vídeo externo", value=bool(settings.get("media_video_pool_enabled", False)), key="media_video_pool_enabled_ui")
-        if st.button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection") if not embedded else st.form_submit_button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection"):
+        if st.button("Salvar selecção dos pools", width='stretch', key="save_media_pool_selection") if not embedded else st.form_submit_button("Salvar selecção dos pools", width='stretch', key="save_media_pool_selection"):
             settings["media_video_pool_enabled"] = bool(video_pool_enabled)
             _persist_media_cards(settings, cards, image_active_id, video_active_id)
             st.success("Selecção dos pools guardada.")
@@ -7290,7 +7290,7 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
         st.markdown("**Adicionar provider de imagem/vídeo**")
         provider_codes = [item["code"] for item in media_provider_catalog()]
         provider_to_add = st.selectbox("Provider de media", provider_codes, format_func=lambda value: media_provider_definition(value).label, key="media_new_provider_choice")
-        add_clicked = st.form_submit_button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card") if embedded else st.button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card")
+        add_clicked = st.form_submit_button("Adicionar provider de imagem/vídeo", width='stretch', key="add_media_provider_card") if embedded else st.button("Adicionar provider de imagem/vídeo", width='stretch', key="add_media_provider_card")
         if add_clicked:
             cards.append(new_media_card(provider_to_add, card_id=f"media-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
             _persist_media_cards(settings, cards, image_active_id, video_active_id)
@@ -7328,7 +7328,7 @@ def render_settings():
                 for index, (key, label) in enumerate((("json", "JSON/API"), ("log", "Logs"), ("pdf", "PDF"), ("csv", "CSV"), ("diff", "Diffs"), ("code", "Código"))):
                     with optimizer_cols[index % 4]:
                         optimizer_values[f"token_optimizer_{key}_enabled"] = st.checkbox(label, value=bool(settings.get(f"token_optimizer_{key}_enabled", True)), key=f"token_optimizer_{key}_ui")
-                if st.button("Guardar optimizador", key="save_token_optimizer", use_container_width=True):
+                if st.button("Guardar optimizador", key="save_token_optimizer", width='stretch'):
                     settings.update({"token_optimizer_enabled": optimizer_enabled, **optimizer_values})
                     write_json("settings.json", settings)
                     st.success("Configuração do jusTokenMax guardada.")
@@ -7401,7 +7401,7 @@ def render_settings():
                             })
                             write_json("settings.json", settings)
 
-                        if st.form_submit_button("Guardar Azure Speech", type="primary", use_container_width=True, key="save_azure_speech"):
+                        if st.form_submit_button("Guardar Azure Speech", type="primary", width='stretch', key="save_azure_speech"):
                             save_azure_speech()
                             st.success("Azure Speech guardado.")
                         _render_api_test_control(
@@ -7509,7 +7509,7 @@ def render_settings():
                             settings.update({"lyria_api_key": lyria_api_key.strip(), "lyria_model": lyria_model})
                             write_json("settings.json", settings)
 
-                        if st.form_submit_button("Guardar Google Lyria", type="primary", use_container_width=True, key="save_google_lyria"):
+                        if st.form_submit_button("Guardar Google Lyria", type="primary", width='stretch', key="save_google_lyria"):
                             save_google_lyria()
                             st.success("Google Lyria guardado.")
                         _render_api_test_control(
@@ -7593,7 +7593,7 @@ def render_settings():
             with st.form("upload_innertube_api_key_form"):
                 upload_innertube = st.text_input("INNERTUBE_API_KEY", value=current_upload_innertube, type="password", key="upload_api_innertube_key", help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.")
                 _render_api_test_control(settings, "innertube_upload", lambda: test_innertube_api_key(upload_innertube), widget_key="api_test_innertube_upload")
-                save_upload_innertube = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
+                save_upload_innertube = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", width='stretch')
             if save_upload_innertube:
                 settings["direct_innertube_api_key"] = upload_innertube.strip()
                 settings.pop("INNERTUBE_API_KEY", None)
@@ -7625,9 +7625,9 @@ def render_settings():
             _render_credential_status(composio_api_key)
             composio_action_cols = st.columns(2)
             with composio_action_cols[0]:
-                save_composio = st.button("Guardar Composio", type="primary", use_container_width=True, key="upload_composio_save")
+                save_composio = st.button("Guardar Composio", type="primary", width='stretch', key="upload_composio_save")
             with composio_action_cols[1]:
-                test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
+                test_composio = st.button("Testar configuração", width='stretch', key="upload_composio_test")
             if save_composio:
                 settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip(), "composio_tool_slug": composio_tool_slug.strip(), "composio_file_field": composio_file_field.strip() or "file", "composio_channel_field": composio_channel_field.strip() or "channel_id", "composio_privacy_field": composio_privacy_field.strip() or "privacy_status", "composio_category_field": composio_category_field.strip() or "category_id", "composio_language_field": composio_language_field.strip() or "language", "composio_arguments_json": composio_arguments_json.strip() or "{}"})
                 write_json("settings.json", settings)
@@ -7646,7 +7646,7 @@ def render_settings():
             upload_post_user_upload = st.text_input("Upload-Post username", value=str(settings.get("upload_post_username") or ""), key="upload_tab_upload_post_user")
             upload_post_platforms_upload = st.text_input("Plataformas Upload-Post", value=str(settings.get("upload_post_platforms") or "youtube,tiktok"), key="upload_tab_upload_post_platforms")
             upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)), key="upload_tab_upload_post_auto")
-            if st.button("Guardar Upload-Post", type="primary", use_container_width=True, key="upload_tab_save_upload_post"):
+            if st.button("Guardar Upload-Post", type="primary", width='stretch', key="upload_tab_save_upload_post"):
                 settings.update({"upload_post_enabled": bool(upload_post_enabled_upload), "upload_post_api_key": upload_post_key_upload.strip(), "upload_post_username": upload_post_user_upload.strip(), "upload_post_platforms": upload_post_platforms_upload.strip(), "upload_post_auto_upload": bool(upload_post_auto_upload)})
                 write_json("settings.json", settings)
                 st.success("Upload-Post guardado.")
@@ -7658,7 +7658,7 @@ def render_settings():
             postiz_mcp_upload = st.text_input("Postiz MCP URL", value=str(settings.get("postiz_mcp_url") or "https://api.postiz.com/mcp"), key="upload_tab_postiz_mcp")
             postiz_integration_upload = st.text_input("Postiz integração padrão", value=str(settings.get("postiz_integration_id") or ""), key="upload_tab_postiz_integration")
             postiz_auto_upload = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)), key="upload_tab_postiz_auto")
-            if st.button("Guardar Postiz", type="primary", use_container_width=True, key="upload_tab_save_postiz"):
+            if st.button("Guardar Postiz", type="primary", width='stretch', key="upload_tab_save_postiz"):
                 settings.update({"postiz_enabled": bool(postiz_enabled_upload), "postiz_api_key": postiz_key_upload.strip(), "postiz_base_url": postiz_base_upload.strip(), "postiz_mcp_url": postiz_mcp_upload.strip(), "postiz_integration_id": postiz_integration_upload.strip(), "postiz_auto_publish": bool(postiz_auto_upload)})
                 write_json("settings.json", settings)
                 st.success("Postiz guardado.")
@@ -7684,8 +7684,8 @@ def render_settings():
                     influencer_supabase_url = text_setting("Supabase Project URL", "influencer_supabase_url", help_text="URL do projecto, por exemplo https://project-id.supabase.co")
                 with db_cols[1]:
                     influencer_supabase_key = text_setting("Supabase API key", "influencer_supabase_key", secret=True, help_text="Use uma chave com as permissões RLS adequadas. Nunca é colocada no GitHub ou nos logs.")
-                test_backend_clicked = st.form_submit_button("Testar ligação do backend", use_container_width=True)
-                save_backend_clicked = st.form_submit_button("Guardar configuração do backend", type="primary", use_container_width=True)
+                test_backend_clicked = st.form_submit_button("Testar ligação do backend", width='stretch')
+                save_backend_clicked = st.form_submit_button("Guardar configuração do backend", type="primary", width='stretch')
         effective_settings = dict(settings)
         effective_settings.update({
             "influencer_db_backend": influencer_db_backend,
@@ -7790,7 +7790,7 @@ def _render_telegram_notification_settings() -> None:
             lambda: test_telegram_credentials(telegram_bot_token, telegram_chat_id),
             widget_key="api_test_telegram",
         )
-        if st.form_submit_button("Guardar configuração Telegram", type="primary", use_container_width=True):
+        if st.form_submit_button("Guardar configuração Telegram", type="primary", width='stretch'):
             settings.update({
                 "telegram_enabled": bool(telegram_enabled),
                 "telegram_bot_token": telegram_bot_token.strip(),
@@ -7838,7 +7838,7 @@ def render_logs():
 
     action_cols = st.columns([1, 1, 3])
     with action_cols[0]:
-        if st.button("Actualizar logs", use_container_width=True):
+        if st.button("Actualizar logs", width='stretch'):
             st.rerun()
     with action_cols[1]:
         st.metric("Registos", len(initial_records))
@@ -7854,7 +7854,7 @@ def render_logs():
     rows = logs_to_rows(records)
     st.dataframe(
         rows,
-        use_container_width=True,
+        width='stretch',
         height=520,
         hide_index=True,
         column_config={
@@ -7894,16 +7894,16 @@ def render_notifications():
 
         action_cols = st.columns([1.4, 1.4, 2.2])
         with action_cols[0]:
-            if st.button("Marcar todas como lidas", use_container_width=True, disabled=unread_count == 0):
+            if st.button("Marcar todas como lidas", width='stretch', disabled=unread_count == 0):
                 mark_all_notifications_read()
                 st.rerun()
         with action_cols[1]:
-            if st.button("Actualizar notificações", use_container_width=True):
+            if st.button("Actualizar notificações", width='stretch'):
                 reconcile_persisted_notifications()
                 st.rerun()
         with action_cols[2]:
             confirm_clear = st.checkbox("Confirmar limpeza do histórico", key="confirm_clear_notifications")
-            if st.button("Limpar histórico", use_container_width=True, disabled=not confirm_clear):
+            if st.button("Limpar histórico", width='stretch', disabled=not confirm_clear):
                 clear_notifications()
                 st.session_state.pop("confirm_clear_notifications", None)
                 st.rerun()
@@ -7925,7 +7925,7 @@ def render_notifications():
                         help=event["description"],
                         key=f"notification_preference_{event['code']}",
                     )
-            if st.form_submit_button("Guardar preferências", type="primary", use_container_width=True):
+            if st.form_submit_button("Guardar preferências", type="primary", width='stretch'):
                 save_notification_preferences(pending_preferences)
                 st.success("Preferências de notificação guardadas.")
                 st.rerun()
@@ -7960,7 +7960,7 @@ def render_notifications():
                     st.caption(f"{item.get('category', 'Sistema')} · {item.get('created_at', '—')}")
                     st.write("Lida" if item.get("read") else "Não lida")
                 with notification_cols[2]:
-                    if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", use_container_width=True):
+                    if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", width='stretch'):
                         mark_notification_read(str(item.get("id")))
                         st.rerun()
 
@@ -8080,7 +8080,7 @@ def render_mcp():
                         st.rerun()
 
                 st.caption(integration.get("endpoint_note", "Porta editável para o serviço local."))
-                if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", use_container_width=True):
+                if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", width='stretch'):
                     update_integration(integration_id, port=int(port))
                     st.success(f"Porta de {integration['name']} guardada: {int(port)}")
                     st.rerun()
@@ -8114,7 +8114,7 @@ def render_mcp():
             st.error("Para expor o servidor fora do computador local, defina um token de acesso MCP.")
 
         action_label = "Guardar e iniciar Servidor MCP" if server_enabled else "Guardar e parar Servidor MCP"
-        if st.button(action_label, type="primary", key="mcp_server_save", use_container_width=True):
+        if st.button(action_label, type="primary", key="mcp_server_save", width='stretch'):
             try:
                 saved = save_server_config(enabled=server_enabled, host=server_host, port=int(server_port), auth_token=server_token, write_enabled=write_enabled)
                 if saved["enabled"]:
@@ -8154,7 +8154,7 @@ def render_mcp():
         st.caption("A skill anexada pode ser guardada na pasta local do Thunderbolt ou descarregada como ficheiro Markdown. Nenhum dos quatro repositórios externos é copiado para o pacote.")
         skill_cols = st.columns(2)
         with skill_cols[0]:
-            if st.button("Guardar skill localmente", type="primary", use_container_width=True, key="mcp_install_mpt_skill"):
+            if st.button("Guardar skill localmente", type="primary", width='stretch', key="mcp_install_mpt_skill"):
                 try:
                     destination = install_skill_locally()
                     st.success(f"Skill guardada em `{destination}`")
@@ -8171,7 +8171,7 @@ def render_mcp():
                     data=skill_data,
                     file_name="moneyprinterturbo-video.md",
                     mime="text/markdown",
-                    use_container_width=True,
+                    width='stretch',
                     key="mcp_download_mpt_skill",
                 )
             else:
@@ -8273,8 +8273,8 @@ def render_metadata_cleaner():
             st.subheader("Resultado")
             st.write(f"**Ficheiro limpo:** `{output.name}`")
             mime = "video/mp4" if output.suffix.lower() == ".mp4" else "video/*"
-            st.download_button("Descarregar vídeo limpo", data=output.read_bytes(), file_name=output.name, mime=mime, use_container_width=True, key="metadata_download_video")
-            st.download_button("Descarregar manifesto de upload (JSON)", data=metadata_manifest(record), file_name=f"{output.stem}-metadata.json", mime="application/json", use_container_width=True, key="metadata_download_manifest")
+            st.download_button("Descarregar vídeo limpo", data=output.read_bytes(), file_name=output.name, mime=mime, width='stretch', key="metadata_download_video")
+            st.download_button("Descarregar manifesto de upload (JSON)", data=metadata_manifest(record), file_name=f"{output.stem}-metadata.json", mime="application/json", width='stretch', key="metadata_download_manifest")
             with st.expander("Pré-visualizar metadados"):
                 st.json(record["metadata"])
 
@@ -8303,7 +8303,7 @@ def render_update_youtube_videos():
     channel = st.selectbox("Canal YouTube", channels, format_func=lambda item: item.get("name") or item.get("url") or "Canal sem nome", key="update_youtube_channel")
     updater = YouTubeVideoUpdater(settings, STORAGE)
     refresh_key = f"update_youtube_loaded_{channel.get('id', '')}"
-    if st.button("Carregar vídeos do canal", type="primary", use_container_width=True, key="update_youtube_load") or refresh_key not in st.session_state:
+    if st.button("Carregar vídeos do canal", type="primary", width='stretch', key="update_youtube_load") or refresh_key not in st.session_state:
         with st.spinner("A carregar vídeos publicados…"):
             result = updater.list_videos(channel, max_results=50)
         st.session_state[refresh_key] = result.data if result.ok else {"error": result.message, "videos": []}
@@ -8325,7 +8325,7 @@ def render_update_youtube_videos():
             top = st.columns([1.2, 3.8, 1.2])
             with top[0]:
                 if video.get("thumbnail_url"):
-                    st.image(video["thumbnail_url"], use_container_width=True)
+                    st.image(video["thumbnail_url"], width='stretch')
             with top[1]:
                 st.markdown(f"**{video.get('title') or 'Sem título'}**")
                 st.caption(f"{video.get('published_at') or 'Data indisponível'} · {video.get('privacy_status') or 'estado desconhecido'} · `{video_id}`")
@@ -8340,7 +8340,7 @@ def render_update_youtube_videos():
             ai_cols = st.columns(3)
             script = next((str(task.get("script") or task.get("video_script") or "") for task in tasks if str(task.get("youtube_video_id") or task.get("video_id") or "") == video_id), "")
             with ai_cols[0]:
-                if st.button("Gerar título", key=f"{card_key}_ai_title", use_container_width=True):
+                if st.button("Gerar título", key=f"{card_key}_ai_title", width='stretch'):
                     try:
                         generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="title")
                         st.session_state[title_key] = generated["title"]
@@ -8348,7 +8348,7 @@ def render_update_youtube_videos():
                     except CreativeGenerationError as exc:
                         st.error(str(exc))
             with ai_cols[1]:
-                if st.button("Gerar descrição", key=f"{card_key}_ai_description", use_container_width=True):
+                if st.button("Gerar descrição", key=f"{card_key}_ai_description", width='stretch'):
                     try:
                         generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="description")
                         st.session_state[desc_key] = generated["description"]
@@ -8356,7 +8356,7 @@ def render_update_youtube_videos():
                     except CreativeGenerationError as exc:
                         st.error(str(exc))
             with ai_cols[2]:
-                if st.button("Gerar título e descrição", key=f"{card_key}_ai_both", use_container_width=True):
+                if st.button("Gerar título e descrição", key=f"{card_key}_ai_both", width='stretch'):
                     try:
                         generated = generate_video_update_metadata(settings, channel, video, script=script, blueprint=blueprint, mode="both")
                         st.session_state[title_key] = generated.get("title", title)
@@ -8365,7 +8365,7 @@ def render_update_youtube_videos():
                     except CreativeGenerationError as exc:
                         st.error(str(exc))
             thumbnail = st.file_uploader("Trocar thumbnail (opcional)", type=["jpg", "jpeg", "png"], key=f"{card_key}_thumbnail")
-            if st.button("Actualizar no YouTube", type="primary", key=f"{card_key}_save", use_container_width=True):
+            if st.button("Actualizar no YouTube", type="primary", key=f"{card_key}_save", width='stretch'):
                 thumbnail_path = None
                 if thumbnail is not None:
                     thumbnail_path = STORAGE / "youtube_update" / f"{video_id}_{thumbnail.name}"
@@ -8548,7 +8548,7 @@ def main():
 
     def render_nav_button(target: str, icon: str, label: str, scope: str):
         display_label = ui_text(label, ui_language)
-        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if is_nav_item_active(target) else "secondary"):
+        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, width='stretch', type="primary" if is_nav_item_active(target) else "secondary"):
             navigate(target)
 
     with st.sidebar:

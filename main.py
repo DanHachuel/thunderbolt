@@ -408,9 +408,9 @@ def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str
             edited_name = st.text_input("Nome de apresentação", value=current_name, max_chars=120, key=f"{edit_key}_input")
             save_col, cancel_col = st.columns(2)
             with save_col:
-                save_name = st.form_submit_button("Guardar nome", type="primary", use_container_width=True)
+                save_name = st.form_submit_button("Guardar nome", type="primary", width='stretch')
             with cancel_col:
-                cancel_name = st.form_submit_button("Cancelar", use_container_width=True)
+                cancel_name = st.form_submit_button("Cancelar", width='stretch')
         if save_name:
             try:
                 set_display_name(kind, path, edited_name)
@@ -426,7 +426,7 @@ def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str
 
 
 def _render_card_pencil(edit_key: str) -> None:
-    if st.button("✏️", help="Editar nome de apresentação", key=f"pencil_{edit_key}", type="tertiary", use_container_width=True):
+    if st.button("✏️", help="Editar nome de apresentação", key=f"pencil_{edit_key}", type="tertiary", width='stretch'):
         st.session_state[edit_key] = True
         st.rerun()
 
@@ -690,7 +690,7 @@ def render_video_generation_settings(
         st.button(
             "Gerar tópico, roteiro e palavras-chave com IA",
             key=f"{prefix}_generate_video_content",
-            use_container_width=True,
+            width='stretch',
             type="secondary",
             icon=":material/auto_awesome:",
             on_click=generate_content_callback,
@@ -818,7 +818,7 @@ def channel_videos_for(channel: dict, limit: int = 10) -> list[dict[str, Any]]:
 def render_channel_video_editor(video: dict, channel_id: str) -> None:
     video_id = str(video.get("id") or "")
     edit_key = f"channel_video_edit_{video_id}"
-    if st.button("Editar vídeo", key=f"edit_channel_video_{video_id}", use_container_width=True):
+    if st.button("Editar vídeo", key=f"edit_channel_video_{video_id}", width='stretch'):
         st.session_state[edit_key] = True
         st.rerun()
     if st.session_state.get(edit_key):
@@ -842,7 +842,7 @@ def render_channel_videos(channel: dict) -> None:
     st.caption("A lista usa o feed público do YouTube, sem Data API Key. Pode actualizar manualmente e editar os metadados locais apresentados.")
     refresh_col, view_col = st.columns([1.4, 1])
     with refresh_col:
-        if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", use_container_width=True):
+        if st.button("Actualizar últimos 10 vídeos", key=f"refresh_channel_videos_{channel_id}", width='stretch'):
             result = fetch_channel_videos_public(channel, limit=10)
             if result.ok:
                 videos = _merge_channel_videos(channel_id, result.data.get("videos", []))
@@ -916,7 +916,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             edited_description = st.text_area("Descrição", value=str(channel.get("description") or ""), height=100)
             edited_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"edit_automation_{channel_id}")
             edited_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
-        save_channel = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
+        save_channel = st.form_submit_button("Guardar alterações", type="primary", width='stretch')
         cancel_edit = st.form_submit_button("Cancelar edição")
     if cancel_edit:
         st.session_state.pop(f"edit_channel_{channel_id}", None)
@@ -1159,7 +1159,7 @@ def render_tiktok_accounts():
         st.info("A pesquisa consulta apenas a página pública do perfil e pode devolver dados incompletos. Se o TikTok bloquear a consulta, utilize o cadastro manual.")
         with st.form("tiktok_public_lookup_form"):
             lookup_source = st.text_input("URL pública ou @handle", placeholder="https://www.tiktok.com/@conta ou @conta", key="tiktok_public_lookup_source")
-            lookup_submitted = st.form_submit_button("Pesquisar perfil público", type="primary", use_container_width=True)
+            lookup_submitted = st.form_submit_button("Pesquisar perfil público", type="primary", width='stretch')
         if lookup_submitted:
             result = fetch_public_tiktok_profile(lookup_source)
             st.session_state["tiktok_public_lookup"] = {"ok": result.ok, "message": result.message, "data": result.data}
@@ -1179,7 +1179,7 @@ def render_tiktok_accounts():
                 with metric_cols[3]: st.metric("Vídeos", lookup_data.get("video_count") if lookup_data.get("video_count") is not None else "—")
                 display_name = st.text_input("Nome da conta", value=str(lookup_data.get("name") or lookup_data.get("username") or ""), key="tiktok_lookup_display_name")
                 notes = st.text_area("Observações internas", value=str(lookup_data.get("notes") or ""), key="tiktok_lookup_notes", height=80)
-                if st.button("Cadastrar conta TikTok", type="primary", use_container_width=True, key="tiktok_register_public_account"):
+                if st.button("Cadastrar conta TikTok", type="primary", width='stretch', key="tiktok_register_public_account"):
                     try:
                         stored = {**lookup_data, "name": display_name.strip() or lookup_data.get("username", ""), "notes": notes.strip(), "source": "public_lookup"}
                         _upsert_tiktok_account(stored)
@@ -1195,7 +1195,7 @@ def render_tiktok_accounts():
             manual_source = st.text_input("@handle ou URL pública", placeholder="@minhaconta", key="tiktok_manual_source")
             manual_name = st.text_input("Nome da conta", placeholder="Nome de apresentação", key="tiktok_manual_name")
             manual_notes = st.text_area("Observações internas", height=90, key="tiktok_manual_notes")
-            manual_submitted = st.form_submit_button("Guardar cadastro manual", type="primary", use_container_width=True)
+            manual_submitted = st.form_submit_button("Guardar cadastro manual", type="primary", width='stretch')
         if manual_submitted:
             try:
                 reference = normalize_tiktok_reference(manual_source)
@@ -1234,7 +1234,7 @@ def render_tiktok_accounts():
                         edited_name = st.text_input("Nome da conta", value=str(account.get("name") or account.get("username") or ""), key=f"edit_tiktok_name_{account_id}")
                         edited_source = st.text_input("@handle ou URL pública", value=str(account.get("public_url") or account.get("url") or account.get("handle") or ""), key=f"edit_tiktok_source_{account_id}")
                         edited_notes = st.text_area("Observações internas", value=str(account.get("notes") or ""), key=f"edit_tiktok_notes_{account_id}", height=80)
-                        edit_submitted = st.form_submit_button("Guardar conta", type="primary", use_container_width=True)
+                        edit_submitted = st.form_submit_button("Guardar conta", type="primary", width='stretch')
                     if edit_submitted:
                         try:
                             reference = normalize_tiktok_reference(edited_source)
@@ -1259,7 +1259,7 @@ def render_tiktok_prompt_masters():
             uploaded_name = Path(uploaded_prompt.name).stem
             prompt_name = st.text_input("Nome do Prompt Master", value=uploaded_name, key="tiktok_prompt_master_name")
             replace_prompt = st.checkbox("Permitir substituir um ficheiro existente", key="tiktok_prompt_master_replace")
-            if st.button("Guardar Prompt Master", type="primary", use_container_width=True, key="save_tiktok_prompt_master"):
+            if st.button("Guardar Prompt Master", type="primary", width='stretch', key="save_tiktok_prompt_master"):
                 safe_stem = re.sub(r"[^A-Za-z0-9À-ÿ._-]+", "-", prompt_name.strip() or uploaded_name).strip(".-") or "prompt-master"
                 destination = TIKTOK_PROMPT_MASTERS / f"{safe_stem}.md"
                 if destination.exists() and not replace_prompt:
@@ -1305,14 +1305,14 @@ def render_tiktok_prompt_masters():
                         edited_content = st.text_area("Conteúdo Markdown", value=content, height=360, key=f"tiktok_prompt_master_editor_{path.stem}")
                         prompt_cols = st.columns(3)
                         with prompt_cols[0]:
-                            if st.button("Guardar alterações", type="primary", use_container_width=True, key=f"save_prompt_master_{path.stem}"):
+                            if st.button("Guardar alterações", type="primary", width='stretch', key=f"save_prompt_master_{path.stem}"):
                                 path.write_text(edited_content.rstrip() + "\n", encoding="utf-8")
                                 st.success("Prompt Master actualizado.")
                                 st.rerun()
                         with prompt_cols[1]:
-                            st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"download_prompt_master_{path.stem}")
+                            st.download_button("Descarregar", data=content.encode("utf-8"), file_name=path.name, mime="text/markdown", width='stretch', key=f"download_prompt_master_{path.stem}")
                         with prompt_cols[2]:
-                            if st.button("Apagar", use_container_width=True, key=f"delete_prompt_master_{path.stem}"):
+                            if st.button("Apagar", width='stretch', key=f"delete_prompt_master_{path.stem}"):
                                 path.unlink(missing_ok=True)
                                 st.success("Prompt Master removido da biblioteca TikTok.")
                                 st.rerun()
@@ -1343,7 +1343,7 @@ def render_channels():
         lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("Buscar no YouTube", type="primary", use_container_width=True, key="youtube_channel_lookup"):
+            if st.button("Buscar no YouTube", type="primary", width='stretch', key="youtube_channel_lookup"):
                 if lookup_mode.startswith("Página pública"):
                     result = youtube.fetch_channel_public(source)
                 elif not youtube.api_key:
@@ -1354,7 +1354,7 @@ def render_channels():
                 st.session_state["yt_message"] = result.message
                 st.session_state["yt_ok"] = result.ok
         with col2:
-            if st.button("Limpar importação", use_container_width=True, key="youtube_channel_clear"):
+            if st.button("Limpar importação", width='stretch', key="youtube_channel_clear"):
                 for key in ("yt_import", "yt_message", "yt_ok"):
                     st.session_state.pop(key, None)
                 st.rerun()
@@ -1442,7 +1442,7 @@ def render_channels():
             (st.success if account_status.ok else st.warning)(account_status.message)
             auth_cols = st.columns([1, 2])
             with auth_cols[0]:
-                if st.button("Autorizar conta Google", type="secondary", use_container_width=True, key="batch_authorize_account"):
+                if st.button("Autorizar conta Google", type="secondary", width='stretch', key="batch_authorize_account"):
                     result = authorize_youtube_batch_account(selected_account, STORAGE)
                     (st.success if result.ok else st.error)(result.message)
                     if result.ok:
@@ -1450,7 +1450,7 @@ def render_channels():
             with auth_cols[1]:
                 st.caption("A autorização é feita no browser do sistema e fica guardada separadamente para esta conta.")
             batch_key = f"youtube_batch_channels_{selected_account_id}"
-            if st.button("Listar canais desta conta", type="primary", use_container_width=True, key="batch_list_channels"):
+            if st.button("Listar canais desta conta", type="primary", width='stretch', key="batch_list_channels"):
                 result = list_youtube_batch_channels(selected_account, STORAGE)
                 st.session_state[batch_key] = result.data.get("channels", []) if result.ok else []
                 st.session_state[f"{batch_key}_message"] = result.message
@@ -1480,7 +1480,7 @@ def render_channels():
                         batch_language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="batch_channel_language")
                     with defaults_cols[3]:
                         batch_style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], key="batch_channel_style")
-                    import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", use_container_width=True)
+                    import_selected = st.form_submit_button("Cadastrar canais seleccionados", type="primary", width='stretch')
                 if import_selected:
                     created_names = []
                     skipped_names = []
@@ -1601,12 +1601,12 @@ def render_channels():
                     st.rerun()
                 action_cols = st.columns(2)
                 with action_cols[0]:
-                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", use_container_width=True):
+                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with action_cols[1]:
                     delete_key = f"delete_pending_{channel_id}"
-                    if st.button("Apagar", key=f"delete_{channel_id}", use_container_width=True):
+                    if st.button("Apagar", key=f"delete_{channel_id}", width='stretch'):
                         st.session_state[delete_key] = True
                         st.rerun()
             if st.session_state.get(edit_key):
@@ -1616,17 +1616,17 @@ def render_channels():
                 block_cols = st.columns(3)
                 with block_cols[0]:
                     st.markdown(f"**Prompts do Canal**\n\n{summary['name']}")
-                    if st.button("Editar Prompts", key=f"edit_prompts_{channel_id}", use_container_width=True):
+                    if st.button("Editar Prompts", key=f"edit_prompts_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[1]:
                     st.markdown(f"**Canais de Referência**\n\n{channel_niche_label(channel)}")
-                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", use_container_width=True):
+                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with block_cols[2]:
                     st.markdown(f"**Narrador**\n\n{summary['voice'] or 'Sem voz padrão'}")
-                    if st.button("Configurar Narrador", key=f"edit_voice_{channel_id}", use_container_width=True):
+                    if st.button("Configurar Narrador", key=f"edit_voice_{channel_id}", width='stretch'):
                         st.session_state[edit_key] = True
                         st.rerun()
 
@@ -1639,7 +1639,7 @@ def render_channels():
                 st.caption("O DELEGATED_SESSION_ID deste canal é individual, mas fica apenas no documento JSON da conta Google. A UI não mostra nem edita esse valor; associe apenas o canal à conta que contém o documento.")
                 with st.form(f"channel_direct_credentials_{channel_id}"):
                     channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel_id}")
-                    save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", use_container_width=True)
+                    save_channel_direct_credentials = st.form_submit_button("Associar conta Google ao canal", type="primary", width='stretch')
                 selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
                 if selected_channel_account:
                     selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
@@ -1704,7 +1704,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                     key="new_video_general_context",
                     placeholder="Opcional: campanha, época, evento ou restrição editorial comum. O tema final será individual por canal.",
                 )
-                if st.button("Gerar tópicos individuais para todos os canais", key="new_video_generate_general_topics", use_container_width=True):
+                if st.button("Gerar tópicos individuais para todos os canais", key="new_video_generate_general_topics", width='stretch'):
                     settings = read_json("settings.json", {})
                     generated_topics: dict[str, dict[str, Any]] = {}
                     errors: list[str] = []
@@ -1774,7 +1774,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.warning("Ainda não existem músicas em storage/music. Escolha Carregar ficheiro ou Criar via Suno API.")
                 elif music_source == "Carregar ficheiro":
                     uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key="new_video_music_upload")
-                    if uploaded_music and st.button("Guardar música local", key="new_video_music_store", use_container_width=True):
+                    if uploaded_music and st.button("Guardar música local", key="new_video_music_store", width='stretch'):
                         try:
                             stored_music = store_music_file(uploaded_music.name, uploaded_music.getvalue())
                             st.session_state["new_video_music_path"] = str(stored_music)
@@ -1785,7 +1785,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                 else:
                     suno_prompt = st.text_area("Prompt musical Suno", placeholder="Instrumental cinematográfico, calmo, sem voz...", key="new_video_suno_prompt")
                     suno_title = st.text_input("Título da música", value=st.session_state.get("new_video_topic") or "Thunderbolt music", key="new_video_suno_title")
-                    if st.button("Solicitar música no Suno", key="new_video_suno_request", use_container_width=True):
+                    if st.button("Solicitar música no Suno", key="new_video_suno_request", width='stretch'):
                         suno_result = request_suno_generation(read_json("settings.json", {}), suno_prompt, suno_title)
                         (st.success if suno_result["ok"] else st.error)(suno_result["message"])
                         if suno_result["ok"]:
@@ -1804,7 +1804,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
             if mode == "general":
                 existing_topics = st.session_state.get("new_video_general_topics", {})
                 payloads = dict(st.session_state.get("new_video_general_payloads", {}))
-                if st.button("Gerar títulos e thumbnails para todos os canais", key="new_video_generate_general_creative", use_container_width=True):
+                if st.button("Gerar títulos e thumbnails para todos os canais", key="new_video_generate_general_creative", width='stretch'):
                     settings = read_json("settings.json", {})
                     new_payloads: dict[str, dict[str, Any]] = {}
                     errors: list[str] = []
@@ -1848,7 +1848,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             payload["thumbnail_text"] = variant.get("overlay_text", "")
                             st.caption(f"{variant.get('composition', '')} · {variant.get('color_palette', '')}")
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                            if st.button("Gerar imagem com Nano Banana", key=f"new_video_general_generate_thumbnail_{channel['id']}", use_container_width=True):
+                            if st.button("Gerar imagem com Nano Banana", key=f"new_video_general_generate_thumbnail_{channel['id']}", width='stretch'):
                                 try:
                                     thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
                                     variant["image_path"] = thumbnail_path
@@ -1861,7 +1861,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                                 except ThumbnailGenerationError as exc:
                                     st.error(str(exc))
                             if thumbnail_path and Path(thumbnail_path).is_file():
-                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                                st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", width='stretch')
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"
                             else:
@@ -1869,7 +1869,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.caption(f"Estado da thumbnail: {payload.get('thumbnail_status', 'prompt_ready')} · texto: {payload.get('thumbnail_text') or 'sem texto'}")
             else:
                 topic_for_creative = str(generation_settings.get("video_subject") or "").strip()
-                if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", use_container_width=True):
+                if st.button("Gerar títulos e thumbnails com IA", key="new_video_generate_creative", width='stretch'):
                     if selected_one is None:
                         st.error("Seleccione primeiro um canal.")
                     else:
@@ -1899,7 +1899,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         selected_title = st.selectbox("Título escolhido", title_options, index=max(0, title_options.index(payload.get("title")) if payload.get("title") in title_options else 0), key="new_video_title_choice")
                         payload["title"] = selected_title
                         with st.expander(f"Ver {len(title_options)} candidatos de título"):
-                            st.dataframe(payload.get("title_candidates", []), use_container_width=True, hide_index=True)
+                            st.dataframe(payload.get("title_candidates", []), width='stretch', hide_index=True)
                     variants = payload.get("thumbnail_variants", [])
                     if variants:
                         labels = [f"{idx + 1}. {item.get('concept', 'Variante')}" for idx, item in enumerate(variants)]
@@ -1912,7 +1912,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         st.caption(f"Composição: {variant.get('composition', '')} · Cores: {variant.get('color_palette', '')}")
                         st.code(variant.get("image_prompt", ""), language="text")
                         thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
-                        if st.button("Gerar imagem da thumbnail com Nano Banana", key="new_video_generate_thumbnail_image", use_container_width=True):
+                        if st.button("Gerar imagem da thumbnail com Nano Banana", key="new_video_generate_thumbnail_image", width='stretch'):
                             try:
                                 thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
                                 variant["image_path"] = thumbnail_path
@@ -1925,7 +1925,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             except ThumbnailGenerationError as exc:
                                 st.error(str(exc))
                         if thumbnail_path and Path(thumbnail_path).is_file():
-                            st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", use_container_width=True)
+                            st.image(thumbnail_path, caption="Thumbnail gerada pelo Nano Banana", width='stretch')
                             payload["thumbnail_path"] = thumbnail_path
                             payload["thumbnail_status"] = "generated"
                         else:
@@ -2079,9 +2079,9 @@ def render_scripts():
         structure_notes = script_settings["script_structure_notes"]
         generate_col, clear_col = st.columns([1.4, 1])
         with generate_col:
-            generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", use_container_width=True, key="generate_script_document")
+            generate_clicked = st.button("Gerar com IA a partir do Blueprint", type="primary", width='stretch', key="generate_script_document")
         with clear_col:
-            clear_clicked = st.button("Limpar rascunho", use_container_width=True, key="clear_script_document")
+            clear_clicked = st.button("Limpar rascunho", width='stretch', key="clear_script_document")
         if clear_clicked:
             for key in ("script_draft", "script_draft_title", "script_draft_content", "script_draft_summary"):
                 st.session_state.pop(key, None)
@@ -2131,7 +2131,7 @@ def render_scripts():
             draft_title = st.text_input("Título do rascunho", key="script_draft_title")
             draft_summary = st.text_input("Resumo", key="script_draft_summary")
             draft_content = st.text_area("Conteúdo guardado", height=460, key="script_draft_content")
-            if st.button("Guardar documento no storage", type="primary", use_container_width=True, key="save_script_document"):
+            if st.button("Guardar documento no storage", type="primary", width='stretch', key="save_script_document"):
                 try:
                     record = save_script_document(
                         {
@@ -2204,7 +2204,7 @@ def render_niche_finder():
                 start_date = st.date_input("Data inicial", value=default_start, min_value=date(2020, 1, 1), max_value=default_end, key="niche_start_date")
                 end_date = st.date_input("Data final", value=default_end, min_value=date(2020, 1, 1), max_value=default_end, key="niche_end_date")
             tags_text = st.text_input("Tags opcionais", key="niche_tags_text", placeholder="Ex.: history, facts, documentary")
-            analyse = st.form_submit_button("Analisar Nichos", type="primary", use_container_width=True)
+            analyse = st.form_submit_button("Analisar Nichos", type="primary", width='stretch')
 
     current_parameters = {
         "n_clusters": n_clusters,
@@ -2266,7 +2266,7 @@ def render_niche_finder():
         cluster_table = cluster_table[cluster_table["palavras"].str.contains(keyword.strip(), case=False, na=False)]
     tab_clusters, tab_rules, tab_data = render_localized_tabs(["Clusters encontrados", "Regras de associação", "Dados analisados"])
     with tab_clusters:
-        st.dataframe(cluster_table, use_container_width=True, hide_index=True)
+        st.dataframe(cluster_table, width='stretch', hide_index=True)
         if not points.empty:
             try:
                 import plotly.express as px
@@ -2274,19 +2274,19 @@ def render_niche_finder():
                 hover = [column for column in ["title", "channel_name", "country", "view_count", "engagement_rate"] if column in points.columns]
                 figure = px.scatter(points, x="x", y="y", color="cluster", hover_data=hover, title="Distribuição dos clusters")
                 figure.update_layout(legend_title_text="Cluster")
-                st.plotly_chart(figure, use_container_width=True)
+                st.plotly_chart(figure, width='stretch')
             except ImportError:
                 st.error("A visualização da análise não está disponível nesta instalação.")
     with tab_rules:
         if rules_table.empty:
             st.info("Não foram encontradas regras com os filtros actuais. Reduza o suporte mínimo ou escolha outro filtro.")
         else:
-            st.dataframe(rules_table, use_container_width=True, hide_index=True)
+            st.dataframe(rules_table, width='stretch', hide_index=True)
         if not items_table.empty:
             st.subheader("Itemsets frequentes")
-            st.dataframe(items_table, use_container_width=True, hide_index=True)
+            st.dataframe(items_table, width='stretch', hide_index=True)
     with tab_data:
-        st.dataframe(results["raw_data"], use_container_width=True, hide_index=True)
+        st.dataframe(results["raw_data"], width='stretch', hide_index=True)
 
 
 def render_niche_finder_apify():
@@ -2335,7 +2335,7 @@ def render_niche_finder_apify():
                 download_subtitles = st.checkbox("Descarregar legendas", value=True, key="niche_apify_download_subtitles")
             with filter_cols[3]:
                 has_cc = st.checkbox("Apenas vídeos com CC", value=False, key="niche_apify_has_cc")
-            analyse_apify = st.form_submit_button("Pesquisar no Apify", type="primary", use_container_width=True)
+            analyse_apify = st.form_submit_button("Pesquisar no Apify", type="primary", width='stretch')
 
     if analyse_apify:
         try:
@@ -2409,17 +2409,17 @@ def render_niche_finder_apify():
         result_frame = pd.DataFrame(visible_results)
         display_columns = ["title", "channel_name", "duration", "view_count", "subscriber_count", "comments_count", "vsc_ratio", "url", "transcript_status", "summary_status", "summary"]
         display_columns = [column for column in display_columns if column in result_frame.columns]
-        st.dataframe(result_frame[display_columns], use_container_width=True, hide_index=True)
+        st.dataframe(result_frame[display_columns], width='stretch', hide_index=True)
         export_frame = result_frame.drop(columns=["transcript"], errors="ignore")
         export_json = export_frame.to_json(orient="records", force_ascii=False, indent=2)
         export_csv = export_frame.to_csv(index=False).encode("utf-8")
         export_cols = st.columns(2)
         with export_cols[0]:
-            st.download_button("Exportar JSON", data=export_json, file_name="niche-finder-apify-results.json", mime="application/json", use_container_width=True, key="niche_apify_export_json")
+            st.download_button("Exportar JSON", data=export_json, file_name="niche-finder-apify-results.json", mime="application/json", width='stretch', key="niche_apify_export_json")
         with export_cols[1]:
-            st.download_button("Exportar CSV", data=export_csv, file_name="niche-finder-apify-results.csv", mime="text/csv", use_container_width=True, key="niche_apify_export_csv")
+            st.download_button("Exportar CSV", data=export_csv, file_name="niche-finder-apify-results.csv", mime="text/csv", width='stretch', key="niche_apify_export_csv")
     except ImportError:
-        st.dataframe(visible_results, use_container_width=True, hide_index=True)
+        st.dataframe(visible_results, width='stretch', hide_index=True)
 
     last_run = st.session_state.get("niche_apify_last_run", {})
     if last_run:
@@ -2461,7 +2461,7 @@ def render_media_download():
         with option_cols[2]:
             embed_metadata = st.checkbox("Incorporar metadados", value=False, key="media_download_embed_metadata")
             st.caption("Playlist desactivada por padrão para evitar downloads acidentais em massa.")
-        start_download = st.form_submit_button("Iniciar download", type="primary", use_container_width=True)
+        start_download = st.form_submit_button("Iniciar download", type="primary", width='stretch')
 
     if start_download:
         progress = st.progress(0, text="A preparar o download…")
@@ -2575,7 +2575,7 @@ def render_cuts():
     with url_tab:
         url_value = st.text_input("URL directa do vídeo", placeholder="https://exemplo.com/video.mp4", key="cuts_video_url")
         st.caption("A URL deve apontar directamente para um ficheiro de vídeo HTTP/HTTPS. O download só ocorre depois de clicar no botão.")
-        if st.button("Descarregar vídeo", key="cuts_download_url", use_container_width=True):
+        if st.button("Descarregar vídeo", key="cuts_download_url", width='stretch'):
             try:
                 source_path = download_direct_video_url(url_value)
                 st.session_state["cuts_source_path"] = str(source_path)
@@ -2590,7 +2590,7 @@ def render_cuts():
         else:
             generated_labels = [f"{path.name} — {path}" for path in generated_paths]
             selected_generated = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: generated_labels[index], key="cuts_generated_index")
-            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", use_container_width=True):
+            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", width='stretch'):
                 source_path = generated_paths[selected_generated]
                 st.session_state["cuts_source_path"] = str(source_path)
                 st.session_state["cuts_source_label"] = f"Pipeline · {source_path.name}"
@@ -2602,7 +2602,7 @@ def render_cuts():
         else:
             folder_labels = [f"{path.name} — {path}" for path in folder_paths]
             selected_folder = st.selectbox("Vídeo da pasta", range(len(folder_paths)), format_func=lambda index: folder_labels[index], key="cuts_folder_index")
-            if st.button("Usar vídeo da pasta", key="cuts_use_folder", use_container_width=True):
+            if st.button("Usar vídeo da pasta", key="cuts_use_folder", width='stretch'):
                 source_path = folder_paths[selected_folder]
                 st.session_state["cuts_source_path"] = str(source_path)
                 st.session_state["cuts_source_label"] = f"Pasta local · {source_path.name}"
@@ -2661,7 +2661,7 @@ def render_cuts():
         generate_button = st.button(
             "Gerar Clips",
             type="primary",
-            use_container_width=True,
+            width='stretch',
             disabled=not (source_path and source_path.is_file() and rights_confirmed),
             key="cuts_generate_button",
         )
@@ -2710,13 +2710,13 @@ def render_cuts():
                         with st.container(border=True):
                             st.caption(f"Clip {clip.get('index', '—')} · {float(clip.get('duration', 0)):.1f}s")
                             st.video(str(clip["path"]))
-                            st.download_button("Descarregar clip", data=Path(clip["path"]).read_bytes(), file_name=clip["name"], mime="video/mp4", key=f"cuts_download_{last_run['id']}_{clip['index']}", use_container_width=True)
+                            st.download_button("Descarregar clip", data=Path(clip["path"]).read_bytes(), file_name=clip["name"], mime="video/mp4", key=f"cuts_download_{last_run['id']}_{clip['index']}", width='stretch')
             try:
                 _, archive_bytes = zip_cut_run(last_run)
-                st.download_button("Descarregar todos os clips (ZIP)", data=archive_bytes, file_name=f"{last_run['id']}.zip", mime="application/zip", key=f"cuts_download_zip_{last_run['id']}", use_container_width=True)
+                st.download_button("Descarregar todos os clips (ZIP)", data=archive_bytes, file_name=f"{last_run['id']}.zip", mime="application/zip", key=f"cuts_download_zip_{last_run['id']}", width='stretch')
             except CutsError as exc:
                 st.warning(str(exc))
-            st.download_button("Descarregar manifesto JSON", data=cut_manifest_bytes(last_run), file_name=f"{last_run['id']}.json", mime="application/json", key=f"cuts_download_manifest_{last_run['id']}", use_container_width=True)
+            st.download_button("Descarregar manifesto JSON", data=cut_manifest_bytes(last_run), file_name=f"{last_run['id']}.json", mime="application/json", key=f"cuts_download_manifest_{last_run['id']}", width='stretch')
         elif last_run.get("error"):
             st.error(last_run["error"])
 
@@ -2725,7 +2725,7 @@ def render_cuts():
         with st.expander("Histórico do Clip Generator"):
             st.dataframe(
                 [{"Data": run.get("created_at", "—"), "Fonte": run.get("source_name", "—"), "Formato": run.get("output_format", "—"), "Clips": len(run.get("clips", [])), "Estado": run.get("status", "—")} for run in runs[:20]],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
 
@@ -2796,7 +2796,7 @@ def render_python_editor():
                         width = st.number_input("Largura", min_value=16, max_value=7680, value=1280, step=2, key="python_editor_width")
                     with resize_cols[1]:
                         height = st.number_input("Altura", min_value=16, max_value=7680, value=720, step=2, key="python_editor_height")
-                apply_operation = st.form_submit_button(f"Aplicar: {operation}", type="primary", use_container_width=True)
+                apply_operation = st.form_submit_button(f"Aplicar: {operation}", type="primary", width='stretch')
             if apply_operation:
                 try:
                     ffmpeg_path = read_json("settings.json", {}).get("ffmpeg_path", "")
@@ -2832,7 +2832,7 @@ def render_python_editor():
         records = list_python_editor_records()
         if records:
             with st.expander("Histórico do Editor Python"):
-                st.dataframe([{key: record.get(key, "") for key in ("created_at", "operation", "source_name", "output_name")} for record in records[:20]], use_container_width=True, hide_index=True)
+                st.dataframe([{key: record.get(key, "") for key in ("created_at", "operation", "source_name", "output_name")} for record in records[:20]], width='stretch', hide_index=True)
 
     with code_tab:
         st.subheader("Scripts Python locais")
@@ -2890,11 +2890,11 @@ def render_videos():
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
-                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                    if st.button("Start", key=f"automation_start_{task['id']}", width='stretch', disabled=state not in {"to_do", "blocked", "failed"}):
                         transition_task(task["id"], "doing")
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                    if st.button("Stop", key=f"automation_stop_{task['id']}", width='stretch', disabled=state != "doing"):
                         transition_task(task["id"], "blocked")
                         st.rerun()
 
@@ -2952,7 +2952,7 @@ def render_automation():
             with cols[3]:
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
             with cols[4]:
-                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
+                if st.button("Guardar", key=f"automation_save_{channel_id}", width='stretch'):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
@@ -2985,11 +2985,11 @@ def render_automation():
                 state = str(task.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
-                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                    if st.button("Start", key=f"automation_start_{task['id']}", width='stretch', disabled=state not in {"to_do", "blocked", "failed"}):
                         transition_task(task["id"], "doing")
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                    if st.button("Stop", key=f"automation_stop_{task['id']}", width='stretch', disabled=state != "doing"):
                         transition_task(task["id"], "blocked")
                         st.rerun()
 
@@ -3314,14 +3314,14 @@ def render_upload_conventional():
         status_cols = st.columns(2)
         with status_cols[0]:
             (st.success if status["agent"].ok else st.warning)(f"Agente: {status['agent'].message}")
-            if st.button("Autorizar agente YouTube", key="youtube_authorize_agent", use_container_width=True):
+            if st.button("Autorizar agente YouTube", key="youtube_authorize_agent", width='stretch'):
                 result = youtube.authorize_agent()
                 (st.success if result.ok else st.error)(result.message)
                 if result.ok:
                     st.rerun()
         with status_cols[1]:
             (st.info if status["fallback"].ok else st.caption)(f"Fallback OAuth: {status['fallback'].message}")
-            if st.button("Autorizar fallback OAuth", key="youtube_authorize_fallback", use_container_width=True):
+            if st.button("Autorizar fallback OAuth", key="youtube_authorize_fallback", width='stretch'):
                 result = youtube.authorize_fallback()
                 (st.success if result.ok else st.error)(result.message)
                 if result.ok:
@@ -3455,7 +3455,7 @@ def render_google_accounts():
                         key=f"batch_session_info_{account_id}",
                         help="Token sessionInfo usado pelo Upload directo. É guardado por conta e sincronizado no credentials.json; os cookies e restantes valores continuam exclusivamente no documento.",
                     )
-                save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", use_container_width=True)
+                save_account = st.form_submit_button("Guardar dados da conta Google", type="primary", width='stretch')
 
             st.markdown("**Documento de cookies/credenciais desta conta Google**")
             st.caption("O documento padrão é criado automaticamente. Suba um JSON completo ou apenas o documento de cookies; os valores preenchidos são incorporados e mantidos em credentials.json.")
@@ -3470,20 +3470,20 @@ def render_google_accounts():
             else:
                 st.success("Documento completo para a conta Google")
             st.caption(f"Documento guardado em: {direct_status['document_file']}")
-            document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", use_container_width=True)
+            document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", width='stretch')
 
             account_status = youtube_batch_account_status(batch_account, STORAGE)
             status_cols = st.columns(3)
             with status_cols[0]:
                 (st.success if account_status.ok else st.warning)(account_status.message)
             with status_cols[1]:
-                if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", use_container_width=True):
+                if st.button("Autorizar/Reautorizar", key=f"batch_authorize_settings_{account_id}", width='stretch'):
                     result = authorize_youtube_batch_account(batch_account, STORAGE)
                     (st.success if result.ok else st.error)(result.message)
                     if result.ok:
                         st.rerun()
             with status_cols[2]:
-                if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
+                if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", width='stretch'):
                     delete_youtube_batch_token(batch_account, STORAGE)
                     delete_credentials_document(STORAGE, batch_account)
                     remaining_accounts = [account for account in batch_accounts if str(account.get("id")) != account_id]
@@ -3566,7 +3566,7 @@ def render_google_accounts():
             key="global_innertube_api_key",
             help="Chave global usada pelo Upload directo para todas as contas Google/YouTube. Guarde-a na configuração global, separada dos documentos de cookies.",
         )
-        save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", use_container_width=True)
+        save_innertube_api_key = st.form_submit_button("Guardar INNERTUBE_API_KEY global", type="primary", width='stretch')
     if save_innertube_api_key:
         settings["direct_innertube_api_key"] = innertube_api_key_value.strip()
         settings.pop("INNERTUBE_API_KEY", None)
@@ -3591,7 +3591,7 @@ def render_google_accounts():
             new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
             new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
             new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
-        add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
+        add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", width='stretch')
     if add_account:
         document_error = ""
         if "@" not in new_account_email.strip():
@@ -3651,7 +3651,7 @@ def render_google_accounts():
             key="google_page_youtube_api_key",
             help="Credencial Google Cloud separada, usada apenas para métricas oficiais da YouTube Data API.",
         )
-        save_google_global = st.form_submit_button("Guardar configuração global do YouTube", type="primary", use_container_width=True)
+        save_google_global = st.form_submit_button("Guardar configuração global do YouTube", type="primary", width='stretch')
     if save_google_global:
         settings.update({
             "youtube_client_id": youtube_client_id.strip(),
@@ -3694,8 +3694,8 @@ def render_material_source_api_keys(settings: dict[str, Any]) -> None:
         key_values: list[str] = []
         for index in range(row_count):
             key_values.append(st.text_input(f"API Key {index + 1}", value=current_keys[index] if index < len(current_keys) else "", type="password", key=f"material_api_key_{selected_source}_{index}"))
-        save_keys = st.form_submit_button("Guardar fonte e chaves", type="primary", use_container_width=True)
-        add_key = st.form_submit_button("Adicionar outra chave", use_container_width=True)
+        save_keys = st.form_submit_button("Guardar fonte e chaves", type="primary", width='stretch')
+        add_key = st.form_submit_button("Adicionar outra chave", width='stretch')
     if add_key:
         st.session_state[row_key] = row_count + 1
         st.rerun()
@@ -3827,14 +3827,14 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             )
             action_cols = st.columns([1.35, 1.35, 1.1])
             with action_cols[0]:
-                test_clicked = st.form_submit_button("Testar chamada API", use_container_width=True)
+                test_clicked = st.form_submit_button("Testar chamada API", width='stretch')
             with action_cols[1]:
-                refresh_clicked = st.form_submit_button("Consultar modelos", use_container_width=True)
+                refresh_clicked = st.form_submit_button("Consultar modelos", width='stretch')
             with action_cols[2]:
-                save_clicked = st.form_submit_button("Guardar cartão", type="primary", use_container_width=True)
+                save_clicked = st.form_submit_button("Guardar cartão", type="primary", width='stretch')
             remove_clicked = False
             if definition.code != "openai":
-                remove_clicked = st.form_submit_button("Remover cartão", use_container_width=True)
+                remove_clicked = st.form_submit_button("Remover cartão", width='stretch')
 
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "telegram_llm": bool(telegram_llm), **extra_values})
@@ -3895,7 +3895,7 @@ def render_llm_provider_cards(settings: dict[str, Any]) -> None:
             format_func=lambda value: ui_text(provider_definition(value).label, current_ui_language()),
             key="llm_new_provider_choice",
         )
-        if st.button("Configurar Novo Provedor LLM", type="primary", use_container_width=True, key="add_llm_provider_card"):
+        if st.button("Configurar Novo Provedor LLM", type="primary", width='stretch', key="add_llm_provider_card"):
             new_card = new_llm_card(provider_to_add, card_id=f"llm-{provider_to_add}-{uuid.uuid4().hex[:8]}")
             cards.append(new_card)
             _persist_llm_cards(settings, cards, str(settings.get(LLM_ACTIVE_CARD_KEY) or DEFAULT_LLM_CARD_ID))
@@ -4106,16 +4106,16 @@ def render_notifications():
 
     action_cols = st.columns([1.4, 1.4, 2.2])
     with action_cols[0]:
-        if st.button("Marcar todas como lidas", use_container_width=True, disabled=unread_count == 0):
+        if st.button("Marcar todas como lidas", width='stretch', disabled=unread_count == 0):
             mark_all_notifications_read()
             st.rerun()
     with action_cols[1]:
-        if st.button("Actualizar notificações", use_container_width=True):
+        if st.button("Actualizar notificações", width='stretch'):
             reconcile_persisted_notifications()
             st.rerun()
     with action_cols[2]:
         confirm_clear = st.checkbox("Confirmar limpeza do histórico", key="confirm_clear_notifications")
-        if st.button("Limpar histórico", use_container_width=True, disabled=not confirm_clear):
+        if st.button("Limpar histórico", width='stretch', disabled=not confirm_clear):
             clear_notifications()
             st.session_state.pop("confirm_clear_notifications", None)
             st.rerun()
@@ -4137,7 +4137,7 @@ def render_notifications():
                     help=event["description"],
                     key=f"notification_preference_{event['code']}",
                 )
-        if st.form_submit_button("Guardar preferências", type="primary", use_container_width=True):
+        if st.form_submit_button("Guardar preferências", type="primary", width='stretch'):
             save_notification_preferences(pending_preferences)
             st.success("Preferências de notificação guardadas.")
             st.rerun()
@@ -4172,7 +4172,7 @@ def render_notifications():
                 st.caption(f"{item.get('category', 'Sistema')} · {item.get('created_at', '—')}")
                 st.write("Lida" if item.get("read") else "Não lida")
             with notification_cols[2]:
-                if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", use_container_width=True):
+                if not item.get("read") and st.button("Marcar como lida", key=f"mark_notification_{item.get('id')}", width='stretch'):
                     mark_notification_read(str(item.get("id")))
                     st.rerun()
 
@@ -4250,7 +4250,7 @@ def render_mcp():
                         st.rerun()
 
                 st.caption(integration.get("endpoint_note", "Porta editável para o serviço local."))
-                if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", use_container_width=True):
+                if st.button("Guardar porta", key=f"mcp_save_port_{integration_id}", width='stretch'):
                     update_integration(integration_id, port=int(port))
                     st.success(f"Porta de {integration['name']} guardada: {int(port)}")
                     st.rerun()
@@ -4284,7 +4284,7 @@ def render_mcp():
             st.error("Para expor o servidor fora do computador local, defina um token de acesso MCP.")
 
         action_label = "Guardar e iniciar Servidor MCP" if server_enabled else "Guardar e parar Servidor MCP"
-        if st.button(action_label, type="primary", key="mcp_server_save", use_container_width=True):
+        if st.button(action_label, type="primary", key="mcp_server_save", width='stretch'):
             try:
                 saved = save_server_config(enabled=server_enabled, host=server_host, port=int(server_port), auth_token=server_token, write_enabled=write_enabled)
                 if saved["enabled"]:
@@ -4324,7 +4324,7 @@ def render_mcp():
         st.caption("A skill anexada pode ser guardada na pasta local do Thunderbolt ou descarregada como ficheiro Markdown. Nenhum dos quatro repositórios externos é copiado para o pacote.")
         skill_cols = st.columns(2)
         with skill_cols[0]:
-            if st.button("Guardar skill localmente", type="primary", use_container_width=True, key="mcp_install_mpt_skill"):
+            if st.button("Guardar skill localmente", type="primary", width='stretch', key="mcp_install_mpt_skill"):
                 try:
                     destination = install_skill_locally()
                     st.success(f"Skill guardada em `{destination}`")
@@ -4341,7 +4341,7 @@ def render_mcp():
                     data=skill_data,
                     file_name="moneyprinterturbo-video.md",
                     mime="text/markdown",
-                    use_container_width=True,
+                    width='stretch',
                     key="mcp_download_mpt_skill",
                 )
             else:
@@ -4443,8 +4443,8 @@ def render_metadata_cleaner():
             st.subheader("Resultado")
             st.write(f"**Ficheiro limpo:** `{output.name}`")
             mime = "video/mp4" if output.suffix.lower() == ".mp4" else "video/*"
-            st.download_button("Descarregar vídeo limpo", data=output.read_bytes(), file_name=output.name, mime=mime, use_container_width=True, key="metadata_download_video")
-            st.download_button("Descarregar manifesto de upload (JSON)", data=metadata_manifest(record), file_name=f"{output.stem}-metadata.json", mime="application/json", use_container_width=True, key="metadata_download_manifest")
+            st.download_button("Descarregar vídeo limpo", data=output.read_bytes(), file_name=output.name, mime=mime, width='stretch', key="metadata_download_video")
+            st.download_button("Descarregar manifesto de upload (JSON)", data=metadata_manifest(record), file_name=f"{output.stem}-metadata.json", mime="application/json", width='stretch', key="metadata_download_manifest")
             with st.expander("Pré-visualizar metadados"):
                 st.json(record["metadata"])
 
@@ -4591,7 +4591,7 @@ def main():
 
     def render_nav_button(target: str, icon: str, label: str, scope: str):
         display_label = ui_text(label, ui_language)
-        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, use_container_width=True, type="primary" if current_page == target else "secondary"):
+        if st.button(display_label, key=f"nav_{scope}_{target}", icon=icon, width='stretch', type="primary" if current_page == target else "secondary"):
             navigate(target)
 
     with st.sidebar:

@@ -120,7 +120,11 @@ def _safe_metadata(value: Any, *, key: str = "") -> Any:
 
 
 def _history() -> list[dict[str, Any]]:
-    saved = storage.read_json(NOTIFICATIONS_FILE, [])
+    try:
+        saved = storage.read_json(NOTIFICATIONS_FILE, [])
+    except PermissionError:
+        # Um lock ou ficheiro sem permissões não deve interromper a interface.
+        return []
     if not isinstance(saved, list):
         return []
     return [item for item in saved if isinstance(item, dict)]

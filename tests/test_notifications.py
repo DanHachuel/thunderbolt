@@ -27,6 +27,19 @@ def test_catalog_and_preferences_cover_each_operation(tmp_path):
     assert storage.read_json("settings.json", {})["notification_preferences"]["video_completed"] is False
 
 
+def test_history_ignores_notification_permission_error(tmp_path, monkeypatch):
+    _isolated_storage(tmp_path / "permission")
+    from hermes_ui import notifications
+
+    def deny_notification_file(name, default=None):
+        if name == notifications.NOTIFICATIONS_FILE:
+            raise PermissionError("lock sem permissões")
+        return default
+
+    monkeypatch.setattr(notifications.storage, "read_json", deny_notification_file)
+    assert notifications._history() == []
+
+
 def test_disabled_event_is_not_written_and_duplicate_is_ignored(tmp_path):
     _isolated_storage(tmp_path / "disabled")
     from hermes_ui import notifications
