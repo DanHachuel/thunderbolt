@@ -25,6 +25,7 @@ const venvDir = process.env.THUNDERBOLT_VENV || process.env.HERMES_VENV || join(
 const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));
 const main = resolve(root, "app", "main.py");
+const streamlitBootstrap = resolve(root, "scripts", "streamlit_bootstrap.py");
 const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
 const pythonEnvironment = { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1", PYTHONLEGACYWINDOWSSTDIO: "1", CLICK_NO_WIN_CONSOLE: "1" };
 
@@ -265,7 +266,7 @@ let shuttingDown = false;
 let child;
 
 function startStreamlit() {
-  child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
+  child = spawn(python, [streamlitBootstrap, "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
     cwd: root,
     stdio: "inherit",
     env: { ...runtimeEnv, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1", PYTHONLEGACYWINDOWSSTDIO: "1", CLICK_NO_WIN_CONSOLE: "1", THUNDERBOLT_LAUNCHER_RESTART: "1" },
