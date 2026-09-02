@@ -7199,7 +7199,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                         state = create_state()
                         st.session_state[f"canva_verifier_{card_id}"] = verifier
                         st.session_state[f"canva_state_{card_id}"] = state
-                        st.session_state[f"canva_authorization_url_{card_id}"] = authorization_url(client_id, redirect_uri, "design:content:read design:content:write", state, challenge)
+                        st.session_state[f"canva_authorization_url_{card_id}"] = authorization_url(client_id, redirect_uri, state=state, code_challenge=challenge)
                     authorization_link = str(st.session_state.get(f"canva_authorization_url_{card_id}") or "")
                     if authorization_link:
                         st.markdown(f"[Abrir autorização Canva]({authorization_link})")
