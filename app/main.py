@@ -44,6 +44,10 @@ from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_a
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
 from app.modules.niche_finder.summarizer import summarize_items
+from app.modules.token_optimizer.cache_manager import clear_derived_cache
+from app.modules.token_optimizer.compressor import check_installation
+from app.modules.token_optimizer.config import DEFAULTS as TOKEN_OPTIMIZER_DEFAULTS
+from app.modules.token_optimizer.metrics import get_stats as get_token_optimizer_stats
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
@@ -7133,6 +7137,24 @@ def render_settings():
             st.subheader("API Keys")
             moneyprinter_path = str(settings.get("moneyprinter_path") or "").strip()
             st.caption(f"Pasta do motor de vídeo: `{moneyprinter_path or 'não configurada'}`")
+            with st.expander("Optimização de tokens — jusTokenMax", expanded=False):
+                st.caption("Compressão local e reversível de contextos volumosos antes das chamadas LLM. Os originais permanecem guardados no storage local.")
+                optimizer_enabled = st.checkbox("Activar optimizador", value=bool(settings.get("token_optimizer_enabled", True)), key="token_optimizer_enabled_ui")
+                optimizer_cols = st.columns(4)
+                optimizer_values = {}
+                for index, (key, label) in enumerate((("json", "JSON/API"), ("log", "Logs"), ("pdf", "PDF"), ("csv", "CSV"), ("diff", "Diffs"), ("code", "Código"))):
+                    with optimizer_cols[index % 4]:
+                        optimizer_values[f"token_optimizer_{key}_enabled"] = st.checkbox(label, value=bool(settings.get(f"token_optimizer_{key}_enabled", True)), key=f"token_optimizer_{key}_ui")
+                if st.button("Guardar optimizador", key="save_token_optimizer", use_container_width=True):
+                    settings.update({"token_optimizer_enabled": optimizer_enabled, **optimizer_values})
+                    write_json("settings.json", settings)
+                    st.success("Configuração do jusTokenMax guardada.")
+                status = check_installation()
+                st.caption(f"Estado: {'instalado' if status.get('installed') else 'não instalado'}{(' · versão ' + str(status.get('version'))) if status.get('version') else ''}")
+                stats = get_token_optimizer_stats()
+                st.caption(f"Contextos: {stats['calls']} · redução acumulada: {stats['reduction_percent']}% · fallbacks: {stats['fallbacks']}")
+                if st.button("Limpar cache derivado", key="clear_token_optimizer_cache"):
+                    st.info(f"{clear_derived_cache()} artefacto(s) derivado(s) removido(s). Os originais da aplicação não foram apagados.")
             with st.form("settings_form"):
                 with st.expander("Niche Finder — Kaggle", expanded=False):
                     st.caption("O dataset permanece no Kaggle. O Thunderbolt usa estas credenciais apenas para publicar/executar a kernel e obter os resultados pequenos da análise.")
