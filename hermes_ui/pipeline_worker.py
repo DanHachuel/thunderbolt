@@ -25,6 +25,7 @@ from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_
 from hermes_ui.material_sources import material_api_keys, material_source_cards, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.thumbnail_blueprints import thumbnail_blueprint_for_channel
+from hermes_ui.voice_preview import synthesize_preview
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
 PIPELINE_LOG_FILENAME = "pipeline_worker.json"
@@ -763,6 +764,8 @@ def _uses_azure_speech_sdk_v2(
     settings: dict[str, Any] | None = None,
 ) -> bool:
     service = str(generation_settings.get("voiceover_service") or "").strip().casefold()
+    if service in {"elevenlabs", "eleven labs"}:
+        return False
     if service in {
         "azure speech sdk v2",
         "azure speech",
@@ -913,6 +916,23 @@ def _run_video_helper_once(
             sync_moneyprinter_config(settings, str(configured_root))
         except OSError as exc:
             raise PipelineError(f"Não foi possível sincronizar a configuração do MoneyPrinterTurbo: {exc}") from exc
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    voiceover_mode = str(generation_settings.get("voiceover_mode") or "").strip().casefold()
+    voiceover_service = str(generation_settings.get("voiceover_service") or "").strip().casefold()
+    generated_elevenlabs_audio: Path | None = None
+    if voiceover_mode not in {"none", "upload"} and voiceover_service == "elevenlabs":
+        elevenlabs_voice = str(task.get("voice") or generation_settings.get("voice") or "").strip()
+        script_text = str(task.get("video_script") or generation_settings.get("video_script") or "").strip()
+        if not elevenlabs_voice:
+            raise PipelineError("Seleccione uma voz personalizada ElevenLabs antes de criar o vídeo.")
+        if not str(settings.get("elevenlabs_api_key") or "").strip():
+            raise PipelineError("ElevenLabs foi seleccionado, mas a API Key não está configurada.")
+        if not script_text:
+            raise PipelineError("ElevenLabs foi seleccionado, mas o roteiro ainda não está disponível.")
+        try:
+            generated_elevenlabs_audio = synthesize_preview(script_text, "elevenlabs", elevenlabs_voice, settings)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise PipelineError(f"Não foi possível gerar a narração ElevenLabs: {exc}") from exc
     env_values = {
         "MPT_LLM_PROVIDER": provider,
         "MPT_LLM_API_KEY": str(card.get("api_key") or "").strip(),
@@ -932,7 +952,6 @@ def _run_video_helper_once(
     if configured_root:
         command.extend(["--root", str(configured_root)])
     command.extend(["--subject", subject, "--"])
-    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
     if _uses_azure_speech_sdk_v2(generation_settings, settings) and str(generation_settings.get("voiceover_mode") or "").strip().casefold() not in {"none", "upload"}:
         missing_voice_config = [
             field for field, value in (
@@ -951,7 +970,7 @@ def _run_video_helper_once(
             })
             raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
     command.extend(_moneyprinter_cli_args(task, route, settings=settings))
-    if str(generation_settings.get("voiceover_mode") or "").strip().casefold() == "upload":
+    if voiceover_mode == "upload":
         voiceover_file = Path(str(generation_settings.get("voiceover_file") or "").strip()).expanduser()
         if not str(voiceover_file) or not voiceover_file.is_file() or voiceover_file.stat().st_size <= 0:
             message = "O modo Upload foi seleccionado, mas não existe um ficheiro de narração válido. Carregue o áudio em Configurações de áudio."
@@ -959,6 +978,8 @@ def _run_video_helper_once(
             metadata.update({"failure_api": "Ficheiro local", "failure_provider": "local_storage", "failure_service": "Áudio de narração", "failure_config_fields": "voiceover_file"})
             raise PipelineError(_failure_message(message, metadata), failure_metadata=metadata)
         command.extend(["--custom-audio-file", str(voiceover_file.resolve())])
+    elif generated_elevenlabs_audio is not None:
+        command.extend(["--custom-audio-file", str(generated_elevenlabs_audio.resolve())])
     output_lines: list[str] = []
     line_queue: queue.Queue[str | None] = queue.Queue()
     started_at = time.monotonic()
