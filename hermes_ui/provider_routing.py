@@ -26,6 +26,7 @@ from .llm_providers import (
     provider_definition,
 )
 from .storage import STORAGE, atomic_write, ensure_storage
+from app.modules.token_optimizer import compress_text
 
 
 POOL_LLM = "llm_text"
@@ -450,6 +451,8 @@ def route_json_request(
 
 def route_llm_json(settings: Mapping[str, Any], system_prompt: str, user_prompt: str) -> RoutedResponse:
     """Send an OpenAI-compatible JSON chat call through the LLM pool."""
+    optimized_user_prompt = compress_text(user_prompt, "json", settings=settings) if len(str(user_prompt or "")) >= 50000 else None
+    prepared_user_prompt = optimized_user_prompt.content if optimized_user_prompt is not None else user_prompt
     def request(card: dict[str, Any]) -> Any:
         definition = provider_definition(card.get("provider"))
         base_url = str(card.get("base_url") or definition.default_base_url).strip().rstrip("/")
@@ -462,7 +465,7 @@ def route_llm_json(settings: Mapping[str, Any], system_prompt: str, user_prompt:
             "model": str(card.get("model") or "").strip(),
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+                {"role": "user", "content": prepared_user_prompt},
             ],
             "response_format": {"type": "json_object"},
         }

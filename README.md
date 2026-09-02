@@ -443,3 +443,11 @@ Durante a execução, o backlog mostra a actividade recente do helper e o tempo 
 A mensagem do card de vídeo deixou de mostrar apenas os primeiros 240 caracteres. A UI apresenta um resumo de erro com até 700 caracteres e disponibiliza um expander não editável com o diagnóstico completo, incluindo os caminhos do log e do manifesto quando existem. Linhas de sucesso de Pexels, sincronização do projecto, verificação do `uv` e marcadores de caminho são excluídas do resumo terminal.
 
 A verificação `uv sync --frozen` tem agora timeout controlado, detalhe seguro do resolver em caso de falha e confirmação explícita quando termina. O estado do manifesto é marcado como `failed` mesmo quando a falha acontece antes de a CLI do MoneyPrinterTurbo iniciar.
+
+## Optimização nativa de tokens com jusTokenMax
+
+O Thunderbolt integra o [jusTokenMax](https://github.com/Kalmantic/jusTokenMax) como optimizador local e reversível de contexto. Payloads JSON e transcrições muito extensas podem ser compactados antes de serem enviados aos providers LLM. Prompts criativos estruturados e conteúdos pequenos são preservados integralmente para evitar alteração semântica.
+
+A configuração encontra-se em **Configuração API > API Keys > Optimização de tokens — jusTokenMax**. É possível activar ou desactivar o optimizador, controlar os levers por tipo, verificar a versão instalada, consultar métricas e limpar apenas os artefactos derivados. Os originais permanecem em `storage/state/token_optimizer_originals/` e podem ser recuperados pelo hash através do módulo interno.
+
+A instalação do pacote inclui `justokenmax` a partir do repositório oficial. Se o CLI não estiver disponível ou ocorrer um erro, o Thunderbolt usa o conteúdo original e regista um fallback local; a geração não fica bloqueada. API keys, passwords, tokens e blobs base64 são redigidos antes de serem guardados em artefactos derivados.

@@ -4,6 +4,8 @@ from typing import Any
 
 import requests
 
+from app.modules.token_optimizer import compress_text
+
 
 DEFAULT_BASE_URLS = {
     "openai": "https://api.openai.com/v1",
@@ -54,13 +56,16 @@ def summarize_transcript(transcript: str, settings: dict[str, Any], *, timeout: 
         "esta estrutura: INTRODUÇÃO: um parágrafo sobre como o vídeo começa. ESTRUTURA: uma lista com "
         "os pontos principais e subpontos da progressão do vídeo."
     )
+    prepared_transcript = transcript
+    if len(transcript) >= 50000:
+        prepared_transcript = compress_text(transcript, "log", settings=settings).content
     payload = {
         "model": model,
         "temperature": 0.2,
         "max_tokens": 1200,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": transcript[:120000]},
+            {"role": "user", "content": prepared_transcript[:120000]},
         ],
     }
     try:
