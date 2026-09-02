@@ -69,7 +69,7 @@ from hermes_ui.update_manager import check_version, restart_current_process, upd
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
-from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, fetch_personal_voices, personal_voice_options
+from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, cached_personal_voices, fetch_personal_voices, personal_voice_options
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.thumbnails import (
     generate_thumbnail_for_task,
@@ -3324,7 +3324,7 @@ def render_music_creation():
             ("music_task_prompt", "prompt"),
         ):
             st.session_state[state_key] = str(generated_fields.get(generated_key) or "")
-    provider_label = st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"], key="music_task_provider")
+    provider_label = st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria", "Eleven Music"], key="music_task_provider")
     theme = st.text_input("Tema / assunto principal", key="music_task_theme", placeholder="Ex.: uma viagem nocturna pela costa portuguesa")
     title = st.text_input("Título da música", key="music_task_title")
     language = st.selectbox(
@@ -3336,6 +3336,26 @@ def render_music_creation():
     )
     genre = st.selectbox("Género musical", list(MUSIC_GENRES), key="music_task_genre")
     vocal = st.selectbox("Vocal", list(MUSIC_VOCAL_OPTIONS), key="music_task_vocal")
+    eleven_voice_id = ""
+    eleven_voice_gender = ""
+    if provider_label == "Eleven Music":
+        cached_voices = cached_personal_voices()
+        if not cached_voices:
+            st.info("Sincronize primeiro as vozes pessoais em Vozes Personalizadas. O Eleven Music não disponibiliza voz de coral para este selector.")
+        else:
+            voice_options = {str(item.get("voice_id")): item for item in cached_voices if item.get("voice_id")}
+            selected_voice_id = st.selectbox(
+                "Voz personalizada (Eleven Music)",
+                [""] + list(voice_options),
+                format_func=lambda item: "Sem voz personalizada" if not item else str(voice_options[item].get("name") or item),
+                key="music_task_eleven_voice",
+            )
+            eleven_voice_id = selected_voice_id
+            selected_voice = voice_options.get(selected_voice_id, {})
+            labels = selected_voice.get("labels") if isinstance(selected_voice.get("labels"), dict) else {}
+            raw_gender = str(labels.get("gender") or labels.get("sex") or "").strip().casefold()
+            eleven_voice_gender = "female" if raw_gender in {"female", "feminino", "woman", "mulher"} else ("male" if raw_gender in {"male", "masculino", "man", "homem"} else "")
+            st.caption(f"Tipo de voz detectado automaticamente: {eleven_voice_gender or 'não identificado'}. Vozes de coral não estão disponíveis no Eleven Music.")
     references = st.text_area(
         "Referências culturais, paisagens, clima ou artistas similares (opcional)",
         key="music_task_references",
@@ -3380,6 +3400,8 @@ def render_music_creation():
                 vocal=vocal,
                 references=references,
                 theme=theme,
+                voice_id=eleven_voice_id,
+                voice_gender=eleven_voice_gender,
             )
             st.success(f"Música criada no Music Backlog: {task['title']}")
             st.rerun()

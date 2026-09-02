@@ -155,6 +155,8 @@ def create_music_task(
     vocal: str = "",
     references: str = "",
     theme: str = "",
+    voice_id: str = "",
+    voice_gender: str = "",
 ) -> dict[str, Any]:
     """Enqueue one audio-only generation; no video task or video worker is used."""
     cleaned_prompt = str(prompt or "").strip()
@@ -164,7 +166,7 @@ def create_music_task(
     task = {
         "id": f"music_{uuid.uuid4().hex[:12]}",
         "kind": "audio_generation",
-        "provider": "lyria" if str(provider).strip().casefold() == "google lyria" else "suno",
+        "provider": "lyria" if str(provider).strip().casefold() == "google lyria" else ("eleven_music" if str(provider).strip().casefold() == "eleven music" else "suno"),
         "model": str(model or "").strip(),
         "title": str(title or "Música sem título").strip() or "Música sem título",
         "prompt": cleaned_prompt,
@@ -173,6 +175,8 @@ def create_music_task(
         "vocal": str(vocal or "").strip(),
         "references": str(references or "").strip(),
         "theme": str(theme or "").strip(),
+        "voice_id": str(voice_id or "").strip(),
+        "voice_gender": str(voice_gender or "").strip().casefold(),
         "duration_seconds": 120,
         "state": "to_do",
         "stage": "music_generation",
@@ -258,6 +262,33 @@ def request_lyria_generation(settings: dict[str, Any], prompt: str, title: str =
         return {"ok": False, "message": "Não foi possível contactar Google Lyria.", "data": {}}
 
 
+def request_eleven_music_generation(settings: dict[str, Any], prompt: str, title: str = "", model: str = "music_v2", *, voice_id: str = "", voice_gender: str = "") -> dict[str, Any]:
+    """Generate music through Eleven Music's synchronous Music API."""
+    api_key = str(settings.get("elevenlabs_api_key") or "").strip()
+    if not api_key:
+        return {"ok": False, "message": "Configure a API Key do ElevenLabs em Configuração API antes de solicitar Eleven Music.", "data": {}}
+    clean_prompt = str(prompt or "").strip()
+    if voice_id:
+        gender = voice_gender if voice_gender in {"male", "female"} else "unspecified"
+        clean_prompt = f"{clean_prompt}\nVocal principal: voz personalizada ElevenLabs seleccionada ({gender}). Não usar coro."
+    try:
+        response = requests.post(
+            "https://api.elevenlabs.io/v1/music",
+            params={"output_format": "mp3_44100_128"},
+            headers={"xi-api-key": api_key, "Content-Type": "application/json"},
+            json={"prompt": clean_prompt[:4100], "model_id": model or "music_v2", "force_instrumental": False},
+            timeout=300,
+        )
+        if response.status_code >= 400:
+            return {"ok": False, "message": f"Eleven Music devolveu HTTP {response.status_code}.", "data": {"status_code": response.status_code}}
+        if not response.content:
+            return {"ok": False, "message": "Eleven Music não devolveu áudio.", "data": {}}
+        output = store_music_file(f"{title or 'eleven-music-generated'}.mp3", response.content)
+        return {"ok": True, "message": "Música gerada por Eleven Music.", "data": {"audio_path": str(output), "model": model or "music_v2", "voice_id": voice_id, "voice_gender": voice_gender}}
+    except (requests.RequestException, OSError, ValueError) as exc:
+        return {"ok": False, "message": f"Não foi possível contactar Eleven Music: {exc}", "data": {}}
+
+
 def run_music_task(task_id: str, settings: dict[str, Any]) -> dict[str, Any] | None:
     """Run exactly one queued audio generation and persist only its audio artefact."""
     task = next((record for record in list_music_tasks() if str(record.get("id") or "") == str(task_id)), None)
@@ -267,6 +298,9 @@ def run_music_task(task_id: str, settings: dict[str, Any]) -> dict[str, Any] | N
     provider = str(task.get("provider") or "suno").casefold()
     if provider == "lyria":
         result = request_lyria_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""), str(task.get("model") or ""))
+        audio_path = str((result.get("data") or {}).get("audio_path") or "")
+    elif provider == "eleven_music":
+        result = request_eleven_music_generation(settings, str(task.get("prompt") or ""), str(task.get("title") or ""), str(task.get("model") or "music_v2"), voice_id=str(task.get("voice_id") or ""), voice_gender=str(task.get("voice_gender") or ""))
         audio_path = str((result.get("data") or {}).get("audio_path") or "")
     else:
         result = request_suno_generation(

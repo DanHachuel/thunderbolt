@@ -126,3 +126,9 @@ def personal_voice_options(settings: dict[str, Any]) -> dict[str, str]:
         for voice in cache.get("voices", [])
         if isinstance(voice, dict) and voice.get("voice_id")
     }
+
+
+def cached_personal_voices() -> list[dict[str, Any]]:
+    """Return the locally cached personal voices without making a network call."""
+    cache = _read_cache()
+    return [voice for voice in (cache or {}).get("voices", []) if isinstance(voice, dict)]
