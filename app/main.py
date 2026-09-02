@@ -2025,7 +2025,7 @@ def render_tiktok_channels():
             for channel in channels:
                 channel_id = str(channel.get("id") or "")
                 with st.container(border=True):
-                    card_cols = st.columns([0.7, 2.3, 1.0, 1.0, 1.35, 1.25])
+                    card_cols = st.columns([0.7, 3.45, 1.15, 1.15, 1.45, 1.55], gap="small")
                     with card_cols[0]:
                         avatar_url = _tiktok_avatar_url(channel)
                         if avatar_url:
@@ -2041,9 +2041,6 @@ def render_tiktok_channels():
                         st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
                     with card_cols[3]:
                         st.metric("Curtidas", format_metric_number(channel.get("likes_count")))
-                    with card_cols[4]:
-                        current_prompt = str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
-                        selected_prompt = st.selectbox("Prompt Master", prompt_ids, index=prompt_ids.index(current_prompt) if current_prompt in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_import_card_prompt_{channel_id}")
                     with card_cols[5]:
                         active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
                         if active != bool(channel.get("active", True)):
@@ -2055,20 +2052,20 @@ def render_tiktok_channels():
                         if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
                             st.rerun()
-                        summary_cols = st.columns(4, gap="small")
-                        with summary_cols[0]:
-                            st.markdown("**Blueprint Padrão**")
-                            st.caption(prompt_labels.get(str(channel.get("default_prompt_master") or channel.get("prompt_master") or ""), "Sem Blueprint padrão"))
-                        with summary_cols[1]:
-                            st.markdown("**Nicho**")
-                            st.caption(channel_niche_label(channel))
-                        with summary_cols[2]:
-                            st.markdown("**Narrador/Voz Padrão**")
-                            st.caption(str(channel.get("default_voice") or channel.get("voice") or "Sem voz padrão"))
-                        with summary_cols[3]:
-                            st.markdown("**Idioma**")
-                            st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
-                        st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))} · Proporção: {channel.get('video_aspect_ratio') or 'Portrait 9:16'}")
+                    summary_cols = st.columns(4, gap="medium")
+                    with summary_cols[0]:
+                        st.markdown("**Blueprint Padrão**")
+                        st.caption(prompt_labels.get(str(channel.get("default_prompt_master") or channel.get("prompt_master") or ""), "Sem Blueprint padrão"))
+                    with summary_cols[1]:
+                        st.markdown("**Nicho**")
+                        st.caption(channel_niche_label(channel))
+                    with summary_cols[2]:
+                        st.markdown("**Narrador/Voz Padrão**")
+                        st.caption(str(channel.get("default_voice") or channel.get("voice") or "Sem voz padrão"))
+                    with summary_cols[3]:
+                        st.markdown("**Idioma**")
+                        st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
+                    st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))} · Proporção: {channel.get('video_aspect_ratio') or 'Portrait 9:16'}")
                     if st.session_state.get(f"tiktok_delete_{channel_id}"):
                         st.warning("Apagar este canal TikTok e os dados locais associados?")
                         confirm_cols = st.columns(2)
@@ -2081,13 +2078,6 @@ def render_tiktok_channels():
                             if st.button("Cancelar", key=f"tiktok_cancel_delete_{channel_id}"):
                                 st.session_state.pop(f"tiktok_delete_{channel_id}", None)
                                 st.rerun()
-                    if st.session_state.get(f"tiktok_niche_{channel_id}"):
-                        with st.form(f"tiktok_niche_form_{channel_id}"):
-                            niche_value = st.text_input("Nicho do canal", value=str(channel.get("niche") or ""))
-                            if st.form_submit_button("Guardar nicho", type="primary"):
-                                update_channel(channel_id, {"niche": niche_value.strip(), "reference_channels": [niche_value.strip()] if niche_value.strip() else []})
-                                st.session_state.pop(f"tiktok_niche_{channel_id}", None)
-                                st.rerun()
                     if st.session_state.get(f"tiktok_edit_{channel_id}"):
                         with st.form(f"tiktok_edit_form_{channel_id}"):
                             edit_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
@@ -2096,6 +2086,7 @@ def render_tiktok_channels():
                             edit_language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label)
                             edit_source = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
                             edit_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Portrait 9:16")) if str(channel.get("video_aspect_ratio") or "Portrait 9:16") in CHANNEL_ASPECT_RATIO_OPTIONS else 1)
+                            edit_niche = st.text_input("Nicho", value=str(channel.get("niche") or ""))
                             edit_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(str(channel.get("default_voice") or channel.get("voice") or "")) if str(channel.get("default_voice") or channel.get("voice") or "") in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
                             edit_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_edit_automation_{channel_id}")
                             edit_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
@@ -2105,7 +2096,7 @@ def render_tiktok_channels():
                                 if not valid_hhmm(edit_time):
                                     st.error("O horário diário deve estar no formato HH:MM.")
                                 else:
-                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
+                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "niche": edit_niche.strip(), "reference_channels": [edit_niche.strip()] if edit_niche.strip() else [], "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
                                     st.session_state.pop(f"tiktok_edit_{channel_id}", None)
                                     st.rerun()
                     with st.expander("Últimos 10 vídeos publicados", expanded=False):
