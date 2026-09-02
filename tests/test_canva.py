@@ -89,3 +89,10 @@ def test_canva_authorization_uses_form_submit_button_when_embedded():
     canva_block = source[start:end]
     assert 'authorize_clicked = st.form_submit_button' in canva_block
     assert 'st.link_button("Abrir autorização Canva"' not in canva_block
+
+
+def test_launcher_routes_canva_callback_to_api_settings_page():
+    source = Path("scripts/cli.mjs").read_text(encoding="utf-8")
+    assert 'requestUrl.pathname === "/oauth/redirect"' in source
+    assert 'requestUrl.searchParams.set("page", "Configuração API")' in source
+    assert 'Location: `${requestUrl.pathname}${requestUrl.search}`' in source

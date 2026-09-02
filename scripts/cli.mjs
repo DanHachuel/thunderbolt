@@ -187,6 +187,18 @@ const supportedLanguages = new Set(["en", "zh", "de", "vi", "tr", "pt", "ru", "e
 const proxy = http.createServer((request, response) => {
   const requestUrl = new URL(request.url || "/", `http://localhost:${publicPort}`);
   const pathParts = requestUrl.pathname.split("/").filter(Boolean);
+  if (requestUrl.pathname === "/oauth/redirect") {
+    requestUrl.pathname = "/";
+    requestUrl.searchParams.set("page", "Configuração API");
+    response.writeHead(302, {
+      Location: `${requestUrl.pathname}${requestUrl.search}`,
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0",
+    });
+    response.end();
+    return;
+  }
   const languagePrefix = pathParts.length === 1 && supportedLanguages.has(pathParts[0]) ? pathParts[0] : "";
   if (languagePrefix) {
     requestUrl.pathname = "/";
