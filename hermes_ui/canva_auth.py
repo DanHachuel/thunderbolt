@@ -11,16 +11,36 @@ import requests
 
 AUTHORIZE_URL = "https://www.canva.com/api/oauth/authorize"
 TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token"
+_PKCE_MIN_LENGTH = 43
+_PKCE_MAX_LENGTH = 128
 
 
 def _b64(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
 
-def create_pkce_pair() -> tuple[str, str]:
-    verifier = _b64(secrets.token_bytes(64))
+def generate_code_verifier() -> str:
+    """Create a RFC 7636 verifier using a cryptographically secure source."""
+    verifier = _b64(secrets.token_bytes(32))
+    if not _PKCE_MIN_LENGTH <= len(verifier) <= _PKCE_MAX_LENGTH:
+        raise RuntimeError("Falha ao gerar um code_verifier PKCE válido.")
+    return verifier
+
+
+def generate_code_challenge(code_verifier: str) -> str:
+    """Derive the S256 Base64URL-without-padding PKCE challenge."""
+    verifier = str(code_verifier or "")
+    if not _PKCE_MIN_LENGTH <= len(verifier) <= _PKCE_MAX_LENGTH:
+        raise ValueError("code_verifier PKCE inválido.")
     challenge = _b64(hashlib.sha256(verifier.encode("ascii")).digest())
-    return verifier, challenge
+    if challenge == "<CODE_CHALLENGE>":
+        raise RuntimeError("Foi detectado um placeholder de code_challenge.")
+    return challenge
+
+
+def create_pkce_pair() -> tuple[str, str]:
+    verifier = generate_code_verifier()
+    return verifier, generate_code_challenge(verifier)
 
 
 def create_state() -> str:
@@ -28,6 +48,8 @@ def create_state() -> str:
 
 
 def authorization_url(client_id: str, redirect_uri: str, scope: str, state: str, code_challenge: str) -> str:
+    if not code_challenge or code_challenge == "<CODE_CHALLENGE>":
+        raise ValueError("Não é permitido iniciar Canva com code_challenge placeholder.")
     params = {
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
