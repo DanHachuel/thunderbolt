@@ -4466,6 +4466,28 @@ def load_video_tasks_for_catalog() -> list[dict[str, Any]]:
     return [task for task in saved if isinstance(task, dict) and str(task.get("id") or "").strip()]
 
 
+def task_platform(task: dict[str, Any]) -> str:
+    """Resolve a plataforma da tarefa, incluindo tarefas legadas sem platform."""
+    explicit = str(task.get("platform") or "").strip().casefold()
+    if explicit in {"youtube", "yt"}:
+        return "youtube"
+    if explicit in {"tiktok", "tik-tok", "tt"}:
+        return "tiktok"
+    channel_id = str(task.get("channel_id") or "")
+    if channel_id:
+        channel = next((item for item in read_json("channels.json", []) if isinstance(item, dict) and str(item.get("id")) == channel_id), None)
+        if channel:
+            return classify_channel_platform(channel)
+    format_value = str(task.get("format") or "").strip().casefold()
+    return "tiktok" if format_value in {"portrait", "portrait 9:16", "9:16"} else "youtube"
+
+
+def load_automation_tasks_for_platform(platform_name: str) -> list[dict[str, Any]]:
+    """Return only automation/catalog tasks belonging to one publishing platform."""
+    target = str(platform_name or "").strip().casefold()
+    return [task for task in load_video_tasks_for_catalog() if task_platform(task) == target]
+
+
 def _task_thumbnail_path(task: dict[str, Any]) -> Path | None:
     """Resolve a generated thumbnail from current and legacy task fields."""
     artifacts = task.get("artifacts") if isinstance(task.get("artifacts"), dict) else {}
@@ -4968,6 +4990,36 @@ def render_tiktok_automation():
                         update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
+    st.divider()
+    st.subheader("Vídeos cadastrados TikTok")
+    st.caption("Esta fila mostra exclusivamente tarefas associadas a canais TikTok.")
+    tiktok_tasks = load_automation_tasks_for_platform("tiktok")
+    if not tiktok_tasks:
+        st.info("Ainda não existem vídeos TikTok cadastrados.")
+    for task in tiktok_tasks:
+        task_id = str(task["id"])
+        with st.container(border=True):
+            cols = st.columns([2.4, 1.4, 1.1, 1.6])
+            with cols[0]:
+                thumbnail_path = _task_thumbnail_path(task)
+                if thumbnail_path:
+                    st.image(str(thumbnail_path), width=150, caption="Thumbnail")
+                st.write(f"**{task.get('title') or task.get('topic') or 'Vídeo TikTok'}**")
+                st.caption(f"{task.get('channel_name') or 'Canal TikTok'} · {task_id}")
+            with cols[1]:
+                _render_video_task_state(task)
+            with cols[2]:
+                st.caption("Plataforma")
+                st.write("TikTok")
+                st.caption("Portrait 9:16")
+            with cols[3]:
+                state = str(task.get("state") or "")
+                if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
+                    retry_task_with_current_settings(task_id) if state in {"blocked", "failed"} else transition_task(task_id, "doing")
+                    st.rerun()
+                if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
+                    stop_task_by_user(task_id)
+                    st.rerun()
 
 
 def render_automation():
@@ -5049,7 +5101,7 @@ def render_automation():
     st.divider()
     st.subheader("Vídeos cadastrados")
     st.caption("Start retoma as etapas já concluídas e só gera novamente o que ainda não estiver pronto. Em tarefas falhadas ou bloqueadas, a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas. Apagar remove o card da fila após confirmação e preserva os artefactos locais.")
-    tasks = load_video_tasks_for_catalog()
+    tasks = load_automation_tasks_for_platform("youtube")
     if not tasks:
         st.info("Ainda não existem vídeos cadastrados.")
     for task in tasks:
