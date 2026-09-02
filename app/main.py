@@ -7134,6 +7134,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
         card_form = nullcontext() if embedded else st.form(f"media_card_form_{card_id}")
         with card_form:
             key_col, model_col = st.columns(2)
+            refresh_clicked = False
             with key_col:
                 api_key = str(card.get("api_key") or "")
                 if definition.requires_api_key:
@@ -7159,9 +7160,15 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                     key=f"media_card_{card_id}_model_select",
                 )
                 model = "" if selected_model == "__select_model__" else selected_model
-            base_url = st.text_input("Base URL", value=str(card.get("base_url") or definition.default_base_url), key=f"media_card_{card_id}_base_url")
+                if definition.code == "canva":
+                    refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
+            if definition.code == "canva":
+                base_url = definition.default_base_url
+                st.text_input("Base URL", value=base_url, disabled=True, key=f"media_card_{card_id}_base_url_display")
+            else:
+                base_url = st.text_input("Base URL", value=str(card.get("base_url") or definition.default_base_url), key=f"media_card_{card_id}_base_url")
             extra_values: dict[str, str] = {}
-            if definition.extra_fields:
+            if definition.extra_fields and definition.code != "canva":
                 extra_cols = st.columns(len(definition.extra_fields))
                 for extra_col, field_name in zip(extra_cols, definition.extra_fields):
                     with extra_col:
@@ -7170,17 +7177,37 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 supports_image = True
                 supports_video = False
                 st.caption("Canva Connect é usado exclusivamente para thumbnails no Pool de Imagem. Não é provider de vídeo.")
-                redirect_uri = str(card.get("redirect_uri") or "").strip()
-                if not redirect_uri:
-                    st.info("Defina o Redirect URI no Developer Portal Canva e repita-o neste card antes de autorizar.")
-                elif str(card.get("client_id") or "").strip() and str(card.get("client_secret") or "").strip():
-                    if st.button("Autorizar Canva", key=f"media_card_{card_id}_authorize"):
+                credential_cols = st.columns(3)
+                with credential_cols[0]:
+                    client_id = st.text_input("Client Id", value=str(card.get("client_id") or ""), key=f"media_card_{card_id}_client_id")
+                with credential_cols[1]:
+                    client_secret = st.text_input("Client Secret", value=str(card.get("client_secret") or ""), type="password", key=f"media_card_{card_id}_client_secret")
+                with credential_cols[2]:
+                    redirect_uri = st.text_input("Redirect Uri", value=str(card.get("redirect_uri") or ""), key=f"media_card_{card_id}_redirect_uri")
+                extra_values.update({"client_id": client_id.strip(), "client_secret": client_secret.strip(), "redirect_uri": redirect_uri.strip()})
+                oauth_token = card.get("oauth_token") if isinstance(card.get("oauth_token"), dict) else {}
+                has_credentials = bool(client_id.strip() and client_secret.strip() and redirect_uri.strip())
+                is_authorized = bool(oauth_token.get("access_token"))
+                oauth_state = "Autorizado" if is_authorized else ("Não Autorizado" if has_credentials else "⚠️ Incompleto")
+                st.markdown(f"**Estado OAuth:** `{oauth_state}`")
+                if not has_credentials:
+                    st.info("Preencha Client Id, Client Secret e Redirect Uri para iniciar a autorização.")
+                else:
+                    if st.button("Iniciar autorização", key=f"media_card_{card_id}_authorize"):
                         verifier, challenge = create_pkce_pair()
                         state = create_state()
                         st.session_state[f"canva_verifier_{card_id}"] = verifier
                         st.session_state[f"canva_state_{card_id}"] = state
-                        st.link_button("Abrir autorização Canva", authorization_url(str(card.get("client_id")), redirect_uri, "design:content:read design:content:write", state, challenge), use_container_width=True)
-                st.caption("Estado OAuth: autorizado" if (card.get("oauth_token") or {}).get("access_token") else "Estado OAuth: não autorizado")
+                        st.session_state[f"canva_authorization_url_{card_id}"] = authorization_url(client_id, redirect_uri, "design:content:read design:content:write", state, challenge)
+                    authorization_link = str(st.session_state.get(f"canva_authorization_url_{card_id}") or "")
+                    if authorization_link:
+                        st.link_button("Abrir autorização Canva", authorization_link, use_container_width=True)
+                with st.expander("Opções de exportação e dimensões", expanded=False):
+                    export_quality = st.selectbox("Export Quality", ["High", "Medium", "Low"], index=["high", "medium", "low"].index(str(card.get("export_quality") or "medium").lower()), key=f"media_card_{card_id}_export_quality")
+                    export_format = st.selectbox("Export Format", ["PNG", "JPG", "PDF"], index=["png", "jpg", "pdf"].index(str(card.get("export_format") or "png").lower()), key=f"media_card_{card_id}_export_format")
+                    dimensions = st.selectbox("Thumbnail Width / Height", ["1280 x 720", "1792 x 1024"], index=1 if str(card.get("thumbnail_width")) == "1792" or str(card.get("thumbnail_height")) == "1024" else 0, key=f"media_card_{card_id}_dimensions")
+                    selected_width, selected_height = dimensions.replace(" ", "").split("x", 1)
+                    extra_values.update({"export_quality": export_quality.lower(), "export_format": export_format.lower(), "thumbnail_width": selected_width, "thumbnail_height": selected_height})
             status_cols = st.columns(4)
             with status_cols[0]:
                 enabled = st.checkbox("Provider activo", value=bool(card.get("enabled", True)), key=f"media_card_{card_id}_enabled")
@@ -7192,7 +7219,8 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                 priority = st.number_input("Prioridade", min_value=0, max_value=999, value=int(card.get("priority", index)), step=1, key=f"media_card_{card_id}_priority")
             action_cols = st.columns(4)
             with action_cols[0]:
-                refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
+                if definition.code != "canva":
+                    refresh_clicked = st.form_submit_button("Consultar Modelos", use_container_width=True, key=f"media_card_{card_id}_refresh")
             with action_cols[1]:
                 test_clicked = st.form_submit_button("Testar Chamada API", use_container_width=True, key=f"media_card_{card_id}_test")
             with action_cols[2]:

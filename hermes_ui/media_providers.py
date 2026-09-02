@@ -219,6 +219,18 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
     for field in definition.extra_fields:
         result[field] = str(source.get(field) or "").strip()
     if provider == "canva":
+        quality = str(source.get("export_quality") or "medium").strip().lower()
+        result["export_quality"] = {"regular": "medium", "default": "medium"}.get(quality, quality if quality in {"high", "medium", "low"} else "medium")
+        export_format = str(source.get("export_format") or "png").strip().lower()
+        result["export_format"] = export_format if export_format in {"png", "jpg", "pdf"} else "png"
+        raw_width = str(source.get("thumbnail_width") or "").strip().lower().replace("×", "x").replace(" ", "")
+        raw_height = str(source.get("thumbnail_height") or "").strip().lower().replace("×", "x").replace(" ", "")
+        combined = raw_width if "x" in raw_width else raw_height
+        if "x" in combined:
+            left, right = combined.split("x", 1)
+            raw_width, raw_height = left, right
+        result["thumbnail_width"] = raw_width if raw_width in {"1280", "1792"} else "1280"
+        result["thumbnail_height"] = raw_height if raw_height in {"720", "1024"} else ("1024" if result["thumbnail_width"] == "1792" else "720")
         result["oauth_token"] = dict(source.get("oauth_token") or {}) if isinstance(source.get("oauth_token"), Mapping) else {}
     if provider == "nano_banana":
         result["aspect_ratio"] = str(source.get("aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO).strip()
