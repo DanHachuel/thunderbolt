@@ -8007,6 +8007,22 @@ def render_supabase_tutorial():
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
 
+def render_canvas_api_tutorial():
+    """Render the Canva Connect API setup guide supplied for Thunderbolt."""
+    tutorial_path = ROOT / "seed" / "references" / "tutorial-api-canvas.md"
+    st.title("Tutorial API Canvas")
+    st.caption("Guia para configurar as credenciais Canva Connect API usadas pelo Thunderbolt.")
+    st.markdown("[Abrir documentação oficial da Canva](https://www.canva.dev/docs/connect/)")
+    try:
+        tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        tutorial_content = ""
+    if not tutorial_content:
+        st.error("O conteúdo local do tutorial não está disponível. Consulte a documentação oficial da Canva.")
+        return
+    st.markdown(tutorial_content, unsafe_allow_html=False)
+
+
 def render_google_oauth_tutorial():
     """Render the Google OAuth setup guide supplied for Thunderbolt."""
     tutorial_path = ROOT / "seed" / "references" / "tutorial-oauth-google.md"
@@ -8437,6 +8453,7 @@ def main():
     documentation_items = [
         ("Tutorial Meta", ":material/menu_book:", "Tutorial Meta"),
         ("Tutorial Supabase", ":material/storage:", "Tutorial Supabase"),
+        ("Tutorial API Canvas", ":material/design_services:", "Tutorial API Canvas"),
         ("Tutorial Kaggle", ":material/menu_book:", "Tutorial Kaggle"),
         ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
         ("Tutorial YouTube Video-Upload Frontend", ":material/video_library:", "Tutorial YouTube Video-Upload Frontend"),
@@ -8616,6 +8633,7 @@ def main():
         "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,
+        "Tutorial API Canvas": render_canvas_api_tutorial,
         "Tutorial YouTube Video-Upload Frontend": render_youtube_frontend_upload_tutorial,
         "Tutorial OAuth do Google": render_google_oauth_tutorial,
         "Configurações": lambda: render_edit_placeholder("Configurações", "Seleccione uma opção no menu expansível."),

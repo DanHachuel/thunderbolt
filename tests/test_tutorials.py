@@ -40,12 +40,23 @@ class TutorialContentTests(unittest.TestCase):
         self.assertIn("Authorization: Bearer", body)
         self.assertIn("não inicia actor", body)
 
+    def test_canvas_api_tutorial_reference_contains_setup_and_oauth_steps(self):
+        tutorial_path = Path(__file__).resolve().parents[1] / "seed" / "references" / "tutorial-api-canvas.md"
+        body = tutorial_path.read_text(encoding="utf-8")
+        self.assertIn("Canva Developer Portal", body)
+        self.assertIn("CANVA_CLIENT_ID", body)
+        self.assertIn("CANVA_CLIENT_SECRET", body)
+        self.assertIn("OAuth 2.0 com PKCE", body)
+        self.assertIn("design:content", body)
+
     def test_main_routes_render_real_tutorials(self):
         main_source = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
         self.assertIn('"Tutorial Kaggle": lambda: render_niche_tutorial("kaggle")', main_source)
         self.assertIn('"Tutorial Apify": lambda: render_niche_tutorial("apify")', main_source)
         self.assertNotIn('"Tutorial Kaggle": lambda: render_edit_placeholder("Tutorial Kaggle", "")', main_source)
         self.assertNotIn('"Tutorial Apify": lambda: render_edit_placeholder("Tutorial Apify", "")', main_source)
+        self.assertIn('("Tutorial API Canvas", ":material/design_services:", "Tutorial API Canvas")', main_source)
+        self.assertIn('"Tutorial API Canvas": render_canvas_api_tutorial', main_source)
 
     def test_all_languages_keep_the_external_sources(self):
         for kind in ("kaggle", "apify"):
