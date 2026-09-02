@@ -15,7 +15,8 @@ def test_tiktok_forms_persist_voice_automation_and_time():
 def test_tiktok_cards_show_requested_channel_settings():
     block = SOURCE.split("def render_tiktok_channels():", 1)[1].split("def is_youtube_channel_record", 1)[0]
     assert 'Narrador/Voz Padrão' in block
-    assert 'Estilo wide: Portrait 9:16' in block
-    assert 'Automação: {\'ligada\' if automation_on else \'desligada\'}' in block
+    assert 'Fonte do vídeo' in block
+    assert 'Proporção do vídeo' in block
+    assert 'Formato' in block
     assert '"Nicho": "niche"' in block
     assert '"Horário diário (HH:MM)": "automation_time"' in block
