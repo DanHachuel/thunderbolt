@@ -4,12 +4,14 @@ import io
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
+os.environ["CLICK_NO_WIN_CONSOLE"] = "1"
 
 def _force_utf8_stream(stream: object) -> object:
     buffer = getattr(stream, "buffer", None)
-    encoding = str(getattr(stream, "encoding", "") or "").lower().replace("-", "_")
-    if buffer is not None and encoding != "utf_8":
-        return io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    if buffer is not None and not getattr(stream, "_thunderbolt_utf8", False):
+        wrapped = io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+        setattr(wrapped, "_thunderbolt_utf8", True)
+        return wrapped
     return stream
 
 _original_stdout, _original_stderr = sys.stdout, sys.stderr
