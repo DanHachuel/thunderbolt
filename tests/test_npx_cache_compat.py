@@ -47,6 +47,10 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('from streamlit.web.cli import main', bootstrap)
         self.assertLess(bootstrap.index('os.environ["PYTHONIOENCODING"]'), bootstrap.index('from streamlit.web.cli import main'))
 
+    def test_package_manifest_includes_python_streamlit_bootstrap(self):
+        manifest = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertIn("scripts/*.py", manifest["files"])
+
 
 if __name__ == "__main__":
     unittest.main()
