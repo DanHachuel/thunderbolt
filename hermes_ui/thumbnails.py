@@ -10,7 +10,7 @@ from typing import Any
 from .creative_generation import _language_instruction, generate_thumbnail_prompt
 from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
-from .storage import STORAGE, ensure_storage, now, read_json, update_json
+from .storage import STORAGE, ensure_storage, now, read_json, update_json, write_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from .thumbnail_blueprints import thumbnail_blueprint_for_channel
 
@@ -49,6 +49,7 @@ def _generate_image_with_pool(
         reference_image=reference_image,
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
+        thumbnail_only=True,
     )
 
 
