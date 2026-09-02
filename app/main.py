@@ -69,6 +69,7 @@ from hermes_ui.update_manager import check_version, restart_current_process, upd
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
+from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, fetch_personal_voices, personal_voice_options
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
 from hermes_ui.thumbnails import (
     generate_thumbnail_for_task,
@@ -185,7 +186,7 @@ VIDEO_CONCATENATION_OPTIONS = ["Random Concatenation (Recommended)", "Sequential
 VIDEO_TRANSITION_OPTIONS = ["None", "Fade", "Dissolve"]
 VIDEO_ENCODER_OPTIONS = ["Default (Recommended)", "H.264", "H.265"]
 VOICEOVER_MODE_OPTIONS = ["Auto", "Upload", "None"]
-VOICEOVER_SERVICE_OPTIONS = ["Azure Speech SDK V2", "Azure TTS V1"]
+VOICEOVER_SERVICE_OPTIONS = ["Azure Speech SDK V2", "Azure TTS V1", "ElevenLabs"]
 VOICEOVER_VOLUME_OPTIONS = ["20%", "40%", "60%", "80%", "100%"]
 VOICEOVER_SPEED_OPTIONS = ["0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "2.0x"]
 BACKGROUND_MUSIC_SOURCE_OPTIONS = ["Ficheiro existente", "Carregar ficheiro", "Criar via Suno API", "Random Background Music", "Sem música"]
@@ -928,6 +929,9 @@ def voice_catalog(current: str = "") -> list[str]:
         voices.extend(f"{item.get('name', '')}-{item.get('gender', '')}" for item in voice_data if item.get("name"))
     except (OSError, json.JSONDecodeError):
         pass
+    for voice_id in personal_voice_options(read_json("settings.json", {})):
+        if voice_id not in voices:
+            voices.append(voice_id)
     for candidate in (current, "en-US-AriaNeural-Female", "pt-BR-FranciscaNeural-Female", "pt-BR-AntonioNeural-Male"):
         if candidate and candidate not in voices:
             voices.append(candidate)
@@ -1091,6 +1095,8 @@ def render_video_generation_settings(
                     and str(configured_voice_settings.get("azure_speech_region") or "").strip()
                 )
                 voice_service_default = "Azure Speech SDK V2" if configured_azure_voice else "Azure TTS V1"
+                if str(st.session_state.get(f"{prefix}_voice", "")).strip() in personal_voice_options(configured_voice_settings):
+                    voice_service_default = "ElevenLabs"
                 voice_service_index = VOICEOVER_SERVICE_OPTIONS.index(voice_service_default)
                 settings["voiceover_service"] = st.selectbox(
                     "Voiceover Service",
@@ -1108,7 +1114,13 @@ def render_video_generation_settings(
                         st.session_state[channel_state_key] = channel_id
                 current_voice = str(st.session_state.get(f"{prefix}_voice", ""))
                 voice_options = voice_catalog(current_voice)
-                settings["voice"] = st.selectbox("Voice (match script language)", voice_options, format_func=lambda value: value or "Sem voz seleccionada", key=f"{prefix}_voice")
+                personal_options = personal_voice_options(configured_voice_settings)
+                settings["voice"] = st.selectbox(
+                    "Voice (match script language)",
+                    voice_options,
+                    format_func=lambda value: personal_options.get(value, value) if value else "Sem voz seleccionada",
+                    key=f"{prefix}_voice",
+                )
                 volume_speed_cols = st.columns(2)
                 with volume_speed_cols[0]:
                     settings["voiceover_volume"] = st.selectbox("Voiceover Volume", VOICEOVER_VOLUME_OPTIONS, index=VOICEOVER_VOLUME_OPTIONS.index("100%"), key=f"{prefix}_voiceover_volume")
@@ -3376,8 +3388,49 @@ def render_music_creation():
 
 
 def render_custom_music_voices() -> None:
-    """Reserved view for future reusable custom music-voice blueprints."""
+    """List and test personal ElevenLabs voices without exposing credentials."""
     st.title("Vozes Personalizadas")
+    st.caption("Vozes pessoais do ElevenLabs Voice Lab disponíveis para narração no Thunderbolt.")
+    settings = read_json("settings.json", {})
+    refresh_col, cache_col = st.columns([1, 2])
+    with refresh_col:
+        refresh = st.button("Actualizar vozes", type="primary", use_container_width=True, key="elevenlabs_refresh_voices")
+    try:
+        voices, metadata = fetch_personal_voices(settings, force=refresh)
+        if metadata.get("source") == "cache":
+            label = "cache local"
+            if metadata.get("stale"):
+                st.warning("A API não respondeu; a mostrar a última lista guardada localmente.")
+        else:
+            label = "API ElevenLabs"
+        with cache_col:
+            st.caption(f"Fonte: {label} · última actualização: {metadata.get('updated_at') or '—'}")
+    except ElevenLabsVoicesError as exc:
+        st.warning(str(exc))
+        st.info("As vozes padrão continuam disponíveis na criação de vídeos.")
+        return
+
+    if not voices:
+        st.info("Nenhuma voz pessoal foi encontrada nesta conta ElevenLabs.")
+        return
+    test_text = st.text_input("Texto curto para testar uma voz", value=DEFAULT_SAMPLE, key="elevenlabs_voice_test_text")
+    for voice in voices:
+        with st.container(border=True):
+            voice_cols = st.columns([2.2, 1.8, 1])
+            with voice_cols[0]:
+                st.markdown(f"**{voice.get('name', 'Sem nome')}**")
+                st.caption(f"ID: `{voice.get('voice_id', '')}`")
+            with voice_cols[1]:
+                labels = voice.get("labels") or {}
+                st.caption("Categoria: personal")
+                st.caption("Labels: " + (", ".join(f"{key}: {value}" for key, value in labels.items()) if labels else "não disponíveis"))
+            with voice_cols[2]:
+                if st.button("Testar voz", key=f"elevenlabs_test_voice_{voice['voice_id']}", use_container_width=True):
+                    try:
+                        preview = synthesize_preview(test_text, "elevenlabs", voice["voice_id"], settings)
+                        st.audio(str(preview), format="audio/mpeg")
+                    except (OSError, RuntimeError, ValueError) as exc:
+                        st.error(f"Não foi possível testar esta voz: {exc}")
 
 
 def render_scripts():
