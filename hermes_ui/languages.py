@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -1130,7 +1131,11 @@ def translate_ui_content(value: Any, language: Any = "pt") -> Any:
     translated = value
     for source, target in _sorted_translations(code):
         if source != target and source in translated:
-            translated = translated.replace(source, target)
+            # Only replace complete tokens. This prevents the English token
+            # ``Font`` from matching the Portuguese word ``Fonte`` and
+            # producing malformed labels such as ``Fontee...``.
+            pattern = rf"(?<!\w){re.escape(source)}(?!\w)"
+            translated = re.sub(pattern, target, translated)
     return translated
 
 
