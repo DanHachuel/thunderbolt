@@ -5,6 +5,7 @@ import io
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
 os.environ["CLICK_NO_WIN_CONSOLE"] = "1"
+os.environ["PYTHONLEGACYWINDOWSSTDIO"] = "1"
 
 def _force_utf8_stream(stream: object) -> object:
     if os.name != "nt":
