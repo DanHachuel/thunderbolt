@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from hermes_ui.canva_auth import authorization_url, create_pkce_pair
+from hermes_ui.canva_auth import authorization_url, create_pkce_pair, generate_code_challenge, generate_code_verifier
 from hermes_ui.canva_client import CanvaClient
 from hermes_ui.media_providers import media_cards_for_pool, normalize_media_card
 
@@ -17,6 +17,21 @@ def test_pkce_authorization_url_contains_required_parameters():
     assert "client_id=client" in url
     assert "state=state" in url
     assert "design%3Acontent%3Aread" in url
+
+
+def test_pkce_pair_meets_canva_rfc7636_requirements():
+    verifier = generate_code_verifier()
+    challenge = generate_code_challenge(verifier)
+    assert 43 <= len(verifier) <= 128
+    assert all(char.isascii() and (char.isalnum() or char in "-._~") for char in verifier)
+    assert len(challenge) == 43
+    assert "=" not in challenge
+    assert challenge == generate_code_challenge(verifier)
+
+
+def test_authorization_url_rejects_code_challenge_placeholder():
+    with pytest.raises(ValueError, match="placeholder"):
+        authorization_url("client", "http://127.0.0.1:3030/oauth/redirect", "asset:read", "state", "<CODE_CHALLENGE>")
 
 
 def test_canva_export_poll_and_download():
