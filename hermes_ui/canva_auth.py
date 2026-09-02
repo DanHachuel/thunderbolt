@@ -13,6 +13,13 @@ AUTHORIZE_URL = "https://www.canva.com/api/oauth/authorize"
 TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token"
 _PKCE_MIN_LENGTH = 43
 _PKCE_MAX_LENGTH = 128
+CANVA_OAUTH_SCOPES = (
+    "asset:read",
+    "asset:write",
+    "design:meta:read",
+    "design:content:read",
+    "design:content:write",
+)
 
 
 def _b64(value: bytes) -> str:
@@ -47,13 +54,15 @@ def create_state() -> str:
     return _b64(secrets.token_bytes(48))
 
 
-def authorization_url(client_id: str, redirect_uri: str, scope: str, state: str, code_challenge: str) -> str:
+def authorization_url(client_id: str, redirect_uri: str, scope: str | list[str] | tuple[str, ...] | None = None, state: str = "", code_challenge: str = "") -> str:
     if not code_challenge or code_challenge == "<CODE_CHALLENGE>":
         raise ValueError("Não é permitido iniciar Canva com code_challenge placeholder.")
+    scope_value = CANVA_OAUTH_SCOPES if scope is None else scope
+    scope_string = " ".join(scope_value) if isinstance(scope_value, (list, tuple)) else " ".join(str(scope_value or "").split())
     params = {
         "code_challenge": code_challenge,
-        "code_challenge_method": "S256",
-        "scope": " ".join(str(scope or "").split()),
+        "code_challenge_method": "s256",
+        "scope": scope_string,
         "response_type": "code",
         "client_id": str(client_id).strip(),
         "state": str(state).strip(),

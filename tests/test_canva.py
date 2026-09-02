@@ -11,12 +11,16 @@ from hermes_ui.media_providers import media_cards_for_pool, normalize_media_card
 
 def test_pkce_authorization_url_contains_required_parameters():
     verifier, challenge = create_pkce_pair()
-    url = authorization_url("client", "http://127.0.0.1:3030/", "design:content:read design:content:write", "state", challenge)
+    url = authorization_url("client", "http://127.0.0.1:3030/", state="state", code_challenge=challenge)
     assert len(verifier) >= 43
-    assert "code_challenge_method=S256" in url
+    assert "code_challenge_method=s256" in url
     assert "client_id=client" in url
     assert "state=state" in url
+    assert "asset%3Aread" in url
+    assert "asset%3Awrite" in url
+    assert "design%3Ameta%3Aread" in url
     assert "design%3Acontent%3Aread" in url
+    assert "design%3Acontent%3Awrite" in url
 
 
 def test_pkce_pair_meets_canva_rfc7636_requirements():
