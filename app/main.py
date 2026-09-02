@@ -1924,6 +1924,7 @@ def render_tiktok_channels():
     channels = _tiktok_channel_records()
     import_tab, spreadsheet_tab, manual_tab = render_localized_tabs(["Importar do Tiktok", "Canais em lote Planilha", "Cadastro manual"])
     prompt_ids, prompt_labels = _tiktok_prompt_options()
+    _, _, _, voice_options, _ = channel_default_options({})
     with import_tab:
         st.caption("A pesquisa consulta exclusivamente a página pública do TikTok. Não existe método alternativo nem utilização de API.")
         st.divider()
@@ -1984,9 +1985,15 @@ def render_tiktok_channels():
                 language = st.selectbox("Idioma", list(LANGUAGE_CODES), format_func=language_label, key="tiktok_import_language")
                 niche = st.text_input("Nicho", key="tiktok_import_niche")
                 prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_import_prompt")
+                voice = st.selectbox("Narrador/Voz Padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="tiktok_import_voice")
+                automation_on = st.toggle("Automação ON", value=False, key="tiktok_import_automation")
+                automation_time = st.text_input("Horário diário (HH:MM)", value="00:00", key="tiktok_import_automation_time")
                 description = st.text_area("Descrição", value=str(imported.get("bio") or ""), key="tiktok_import_description")
                 if st.form_submit_button("Cadastrar canal TikTok", type="primary"):
-                    channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
+                    if not valid_hhmm(automation_time):
+                        st.error("O horário diário deve estar no formato HH:MM.")
+                        st.stop()
+                    channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "default_voice": voice, "voice": voice, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_on": automation_on, "automation_time": automation_time.strip(), "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
                     avatar_url = _tiktok_avatar_url(imported)
                     update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt, "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                     st.session_state.pop("tiktok_channel_import", None)
@@ -2009,6 +2016,7 @@ def render_tiktok_channels():
                         st.markdown(f"**{channel.get('name') or 'Perfil TikTok'}**")
                         st.caption(f"{channel.get('handle') or 'sem handle'} · {channel.get('url') or 'sem URL'}")
                         st.caption(channel.get("description") or "Perfil carregado da página pública do TikTok.")
+                        st.caption(f"Nicho: {channel.get('niche') or 'não configurado'}")
                     with card_cols[2]:
                         st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
                     with card_cols[3]:
@@ -2027,11 +2035,20 @@ def render_tiktok_channels():
                         if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
                             st.rerun()
-                        st.caption("Formato: Portrait 9:16")
+                        st.caption("Estilo wide: Portrait 9:16")
+                        st.caption(f"Automação: {'ligada' if automation_on else 'desligada'} · {automation_time}")
+                        _, _, _, card_voice_options, card_current_voice = channel_default_options(channel)
+                        selected_voice = st.selectbox("Narrador/Voz Padrão", card_voice_options, index=card_voice_options.index(card_current_voice) if card_current_voice in card_voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key=f"tiktok_import_card_voice_{channel_id}")
+                        automation_on = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_import_card_automation_{channel_id}")
+                        automation_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"), key=f"tiktok_import_card_time_{channel_id}")
                         if st.button("Guardar", key=f"tiktok_import_card_save_{channel_id}", use_container_width=True, type="primary"):
-                            update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait"})
-                            st.success("Prompt Master do canal guardado.")
-                            st.rerun()
+                            if not valid_hhmm(automation_time):
+                                st.error("O horário diário deve estar no formato HH:MM.")
+                            else:
+                                update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "default_voice": selected_voice, "voice": selected_voice, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "automation_on": automation_on, "automation_time": automation_time.strip()})
+                                st.success("Dados do canal TikTok guardados.")
+                                st.rerun()
+                        st.caption("Estilo wide: Portrait 9:16")
                     niche_action = st.columns([1.0, 4.0])
                     with niche_action[0]:
                         if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}"):
@@ -2062,11 +2079,18 @@ def render_tiktok_channels():
                             edit_url = st.text_input("URL pública", value=str(channel.get("url") or ""))
                             edit_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
                             edit_language = st.selectbox("Idioma do canal", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index(language_code(channel.get("language") or "pt")), format_func=language_label)
+                            edit_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(str(channel.get("default_voice") or channel.get("voice") or "")) if str(channel.get("default_voice") or channel.get("voice") or "") in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
+                            edit_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_edit_automation_{channel_id}")
+                            edit_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
+                            st.caption("Estilo wide: Portrait 9:16")
                             edit_description = st.text_area("Descrição", value=str(channel.get("description") or ""))
                             if st.form_submit_button("Guardar edição", type="primary"):
-                                update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "description": edit_description.strip(), "platform": "tiktok"})
-                                st.session_state.pop(f"tiktok_edit_{channel_id}", None)
-                                st.rerun()
+                                if not valid_hhmm(edit_time):
+                                    st.error("O horário diário deve estar no formato HH:MM.")
+                                else:
+                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "default_voice": edit_voice, "voice": edit_voice, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
+                                    st.session_state.pop(f"tiktok_edit_{channel_id}", None)
+                                    st.rerun()
                     with st.expander("Últimos 10 vídeos publicados", expanded=False):
                         recent_videos = channel_videos_for(channel, limit=10)
                         if not recent_videos:
@@ -2096,7 +2120,7 @@ def render_tiktok_channels():
                 candidate = {"name": row.get("name", ""), "handle": row.get("handle", ""), "url": row.get("url", "")}
                 if find_duplicate_channel(candidate, channels):
                     continue
-                created_channel = create_channel(str(row.get("name") or row.get("handle") or "TikTok"), str(row.get("url") or ""), {"platform": "tiktok", "handle": row.get("handle", ""), "language": language_code(row.get("language") or "pt"), "niche": row.get("niche", ""), "description": row.get("description", ""), "default_prompt_master": row.get("prompt_master", ""), "prompt_master": row.get("prompt_master", ""), "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_time": row.get("automation_time") or "00:00"})
+                created_channel = create_channel(str(row.get("name") or row.get("handle") or "TikTok"), str(row.get("url") or ""), {"platform": "tiktok", "handle": row.get("handle", ""), "language": language_code(row.get("language") or "pt"), "niche": row.get("niche", ""), "description": row.get("description", ""), "default_prompt_master": row.get("prompt_master", ""), "prompt_master": row.get("prompt_master", ""), "default_voice": row.get("voice", ""), "voice": row.get("voice", ""), "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_on": bool(row.get("automation_on", False)), "automation_time": row.get("automation_time") or "00:00"})
                 update_channel(created_channel["id"], {"platform": "tiktok"})
                 created += 1
             st.success(f"{created} canal(is) TikTok cadastrado(s).")
@@ -2106,7 +2130,7 @@ def render_tiktok_channels():
         st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
         if channels:
             st.dataframe(
-                [{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels],
+                [{k: c.get(v, "") for k, v in {"URL canal": "url", "Nome canal": "name", "Handle canal": "handle", "Idioma": "language", "Nicho": "niche", "Prompt Master": "default_prompt_master", "Narrador/Voz Padrão": "default_voice", "Estilo wide": "style_wide", "Automação ligada": "automation_on", "Horário diário (HH:MM)": "automation_time", "Proporção": "video_aspect_ratio", "Activo": "active", "Descrição": "description"}.items()} for c in channels],
                 use_container_width=True,
                 hide_index=True,
                 height=360,
@@ -2121,10 +2145,17 @@ def render_tiktok_channels():
             language = st.selectbox("Idioma", list(LANGUAGE_CODES), format_func=language_label, key="tiktok_manual_channel_language")
             niche = st.text_input("Nicho", key="tiktok_manual_channel_niche")
             prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_manual_channel_prompt")
+            voice = st.selectbox("Narrador/Voz Padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="tiktok_manual_channel_voice")
+            automation_on = st.toggle("Automação ON", value=False, key="tiktok_manual_channel_automation")
+            automation_time = st.text_input("Horário diário (HH:MM)", value="00:00", key="tiktok_manual_channel_automation_time")
+            st.caption("Estilo wide: Portrait 9:16")
             description = st.text_area("Descrição", key="tiktok_manual_channel_description")
             if st.form_submit_button("Guardar canal manual", type="primary"):
                 reference = normalize_tiktok_reference(url or handle)
-                channel = create_channel(name.strip() or reference["username"], reference["url"], {"platform": "tiktok", "handle": reference["handle"], "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16"})
+                if not valid_hhmm(automation_time):
+                    st.error("O horário diário deve estar no formato HH:MM.")
+                    st.stop()
+                channel = create_channel(name.strip() or reference["username"], reference["url"], {"platform": "tiktok", "handle": reference["handle"], "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "default_voice": voice, "voice": voice, "style_wide": "portrait", "video_aspect_ratio": "Portrait 9:16", "automation_on": automation_on, "automation_time": automation_time.strip()})
                 update_channel(channel["id"], {"platform": "tiktok"})
                 st.success("Canal TikTok cadastrado.")
                 st.rerun()
