@@ -227,7 +227,11 @@ proxy.on("upgrade", (request, clientSocket, head) => {
 
 // O backend Streamlit fica em 127.0.0.1; apenas o proxy escuta em todas as
 // interfaces para que o encaminhamento seguro do ambiente consiga alcançá-lo.
-proxy.listen(publicPort, () => {
+proxy.on("error", (error) => {
+  console.error(`Thunderbolt: não foi possível abrir a interface em ${publicPort}: ${error.message}`);
+  process.exitCode = 1;
+});
+proxy.listen(publicPort, "127.0.0.1", () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
 const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
@@ -249,9 +253,12 @@ let child;
 function startStreamlit() {
   child = spawn(python, ["-m", "streamlit", "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
     cwd: root,
-    stdio: "ignore",
+    stdio: "inherit",
     env: { ...runtimeEnv, THUNDERBOLT_LAUNCHER_RESTART: "1" },
     windowsHide: false,
+  });
+  child.on("error", (error) => {
+    console.error(`Thunderbolt: não foi possível iniciar o Streamlit: ${error.message}`);
   });
   child.on("exit", (code, signal) => {
     if (shuttingDown) {
