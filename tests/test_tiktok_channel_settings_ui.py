@@ -17,6 +17,7 @@ def test_tiktok_cards_show_requested_channel_settings():
     assert 'Narrador/Voz Padrão' in block
     assert 'Fonte do vídeo' in block
     assert 'Proporção do vídeo' in block
-    assert 'Formato' in block
+    assert 'tiktok_import_card_format_' not in block
+    assert 'selectbox("Formato", CHANNEL_FORMAT_OPTIONS' not in block
     assert '"Nicho": "niche"' in block
     assert '"Horário diário (HH:MM)": "automation_time"' in block

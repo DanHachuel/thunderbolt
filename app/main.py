@@ -1311,7 +1311,6 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             edited_language = st.selectbox("Idioma do roteiro", language_options, index=language_options.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in language_options else 0, format_func=video_language_label)
             edited_style = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
             edited_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Landscape 16:9")) if str(channel.get("video_aspect_ratio") or "Landscape 16:9") in CHANNEL_ASPECT_RATIO_OPTIONS else 0)
-            edited_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "wide")) if str(channel.get("format") or "wide") in CHANNEL_FORMAT_OPTIONS else 0)
             edited_niche = st.text_input("Nicho", value=str(channel.get("niche") or channel_niche_label(channel) if channel_niche_label(channel) != "SEM NICHO CONFIGURADO" else "") )
         with edit_cols[1]:
             edited_blueprint = st.selectbox("Blueprint Padrão", blueprint_ids, index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"))
@@ -1333,7 +1332,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
         else:
             update_channel(channel_id, {
                 "name": edited_name.strip(), "url": edited_url.strip(), "handle": edited_handle.strip(), "language": edited_language,
-                "style_wide": channel_video_source_storage(edited_style), "video_aspect_ratio": edited_aspect, "format": edited_format,
+                "style_wide": channel_video_source_storage(edited_style), "video_aspect_ratio": edited_aspect,
                 "niche": edited_niche.strip(), "reference_channels": [item.strip() for item in re.split(r"[,|]", edited_niche) if item.strip()],
                 "default_blueprint_id": edited_blueprint.strip(), "blueprint_id": edited_blueprint.strip(),
                 "default_voice": edited_voice.strip(), "voice": edited_voice.strip(),
@@ -2004,7 +2003,6 @@ def render_tiktok_channels():
                 language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, format_func=video_language_label, key="tiktok_import_language")
                 source_value = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, key="tiktok_import_source")
                 aspect_value = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=1, key="tiktok_import_aspect")
-                format_value = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=1, key="tiktok_import_format")
                 niche = st.text_input("Nicho", key="tiktok_import_niche")
                 prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_import_prompt")
                 voice = st.selectbox("Narrador/Voz Padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="tiktok_import_voice")
@@ -2015,7 +2013,7 @@ def render_tiktok_channels():
                     if not valid_hhmm(automation_time):
                         st.error("O horário diário deve estar no formato HH:MM.")
                         st.stop()
-                    channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "default_voice": voice, "voice": voice, "style_wide": channel_video_source_storage(source_value), "video_aspect_ratio": aspect_value, "format": format_value, "automation_on": automation_on, "automation_time": automation_time.strip(), "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
+                    channel = create_channel(name.strip(), url.strip(), {"platform": "tiktok", "handle": handle.strip(), "language": language, "niche": niche.strip(), "description": description.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "default_voice": voice, "voice": voice, "style_wide": channel_video_source_storage(source_value), "video_aspect_ratio": aspect_value, "format": "Shorts", "automation_on": automation_on, "automation_time": automation_time.strip(), "metrics_source": "tiktok_public_page", "subscriber_count": imported.get("subscriber_count"), "video_count": imported.get("video_count")})
                     avatar_url = _tiktok_avatar_url(imported)
                     update_channel(channel["id"], {"platform": "tiktok", "default_prompt_master": prompt, "prompt_master": prompt, "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                     st.session_state.pop("tiktok_channel_import", None)
@@ -2057,27 +2055,20 @@ def render_tiktok_channels():
                         if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
                             st.rerun()
-                        _, _, _, card_voice_options, card_current_voice = channel_default_options(channel)
-                        selected_voice = st.selectbox("Narrador/Voz Padrão", card_voice_options, index=card_voice_options.index(card_current_voice) if card_current_voice in card_voice_options else 0, format_func=lambda item: item or "Sem voz padrão", key=f"tiktok_import_card_voice_{channel_id}")
-                        selected_source = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0, key=f"tiktok_import_card_source_{channel_id}")
-                        selected_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Portrait 9:16")) if str(channel.get("video_aspect_ratio") or "Portrait 9:16") in CHANNEL_ASPECT_RATIO_OPTIONS else 1, key=f"tiktok_import_card_aspect_{channel_id}")
-                        selected_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1, key=f"tiktok_import_card_format_{channel_id}")
-                        selected_language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label, key=f"tiktok_import_card_language_{channel_id}")
-                        automation_on = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_import_card_automation_{channel_id}")
-                        automation_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"), key=f"tiktok_import_card_time_{channel_id}")
-                        if st.button("Guardar", key=f"tiktok_import_card_save_{channel_id}", use_container_width=True, type="primary"):
-                            if not valid_hhmm(automation_time):
-                                st.error("O horário diário deve estar no formato HH:MM.")
-                            else:
-                                update_channel(channel_id, {"platform": "tiktok", "default_prompt_master": selected_prompt, "prompt_master": selected_prompt, "default_voice": selected_voice, "voice": selected_voice, "language": selected_language, "video_aspect_ratio": selected_aspect, "format": selected_format, "style_wide": channel_video_source_storage(selected_source), "automation_on": automation_on, "automation_time": automation_time.strip()})
-                                st.success("Dados do canal TikTok guardados.")
-                                st.rerun()
-                        st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))}")
-                    niche_action = st.columns([1.0, 4.0])
-                    with niche_action[0]:
-                        if st.button("Editar nicho", key=f"tiktok_import_card_niche_{channel_id}"):
-                            st.session_state[f"tiktok_niche_{channel_id}"] = not st.session_state.get(f"tiktok_niche_{channel_id}", False)
-                            st.rerun()
+                        summary_cols = st.columns(4, gap="small")
+                        with summary_cols[0]:
+                            st.markdown("**Blueprint Padrão**")
+                            st.caption(prompt_labels.get(str(channel.get("default_prompt_master") or channel.get("prompt_master") or ""), "Sem Blueprint padrão"))
+                        with summary_cols[1]:
+                            st.markdown("**Nicho**")
+                            st.caption(channel_niche_label(channel))
+                        with summary_cols[2]:
+                            st.markdown("**Narrador/Voz Padrão**")
+                            st.caption(str(channel.get("default_voice") or channel.get("voice") or "Sem voz padrão"))
+                        with summary_cols[3]:
+                            st.markdown("**Idioma**")
+                            st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
+                        st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))} · Proporção: {channel.get('video_aspect_ratio') or 'Portrait 9:16'}")
                     if st.session_state.get(f"tiktok_delete_{channel_id}"):
                         st.warning("Apagar este canal TikTok e os dados locais associados?")
                         confirm_cols = st.columns(2)
@@ -2105,7 +2096,6 @@ def render_tiktok_channels():
                             edit_language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label)
                             edit_source = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
                             edit_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Portrait 9:16")) if str(channel.get("video_aspect_ratio") or "Portrait 9:16") in CHANNEL_ASPECT_RATIO_OPTIONS else 1)
-                            edit_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1)
                             edit_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(str(channel.get("default_voice") or channel.get("voice") or "")) if str(channel.get("default_voice") or channel.get("voice") or "") in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
                             edit_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_edit_automation_{channel_id}")
                             edit_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
@@ -2115,7 +2105,7 @@ def render_tiktok_channels():
                                 if not valid_hhmm(edit_time):
                                     st.error("O horário diário deve estar no formato HH:MM.")
                                 else:
-                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "format": edit_format, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
+                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
                                     st.session_state.pop(f"tiktok_edit_{channel_id}", None)
                                     st.rerun()
                     with st.expander("Últimos 10 vídeos publicados", expanded=False):
@@ -2172,7 +2162,6 @@ def render_tiktok_channels():
             language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, format_func=video_language_label, key="tiktok_manual_channel_language")
             source_value = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, key="tiktok_manual_channel_source")
             aspect_value = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=1, key="tiktok_manual_channel_aspect")
-            format_value = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=1, key="tiktok_manual_channel_format")
             niche = st.text_input("Nicho", key="tiktok_manual_channel_niche")
             prompt = st.selectbox("Prompt Master padrão", prompt_ids, format_func=lambda item: prompt_labels.get(item, item), key="tiktok_manual_channel_prompt")
             voice = st.selectbox("Narrador/Voz Padrão", voice_options, format_func=lambda item: item or "Sem voz padrão", key="tiktok_manual_channel_voice")
@@ -2264,7 +2253,6 @@ def render_channels():
                 language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(imported.get("language") or "pt")) if normalize_video_language(imported.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label, key="yt_import_language")
                 style = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=0, key="yt_import_style")
                 video_aspect_ratio = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, key="yt_import_aspect_ratio")
-                video_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, key="yt_import_format")
                 blueprint = st.selectbox("Blueprint Padrão", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
                 voice_options = voice_catalog(imported.get("default_voice") or imported.get("voice", ""))
                 current_voice = imported.get("default_voice") or imported.get("voice", "")
@@ -2294,7 +2282,7 @@ def render_channels():
                             "niche": niche.strip(),
                             "reference_channels": [item.strip() for item in re.split(r"[,|]", niche) if item.strip()],
                             "language": language,
-                            "style_wide": channel_video_source_storage(style), "video_aspect_ratio": video_aspect_ratio, "format": video_format,
+                            "style_wide": channel_video_source_storage(style), "video_aspect_ratio": video_aspect_ratio, "format": "wide",
                             "blueprint_id": blueprint.strip(),
                             "default_blueprint_id": blueprint.strip(),
                             "default_voice": voice.strip(),
@@ -5015,15 +5003,14 @@ def render_tiktok_automation():
             with default_cols[3]:
                 prompt = st.selectbox("Prompt Master Padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
             with default_cols[4]:
-                st.markdown("**Pool de vídeos**")
-                st.caption("TikTok / Shorts")
+                automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1, key=f"tiktok_automation_format_{channel_id}")
             with default_cols[5]:
                 if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
                         avatar_url = _tiktok_avatar_url(channel)
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
     st.divider()
@@ -5118,6 +5105,8 @@ def render_automation():
                 st.markdown("**Thumbnail Blueprint**")
                 st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
             with default_cols[4]:
+                automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "wide")) if str(channel.get("format") or "wide") in CHANNEL_FORMAT_OPTIONS else 0, key=f"automation_format_{channel_id}")
+            with default_cols[5]:
                 automation_voice = st.selectbox(
                     "Narrador/Voz Padrão",
                     voice_options,
@@ -5133,6 +5122,7 @@ def render_automation():
                         update_channel(channel_id, {
                             "automation_on": bool(enabled),
                             "automation_time": schedule_time.strip(),
+                            "format": automation_format,
                         })
                         set_channel_defaults(channel_id, automation_blueprint, automation_voice)
                         paired_id = str(paired_thumbnail.get("id") or "Generic_Thumbnail_Blueprint")
