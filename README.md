@@ -451,3 +451,11 @@ O Thunderbolt integra o [jusTokenMax](https://github.com/Kalmantic/jusTokenMax) 
 A configuração encontra-se em **Configuração API > API Keys > Optimização de tokens — jusTokenMax**. É possível activar ou desactivar o optimizador, controlar os levers por tipo, verificar a versão instalada, consultar métricas e limpar apenas os artefactos derivados. Os originais permanecem em `storage/state/token_optimizer_originals/` e podem ser recuperados pelo hash através do módulo interno.
 
 A instalação do pacote inclui `justokenmax` a partir do repositório oficial. Se o CLI não estiver disponível ou ocorrer um erro, o Thunderbolt usa o conteúdo original e regista um fallback local; a geração não fica bloqueada. API keys, passwords, tokens e blobs base64 são redigidos antes de serem guardados em artefactos derivados.
+
+## Canva Skills — automação criativa
+
+O Thunderbolt inclui as seis Canva Skills activas do pacote oficial `canva-sdks/canva-skills`, adaptadas para chamadas REST directas: `resize-for-social-media`, `bulk-create`, `implement-feedback`, `edit-design`, `get-design-feedback` e `brand-check`. A página `Canva Skills` permite executar as operações sobre um card Canva autorizado em **Configuração API > API Keys > Imagem e Video IA**.
+
+A criação em lote usa o endpoint oficial de Autofill e requer Canva Enterprise (ou quota de trial durante desenvolvimento). A criação de variantes sociais copia o design e exporta cada variante; a Connect REST pública não oferece um endpoint geral de resize responsivo, por isso a dimensão alvo é registada e o link de edição Canva é disponibilizado para ajustes finais. A API REST também não expõe as transacções de edição usadas pelo MCP; `edit-design` e `implement-feedback` funcionam como preparação aprovada e identificam claramente as alterações que exigem edição manual, sem efectuar commits falsos.
+
+O fluxo automático de thumbnails continua a usar Canva exclusivamente no Pool de Imagem para thumbnails. Canva nunca é seleccionado para geração de vídeo. Consulte `app/modules/canva_skills/` para os módulos e `app/pages/canva_skills.py` para a interface.

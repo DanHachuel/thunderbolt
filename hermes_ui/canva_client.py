@@ -35,12 +35,12 @@ class CanvaClient:
             self._save_token(refresh_access_token(self.client_id, self.client_secret, refresh))
         return str(self.token["access_token"])
 
-    def request(self, method: str, path: str, *, json: Mapping[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
+    def request(self, method: str, path: str, *, json: Mapping[str, Any] | None = None, params: Mapping[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
         refreshed = False
         for attempt in range(4):
             try:
                 token = self._access_token()
-                response = requests.request(method, f"{self.base_url}/{path.lstrip('/')}", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}, json=json, timeout=timeout)
+                response = requests.request(method, f"{self.base_url}/{path.lstrip('/')}", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}, json=json, params=params, timeout=timeout)
             except requests.RequestException as exc:
                 if attempt == 3:
                     raise RuntimeError(f"Falha de rede na Canva: {str(exc)[:200]}") from exc
