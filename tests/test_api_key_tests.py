@@ -150,6 +150,19 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
         self.assertEqual(get.call_args.kwargs["headers"], {"Authorization": "Bearer kie-secret"})
         self.assertNotIn("kie-secret", str(result))
 
+    def test_fal_media_diagnostic_uses_models_api_and_key_auth(self):
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "fal_ai",
+                "api_key": "fal-secret",
+                "model": "fal-ai/flux/dev",
+                "base_url": "https://queue.fal.run",
+            })
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "https://api.fal.ai/v1/models")
+        self.assertEqual(get.call_args.kwargs["headers"], {"Authorization": "Key fal-secret"})
+        self.assertNotIn("fal-secret", str(result))
+
     def test_heygen_media_diagnostic_uses_read_only_account_endpoint(self):
         with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
             result = api_key_tests.test_media_provider_card({

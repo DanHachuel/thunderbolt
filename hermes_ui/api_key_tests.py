@@ -177,6 +177,8 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
         return _get(f"{base_url}/v3/users/me", headers={"X-Api-Key": api_key})
     if provider == "kie_ai":
         return _get(f"{base_url}/chat/credit", headers={"Authorization": f"Bearer {api_key}"})
+    if provider == "fal_ai":
+        return _get("https://api.fal.ai/v1/models", headers={"Authorization": f"Key {api_key}"})
     if not model and provider not in {"inferenceport", "cloudflare_workers_ai", "heygen"}:
         return _result("missing", "Complete o modelo antes de testar.")
     if provider == "openrouter":
@@ -194,8 +196,6 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
         return _get(endpoint, headers=headers, params={"search": model or "stable-diffusion"})
     if api_style in {"openai_compatible", "huggingface", "agnes", "kie"} or provider in {"pollinations", "huggingface", "agnes", "inferenceport"}:
         endpoint = _models_endpoint(base_url)
-    elif provider == "fal_ai":
-        endpoint = f"{base_url}/models" if base_url.endswith("/v1") else base_url
     else:
         endpoint = base_url
     return _get(endpoint, headers=headers)

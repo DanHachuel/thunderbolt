@@ -7089,6 +7089,26 @@ def _fetch_media_models(card: dict[str, Any]) -> list[str]:
     provider = str(card.get("provider") or "").strip().lower()
     if provider == "kie_ai":
         return list(KIE_MEDIA_MODEL_CATALOG)
+    if provider == "fal_ai":
+        api_key = str(card.get("api_key") or "").strip()
+        if not api_key:
+            raise ValueError("Introduza a API key FAL AI antes de consultar os modelos.")
+        response = requests.get(
+            "https://api.fal.ai/v1/models",
+            headers={"Accept": "application/json", "Authorization": f"Key {api_key}"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        entries = payload.get("models") if isinstance(payload, dict) else []
+        models = {
+            str(item.get("endpoint_id") or "").strip()
+            for item in entries
+            if isinstance(item, dict) and str(item.get("endpoint_id") or "").strip()
+        }
+        if not models:
+            raise ValueError("A FAL AI não devolveu modelos disponíveis.")
+        return sorted(models, key=str.casefold)
     if provider == "openrouter":
         base_url = str(card.get("base_url") or "https://openrouter.ai/api/v1").rstrip("/")
         headers = {"Accept": "application/json", "Authorization": f"Bearer {str(card.get('api_key') or '').strip()}"}
