@@ -45,6 +45,8 @@ def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_pa
         "perform-editing-operations", "commit-editing-transaction",
         "get-export-formats", "export-design",
     ]
+    get_content_arguments = client.call.call_args_list[1].args[1]
+    assert get_content_arguments["content_types"] == ["richtexts"]
 
 
 def test_direct_workflow_requires_search_result(tmp_path: Path):
