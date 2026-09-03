@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from hermes_ui.canva_mcp_workflow import _design_id, run_direct_canva_thumbnail
+from hermes_ui.canva_mcp_workflow import _first_text_element, _design_id, run_direct_canva_thumbnail
 
 
 def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_path: Path):
@@ -71,6 +71,12 @@ def test_design_id_accepts_canva_mcp_identifier_variants():
     assert _design_id({"design_id": "D-1"}) == "D-1"
     assert _design_id({"designId": "D-2"}) == "D-2"
     assert _design_id({"design": {"id": "D-3"}}) == "D-3"
+
+
+def test_text_element_accepts_canva_richtext_identifier_variants():
+    assert _first_text_element({"richtexts": [{"richtext_id": "R-1", "content": "old"}]}) == "R-1"
+    assert _first_text_element({"text_elements": [{"elementId": "E-2", "value": "old"}]}) == "E-2"
+    assert _first_text_element({"elements": [{"id": "E-3", "type": "rich_text"}]}) == "E-3"
 
 
 def test_direct_workflow_skips_search_result_without_id(tmp_path: Path):
