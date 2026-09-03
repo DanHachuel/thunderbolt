@@ -100,3 +100,40 @@ def test_direct_workflow_skips_search_result_without_id(tmp_path: Path):
             )
         except Exception as exc:
             assert "não devolveu o ID do design" not in str(exc)
+
+
+def test_direct_workflow_generates_editable_thumbnail_when_search_has_no_text(tmp_path: Path):
+    client = Mock()
+    client.tools.return_value = [
+        {"name": name} for name in (
+            "search-designs", "get-design-content", "generate-design",
+            "create-design-from-candidate", "start-editing-transaction",
+            "perform-editing-operations", "commit-editing-transaction",
+            "get-export-formats", "export-design",
+        )
+    ]
+    client.call.side_effect = [
+        {"structuredContent": {"items": [{"id": "D1111111111"}]}},
+        {"structuredContent": {"richtexts": []}},
+        {"structuredContent": {"job_id": "job-1", "candidates": [{"candidate_id": "candidate-1"}]}},
+        {"structuredContent": {"design": {"id": "D2222222222"}}},
+        {"structuredContent": {"richtexts": [{"element_id": "text-1", "text": "headline"}]}},
+        {"structuredContent": {"transaction_id": "tx-1", "pages": [{"page_id": "p-1", "is_responsive": False}]}},
+        {"structuredContent": {"ok": True}},
+        {"structuredContent": {"ok": True}},
+        {"structuredContent": {"formats": [{"type": "png"}]}},
+        {"structuredContent": {"url": "https://cdn.example/generated.png"}},
+    ]
+    response = Mock(content=b"png", status_code=200)
+    response.raise_for_status.return_value = None
+    with patch("hermes_ui.canva_mcp_workflow.CanvaMCPClient") as factory, patch("hermes_ui.canva_mcp_workflow.requests.get", return_value=response):
+        factory.return_value.__enter__.return_value = client
+        output = tmp_path / "thumb.png"
+        assert run_direct_canva_thumbnail(
+            title="Título", topic="história", prompt="prompt",
+            blueprint={"id": "bp", "content": "headline, dark background, icons"},
+            destination=output, width=1280, height=720,
+        ) == output
+    generate_call = next(call for call in client.call.call_args_list if call.args[0] == "generate-design")
+    assert generate_call.args[1]["design_type"] == "youtube_thumbnail"
+    assert "editable headline text boxes" in generate_call.args[1]["query"]
