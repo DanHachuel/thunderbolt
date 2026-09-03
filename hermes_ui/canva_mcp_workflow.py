@@ -200,11 +200,11 @@ def run_direct_canva_thumbnail(
             "user_intent": "Find an existing Canva design to edit as a Thunderbolt thumbnail.",
         }))
         candidates = _items(result)
-        if not candidates:
-            raise CanvaMCPError("Canva não encontrou designs para as palavras-chave da thumbnail.")
         candidates = [candidate for candidate in candidates if _design_id(candidate)]
-        if not candidates:
+        if not candidates and _items(result):
             raise CanvaMCPError("A pesquisa Canva devolveu um design sem ID.")
+        if not candidates and not ({"generate-design", "generate_design"} & available):
+            raise CanvaMCPError("Canva não encontrou designs para as palavras-chave da thumbnail.")
 
         get_name = "get-design-content" if "get-design-content" in available else "get_design_content"
         selected = None
