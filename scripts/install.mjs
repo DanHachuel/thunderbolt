@@ -433,13 +433,17 @@ function installRequirementIfNeeded(requirementsPath, stateKey, modules, label) 
   const state = readDependencyState();
   const importsOk = importsAvailable(modules);
   const hashMatches = state[stateKey] === currentHash;
-  if (!forceDeps && importsOk && (hashMatches || !state[stateKey])) {
+  const markerPath = join(venvPath, `.${stateKey}.sha256`);
+  const markerHash = existsSync(markerPath) ? readFileSync(markerPath, "utf8").trim() : "";
+  const persistedHashMatches = hashMatches || markerHash === currentHash;
+  if (!forceDeps && importsOk && persistedHashMatches) {
     console.log(`${label}: dependências detectadas e reutilizadas; nenhuma reinstalação necessária.`);
     writeDependencyState({ [stateKey]: currentHash });
     return;
   }
   console.log(`${label}: dependências ausentes, incompletas ou alteradas; a instalar agora.`);
   run(pythonBin, ["-m", "pip", "install", "-r", requirementsPath]);
+  writeFileSync(markerPath, `${currentHash}\n`, "utf8");
   writeDependencyState({ [stateKey]: currentHash });
 }
 
@@ -461,7 +465,7 @@ function writeSettings(moneyprinterPath) {
 
 function installThunderboltDependencies(python) {
   if (!existsSync(pythonBin)) run(python.command, [...python.args, "-m", "venv", venvPath]);
-  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "google.auth", "google_auth_oauthlib", "googleapiclient"], "Thunderbolt");
+  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "google.auth", "google_auth_oauthlib", "googleapiclient", "yt_dlp", "youtube_transcript_api"], "Thunderbolt");
 }
 
 function installMoneyPrinterDependencies(moneyprinterPath) {
