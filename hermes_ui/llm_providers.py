@@ -55,7 +55,7 @@ LLM_PROVIDER_CATALOG: tuple[LlmProviderDefinition, ...] = (
         "nvidia_nim_paligemma",
         "OpenAI / NVIDIA NIM (Paligemma)",
         show_base_url=True,
-        default_base_url="https://ai.api.nvidia.com/v1/vlm/google/paligemma",
+        default_base_url="https://integrate.api.nvidia.com/v1",
         supports_model_discovery=False,
         excluded_from_normal_pool=True,
         description="Provider exclusivo do Analista Growth YouTube para análise visual de thumbnails.",
