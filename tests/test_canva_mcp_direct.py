@@ -115,7 +115,7 @@ def test_direct_workflow_generates_editable_thumbnail_when_search_has_no_text(tm
     client.call.side_effect = [
         {"structuredContent": {"items": [{"id": "D1111111111"}]}},
         {"structuredContent": {"richtexts": []}},
-        {"structuredContent": {"job_id": "job-1", "candidates": [{"candidate_id": "candidate-1"}]}},
+        {"structuredContent": {"job": {"id": "job-1", "result": {"generated_designs": [{"candidate_id": "candidate-1"}]}}}},
         {"structuredContent": {"design": {"id": "D2222222222"}}},
         {"structuredContent": {"richtexts": [{"element_id": "text-1", "text": "headline"}]}},
         {"structuredContent": {"transaction_id": "tx-1", "pages": [{"page_id": "p-1", "is_responsive": False}]}},

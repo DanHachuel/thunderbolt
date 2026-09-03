@@ -27,10 +27,10 @@ def _payload(result: Mapping[str, Any]) -> Any:
 
 def _items(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, Mapping):
-        for key in ("items", "designs", "results", "candidates"):
+        for key in ("items", "designs", "results", "candidates", "generated_designs"):
             if isinstance(value.get(key), list):
                 return [dict(item) for item in value[key] if isinstance(item, Mapping)]
-        for key in ("data", "result", "response"):
+        for key in ("data", "result", "response", "job"):
             if isinstance(value.get(key), (Mapping, list)):
                 nested = _items(value[key])
                 if nested:
@@ -54,6 +54,17 @@ def _first_named_id(value: Any, keys: tuple[str, ...]) -> str:
             found = _first_named_id(child, keys)
             if found:
                 return found
+    return ""
+
+
+def _generation_job_id(value: Any) -> str:
+    if isinstance(value, Mapping):
+        job = value.get("job")
+        if isinstance(job, Mapping):
+            candidate = str(job.get("id") or "").strip()
+            if candidate:
+                return candidate
+        return _first_named_id(value, ("job_id", "jobId"))
     return ""
 
 
@@ -202,7 +213,7 @@ def run_direct_canva_thumbnail(
                 ),
                 "user_intent": "Create an editable YouTube thumbnail with text boxes and visual elements when searched designs are not editable.",
             }))
-            job_id = _first_named_id(generated, ("job_id", "jobId"))
+            job_id = _generation_job_id(generated)
             generated_candidates = _items(generated)
             candidate_id = _first_named_id(generated_candidates[0] if generated_candidates else {}, ("candidate_id", "candidateId"))
             if not job_id or not candidate_id:
