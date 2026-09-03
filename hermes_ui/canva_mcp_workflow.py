@@ -99,6 +99,22 @@ def _first_text_element(value: Any, *, text_context: bool = False) -> str:
     return ""
 
 
+def _has_richtext(value: Any) -> bool:
+    """Return whether a Canva payload contains at least one richtext item."""
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            if str(key).lower() in {"richtexts", "rich_texts", "text_elements", "textelements"}:
+                if isinstance(child, list) and any(isinstance(item, Mapping) for item in child):
+                    return True
+                if isinstance(child, Mapping) and child:
+                    return True
+            if _has_richtext(child):
+                return True
+    elif isinstance(value, list):
+        return any(_has_richtext(child) for child in value)
+    return False
+
+
 def _first_page(value: Any) -> tuple[str, list[dict[str, Any]]]:
     pages: list[dict[str, Any]] = []
     if isinstance(value, Mapping) and isinstance(value.get("pages"), list):
@@ -132,17 +148,27 @@ def run_direct_canva_thumbnail(
         candidates = _items(result)
         if not candidates:
             raise CanvaMCPError("Canva não encontrou designs para as palavras-chave da thumbnail.")
-        selected = next((candidate for candidate in candidates if _design_id(candidate)), candidates[0])
-        design_id = _design_id(selected)
-        if not design_id:
+        candidates = [candidate for candidate in candidates if _design_id(candidate)]
+        if not candidates:
             raise CanvaMCPError("A pesquisa Canva devolveu um design sem ID.")
 
         get_name = "get-design-content" if "get-design-content" in available else "get_design_content"
-        content = _payload(client.call(get_name, {
-            "design_id": design_id,
-            "content_types": ["richtexts"],
-            "user_intent": "Inspect the selected Canva design before applying the thumbnail edit.",
-        }))
+        selected = None
+        content: Any = {}
+        for candidate in candidates:
+            candidate_id = _design_id(candidate)
+            candidate_content = _payload(client.call(get_name, {
+                "design_id": candidate_id,
+                "content_types": ["richtexts"],
+                "user_intent": "Inspect the selected Canva design before applying the thumbnail edit.",
+            }))
+            if _has_richtext(candidate_content):
+                selected = candidate
+                content = candidate_content
+                break
+        if selected is None:
+            raise CanvaMCPError("Os designs Canva encontrados não têm elementos de texto editáveis.")
+        design_id = _design_id(selected)
         start_name = "start-editing-transaction" if "start-editing-transaction" in available else "start_editing_transaction"
         started = _payload(client.call(start_name, {
             "design_id": design_id,
@@ -154,6 +180,12 @@ def run_direct_canva_thumbnail(
         page_id, pages = _first_page(started)
         element_id = _first_text_element(started) or _first_text_element(content)
         if not element_id:
+            cancel_name = "cancel-editing-transaction" if "cancel-editing-transaction" in available else "cancel_editing_transaction"
+            if cancel_name in available:
+                client.call(cancel_name, {
+                    "transaction_id": transaction_id,
+                    "user_intent": "Discard the Canva editing transaction because no editable text element was returned.",
+                })
             raise CanvaMCPError("O design Canva não devolveu um elemento de texto editável.")
         perform_name = "perform-editing-operations" if "perform-editing-operations" in available else "perform_editing_operations"
         operations = [{"type": "replace_text", "element_id": element_id, "text": title[:255]}]
