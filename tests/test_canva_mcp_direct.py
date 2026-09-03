@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from hermes_ui.canva_mcp_workflow import _first_text_element, _has_richtext, _design_id, run_direct_canva_thumbnail
+from hermes_ui.canva_mcp_workflow import _download_url, _first_text_element, _has_richtext, _design_id, run_direct_canva_thumbnail
 
 
 def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_path: Path):
@@ -22,7 +22,7 @@ def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_pa
         {"structuredContent": {"pages": [{"page_id": "page-1", "is_responsive": False}]}},
         {"structuredContent": {"ok": True}},
         {"structuredContent": {"formats": [{"type": "png"}]}},
-        {"structuredContent": {"url": "https://cdn.example/thumb.png"}},
+        {"structuredContent": {"job": {"status": "success", "urls": ["https://cdn.example/thumb.png"]}}},
     ]
     response = Mock(content=b"png", status_code=200)
     response.raise_for_status.return_value = None
@@ -82,6 +82,10 @@ def test_text_element_accepts_canva_richtext_identifier_variants():
 def test_has_richtext_matches_official_canva_transaction_shape():
     assert _has_richtext({"richtexts": [{"element_id": "E-1", "regions": []}]}) is True
     assert _has_richtext({"richtexts": [], "fills": []}) is False
+
+
+def test_download_url_accepts_official_export_job_urls_shape():
+    assert _download_url({"job": {"status": "success", "urls": ["https://export.canva.com/thumb.png"]}}) == "https://export.canva.com/thumb.png"
 
 
 def test_direct_workflow_skips_search_result_without_id(tmp_path: Path):

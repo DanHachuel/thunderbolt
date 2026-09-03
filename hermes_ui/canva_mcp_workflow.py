@@ -101,6 +101,30 @@ def _first_id(value: Any, keys: tuple[str, ...]) -> str:
     return ""
 
 
+def _download_url(value: Any) -> str:
+    if isinstance(value, Mapping):
+        for key in ("url", "download_url", "downloadUrl"):
+            candidate = str(value.get(key) or "").strip()
+            if candidate.startswith(("http://", "https://")):
+                return candidate
+        urls = value.get("urls")
+        if isinstance(urls, list):
+            for url in urls:
+                candidate = str(url or "").strip()
+                if candidate.startswith(("http://", "https://")):
+                    return candidate
+        for child in value.values():
+            found = _download_url(child)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _download_url(child)
+            if found:
+                return found
+    return ""
+
+
 def _first_text_element(value: Any, *, text_context: bool = False) -> str:
     if isinstance(value, Mapping):
         # The MCP returns rich text elements with slightly different ID
@@ -286,7 +310,7 @@ def run_direct_canva_thumbnail(
             },
             "user_intent": "Export the finished Thunderbolt thumbnail as PNG.",
         }))
-        url = _first_id(exported, ("url", "download_url"))
+        url = _download_url(exported)
         if not url:
             raise CanvaMCPError("Canva não devolveu URL de download do PNG.")
         response = requests.get(url, timeout=90)
