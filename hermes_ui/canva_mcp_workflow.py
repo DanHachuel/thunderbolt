@@ -27,7 +27,7 @@ def _payload(result: Mapping[str, Any]) -> Any:
 
 def _items(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, Mapping):
-        for key in ("items", "designs", "results"):
+        for key in ("items", "designs", "results", "candidates"):
             if isinstance(value.get(key), list):
                 return [dict(item) for item in value[key] if isinstance(item, Mapping)]
         for key in ("data", "result", "response"):
@@ -36,6 +36,25 @@ def _items(value: Any) -> list[dict[str, Any]]:
                 if nested:
                     return nested
     return []
+
+
+def _first_named_id(value: Any, keys: tuple[str, ...]) -> str:
+    """Find an ID by field name without treating unrelated nested IDs as matches."""
+    if isinstance(value, Mapping):
+        for key in keys:
+            candidate = str(value.get(key) or "").strip()
+            if candidate:
+                return candidate
+        for child in value.values():
+            found = _first_named_id(child, keys)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _first_named_id(child, keys)
+            if found:
+                return found
+    return ""
 
 
 def _design_id(value: Any) -> str:
@@ -167,7 +186,41 @@ def run_direct_canva_thumbnail(
                 content = candidate_content
                 break
         if selected is None:
-            raise CanvaMCPError("Os designs Canva encontrados não têm elementos de texto editáveis.")
+            generate_name = "generate-design" if "generate-design" in available else "generate_design"
+            create_name = "create-design-from-candidate" if "create-design-from-candidate" in available else "create_design_from_candidate"
+            if generate_name not in available or create_name not in available:
+                raise CanvaMCPError("Os designs Canva encontrados não têm elementos de texto editáveis e esta sessão MCP não disponibiliza geração de design.")
+            blueprint_text = str(blueprint.get("content") or "")[:5000]
+            generated = _payload(client.call(generate_name, {
+                "design_type": "youtube_thumbnail",
+                "query": (
+                    "Create one editable YouTube thumbnail in 16:9 format for this topic: "
+                    f"{title}. Context: {topic}. Thumbnail prompt: {prompt[:1200]}. "
+                    "Use clearly editable headline text boxes, a strong background, readable text "
+                    "background shapes, relevant icons, depth/effects, and high-contrast lettering. "
+                    "Follow these local Thumbnail Blueprint rules: " + blueprint_text
+                ),
+                "user_intent": "Create an editable YouTube thumbnail with text boxes and visual elements when searched designs are not editable.",
+            }))
+            job_id = _first_named_id(generated, ("job_id", "jobId"))
+            generated_candidates = _items(generated)
+            candidate_id = _first_named_id(generated_candidates[0] if generated_candidates else {}, ("candidate_id", "candidateId"))
+            if not job_id or not candidate_id:
+                raise CanvaMCPError("Canva não devolveu um candidato editável para a thumbnail.")
+            created = _payload(client.call(create_name, {
+                "job_id": job_id,
+                "candidate_id": candidate_id,
+                "user_intent": "Create the selected editable YouTube thumbnail candidate in the user's Canva account.",
+            }))
+            design_id = _design_id(created)
+            if not design_id:
+                raise CanvaMCPError("Canva não devolveu o ID do design gerado.")
+            selected = {"id": design_id}
+            content = _payload(client.call(get_name, {
+                "design_id": design_id,
+                "content_types": ["richtexts"],
+                "user_intent": "Inspect the generated editable thumbnail before applying the final lettering.",
+            }))
         design_id = _design_id(selected)
         start_name = "start-editing-transaction" if "start-editing-transaction" in available else "start_editing_transaction"
         started = _payload(client.call(start_name, {
