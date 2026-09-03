@@ -29,7 +29,13 @@ jobs:
 
       - name: Apply requested version
         if: ${{ inputs.version != '' }}
-        run: npm version "${{ inputs.version }}" --no-git-tag-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if [ "$CURRENT_VERSION" != "${{ inputs.version }}" ]; then
+            npm version "${{ inputs.version }}" --no-git-tag-version
+          else
+            echo "Version $CURRENT_VERSION already selected; no change needed."
+          fi
 
       - name: Validate package metadata
         run: |
