@@ -33,6 +33,12 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('copyMissingTree(join(candidate, "storage"), targetStorage)', source)
         self.assertIn('migrateLegacyNpxStorage();', source)
 
+    def test_install_persists_dependency_hash_inside_venv_and_checks_growth_dependencies(self):
+        source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")
+        self.assertIn('const markerPath = join(venvPath, `.${stateKey}.sha256`);', source)
+        self.assertIn('const persistedHashMatches = hashMatches || markerHash === currentHash;', source)
+        self.assertIn('"yt_dlp", "youtube_transcript_api"', source)
+
     def test_required_commands_remain_documented_without_extra_flags(self):
         source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
         self.assertIn('args[0] === "install"', source)
