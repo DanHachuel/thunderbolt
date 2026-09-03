@@ -7,6 +7,12 @@ import { homedir, platform } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Definir no processo pai para Click/Streamlit herdarem as opções no Windows.
+process.env.CLICK_NO_WIN_CONSOLE = "1";
+process.env.PYTHONIOENCODING = "utf-8";
+process.env.PYTHONUTF8 = "1";
+process.env.PYTHONLEGACYWINDOWSSTDIO = "1";
+
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
 
