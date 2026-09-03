@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.14 (normalizado pelo npm para 0.5.14)
+## 0.5.15 (normalizado pelo npm para 0.5.15)
 
 Aplicada a correcção definitiva do caminho de saída do Click no Windows, com shim UTF-8 carregado antes do Streamlit e teste de regressão para stdout com encoding `utf-16-le`.
 
