@@ -89,6 +89,18 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertNotIn('aspect_ratio', media_renderer)
         self.assertNotIn('image_size', media_renderer)
 
+    def test_media_pool_order_has_no_redundant_top_selectors(self):
+        media_page = MAIN_SOURCE[MAIN_SOURCE.index('def render_media_provider_cards('):MAIN_SOURCE.index('def render_settings(')]
+        for label in (
+            'Provider principal de imagem',
+            'Provider principal de vídeo',
+            'Usar pool de vídeo externo',
+            'Salvar selecção dos pools',
+        ):
+            self.assertNotIn(label, media_page)
+        media_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_media_provider_card('):MAIN_SOURCE.index('def render_media_provider_cards(')]
+        self.assertIn('"Prioridade"', media_renderer)
+
     def test_llm_card_uses_priority_instead_of_primary_checkbox(self):
         llm_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_llm_card('):MAIN_SOURCE.index('def render_llm_provider_cards(')]
         self.assertIn('st.number_input(', llm_renderer)
