@@ -107,6 +107,7 @@ from hermes_ui.thumbnails import (
 from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields, missing_setting_sections, normalise_saved_script, setting_widget_suffixes
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords, generate_video_update_metadata
 from hermes_ui.media_generation import MediaGenerationError, format_media_generation_error, generate_image_for_card, generate_video_for_card
+from hermes_ui.growth_youtube import list_analyses, run_audit
 from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -1490,13 +1491,35 @@ def _growth_channel_metrics(channel: dict[str, Any]) -> tuple[list[dict[str, Any
 
 def render_growth_youtube():
     st.title("Analista Growth Youtube")
-    st.caption("Auditoria de crescimento baseada nos 3 pilares críticos e nas métricas secundárias do agente Growth.")
+    st.caption("Auditoria pública baseada nos 3 pilares críticos e nas métricas secundárias do agente Growth.")
     channels = [item for item in read_json("channels.json", []) if isinstance(item, dict) and item.get("active", True) and is_youtube_channel_record(item)]
     if not channels:
         st.info("Cadastre pelo menos um canal YouTube em Canais YouTube para iniciar a análise.")
         return
-    selected = st.selectbox("Canal a analisar", channels, format_func=lambda item: str(item.get("name") or "Canal sem nome"), key="growth_youtube_channel")
-    metrics, overall = _growth_channel_metrics(selected)
+    selector_col, action_col = st.columns([1.05, 1.15], gap="small")
+    with selector_col:
+        selected = st.selectbox("Canal a analisar", channels, format_func=lambda item: str(item.get("name") or "Canal sem nome"), key="growth_youtube_channel")
+    with action_col:
+        st.write("")
+        analyse_clicked = st.button("ANALISAR CANAL", type="primary", use_container_width=True, key="growth_youtube_analyse")
+    if analyse_clicked:
+        settings = read_json("settings.json", {})
+        llm_settings, _ = ensure_llm_provider_cards(settings)
+        vision_card = next((card for card in llm_settings.get(LLM_CARDS_KEY, []) if isinstance(card, dict) and card.get("provider") == "nvidia_nim_paligemma" and card.get("enabled", True)), None)
+        with st.status("A preparar a análise pública…", expanded=True) as status:
+            try:
+                record = run_audit(selected, settings, vision_card=vision_card, progress=st.write)
+                st.session_state["growth_last_analysis_code"] = record["code"]
+                status.update(label="Análise concluída", state="complete")
+            except Exception as exc:
+                status.update(label="Análise falhou", state="error")
+                st.error(str(exc)[:500])
+    records = list_analyses()
+    selected_record = next((item for item in reversed(records) if str(item.get("channel_id")) == str(selected.get("id"))), None)
+    if selected_record is None and records:
+        selected_record = records[-1]
+    metrics = selected_record.get("metrics", []) if selected_record else []
+    overall = int(selected_record.get("overall_score", 50)) if selected_record else 50
     color = _growth_score_color(overall)
     st.markdown(
         f'<div style="border:1px solid #263447;border-radius:12px;padding:18px;margin:12px 0 20px;background:#101722;display:flex;align-items:center;justify-content:space-between;">'
@@ -1504,8 +1527,12 @@ def render_growth_youtube():
         f'<div style="font-size:42px;font-weight:800;color:{color};line-height:1;">{overall}<span style="font-size:16px;color:#94a3b8;">/100</span></div></div>',
         unsafe_allow_html=True,
     )
+    if selected_record and selected_record.get("report_path"):
+        report_path = Path(str(selected_record["report_path"]))
+        if report_path.is_file():
+            st.download_button("BAIXAR ANALISE COMPLETA", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", key=f"growth_download_{selected_record['code']}")
     st.subheader("Dashboard de Growth")
-    st.caption("Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100. Métricas sem fonte local aparecem explicitamente como sem dados.")
+    st.caption("Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100. Clique em ANALISAR CANAL para recolher dados públicos actualizados.")
     for row_start in range(0, len(metrics), 4):
         cols = st.columns(4, gap="small")
         for col, metric in zip(cols, metrics[row_start:row_start + 4]):
@@ -1516,12 +1543,25 @@ def render_growth_youtube():
                     f'<div style="font-size:13px;color:#cbd5e1;min-height:34px;">{metric["label"]}</div>'
                     f'<div style="font-size:30px;font-weight:800;color:{_growth_score_color(score)};">{score}<span style="font-size:13px;color:#94a3b8;">/100</span></div>'
                     f'<div style="font-size:12px;color:#e2e8f0;margin-top:5px;">{metric["value"]}</div>'
-                    f'<div style="font-size:11px;color:#64748b;margin-top:5px;">Fonte: {metric["source"]}</div></div>',
+                    f'<div style="font-size:11px;color:#64748b;margin-top:5px;">{metric.get("diagnosis", "")[:100]}</div></div>',
                     unsafe_allow_html=True,
                 )
     st.divider()
-    st.subheader("Leitura estratégica")
-    st.write("Priorize primeiro as métricas abaixo de 70. A referência do agente indica que Thumbnail + Título devem ser optimizados antes de alterações de conteúdo; Hook, Ritmo e Tráfego ficam pendentes de dados do YouTube Studio.")
+    history_tab, dashboard_tab = st.tabs(["Últimas análises", "Leitura estratégica"])
+    with dashboard_tab:
+        st.write("Priorize primeiro as métricas abaixo de 70. Thumbnail + Título devem ser optimizados antes de alterações de conteúdo; Hook, Ritmo e Tráfego ficam pendentes de dados do YouTube Studio quando não houver dados públicos.")
+    with history_tab:
+        if not records:
+            st.info("Ainda não existem análises guardadas.")
+        for record in reversed(records[-20:]):
+            row = st.columns([2, 1, 2, 1, 1.4])
+            row[0].write(f"**{record.get('channel_name', 'Canal')}**")
+            row[1].write(str(record.get("platform", "YouTube")))
+            row[2].caption(str(record.get("code", "")))
+            row[3].write(f"{record.get('overall_score', 0)}/100")
+            report_path = Path(str(record.get("report_path") or ""))
+            if report_path.is_file():
+                row[4].download_button("Análise", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", key=f"growth_history_{record.get('code')}")
 
 
 def render_dashboard():
