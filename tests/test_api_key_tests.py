@@ -138,6 +138,18 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(get.call_args.args[0], "http://localhost:8080/v1/models")
 
+    def test_kie_media_diagnostic_uses_read_only_credit_endpoint(self):
+        with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
+            result = api_key_tests.test_media_provider_card({
+                "provider": "kie_ai",
+                "api_key": "kie-secret",
+                "base_url": "https://api.kie.ai/api/v1",
+            })
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(get.call_args.args[0], "https://api.kie.ai/api/v1/chat/credit")
+        self.assertEqual(get.call_args.kwargs["headers"], {"Authorization": "Bearer kie-secret"})
+        self.assertNotIn("kie-secret", str(result))
+
     def test_heygen_media_diagnostic_uses_read_only_account_endpoint(self):
         with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:
             result = api_key_tests.test_media_provider_card({
