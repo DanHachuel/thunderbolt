@@ -7135,6 +7135,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
         with card_form:
             key_col, model_col = st.columns(2)
             refresh_clicked = False
+            authorize_clicked = False
             with key_col:
                 api_key = str(card.get("api_key") or "")
                 if definition.requires_api_key:
@@ -7231,7 +7232,12 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
         edited = dict(card)
         edited.update({"api_key": str(api_key or "").strip(), "model": str(model or "").strip(), "base_url": str(base_url or "").strip(), "enabled": bool(enabled), "supports_image": bool(supports_image), "supports_video": bool(supports_video), "priority": int(priority), **extra_values})
         cards[index] = edited
-        if refresh_clicked:
+        if authorize_clicked:
+            # Guardar as credenciais antes de o browser sair para a Canva. No
+            # callback, o código OAuth é trocado usando este card persistido.
+            _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
+            st.success("Credenciais Canva guardadas. Abra o link para autorizar.")
+        elif refresh_clicked:
             try:
                 discovered = _fetch_media_models(edited)
                 st.session_state[f"media_model_catalog_{card_id}"] = discovered
