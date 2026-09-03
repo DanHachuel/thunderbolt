@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.26
+
+Corrigida a renderização dos cards de Imagem e Video IA para os apresentar imediatamente pela ordem do campo Prioridade, fazendo o card subir ou descer na fila após ser guardado.
+
 ## 0.5.17
 
 Removidos da secção Imagem e Video IA os selectores de provider principal de imagem, provider principal de vídeo e a checkbox de pool de vídeo externo. A ordem dos pools passa a ser definida pelos campos de Prioridade nos próprios cartões.

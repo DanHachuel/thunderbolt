@@ -7285,6 +7285,7 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
     with st.expander("Imagem e Video IA", expanded=False):
         full_ia_labels = ", ".join(media_provider_definition(code).label for code in FULL_IA_VIDEO_PROVIDER_CODES)
         st.caption(f"Configure providers de imagem e vídeo em cartões independentes. O router usa apenas o pool correspondente e faz failover entre providers activos. Pool Full IA: {full_ia_labels}.")
+        cards.sort(key=lambda card: int(card.get("priority", 0)))
         for index in range(len(cards)):
             _render_media_provider_card(settings, cards, index, embedded=embedded)
         st.divider()

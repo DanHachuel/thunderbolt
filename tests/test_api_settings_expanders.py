@@ -92,6 +92,11 @@ class ApiSettingsExpandersTests(unittest.TestCase):
         self.assertNotIn('aspect_ratio', media_renderer)
         self.assertNotIn('image_size', media_renderer)
 
+    def test_media_cards_are_rendered_in_priority_order(self):
+        renderer = MAIN_SOURCE[MAIN_SOURCE.index('def render_media_provider_cards('):]
+        self.assertIn('cards.sort(key=lambda card: int(card.get("priority", 0)))', renderer)
+        self.assertLess(renderer.index('cards.sort('), renderer.index('_render_media_provider_card('))
+
     def test_llm_card_uses_priority_instead_of_primary_checkbox(self):
         llm_renderer = MAIN_SOURCE[MAIN_SOURCE.index('def _render_llm_card('):MAIN_SOURCE.index('def render_llm_provider_cards(')]
         self.assertIn('st.number_input(', llm_renderer)
