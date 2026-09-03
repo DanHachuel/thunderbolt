@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from hermes_ui.canva_mcp_workflow import run_direct_canva_thumbnail
+from hermes_ui.canva_mcp_workflow import _design_id, run_direct_canva_thumbnail
 
 
 def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_path: Path):
@@ -63,3 +63,27 @@ def test_direct_workflow_requires_search_result(tmp_path: Path):
             assert "não encontrou designs" in str(exc)
         else:
             raise AssertionError("O fluxo deveria falhar sem resultado de pesquisa")
+
+
+def test_design_id_accepts_canva_mcp_identifier_variants():
+    assert _design_id({"design_id": "D-1"}) == "D-1"
+    assert _design_id({"designId": "D-2"}) == "D-2"
+    assert _design_id({"design": {"id": "D-3"}}) == "D-3"
+
+
+def test_direct_workflow_skips_search_result_without_id(tmp_path: Path):
+    client = Mock()
+    client.tools.return_value = [{"name": "search-designs"}]
+    client.call.return_value = {
+        "structuredContent": {"items": [{"title": "sem id"}, {"design_id": "D-456"}]}
+    }
+    with patch("hermes_ui.canva_mcp_workflow.CanvaMCPClient") as factory:
+        factory.return_value.__enter__.return_value = client
+        try:
+            run_direct_canva_thumbnail(
+                title="Teste", topic="", prompt="prompt",
+                blueprint={"id": "bp", "content": "rules"},
+                destination=tmp_path / "thumb.png", width=1280, height=720,
+            )
+        except Exception as exc:
+            assert "não devolveu o ID do design" not in str(exc)

@@ -30,7 +30,27 @@ def _items(value: Any) -> list[dict[str, Any]]:
         for key in ("items", "designs", "results"):
             if isinstance(value.get(key), list):
                 return [dict(item) for item in value[key] if isinstance(item, Mapping)]
+        for key in ("data", "result", "response"):
+            if isinstance(value.get(key), (Mapping, list)):
+                nested = _items(value[key])
+                if nested:
+                    return nested
     return []
+
+
+def _design_id(value: Any) -> str:
+    """Extract a Canva design identifier from REST/MCP result variants."""
+    if isinstance(value, Mapping):
+        for key in ("design_id", "designId", "id"):
+            candidate = str(value.get(key) or "").strip()
+            if candidate:
+                return candidate
+        for key in ("design", "resource", "data"):
+            if isinstance(value.get(key), Mapping):
+                found = _design_id(value[key])
+                if found:
+                    return found
+    return ""
 
 
 def _first_id(value: Any, keys: tuple[str, ...]) -> str:
@@ -102,8 +122,8 @@ def run_direct_canva_thumbnail(
         candidates = _items(result)
         if not candidates:
             raise CanvaMCPError("Canva não encontrou designs para as palavras-chave da thumbnail.")
-        selected = candidates[0]
-        design_id = str(selected.get("id") or "").strip()
+        selected = next((candidate for candidate in candidates if _design_id(candidate)), candidates[0])
+        design_id = _design_id(selected)
         if not design_id:
             raise CanvaMCPError("A pesquisa Canva devolveu um design sem ID.")
 
