@@ -39,6 +39,11 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('const persistedHashMatches = hashMatches || markerHash === currentHash;', source)
         self.assertIn('"yt_dlp", "youtube_transcript_api"', source)
 
+    def test_npx_storage_migration_is_one_time(self):
+        source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")
+        self.assertIn('npx-storage-migration-v1.json', source)
+        self.assertIn('if (existsSync(migrationMarker)) return;', source)
+
     def test_required_commands_remain_documented_without_extra_flags(self):
         source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
         self.assertIn('args[0] === "install"', source)

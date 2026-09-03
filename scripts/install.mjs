@@ -216,6 +216,8 @@ function legacyNpxPackageRoots() {
 
 function migrateLegacyNpxStorage() {
   const targetStorage = join(thunderboltHome, "storage");
+  const migrationMarker = join(targetStorage, "state", "npx-storage-migration-v1.json");
+  if (existsSync(migrationMarker)) return;
   const candidates = legacyNpxPackageRoots();
   let mergedFiles = 0;
   for (const candidate of candidates) {
@@ -223,6 +225,8 @@ function migrateLegacyNpxStorage() {
     mergedFiles += mergeLegacyStorage(candidate);
   }
   if (mergedFiles > 0) console.log(`Dados locais recuperados do cache npm para ${targetStorage} (${mergedFiles} ficheiro(s) unido(s)).`);
+  mkdirSync(dirname(migrationMarker), { recursive: true });
+  writeFileSync(migrationMarker, JSON.stringify({ version: 1, migrated_at: new Date().toISOString() }) + "\n", "utf8");
 }
 
 function copyOrMove(source, target, label) {
