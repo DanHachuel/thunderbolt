@@ -37,6 +37,7 @@ class LlmProviderDefinition:
     supports_model_discovery: bool = True
     extra_fields: tuple[str, ...] = ()
     description: str = ""
+    excluded_from_normal_pool: bool = False
 
 
 # Só estão aqui providers que o adaptador OpenAI-compatible existente consegue
@@ -49,6 +50,15 @@ LLM_PROVIDER_CATALOG: tuple[LlmProviderDefinition, ...] = (
         show_base_url=True,
         default_base_url=DEFAULT_NVIDIA_NIM_BASE_URL,
         description="OpenAI ou NVIDIA NIM através do protocolo OpenAI-compatible.",
+    ),
+    LlmProviderDefinition(
+        "nvidia_nim_paligemma",
+        "OpenAI / NVIDIA NIM (Paligemma)",
+        show_base_url=True,
+        default_base_url="https://integrate.api.nvidia.com/v1",
+        supports_model_discovery=False,
+        excluded_from_normal_pool=True,
+        description="Provider exclusivo do Analista Growth YouTube para análise visual de thumbnails.",
     ),
     LlmProviderDefinition("openrouter", "OpenRouter", default_base_url="https://openrouter.ai/api/v1"),
     LlmProviderDefinition("moonshot", "Moonshot / Kimi", default_base_url="https://api.moonshot.ai/v1"),

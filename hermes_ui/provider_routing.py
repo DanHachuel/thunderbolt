@@ -283,7 +283,9 @@ def enabled_cards(settings: Mapping[str, Any], pool: str) -> list[dict[str, Any]
         enabled = [
             (index, card)
             for index, card in enumerate(cards)
-            if bool(card.get("enabled", True)) and not bool(card.get("telegram_llm", False))
+            if bool(card.get("enabled", True))
+            and not bool(card.get("telegram_llm", False))
+            and not provider_definition(card.get("provider")).excluded_from_normal_pool
         ]
         enabled.sort(key=lambda pair: (int(pair[1].get("priority", 1)), pair[0]))
         return [card for _index, card in enabled]
