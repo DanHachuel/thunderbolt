@@ -656,6 +656,19 @@ def render_channel_thumbnail_blueprint_panel(channel: dict, *, compact: bool = F
         st.info(f"**Thumbnail Blueprint utilizado pelo canal:** {name} · apenas leitura")
 
 
+def render_tiktok_prompt_master_panel(channel: dict, *, compact: bool = False) -> None:
+    """Mostrar a configuração editorial TikTok sem exigir um Blueprint YouTube."""
+    prompt_id = str(channel.get("default_prompt_master") or channel.get("prompt_master") or "").strip()
+    _prompt_ids, prompt_labels = _tiktok_prompt_options()
+    prompt_name = prompt_labels.get(prompt_id, prompt_id)
+    if not prompt_id:
+        st.warning("**SEM PROMPT MASTER CONFIGURADO** · configure um Prompt Master padrão na aba Canais Tiktok.")
+    elif compact:
+        st.caption(f"**Prompt Master TikTok:** {prompt_name}")
+    else:
+        st.info(f"**Prompt Master utilizado pelo canal TikTok:** {prompt_name} · `{prompt_id}`")
+
+
 def creative_payload_from_result(channel: dict, topic: str, creative: dict, topic_source: str = "manual") -> dict[str, Any]:
     variant = creative.get("thumbnail_variant") or {}
     return {
@@ -3039,9 +3052,12 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 else:
                     selected_one = st.selectbox("Canal", active_channels, format_func=lambda c: c["name"], key=f"{prefix}_channel")
                     selected = [selected_one["id"]]
-                    # Intentionally sits between Canal and the generation settings, as requested.
-                    render_channel_blueprint_panel(selected_one)
-                    render_channel_thumbnail_blueprint_panel(selected_one)
+                    # YouTube uses Blueprints; TikTok Shorts use the channel Prompt Master.
+                    if channel_platform == "tiktok":
+                        render_tiktok_prompt_master_panel(selected_one)
+                    else:
+                        render_channel_blueprint_panel(selected_one)
+                        render_channel_thumbnail_blueprint_panel(selected_one)
                     generation_settings = render_video_generation_settings(
                         prefix,
                         current_language=str(st.session_state.get("video_language") or ""),
