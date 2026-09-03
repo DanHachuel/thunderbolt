@@ -166,7 +166,11 @@ def test_supabase_tutorial_is_packaged_and_added_to_ai_influencers():
     assert 'guide-supabase.md' in MAIN_SOURCE
 
 
-def test_growth_pages_are_empty_placeholders():
+def test_growth_pages_keep_other_placeholders_and_render_youtube_auditor():
+    assert 'def render_growth_youtube():' in MAIN_SOURCE
+    assert '"Analista Growth Youtube": render_growth_youtube' in MAIN_SOURCE
+    assert 'Canal a analisar' in MAIN_SOURCE
+    assert 'Nota geral do canal' in MAIN_SOURCE
     assert '("Analista Facebook Pages", ":material/analytics:", "Analista Facebook Pages")' in MAIN_SOURCE
     assert '("Analista Bilibili", ":material/analytics:", "Analista Bilibili")' in MAIN_SOURCE
     assert '"Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", "")' in MAIN_SOURCE
