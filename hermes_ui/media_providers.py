@@ -22,6 +22,7 @@ FULL_IA_VIDEO_PROVIDER_CODES = (
     "huggingface",
     "inferenceport",
     "heygen",
+    "openrouter",
 )
 
 # Mantidos internamente para preservar compatibilidade e controlar o prompt dos providers.
@@ -164,6 +165,16 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
         api_style="heygen",
         extra_fields=("avatar_id", "voice_id"),
         description="Vídeos com avatar, script ou áudio pela API V3 da HeyGen.",
+    ),
+    MediaProviderDefinition(
+        "openrouter",
+        "OpenRouter",
+        default_base_url="https://openrouter.ai/api/v1",
+        supports_image=True,
+        supports_video=True,
+        supports_text=True,
+        api_style="openrouter",
+        description="Gateway unificado para modelos de geração de imagem e vídeo via APIs dedicadas do OpenRouter.",
     ),
 )
 

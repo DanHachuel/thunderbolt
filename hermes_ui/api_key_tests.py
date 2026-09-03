@@ -15,6 +15,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 import requests
 
 from app.modules.niche_finder.apify import APIFY_API_BASE
+from integrations.openai_model_discovery import OpenAICompatibleAPIError, validate_openrouter_api_key
 
 DEFAULT_TIMEOUT = 20
 
@@ -176,6 +177,12 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
         return _get(f"{base_url}/v3/users/me", headers={"X-Api-Key": api_key})
     if not model and provider not in {"inferenceport", "cloudflare_workers_ai", "heygen"}:
         return _result("missing", "Complete o modelo antes de testar.")
+    if provider == "openrouter":
+        try:
+            validate_openrouter_api_key(api_key, base_url, model)
+        except OpenAICompatibleAPIError as exc:
+            return _result("error", str(exc)[:240])
+        return _result("success", "OpenRouter API Key e modelo OK")
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     if provider == "cloudflare_workers_ai":
         account_id = str(source.get("account_id") or "").strip()
