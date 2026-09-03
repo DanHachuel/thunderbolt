@@ -43,7 +43,9 @@ def test_report_contains_metrics_and_downloadable_video_summary(tmp_path):
     }
     report = growth_youtube._report_markdown(record)
     assert "CHANNEL AUDIT REPORT: Canal Teste" in report
-    assert "Qualidade do título" in report
+    assert "**Título**" in report
+    assert "Projecção financeira e contexto" in report
+    assert "Estratégia de longo prazo" in report
     assert "Título / teste" in report
 
 
@@ -53,9 +55,10 @@ def test_paligemma_payload_is_isolated_and_uses_bearer(tmp_path):
     response = Mock(status_code=200)
     response.raise_for_status.return_value = None
     response.json.return_value = {"choices": [{"message": {"content": '{"score": 82, "diagnosis": "Boa"}'}}]}
-    card = {"api_key": "secret", "base_url": "https://integrate.api.nvidia.com/v1", "model": "google/paligemma"}
+    card = {"api_key": "secret", "base_url": "https://ai.api.nvidia.com/v1/vlm/google/paligemma", "model": "google/paligemma"}
     with patch("hermes_ui.growth_youtube.requests.post", return_value=response) as post:
         result = growth_youtube.analyse_thumbnail_with_paligemma(str(image), card)
     assert result["score"] == 82
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
     assert post.call_args.kwargs["json"]["model"] == "google/paligemma"
+    assert post.call_args.args[0] == "https://ai.api.nvidia.com/v1/vlm/google/paligemma"
