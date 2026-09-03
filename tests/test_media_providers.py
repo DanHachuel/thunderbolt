@@ -11,6 +11,16 @@ from hermes_ui.provider_routing import POOL_IMAGE, RoutedResponse
 
 
 class MediaProvidersTests(unittest.TestCase):
+    def test_media_pool_order_uses_card_priority_not_legacy_active_selection(self):
+        settings = {
+            "media_provider_cards": [
+                {"id": "slow", "provider": "pollinations", "priority": 2, "supports_image": True, "enabled": True},
+                {"id": "first", "provider": "agnes", "priority": 1, "supports_image": True, "enabled": True},
+            ],
+            "media_image_active_card_id": "slow",
+        }
+        self.assertEqual([card["id"] for card in media_providers.media_cards_for_pool(settings, "image")], ["first", "slow"])
+
     def test_catalog_contains_requested_current_providers_and_excludes_deprecated_names(self):
         codes = {item["code"] for item in media_providers.media_provider_catalog()}
         self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai", "heygen", "openrouter"}.issubset(codes))
