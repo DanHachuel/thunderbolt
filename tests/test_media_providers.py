@@ -56,6 +56,27 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "image")], ["priority-image", "active-image"])
         self.assertEqual([item["id"] for item in media_providers.media_cards_for_pool(settings, "video")], ["video"])
 
+    def test_media_cards_are_reordered_by_priority_when_migrated_or_saved(self):
+        settings = {
+            "media_provider_cards": [
+                {"id": "second", "provider": "pollinations", "supports_image": True, "priority": 2},
+                {"id": "first", "provider": "nano_banana", "supports_image": True, "priority": 1},
+            ]
+        }
+        migrated, changed = media_providers.ensure_media_provider_cards(settings)
+        self.assertTrue(changed)
+        self.assertEqual([item["id"] for item in migrated[media_providers.MEDIA_CARDS_KEY]], ["first", "second"])
+
+        saved = media_providers.apply_media_provider_cards_to_settings(
+            {},
+            [
+                {"id": "third", "provider": "pollinations", "supports_image": True, "priority": 3},
+                {"id": "first", "provider": "nano_banana", "supports_image": True, "priority": 1},
+                {"id": "second", "provider": "agnes", "supports_image": True, "priority": 2},
+            ],
+        )
+        self.assertEqual([item["id"] for item in saved[media_providers.MEDIA_CARDS_KEY]], ["first", "second", "third"])
+
     def test_openai_compatible_image_base64_is_saved(self):
         encoded = base64.b64encode(b"image").decode("ascii")
         card = {
