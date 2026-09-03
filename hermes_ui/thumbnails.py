@@ -260,7 +260,26 @@ def generate_thumbnail_for_task(
         raise ThumbnailGenerationError("A thumbnail não tem um prompt de imagem para gerar.")
     _archive_image(str(task_id), record.get("image_path"))
     visual_prompt = record["prompt"]
-    rules = str((thumbnail_blueprint or {}).get("content") or "").strip()
+    effective_blueprint = dict(thumbnail_blueprint or {})
+    configured_cards = settings.get("media_provider_cards", []) if isinstance(settings, dict) else []
+    canva_selected = any(
+        isinstance(item, dict)
+        and str(item.get("provider") or "").lower() == "canva"
+        and bool(item.get("enabled", True))
+        for item in configured_cards
+    ) if isinstance(configured_cards, list) else False
+    if not effective_blueprint and canva_selected:
+        channels = read_json("channels.json", [])
+        channel = next(
+            (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == record["channel_id"]),
+            {},
+        ) if isinstance(channels, list) else {}
+        effective_blueprint = thumbnail_blueprint_for_channel(
+            {**channel, "thumbnail_blueprint_id": record["thumbnail_blueprint_id"] or channel.get("thumbnail_blueprint_id", "")}
+        )
+    rules = str(effective_blueprint.get("content") or "").strip()
+    if canva_selected and not rules:
+        raise ThumbnailGenerationError("A tarefa não tem um Thumbnail Blueprint local válido.")
     if rules:
         visual_prompt = f"{visual_prompt}\n\nTHUMBNAIL BLUEPRINT — FOLLOW THESE VISUAL RULES:\n{rules}"
     image_path = _generate_image_with_pool(
