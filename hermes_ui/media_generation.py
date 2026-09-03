@@ -83,6 +83,7 @@ def format_media_generation_error(exc: MediaGenerationError, *, operation: str =
 
 AGNES_IMAGE_MODEL = "agnes-image-2.1-flash"
 AGNES_IMAGE_TIMEOUT_SECONDS = 120
+AGNES_MAX_PROMPT_CHARS = 9500
 
 
 def _api_key(card: Mapping[str, Any]) -> str:
@@ -107,6 +108,17 @@ def _headers(card: Mapping[str, Any], *, fal: bool = False) -> dict[str, str]:
         else:
             headers["Authorization"] = f"Key {key}" if fal else f"Bearer {key}"
     return headers
+
+
+def _fit_provider_prompt(prompt: str, provider: str) -> str:
+    """Keep provider-specific prompt limits from turning a thumbnail into a 400."""
+    text = str(prompt or "").strip()
+    if provider != "agnes" or len(text) <= AGNES_MAX_PROMPT_CHARS:
+        return text
+    # Keep both the visual brief and the mandatory lettering layer at the end.
+    tail_size = min(1800, AGNES_MAX_PROMPT_CHARS // 4)
+    head_size = AGNES_MAX_PROMPT_CHARS - tail_size - 80
+    return f"{text[:head_size].rstrip()}\n\n[Prompt longo resumido para o limite Agnes AI.]\n\n{text[-tail_size:].lstrip()}"
 
 
 def _append_generation_constraints(
@@ -298,6 +310,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         aspect_ratio="16:9",
         size=requested_size,
     )
+    constrained_prompt = _fit_provider_prompt(constrained_prompt, provider)
     if style == "cloudflare":
         return requests.post(endpoint, headers=_headers(card), json={"prompt": constrained_prompt}, timeout=180)
     if style == "fal_queue":
