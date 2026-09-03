@@ -232,6 +232,12 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
         result["thumbnail_width"] = raw_width if raw_width in {"1280", "1792"} else "1280"
         result["thumbnail_height"] = raw_height if raw_height in {"720", "1024"} else ("1024" if result["thumbnail_width"] == "1792" else "720")
         result["oauth_token"] = dict(source.get("oauth_token") or {}) if isinstance(source.get("oauth_token"), Mapping) else {}
+        pending = source.get("oauth_pending")
+        if isinstance(pending, Mapping) and pending.get("state") and pending.get("code_verifier"):
+            result["oauth_pending"] = {
+                "state": str(pending.get("state")),
+                "code_verifier": str(pending.get("code_verifier")),
+            }
     if provider == "nano_banana":
         result["aspect_ratio"] = str(source.get("aspect_ratio") or INTERNAL_IMAGE_ASPECT_RATIO).strip()
         result["image_size"] = str(source.get("image_size") or INTERNAL_IMAGE_SIZE).strip()

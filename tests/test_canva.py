@@ -106,3 +106,12 @@ def test_canva_authorization_persists_credentials_before_callback():
     assert 'if authorize_clicked:' in canva_block
     assert '_persist_media_cards(settings, cards' in canva_block
     assert canva_block.index('if authorize_clicked:') < canva_block.index('elif refresh_clicked:')
+
+
+def test_canva_oauth_transaction_survives_streamlit_session_refresh():
+    source = Path("app/main.py").read_text(encoding="utf-8")
+    providers = Path("hermes_ui/media_providers.py").read_text(encoding="utf-8")
+    assert 'oauth_pending.get("state")' in source
+    assert 'oauth_pending.get("code_verifier")' in source
+    assert 'extra_values["oauth_pending"]' in source
+    assert 'result["oauth_pending"]' in providers
