@@ -8644,7 +8644,7 @@ def main():
         "Início": render_dashboard,
         "Pipeline Vídeos": render_pipeline,
         "Criação de Vídeos": render_new_video,
-        "Criação de Shorts": lambda: render_new_video("Criação de Shorts", "new_shorts", channel_platform="youtube", fixed_aspect_ratio="Portrait 9:16"),
+        "Criação de Shorts": lambda: render_new_video("Criação de Shorts", "new_shorts", channel_platform="tiktok", fixed_aspect_ratio="Portrait 9:16"),
         "Backlog Vídeos": render_videos,
         "Criação de Músicas": render_music_creation,
         "Music Backlog": render_music_backlog,
