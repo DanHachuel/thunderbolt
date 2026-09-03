@@ -71,9 +71,24 @@ def _download_thumbnail(video: Mapping[str, Any], directory: Path) -> str:
     directory.mkdir(parents=True, exist_ok=True)
     destination = directory / f"{video['id']}.jpg"
     if not destination.exists():
-        response = requests.get(str(video.get("thumbnail_url") or ""), timeout=30)
-        response.raise_for_status()
-        destination.write_bytes(response.content)
+        try:
+            import yt_dlp
+            options = {
+                "quiet": True,
+                "skip_download": True,
+                "writethumbnail": True,
+                "outtmpl": str(directory / f"{video['id']}.%(ext)s"),
+                "noplaylist": True,
+            }
+            with yt_dlp.YoutubeDL(options) as downloader:
+                downloader.download([str(video.get("url") or f"https://www.youtube.com/watch?v={video['id']}")])
+            generated = next(directory.glob(f"{video['id']}.*"), None)
+            if generated and generated != destination:
+                generated.replace(destination)
+        except Exception as exc:
+            raise RuntimeError(f"Não foi possível baixar a thumbnail {video['id']} com yt-dlp: {exc}") from exc
+    if not destination.exists():
+        raise RuntimeError(f"yt-dlp não gerou a thumbnail do vídeo {video['id']}.")
     return str(destination)
 
 
@@ -145,7 +160,9 @@ def _vision_prompt(video: Mapping[str, Any]) -> str:
 
 def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict[str, Any]:
     key = str(card.get("api_key") or "").strip()
-    base = str(card.get("base_url") or "https://integrate.api.nvidia.com/v1").rstrip("/")
+    base = str(card.get("base_url") or "https://ai.api.nvidia.com/v1/vlm/google/paligemma").rstrip("/")
+    if base.endswith("/v1"):
+        base = f"{base}/vlm/google/paligemma"
     model = str(card.get("model") or "google/paligemma").strip()
     if not key:
         return {"score": 50, "diagnosis": "API key NVIDIA NIM Paligemma não configurada.", "status": "sem_dados"}
@@ -154,7 +171,7 @@ def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict
         {"type": "text", "text": "Evaluate this thumbnail for YouTube Growth. Return JSON with score, diagnosis, contrast, mobile_readability, text_words, hierarchy, emotion, overlap_risk."},
         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{data}"}},
     ]}], "max_tokens": 500, "temperature": 0.1}
-    response = requests.post(f"{base}/chat/completions", headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, json=payload, timeout=120)
+    response = requests.post(base, headers={"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}, json=payload, timeout=120)
     response.raise_for_status()
     content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
     match = re.search(r"\{.*\}", str(content), flags=re.S)
@@ -165,13 +182,14 @@ def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict
 
 
 def _report_markdown(record: Mapping[str, Any]) -> str:
-    lines = [f"# CHANNEL AUDIT REPORT: {record.get('channel_name', 'Canal')}", "", f"- Código: `{record.get('code')}`", f"- Plataforma: YouTube", f"- Data: {record.get('created_at')}", f"- Nota geral: **{record.get('overall_score', 0)}/100**", "", "## Diagnóstico por métrica", "", "| Métrica | Nota | Evidência | Diagnóstico |", "|---|---:|---|---|"]
+    lines = [f"# CHANNEL AUDIT REPORT: {record.get('channel_name', 'Canal')}", "", f"- Código: `{record.get('code')}`", "- Plataforma: YouTube", f"- Data: {record.get('created_at')}", f"- Nota geral: **{record.get('overall_score', 0)}/100**", "", "## 1. Projecção financeira e contexto", "", "A análise pública não expõe RPM, país da audiência nem horas de visualização. O relatório não inventa estes valores. Para referência do agente, o YPP usa 1.000 inscritos e 4.000 horas de vídeos longos em 12 meses ou 10 milhões de visualizações de Shorts em 90 dias até 31/01/2027; a partir de 01/02/2027 a meta de Shorts indicada pelo agente é 20 milhões.", "", "## 2. Resumo do diagnóstico", "", "| Pilar | Nota | Métrica observada | Resultado |", "|---|---:|---|---|"]
+    pillar_names = {"Demanda validada": "Demanda", "Qualidade da thumbnail": "Thumbnail", "Qualidade do título": "Título", "Hook — retenção inicial": "Hook", "Ritmo e edição": "Pacing", "Origem do tráfego": "Tráfego", "Conversão em inscritos": "CTA", "Cadência de publicação": "Cadência"}
     for metric in record.get("metrics", []):
-        lines.append(f"| {metric['label']} | {metric['score']}/100 | {metric['value']} | {metric['diagnosis']} |")
-    lines += ["", "## Últimos 10 vídeos", "", "| Título | Visualizações | Thumbnail | Transcrição | Nota do título |", "|---|---:|---|---|---:|"]
+        lines.append(f"| **{pillar_names.get(metric['label'], metric['label'])}** | {metric['score']}/100 | {metric['value']} | {metric['diagnosis']} |")
+    lines += ["", "## 3. Últimos 10 vídeos", "", "| Título | Visualizações | Thumbnail | Transcrição | Nota do título |", "|---|---:|---|---|---:|"]
     for video in record.get("videos", []):
         lines.append(f"| {video.get('title', '').replace('|', '/')} | {video.get('view_count', 0):,} | {video.get('thumbnail_status', '')} | {video.get('transcript_status', '')} | {video.get('title_score', 0)}/100 |")
-    lines += ["", "## Top 3 prioridades", "", "1. Melhorar primeiro thumbnails e títulos abaixo de 70, aumentando contraste e reduzindo texto.", "2. Reforçar o hook inicial com o resultado ou promessa nos primeiros segundos.", "3. Introduzir CTA contextual e pattern interrupts ao longo do vídeo.", "", "## Limitações", "", "CTR, retenção real, origem de tráfego, RPM e horas de visualização exigem dados autorizados do YouTube Studio e não são inventados a partir da página pública."]
+    lines += ["", "## 4. Actionable Roadmap — Top 3 prioridades", "", "1. **REMAKE THUMBNAILS** dos vídeos abaixo de 70: aumentar contraste, sujeito claro, emoção forte e máximo de três palavras legíveis no telemóvel.", "2. **REWRITE TITLES** com Curiosity, Clarity e Urgency; colocar a keyword principal no início e usar números/adjectivos de poder quando forem verdadeiros.", "3. **EDIT HOOK**: começar pelo resultado, promessa ou estatística forte e introduzir pattern interrupts a cada 5–8 segundos.", "", "## 5. Estratégia de longo prazo", "", "Construir uma biblioteca de pelo menos 50 vídeos evergreen, publicar com cadência semanal fixa e procurar que Browse Features se torne a principal origem de tráfego. Para um criador solo, consistência supera frequência; melhorar Thumbnail + Título antes de alterar a produção.", "", "## Limitações", "", "CTR, retenção real, origem de tráfego, RPM e horas de visualização exigem dados autorizados do YouTube Studio e não são inventados a partir da página pública."]
     return "\n".join(lines) + "\n"
 
 
@@ -184,15 +202,32 @@ def run_audit(channel: Mapping[str, Any], settings: Mapping[str, Any], *, vision
     if not channel_url:
         raise RuntimeError("O canal seleccionado não tem URL pública ou handle YouTube.")
     notify("A buscar o canal e os 10 vídeos mais recentes…")
-    videos = _public_videos(channel_url, 10)
+    try:
+        videos = _public_videos(channel_url, 10)
+    except Exception as exc:
+        failed = {"code": code, "channel_id": str(channel.get("id") or ""), "channel_name": str(channel.get("name") or "Canal"), "platform": "YouTube", "created_at": datetime.now(timezone.utc).isoformat(), "status": "failed", "error": str(exc)[:500]}
+        analyses = read_json(ANALYSES_FILENAME, [])
+        if not isinstance(analyses, list): analyses = []
+        analyses.append(failed)
+        write_json(ANALYSES_FILENAME, analyses[-100:])
+        raise
     if not videos:
-        raise RuntimeError("Não foram encontrados vídeos públicos no canal seleccionado.")
+        failed = {"code": code, "channel_id": str(channel.get("id") or ""), "channel_name": str(channel.get("name") or "Canal"), "platform": "YouTube", "created_at": datetime.now(timezone.utc).isoformat(), "status": "failed", "error": "Não foram encontrados vídeos públicos no canal seleccionado."}
+        analyses = read_json(ANALYSES_FILENAME, [])
+        if not isinstance(analyses, list): analyses = []
+        analyses.append(failed)
+        write_json(ANALYSES_FILENAME, analyses[-100:])
+        raise RuntimeError(failed["error"])
     title_scores: list[int] = []
     transcript_scores: list[int] = []
     for index, video in enumerate(videos, 1):
         notify(f"A analisar vídeo {index}/{len(videos)}…")
-        video["thumbnail_path"] = _download_thumbnail(video, root / "thumbnails")
-        video["thumbnail_status"] = "baixada"
+        try:
+            video["thumbnail_path"] = _download_thumbnail(video, root / "thumbnails")
+            video["thumbnail_status"] = "baixada"
+        except Exception as exc:
+            video["thumbnail_path"] = ""
+            video["thumbnail_status"] = f"erro: {str(exc)[:120]}"
         text, status = _transcript(str(video["id"]))
         video["transcript_status"] = status
         video["transcript_path"] = str(root / "transcripts" / f"{video['id']}.txt")
@@ -202,7 +237,7 @@ def run_audit(channel: Mapping[str, Any], settings: Mapping[str, Any], *, vision
         video["transcript_score"], video["transcript_diagnosis"] = _analyse_transcript_with_llm(text, settings)
         title_scores.append(video["title_score"])
         transcript_scores.append(video["transcript_score"])
-        if vision_card:
+        if vision_card and video.get("thumbnail_path"):
             try: video["vision"] = analyse_thumbnail_with_paligemma(video["thumbnail_path"], vision_card)
             except Exception as exc: video["vision"] = {"score": 50, "status": "erro", "diagnosis": str(exc)[:220]}
         else: video["vision"] = {"score": 50, "status": "sem_dados", "diagnosis": "Provider Paligemma não configurado."}

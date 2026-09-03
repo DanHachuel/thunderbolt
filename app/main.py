@@ -1563,14 +1563,17 @@ def render_growth_youtube():
         if not records:
             st.info("Ainda não existem análises guardadas.")
         for record in reversed(records[-20:]):
-            row = st.columns([2, 1, 2, 1, 1.4])
+            row = st.columns([2, 1, 2.2, 1.2, 1, 1.4])
             row[0].write(f"**{record.get('channel_name', 'Canal')}**")
             row[1].write(str(record.get("platform", "YouTube")))
             row[2].caption(str(record.get("code", "")))
-            row[3].write(f"{record.get('overall_score', 0)}/100")
+            row[3].caption(str(record.get("created_at", "")).replace("T", " ")[:19])
+            row[4].write(f"{record.get('overall_score', '—')}/100" if record.get("overall_score") is not None else "—")
             report_path = Path(str(record.get("report_path") or ""))
             if report_path.is_file():
-                row[4].download_button("Análise", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", key=f"growth_history_{record.get('code')}")
+                row[5].download_button("Análise", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", key=f"growth_history_{record.get('code')}")
+            elif record.get("status") == "failed":
+                row[5].caption("Falhou")
 
 
 def render_dashboard():
