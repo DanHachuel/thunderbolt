@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 from integrations.openai_model_discovery import (
     OpenAICompatibleAPIError,
     chat_completions_endpoint,
+    fetch_replicate_models,
     models_endpoint,
     validate_openai_compatible_api_key,
     validate_openrouter_api_key,
@@ -13,6 +14,24 @@ from integrations.openai_model_discovery import (
 
 
 class OpenAICompatibleApiValidationTests(TestCase):
+    def test_replicate_catalog_uses_native_results_endpoint_and_latest_version(self) -> None:
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "results": [
+                {"owner": "black-forest-labs", "name": "flux", "latest_version": {"id": "version-123"}},
+                {"owner": "missing", "name": "no-version", "latest_version": None},
+            ]
+        }
+        with patch("integrations.openai_model_discovery.requests.get", return_value=response) as get:
+            models = fetch_replicate_models("r8_secret", "https://api.replicate.com/v1")
+
+        self.assertEqual(models, ["black-forest-labs/flux:version-123"])
+        get.assert_called_once_with(
+            "https://api.replicate.com/v1/models",
+            headers={"Accept": "application/json", "Authorization": "Bearer r8_secret"},
+            timeout=12,
+        )
+
     def test_openrouter_base_url_builds_official_endpoints_without_query_suffix(self) -> None:
         base_url = "https://openrouter.ai/api/v1?"
 

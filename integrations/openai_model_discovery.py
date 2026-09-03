@@ -208,3 +208,53 @@ def fetch_openai_compatible_models(
     except ValueError as exc:
         raise ModelDiscoveryError("O endpoint devolveu uma resposta que não é JSON.") from exc
     return normalize_model_ids(payload)
+
+
+def fetch_replicate_models(
+    api_key: str,
+    base_url: str,
+    *,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> list[str]:
+    """Fetch Replicate model slugs with their latest version IDs.
+
+    Replicate is not OpenAI-compatible: its catalog uses ``results`` rather
+    than ``data`` and the latest version ID is required by predictions.
+    """
+    token = str(api_key or "").strip()
+    if not token:
+        raise ModelDiscoveryError("Informe a API key Replicate antes de consultar os modelos.")
+    base = _normalise_http_base_url(base_url, error_type=ModelDiscoveryError)
+    endpoint = base if base.endswith("/models") else f"{base}/models"
+    try:
+        response = requests.get(
+            endpoint,
+            headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise ModelDiscoveryError(f"Não foi possível consultar {endpoint}: {exc}") from exc
+    if response.status_code >= 400:
+        if response.status_code in (401, 403):
+            raise ModelDiscoveryError(f"O endpoint Replicate recusou a API key (HTTP {response.status_code}).")
+        raise ModelDiscoveryError(f"O endpoint Replicate devolveu HTTP {response.status_code}.")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise ModelDiscoveryError("O endpoint Replicate devolveu uma resposta que não é JSON.") from exc
+    entries = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ModelDiscoveryError("A resposta Replicate não tem uma lista results válida.")
+    models: set[str] = set()
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        owner = str(item.get("owner") or "").strip()
+        name = str(item.get("name") or "").strip()
+        latest = item.get("latest_version")
+        version = str(latest.get("id") or "").strip() if isinstance(latest, dict) else ""
+        if owner and name and version:
+            models.add(f"{owner}/{name}:{version}")
+    if not models:
+        raise ModelDiscoveryError("O endpoint Replicate não devolveu modelos com versão disponível.")
+    return sorted(models, key=str.casefold)[:MAX_MODEL_IDS]
