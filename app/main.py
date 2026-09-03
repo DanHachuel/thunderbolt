@@ -7285,22 +7285,6 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
     with st.expander("Imagem e Video IA", expanded=False):
         full_ia_labels = ", ".join(media_provider_definition(code).label for code in FULL_IA_VIDEO_PROVIDER_CODES)
         st.caption(f"Configure providers de imagem e vídeo em cartões independentes. O router usa apenas o pool correspondente e faz failover entre providers activos. Pool Full IA: {full_ia_labels}.")
-        image_cards = [card for card in cards if card.get("supports_image")]
-        video_cards = [card for card in cards if card.get("supports_video")]
-        selector_cols = st.columns(3)
-        image_options = [""] + [str(card.get("id")) for card in image_cards]
-        video_options = [""] + [str(card.get("id")) for card in video_cards]
-        with selector_cols[0]:
-            image_active_id = st.selectbox("Provider principal de imagem", image_options, index=image_options.index(str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or "")) if str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or "") in image_options else 0, format_func=lambda value: "Automático / primeiro activo" if not value else next((media_provider_definition(card.get("provider")).label for card in image_cards if str(card.get("id")) == value), value), key="media_image_active_selector")
-        with selector_cols[1]:
-            video_active_id = st.selectbox("Provider principal de vídeo", video_options, index=video_options.index(str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "")) if str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or "") in video_options else 0, format_func=lambda value: "Não usar pool externo" if not value else next((media_provider_definition(card.get("provider")).label for card in video_cards if str(card.get("id")) == value), value), key="media_video_active_selector")
-        with selector_cols[2]:
-            video_pool_enabled = st.checkbox("Usar pool de vídeo externo", value=bool(settings.get("media_video_pool_enabled", False)), key="media_video_pool_enabled_ui")
-        if st.button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection") if not embedded else st.form_submit_button("Salvar selecção dos pools", use_container_width=True, key="save_media_pool_selection"):
-            settings["media_video_pool_enabled"] = bool(video_pool_enabled)
-            _persist_media_cards(settings, cards, image_active_id, video_active_id)
-            st.success("Selecção dos pools guardada.")
-            st.rerun()
         for index in range(len(cards)):
             _render_media_provider_card(settings, cards, index, embedded=embedded)
         st.divider()
@@ -7310,7 +7294,7 @@ def render_media_provider_cards(settings: dict[str, Any], *, embedded: bool = Fa
         add_clicked = st.form_submit_button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card") if embedded else st.button("Adicionar provider de imagem/vídeo", use_container_width=True, key="add_media_provider_card")
         if add_clicked:
             cards.append(new_media_card(provider_to_add, card_id=f"media-{provider_to_add}-{uuid.uuid4().hex[:8]}"))
-            _persist_media_cards(settings, cards, image_active_id, video_active_id)
+            _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
             st.success("Novo provider de imagem/vídeo adicionado.")
             st.rerun()
 

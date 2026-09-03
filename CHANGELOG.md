@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.17
+
+Removidos da secção Imagem e Video IA os selectores de provider principal de imagem, provider principal de vídeo e a checkbox de pool de vídeo externo. A ordem dos pools passa a ser definida pelos campos de Prioridade nos próprios cartões.
+
 ## 0.5.16
 
 Adicionado um handler SIGINT no entry point do Streamlit que encerra o processo de forma controlada antes do handler de shutdown do Streamlit chamar `click.secho`, eliminando o caminho que provocava `LookupError: unknown encoding: utf-16-le` ao pressionar Ctrl+C no Windows.

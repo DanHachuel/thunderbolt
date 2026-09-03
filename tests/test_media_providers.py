@@ -43,7 +43,7 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertNotIn("aspect_ratio", definition.extra_fields)
         self.assertNotIn("image_size", definition.extra_fields)
 
-    def test_pools_filter_capabilities_and_use_active_card_only_as_priority_tiebreaker(self):
+    def test_pools_filter_capabilities_and_sort_only_by_card_priority(self):
         settings = {
             "media_provider_cards": [
                 {"id": "video", "provider": "fal_ai", "model": "video-model", "supports_video": True, "supports_image": False, "enabled": True, "priority": 2},
