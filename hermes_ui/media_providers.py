@@ -251,6 +251,13 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
     return result
 
 
+def _ordered_media_cards(cards: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Ordenar os cartões pela prioridade, preservando a ordem em caso de empate."""
+    indexed = [(index, normalize_media_card(card, index)) for index, card in enumerate(cards)]
+    indexed.sort(key=lambda pair: (int(pair[1].get("priority", pair[0])), pair[0]))
+    return [card for _index, card in indexed]
+
+
 def new_media_card(provider: Any, *, card_id: str | None = None) -> dict[str, Any]:
     code = str(provider or "").strip().lower()
     if code not in _MEDIA_BY_CODE:
@@ -294,6 +301,10 @@ def ensure_media_provider_cards(settings: Mapping[str, Any]) -> tuple[dict[str, 
             )
         )
         changed = True
+    ordered_cards = _ordered_media_cards(cards)
+    if ordered_cards != cards:
+        changed = True
+    cards = ordered_cards
     result[MEDIA_CARDS_KEY] = cards
 
     for pool, key, capability in (
@@ -321,6 +332,7 @@ def apply_media_provider_cards_to_settings(settings: Mapping[str, Any], cards: l
     normalized = [normalize_media_card(item, index) for index, item in enumerate(cards)]
     if not normalized:
         normalized = [new_media_card("nano_banana", card_id="media-nano-banana-default")]
+    normalized = _ordered_media_cards(normalized)
     result[MEDIA_CARDS_KEY] = normalized
     for key, wanted, capability in (
         (MEDIA_IMAGE_ACTIVE_CARD_KEY, image_active_id, "supports_image"),
