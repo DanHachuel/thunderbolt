@@ -55,10 +55,10 @@ def test_paligemma_payload_is_isolated_and_uses_bearer(tmp_path):
     response = Mock(status_code=200)
     response.raise_for_status.return_value = None
     response.json.return_value = {"choices": [{"message": {"content": '{"score": 82, "diagnosis": "Boa"}'}}]}
-    card = {"api_key": "secret", "base_url": "https://ai.api.nvidia.com/v1/vlm/google/paligemma", "model": "google/paligemma"}
+    card = {"api_key": "secret", "base_url": "https://integrate.api.nvidia.com/v1", "model": "google/paligemma"}
     with patch("hermes_ui.growth_youtube.requests.post", return_value=response) as post:
         result = growth_youtube.analyse_thumbnail_with_paligemma(str(image), card)
     assert result["score"] == 82
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
     assert post.call_args.kwargs["json"]["model"] == "google/paligemma"
-    assert post.call_args.args[0] == "https://ai.api.nvidia.com/v1/vlm/google/paligemma"
+    assert post.call_args.args[0] == "https://integrate.api.nvidia.com/v1/chat/completions"

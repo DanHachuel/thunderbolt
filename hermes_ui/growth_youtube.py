@@ -160,9 +160,8 @@ def _vision_prompt(video: Mapping[str, Any]) -> str:
 
 def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict[str, Any]:
     key = str(card.get("api_key") or "").strip()
-    base = str(card.get("base_url") or "https://ai.api.nvidia.com/v1/vlm/google/paligemma").rstrip("/")
-    if base.endswith("/v1"):
-        base = f"{base}/vlm/google/paligemma"
+    base = str(card.get("base_url") or "https://integrate.api.nvidia.com/v1").rstrip("/")
+    endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
     model = str(card.get("model") or "google/paligemma").strip()
     if not key:
         return {"score": 50, "diagnosis": "API key NVIDIA NIM Paligemma não configurada.", "status": "sem_dados"}
@@ -171,7 +170,7 @@ def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict
         {"type": "text", "text": "Evaluate this thumbnail for YouTube Growth. Return JSON with score, diagnosis, contrast, mobile_readability, text_words, hierarchy, emotion, overlap_risk."},
         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{data}"}},
     ]}], "max_tokens": 500, "temperature": 0.1}
-    response = requests.post(base, headers={"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}, json=payload, timeout=120)
+    response = requests.post(endpoint, headers={"Authorization": f"Bearer {key}", "Accept": "application/json", "Content-Type": "application/json"}, json=payload, timeout=120)
     response.raise_for_status()
     content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
     match = re.search(r"\{.*\}", str(content), flags=re.S)
