@@ -1442,6 +1442,88 @@ def render_home_update_controls() -> None:
                 st.rerun()
 
 
+def _growth_score_color(score: float) -> str:
+    if score <= 30:
+        return "#ef4444"
+    if score < 70:
+        return "#f59e0b"
+    return "#22c55e"
+
+
+def _growth_channel_metrics(channel: dict[str, Any]) -> tuple[list[dict[str, Any]], float]:
+    """Calculate transparent local growth notes without fabricating Studio metrics."""
+    channel_id = str(channel.get("id") or "")
+    tasks = [item for item in read_json("tasks.json", []) if isinstance(item, dict) and str(item.get("channel_id") or "") == channel_id]
+    completed = [item for item in tasks if str(item.get("state") or item.get("status") or "").lower() == "done"]
+    with_thumbnail = [item for item in tasks if str(item.get("thumbnail_path") or (item.get("artifacts") or {}).get("thumbnail") or "").strip()]
+    with_title = [item for item in tasks if str(item.get("title") or "").strip()]
+    subscriber_count = channel.get("subscriber_count")
+    view_count = channel.get("view_count")
+    video_count = channel.get("video_count")
+
+    def number(value: Any) -> float | None:
+        try:
+            return float(value) if value is not None and str(value).strip() else None
+        except (TypeError, ValueError):
+            return None
+
+    subscribers, views, videos = number(subscriber_count), number(view_count), number(video_count)
+    demand = 70 if views is not None and views >= 1_000_000 else 55 if views is not None and views >= 100_000 else 50
+    thumbnail = round((len(with_thumbnail) / len(tasks)) * 100) if tasks else 50
+    title = round((len(with_title) / len(tasks)) * 100) if tasks else 50
+    conversion = round(min(100, (subscribers / views) * 10000)) if subscribers is not None and views and views > 0 else 50
+    cadence = round(min(100, len(tasks) * 12.5)) if tasks else 50
+    metrics = [
+        {"label": "Demanda validada", "score": demand, "value": f"{views:,.0f} visualizações" if views is not None else "Sem dados de visualizações", "source": "Canal YouTube" if views is not None else "Requer dados do canal"},
+        {"label": "Qualidade da thumbnail", "score": thumbnail, "value": f"{len(with_thumbnail)}/{len(tasks)} tarefas com thumbnail" if tasks else "Sem tarefas analisadas", "source": "Artefactos locais"},
+        {"label": "Qualidade do título", "score": title, "value": f"{len(with_title)}/{len(tasks)} tarefas com título" if tasks else "Sem tarefas analisadas", "source": "Artefactos locais"},
+        {"label": "Hook — retenção inicial", "score": 50, "value": "Sem dados de retenção", "source": "Requer YouTube Studio"},
+        {"label": "Ritmo e edição", "score": 50, "value": "Sem gráfico de retenção", "source": "Requer YouTube Studio"},
+        {"label": "Origem do tráfego", "score": 50, "value": "Sem distribuição de tráfego", "source": "Requer YouTube Studio"},
+        {"label": "Conversão em inscritos", "score": conversion, "value": f"{subscribers:,.0f} inscritos / {views:,.0f} visualizações" if subscribers is not None and views is not None else "Sem dados de inscritos e visualizações", "source": "Canal YouTube" if subscribers is not None and views is not None else "Requer dados do canal"},
+        {"label": "Cadência de publicação", "score": cadence, "value": f"{len(tasks)} tarefas locais" if tasks else "Sem tarefas locais", "source": "Pipeline local"},
+    ]
+    available = [metric["score"] for metric in metrics if metric["source"] not in {"Requer YouTube Studio", "Requer dados do canal"}]
+    overall = round(sum(available) / len(available)) if available else 50
+    return metrics, overall
+
+
+def render_growth_youtube():
+    st.title("Analista Growth Youtube")
+    st.caption("Auditoria de crescimento baseada nos 3 pilares críticos e nas métricas secundárias do agente Growth.")
+    channels = [item for item in read_json("channels.json", []) if isinstance(item, dict) and item.get("active", True) and is_youtube_channel_record(item)]
+    if not channels:
+        st.info("Cadastre pelo menos um canal YouTube em Canais YouTube para iniciar a análise.")
+        return
+    selected = st.selectbox("Canal a analisar", channels, format_func=lambda item: str(item.get("name") or "Canal sem nome"), key="growth_youtube_channel")
+    metrics, overall = _growth_channel_metrics(selected)
+    color = _growth_score_color(overall)
+    st.markdown(
+        f'<div style="border:1px solid #263447;border-radius:12px;padding:18px;margin:12px 0 20px;background:#101722;display:flex;align-items:center;justify-content:space-between;">'
+        f'<div><div style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Nota geral do canal</div><div style="font-size:18px;font-weight:700;margin-top:5px;">{str(selected.get("name") or "Canal")}</div></div>'
+        f'<div style="font-size:42px;font-weight:800;color:{color};line-height:1;">{overall}<span style="font-size:16px;color:#94a3b8;">/100</span></div></div>',
+        unsafe_allow_html=True,
+    )
+    st.subheader("Dashboard de Growth")
+    st.caption("Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100. Métricas sem fonte local aparecem explicitamente como sem dados.")
+    for row_start in range(0, len(metrics), 4):
+        cols = st.columns(4, gap="small")
+        for col, metric in zip(cols, metrics[row_start:row_start + 4]):
+            with col:
+                score = metric["score"]
+                st.markdown(
+                    f'<div style="min-height:142px;border:1px solid #263447;border-radius:10px;padding:14px;background:#0d141e;">'
+                    f'<div style="font-size:13px;color:#cbd5e1;min-height:34px;">{metric["label"]}</div>'
+                    f'<div style="font-size:30px;font-weight:800;color:{_growth_score_color(score)};">{score}<span style="font-size:13px;color:#94a3b8;">/100</span></div>'
+                    f'<div style="font-size:12px;color:#e2e8f0;margin-top:5px;">{metric["value"]}</div>'
+                    f'<div style="font-size:11px;color:#64748b;margin-top:5px;">Fonte: {metric["source"]}</div></div>',
+                    unsafe_allow_html=True,
+                )
+    st.divider()
+    st.subheader("Leitura estratégica")
+    st.write("Priorize primeiro as métricas abaixo de 70. A referência do agente indica que Thumbnail + Título devem ser optimizados antes de alterações de conteúdo; Hook, Ritmo e Tráfego ficam pendentes de dados do YouTube Studio.")
+
+
 def render_dashboard():
     ui_language = current_ui_language()
     st.title("Thunderbolt")
@@ -8668,7 +8750,7 @@ def main():
         "Motion Control": lambda: render_motion_control(read_json("settings.json", {})),
         "UGC Products": lambda: render_ugc_products(read_json("settings.json", {})),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
-        "Analista Growth Youtube": lambda: render_edit_placeholder("Analista Growth Youtube", ""),
+        "Analista Growth Youtube": render_growth_youtube,
         "Analista Growth Tiktok": lambda: render_edit_placeholder("Analista Growth Tiktok", ""),
         "Analista Growth Instagram": lambda: render_edit_placeholder("Analista Growth Instagram", ""),
         "Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", ""),
