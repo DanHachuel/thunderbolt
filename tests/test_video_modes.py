@@ -47,6 +47,14 @@ def test_video_creation_has_exactly_four_primary_expanders_and_thumbnail_action(
     assert 'generated["title_candidates"] = existing_payload.get("title_candidates", [])' in source
 
 
+def test_shorts_use_tiktok_prompt_master_instead_of_youtube_blueprint():
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    assert 'def render_tiktok_prompt_master_panel(' in source
+    assert 'if channel_platform == "tiktok":' in source
+    assert 'render_tiktok_prompt_master_panel(selected_one)' in source
+    assert 'render_channel_thumbnail_blueprint_panel(selected_one)' in source
+
+
 def test_automation_card_matches_reference_layout_without_changing_control_keys():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
     assert 'header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])' in source
