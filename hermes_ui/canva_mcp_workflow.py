@@ -130,6 +130,7 @@ def run_direct_canva_thumbnail(
         get_name = "get-design-content" if "get-design-content" in available else "get_design_content"
         content = _payload(client.call(get_name, {
             "design_id": design_id,
+            "content_types": ["richtexts"],
             "user_intent": "Inspect the selected Canva design before applying the thumbnail edit.",
         }))
         start_name = "start-editing-transaction" if "start-editing-transaction" in available else "start_editing_transaction"
