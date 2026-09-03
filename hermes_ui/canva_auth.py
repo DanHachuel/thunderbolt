@@ -61,7 +61,10 @@ def authorization_url(client_id: str, redirect_uri: str, scope: str | list[str] 
     scope_string = " ".join(scope_value) if isinstance(scope_value, (list, tuple)) else " ".join(str(scope_value or "").split())
     params = {
         "code_challenge": code_challenge,
-        "code_challenge_method": "s256",
+        # A Canva e a RFC 7636 definem o identificador do método com esta
+        # capitalização exacta: S256. O valor minúsculo pode abrir o
+        # consentimento, mas impedir a conclusão do fluxo OAuth.
+        "code_challenge_method": "S256",
         "scope": scope_string,
         "response_type": "code",
         "client_id": str(client_id).strip(),
