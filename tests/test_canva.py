@@ -145,3 +145,14 @@ def test_canva_test_does_not_require_model_or_generic_api_key():
     result = _test_media_provider_card({"provider": "canva", "oauth_token": {}})
     assert result["status"] == "missing"
     assert "API key ou autorize" in result["message"]
+
+
+def test_thumbnail_gallery_does_not_use_deprecated_container_width_image_argument():
+    source = Path("app/main.py").read_text(encoding="utf-8")
+    start = source.index("def render_thumbnails")
+    end = source.index("def ", start + len("def render_thumbnails"))
+    block = source[start:end]
+    assert "st.image(str(image_path), use_container_width=True)" not in block
+    assert "image_bytes = image_path.read_bytes()" in block
+    assert "st.image(image_bytes)" in block
+    assert "data=image_bytes" in block

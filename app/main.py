@@ -4775,10 +4775,16 @@ def render_thumbnails():
             with image_col:
                 image_path = record.get("image_path")
                 if image_path and image_path.is_file():
-                    st.image(str(image_path), use_container_width=True)
+                    # Pass bytes to Streamlit and avoid the deprecated
+                    # ``use_container_width`` argument.  On Windows the
+                    # deprecation warning can be emitted after the bootstrap
+                    # stream has been closed, which masks the real page with
+                    # ``ValueError: I/O operation on closed file``.
+                    image_bytes = image_path.read_bytes()
+                    st.image(image_bytes)
                     st.download_button(
                         "Descarregar thumbnail",
-                        data=image_path.read_bytes(),
+                        data=image_bytes,
                         file_name=image_path.name,
                         mime="image/jpeg" if image_path.suffix.lower() in {".jpg", ".jpeg"} else "image/png",
                         key=f"thumbnail_download_{task_id}_{record['variant_index']}",
