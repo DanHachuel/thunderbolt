@@ -25,6 +25,19 @@ FULL_IA_VIDEO_PROVIDER_CODES = (
     "openrouter",
 )
 
+# A KIE disponibiliza o Market por páginas de modelo, sem um endpoint global
+# documentado para listar modelos. Estes slugs são os modelos multimédia
+# suportados pelo contrato unificado jobs/createTask.
+KIE_MEDIA_MODEL_CATALOG = (
+    "bytedance/seedream-v4-text-to-image",
+    "seedream/4.5-text-to-image",
+    "grok-imagine/text-to-image",
+    "kling-2.6/text-to-video",
+    "grok-imagine/image-to-video",
+    "veo3_fast",
+    "veo3",
+)
+
 # Mantidos internamente para preservar compatibilidade e controlar o prompt dos providers.
 INTERNAL_IMAGE_ASPECT_RATIO = "16:9"
 INTERNAL_IMAGE_SIZE = "1K"

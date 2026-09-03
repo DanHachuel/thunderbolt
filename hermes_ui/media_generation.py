@@ -191,6 +191,11 @@ def _image_value(payload: Any) -> tuple[bytes | None, str]:
 def _image_request_id(payload: Any) -> str:
     if not isinstance(payload, Mapping):
         return ""
+    nested = payload.get("data")
+    if isinstance(nested, Mapping):
+        task_id = str(nested.get("taskId") or "").strip()
+        if task_id:
+            return task_id
     for key in ("id", "prediction_id", "request_id", "task_id", "job_id"):
         value = str(payload.get(key) or "").strip()
         if value:
@@ -254,7 +259,9 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
         return explicit
     if style == "openrouter":
         return f"{base}/images"
-    if style in {"openai_compatible", "huggingface", "agnes", "kie"}:
+    if style == "kie":
+        return f"{base}/jobs/createTask"
+    if style in {"openai_compatible", "huggingface", "agnes"}:
         return f"{base}/images/generations"
     if style == "replicate":
         return f"{base}/predictions"
@@ -300,6 +307,12 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if style == "replicate":
         body = {"version": _model(card), "input": {"prompt": constrained_prompt}}
+        return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
+    if style == "kie":
+        body = {
+            "model": _model(card),
+            "input": {"prompt": constrained_prompt, "aspect_ratio": "16:9", "resolution": "1K"},
+        }
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if provider == "agnes":
         body = {
@@ -425,6 +438,9 @@ def generate_image_for_card(
         style = str(routed.card.get("api_style") or media_provider_definition(routed.card.get("provider")).api_style)
         if request_id and style == "replicate":
             image_bytes, url = _poll_image(routed.card, request_id)
+        elif request_id and style == "kie":
+            urls = _poll_kie_task(routed.card, request_id, endpoint="/jobs/recordInfo", veo=False)
+            url = urls[0] if urls else ""
     return _download_or_write(image_bytes, url, destination, routed.card)
 
 
@@ -491,7 +507,9 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
         return f"{base}/{_model(card).lstrip('/')}"
     if style == "openrouter":
         return f"{base}/videos"
-    if style in {"openai_compatible", "agnes", "kie"}:
+    if style == "kie":
+        return f"{base}/jobs/createTask"
+    if style in {"openai_compatible", "agnes"}:
         return f"{base}/videos/generations"
     if style == "replicate":
         return f"{base}/predictions"
@@ -518,6 +536,15 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
         body["aspect_ratio"] = str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO)
         body["resolution"] = str(card.get("video_size") or INTERNAL_VIDEO_SIZE)
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
+    if style == "kie":
+        input_payload: dict[str, Any] = {
+            "prompt": body["prompt"],
+            "aspect_ratio": str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO),
+            "resolution": str(card.get("video_size") or INTERNAL_VIDEO_SIZE),
+        }
+        if image_url:
+            input_payload["imageUrls"] = [image_url]
+        return requests.post(endpoint, headers=_headers(card), json={"model": _model(card), "input": input_payload}, timeout=180)
     if style == "heygen":
         avatar_id = str(card.get("avatar_id") or "").strip()
         if not avatar_id:
@@ -570,7 +597,7 @@ def _video_result(payload: Mapping[str, Any]) -> tuple[str, str]:
         direct = str(data.get("video_url") or data.get("url") or "").strip()
         if direct.startswith(("http://", "https://")):
             return direct, ""
-        for key in ("video_id", "id", "request_id", "task_id", "job_id"):
+        for key in ("video_id", "id", "request_id", "task_id", "taskId", "job_id"):
             value = str(data.get(key) or "").strip()
             if value:
                 return "", value
@@ -648,7 +675,11 @@ def generate_video_for_card(
     url, request_id = _video_result(routed.payload)
     if not url and request_id:
         try:
-            url = _poll_video(routed.card, request_id)
+            if str(routed.card.get("api_style") or media_provider_definition(routed.card.get("provider")).api_style) == "kie":
+                urls = _poll_kie_task(routed.card, request_id, endpoint="/jobs/recordInfo", veo=False)
+                url = urls[0] if urls else ""
+            else:
+                url = _poll_video(routed.card, request_id)
         except ProviderCallError as exc:
             raise MediaGenerationError(str(exc)) from exc
     if not url:

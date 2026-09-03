@@ -77,6 +77,27 @@ class MediaProvidersTests(unittest.TestCase):
         )
         self.assertEqual([item["id"] for item in saved[media_providers.MEDIA_CARDS_KEY]], ["first", "second", "third"])
 
+    def test_kie_image_request_uses_market_create_task_contract(self):
+        response = Mock(status_code=200)
+        card = {"provider": "kie_ai", "api_style": "kie", "api_key": "secret", "base_url": "https://api.kie.ai/api/v1", "model": "grok-imagine/text-to-image"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image")
+        self.assertEqual(post.call_args.args[0], "https://api.kie.ai/api/v1/jobs/createTask")
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["model"], "grok-imagine/text-to-image")
+        self.assertEqual(body["input"]["aspect_ratio"], "16:9")
+
+    def test_kie_video_request_uses_market_create_task_contract(self):
+        response = Mock(status_code=200)
+        card = {"provider": "kie_ai", "api_style": "kie", "api_key": "secret", "base_url": "https://api.kie.ai/api/v1", "model": "kling-2.6/text-to-video"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._video_request(card, "video prompt")
+        self.assertEqual(post.call_args.args[0], "https://api.kie.ai/api/v1/jobs/createTask")
+        self.assertEqual(post.call_args.kwargs["json"]["model"], "kling-2.6/text-to-video")
+
+    def test_kie_image_request_id_reads_nested_task_id(self):
+        self.assertEqual(media_generation._image_request_id({"code": 200, "data": {"taskId": "task-123"}}), "task-123")
+
     def test_openai_compatible_image_base64_is_saved(self):
         encoded = base64.b64encode(b"image").decode("ascii")
         card = {
