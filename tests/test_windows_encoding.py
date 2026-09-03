@@ -54,3 +54,14 @@ def test_bootstrap_installs_compatibility_before_streamlit_import() -> None:
     source = (SCRIPTS / "streamlit_bootstrap.py").read_text(encoding="utf-8")
     assert source.index("install_windows_encoding()") < source.index("from streamlit.web.cli import main")
     assert source.index("os.environ[\"CLICK_NO_WIN_CONSOLE\"]") < source.index("from streamlit.web.cli import main")
+
+
+def test_bootstrap_registers_custom_sigint_before_streamlit_main() -> None:
+    source = (SCRIPTS / "streamlit_bootstrap.py").read_text(encoding="utf-8")
+    handler = source.index("def custom_sigint_handler")
+    registration = source.index("signal.signal(signal.SIGINT, custom_sigint_handler)")
+    streamlit_main = source.index("from streamlit.web.cli import main")
+    assert handler > streamlit_main
+    assert registration > handler
+    assert "raise SystemExit(0)" in source
+    assert "Encerrando servidor..." in source

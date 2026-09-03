@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.16
+
+Adicionado um handler SIGINT no entry point do Streamlit que encerra o processo de forma controlada antes do handler de shutdown do Streamlit chamar `click.secho`, eliminando o caminho que provocava `LookupError: unknown encoding: utf-16-le` ao pressionar Ctrl+C no Windows.
+
 ## 0.5.15 (normalizado pelo npm para 0.5.15)
 
 Aplicada a correcção definitiva do caminho de saída do Click no Windows, com shim UTF-8 carregado antes do Streamlit e teste de regressão para stdout com encoding `utf-16-le`.

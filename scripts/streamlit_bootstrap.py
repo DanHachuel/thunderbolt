@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import sys
 from windows_encoding_compat import install as install_windows_encoding, wrap_stream
 
@@ -31,5 +32,13 @@ sys.stderr = _utf8_stream(sys.stderr)
 
 from streamlit.web.cli import main  # noqa: E402
 
+
+def custom_sigint_handler(signum: int, frame: object) -> None:
+    """Exit before Streamlit's Click shutdown handler writes to Win32 console."""
+    print("\nEncerrando servidor...", file=sys.stderr)
+    raise SystemExit(0)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, custom_sigint_handler)
     main()
