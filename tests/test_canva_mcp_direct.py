@@ -1,7 +1,14 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from hermes_ui.canva_mcp_workflow import _download_url, _first_text_element, _has_richtext, _design_id, run_direct_canva_thumbnail
+from hermes_ui.canva_mcp_workflow import _download_url, _first_text_element, _has_richtext, _design_id, _thumbnail_layout_instructions, run_direct_canva_thumbnail
+
+
+def test_thumbnail_layout_instructions_require_independent_non_overlapping_elements():
+    instructions = _thumbnail_layout_instructions()
+    assert "separate editable bounding boxes" in instructions
+    assert "never stack or merge" in instructions
+    assert "do not place two elements at the same coordinates" in instructions
 
 
 def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_path: Path):
