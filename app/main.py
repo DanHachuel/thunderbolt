@@ -1516,21 +1516,30 @@ def render_growth_youtube():
                 st.error(str(exc)[:500])
     records = list_analyses()
     selected_record = next((item for item in reversed(records) if str(item.get("channel_id")) == str(selected.get("id"))), None)
-    if selected_record is None and records:
-        selected_record = records[-1]
-    metrics = selected_record.get("metrics", []) if selected_record else []
-    overall = int(selected_record.get("overall_score", 50)) if selected_record else 50
-    color = _growth_score_color(overall)
-    st.markdown(
-        f'<div style="border:1px solid #263447;border-radius:12px;padding:18px;margin:12px 0 20px;background:#101722;display:flex;align-items:center;justify-content:space-between;">'
-        f'<div><div style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Nota geral do canal</div><div style="font-size:18px;font-weight:700;margin-top:5px;">{str(selected.get("name") or "Canal")}</div></div>'
-        f'<div style="font-size:42px;font-weight:800;color:{color};line-height:1;">{overall}<span style="font-size:16px;color:#94a3b8;">/100</span></div></div>',
-        unsafe_allow_html=True,
-    )
-    if selected_record and selected_record.get("report_path"):
-        report_path = Path(str(selected_record["report_path"]))
-        if report_path.is_file():
-            st.download_button("BAIXAR ANALISE COMPLETA", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", key=f"growth_download_{selected_record['code']}")
+    metrics = selected_record.get("metrics", []) if selected_record else [
+        {"label": label, "score": 0, "value": "Aguardando análise", "diagnosis": "Clique em ANALISAR CANAL para preencher esta métrica."}
+        for label in ("Demanda validada", "Qualidade da thumbnail", "Qualidade do título", "Hook — retenção inicial", "Ritmo e edição", "Origem do tráfego", "Conversão em inscritos", "Cadência de publicação")
+    ]
+    overall = int(selected_record.get("overall_score", 0)) if selected_record else None
+    color = _growth_score_color(overall) if overall is not None else "#64748b"
+    score_text = str(overall) if overall is not None else "—"
+    score_suffix = "/100" if overall is not None else ""
+    summary_col, download_col = st.columns([3.25, 1], gap="large")
+    with summary_col:
+        st.markdown(
+            f'<div style="border:1px solid #263447;border-radius:12px;padding:18px;margin:12px 0 20px;background:#101722;display:flex;align-items:center;justify-content:space-between;min-height:76px;">'
+            f'<div><div style="font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Nota geral do canal</div><div style="font-size:18px;font-weight:700;margin-top:5px;">{str(selected.get("name") or "Canal")}</div></div>'
+            f'<div style="font-size:42px;font-weight:800;color:{color};line-height:1;">{score_text}<span style="font-size:16px;color:#94a3b8;">{score_suffix}</span></div></div>',
+            unsafe_allow_html=True,
+        )
+    with download_col:
+        st.write("")
+        if selected_record and selected_record.get("report_path"):
+            report_path = Path(str(selected_record["report_path"]))
+            if report_path.is_file():
+                st.download_button("BAIXAR ANALISE COMPLETA", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", use_container_width=True, key=f"growth_download_{selected_record['code']}")
+        else:
+            st.button("BAIXAR ANALISE COMPLETA", disabled=True, use_container_width=True, key="growth_download_disabled")
     st.subheader("Dashboard de Growth")
     st.caption("Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100. Clique em ANALISAR CANAL para recolher dados públicos actualizados.")
     for row_start in range(0, len(metrics), 4):
