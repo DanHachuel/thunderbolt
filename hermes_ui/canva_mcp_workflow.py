@@ -71,19 +71,29 @@ def _first_id(value: Any, keys: tuple[str, ...]) -> str:
     return ""
 
 
-def _first_text_element(value: Any) -> str:
+def _first_text_element(value: Any, *, text_context: bool = False) -> str:
     if isinstance(value, Mapping):
-        for key in ("element_id", "id"):
+        # The MCP returns rich text elements with slightly different ID
+        # names depending on the design type/version of the server.
+        text_markers = ("text", "richtext", "rich_text", "content", "paragraph")
+        mapping_text = str(value).lower()
+        is_text_mapping = text_context or any(
+            marker in str(key).lower() or marker in mapping_text
+            for key in value
+            for marker in text_markers
+        )
+        for key in ("element_id", "elementId", "richtext_id", "richTextId", "text_id", "textId", "id"):
             candidate = str(value.get(key) or "").strip()
-            if candidate and any(token in str(value).lower() for token in ("text", "richtext", "content")):
+            if candidate and is_text_mapping:
                 return candidate
-        for child in value.values():
-            found = _first_text_element(child)
+        for key, child in value.items():
+            child_context = text_context or any(marker in str(key).lower() for marker in text_markers)
+            found = _first_text_element(child, text_context=child_context)
             if found:
                 return found
     elif isinstance(value, list):
         for child in value:
-            found = _first_text_element(child)
+            found = _first_text_element(child, text_context=text_context)
             if found:
                 return found
     return ""
