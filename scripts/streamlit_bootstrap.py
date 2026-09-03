@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import io
 import os
 import sys
+from windows_encoding_compat import install as install_windows_encoding, wrap_stream
 
 # Este ficheiro é o primeiro módulo Python executado pelo launcher. As
 # variáveis e os streams precisam de ser corrigidos antes de qualquer import
@@ -11,6 +11,7 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
 os.environ["PYTHONLEGACYWINDOWSSTDIO"] = "1"
 os.environ["CLICK_NO_WIN_CONSOLE"] = "1"
+install_windows_encoding()
 
 
 def _utf8_stream(stream: object) -> object:
@@ -20,7 +21,7 @@ def _utf8_stream(stream: object) -> object:
     if buffer is None:
         return stream
     try:
-        return io.TextIOWrapper(buffer, encoding="utf-8", errors="replace", line_buffering=True)
+        return wrap_stream(stream)
     except (AttributeError, OSError, ValueError):
         return stream
 
