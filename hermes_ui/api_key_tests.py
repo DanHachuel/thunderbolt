@@ -128,6 +128,20 @@ def test_nano_banana_credentials(api_key: str, model: str) -> dict[str, Any]:
     )
 
 
+def test_canva_credentials(card: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate Canva with the configured API key or OAuth access token."""
+    source = dict(card) if isinstance(card, Mapping) else {}
+    api_key = str(source.get("api_key") or "").strip()
+    oauth_token = source.get("oauth_token") if isinstance(source.get("oauth_token"), Mapping) else {}
+    token = api_key or str(oauth_token.get("access_token") or "").strip()
+    if not token:
+        return _missing("Introduza a API key ou autorize o Canva antes de testar este provider.")
+    return _get(
+        "https://api.canva.com/rest/v1/users/me",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+
+
 def test_google_lyria_credentials(api_key: str, model: str) -> dict[str, Any]:
     """Validate access to the selected Lyria model without requesting audio generation."""
     api_key = str(api_key or "").strip()
@@ -146,6 +160,8 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     """Run a bounded, non-generative check for an image/video provider card."""
     source = dict(card) if isinstance(card, Mapping) else {}
     provider = str(source.get("provider") or "").strip().lower()
+    if provider == "canva":
+        return test_canva_credentials(source)
     api_key = str(source.get("api_key") or "").strip()
     model = str(source.get("model") or "").strip()
     base_url = str(source.get("base_url") or "").strip().rstrip("/")
