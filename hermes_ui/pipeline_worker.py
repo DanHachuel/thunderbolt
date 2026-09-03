@@ -82,6 +82,7 @@ def _generate_pipeline_thumbnail(
     variant_index: int = 0,
     lettering_text: str = "",
     lettering_prompt: str = "",
+    thumbnail_blueprint: dict[str, Any] | None = None,
 ) -> Path:
     """Use the image pool while keeping the legacy single-Nano call seam."""
     cards = media_cards_for_pool(settings, "image")
@@ -101,6 +102,7 @@ def _generate_pipeline_thumbnail(
         variant_index=variant_index,
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
+        thumbnail_blueprint=thumbnail_blueprint,
     )
 
 
@@ -1492,6 +1494,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
                 variant_index=0,
                 lettering_text=str(variant.get("overlay_text") or ""),
                 lettering_prompt=str(variant.get("lettering_prompt") or ""),
+                thumbnail_blueprint=blueprint,
             )
         except (MediaGenerationError, ThumbnailGenerationError) as exc:
             raise PipelineError(f"A thumbnail não foi gerada; o vídeo já está disponível em {video_path}: {exc}") from exc

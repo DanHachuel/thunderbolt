@@ -7169,6 +7169,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
             if definition.code == "canva":
                 base_url = definition.default_base_url
                 st.text_input("Base URL", value=base_url, disabled=True, key=f"media_card_{card_id}_base_url_display")
+                st.caption("Canva MCP directo: https://mcp.canva.com/mcp — a autenticação MCP é aberta pelo Thunderbolt na primeira utilização.")
             else:
                 base_url = st.text_input("Base URL", value=str(card.get("base_url") or definition.default_base_url), key=f"media_card_{card_id}_base_url")
             extra_values: dict[str, str] = {}

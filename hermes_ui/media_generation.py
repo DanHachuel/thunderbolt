@@ -41,6 +41,7 @@ from .provider_routing import (
 from .storage import STORAGE, ensure_storage, write_json
 from .thumbnail_generation import _compose_thumbnail_prompt, generate_thumbnail_image, normalize_thumbnail_bytes
 from .canva_client import CanvaClient
+from .canva_mcp_workflow import run_direct_canva_thumbnail
 
 
 class MediaGenerationError(RuntimeError):
@@ -324,6 +325,7 @@ def generate_image_for_card(
     lettering_text: str = "",
     lettering_prompt: str = "",
     reference_image: Path | None = None,
+    thumbnail_blueprint: Mapping[str, Any] | None = None,
 ) -> Path:
     """Generate one image with the selected media card."""
     card = dict(card)
@@ -333,6 +335,23 @@ def generate_image_for_card(
         export_format = str(card.get("export_format") or "png").lower()
         destination = STORAGE / "thumbnails" / f"canva-{abs(hash((topic, prompt, variant_index))) & 0xffffffffffffffff:x}.{export_format if export_format in {'png', 'jpg'} else 'png'}"
         card["output_path"] = str(destination)
+        blueprint = dict(thumbnail_blueprint or {})
+        if not str(blueprint.get("content") or "").strip():
+            raise MediaGenerationError("Canva exige um Thumbnail Blueprint local válido.")
+        try:
+            return run_direct_canva_thumbnail(
+                title=str(topic or "Thunderbolt thumbnail")[:255],
+                topic=topic,
+                prompt=prompt,
+                blueprint=blueprint,
+                destination=destination,
+                width=int(card.get("thumbnail_width") or 1280),
+                height=int(card.get("thumbnail_height") or 720),
+                quality=str(card.get("export_quality") or "medium"),
+            )
+        except Exception as exc:
+            raise MediaGenerationError(str(exc)) from exc
+
         def save_token(token: Mapping[str, Any]) -> None:
             updated = dict(settings)
             saved_cards = [dict(item) for item in updated.get("media_provider_cards", []) if isinstance(item, Mapping)]
@@ -417,6 +436,7 @@ def generate_image_from_pool(
     lettering_prompt: str = "",
     reference_image: Path | None = None,
     thumbnail_only: bool = False,
+    thumbnail_blueprint: Mapping[str, Any] | None = None,
 ) -> Path:
     """Try eligible image cards in priority order, without cross-pool fallback."""
     cards = media_cards_for_pool(settings, "image", thumbnail_only=True) if thumbnail_only else media_cards_for_pool(settings, "image")
@@ -434,6 +454,7 @@ def generate_image_from_pool(
                 lettering_text=lettering_text,
                 lettering_prompt=lettering_prompt,
                 reference_image=reference_image,
+                thumbnail_blueprint=thumbnail_blueprint,
             )
         except MediaGenerationError as exc:
             errors.append(f"{card.get('provider')}: {str(exc)[:180]}")

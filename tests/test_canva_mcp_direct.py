@@ -1,0 +1,65 @@
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from hermes_ui.canva_mcp_workflow import run_direct_canva_thumbnail
+
+
+def test_direct_workflow_calls_search_edit_commit_formats_export_in_order(tmp_path: Path):
+    client = Mock()
+    client.tools.return_value = [
+        {"name": "search-designs"},
+        {"name": "get-design-content"},
+        {"name": "start-editing-transaction"},
+        {"name": "perform-editing-operations"},
+        {"name": "commit-editing-transaction"},
+        {"name": "get-export-formats"},
+        {"name": "export-design"},
+    ]
+    client.call.side_effect = [
+        {"structuredContent": {"items": [{"id": "D1234567890", "thumbnail": {"width": 1280, "height": 720}}]}},
+        {"structuredContent": {"richtexts": [{"element_id": "text-1", "text": "old"}]}},
+        {"structuredContent": {"transaction_id": "tx-1", "pages": [{"page_id": "page-1", "is_responsive": False}]}},
+        {"structuredContent": {"pages": [{"page_id": "page-1", "is_responsive": False}]}},
+        {"structuredContent": {"ok": True}},
+        {"structuredContent": {"formats": [{"type": "png"}]}},
+        {"structuredContent": {"url": "https://cdn.example/thumb.png"}},
+    ]
+    response = Mock(content=b"png", status_code=200)
+    response.raise_for_status.return_value = None
+    with patch("hermes_ui.canva_mcp_workflow.CanvaMCPClient") as factory, patch("hermes_ui.canva_mcp_workflow.requests.get", return_value=response):
+        factory.return_value.__enter__.return_value = client
+        output = tmp_path / "thumb.png"
+        result = run_direct_canva_thumbnail(
+            title="Título da thumbnail",
+            topic="história",
+            prompt="prompt",
+            blueprint={"id": "HISTORIA_Thumbnail_Blueprint", "content": "rules"},
+            destination=output,
+            width=1280,
+            height=720,
+        )
+    assert result == output
+    assert output.read_bytes() == b"png"
+    assert [call.args[0] for call in client.call.call_args_list] == [
+        "search-designs", "get-design-content", "start-editing-transaction",
+        "perform-editing-operations", "commit-editing-transaction",
+        "get-export-formats", "export-design",
+    ]
+
+
+def test_direct_workflow_requires_search_result(tmp_path: Path):
+    client = Mock()
+    client.tools.return_value = [{"name": "search-designs"}]
+    client.call.return_value = {"structuredContent": {"items": []}}
+    with patch("hermes_ui.canva_mcp_workflow.CanvaMCPClient") as factory:
+        factory.return_value.__enter__.return_value = client
+        try:
+            run_direct_canva_thumbnail(
+                title="Teste", topic="", prompt="prompt",
+                blueprint={"id": "bp", "content": "rules"},
+                destination=tmp_path / "thumb.png", width=1280, height=720,
+            )
+        except Exception as exc:
+            assert "não encontrou designs" in str(exc)
+        else:
+            raise AssertionError("O fluxo deveria falhar sem resultado de pesquisa")
