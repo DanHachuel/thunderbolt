@@ -94,6 +94,29 @@ def _model(card: Mapping[str, Any]) -> str:
     return str(card.get("model") or "").strip()
 
 
+def _hydrate_media_card(settings: Mapping[str, Any], card: Mapping[str, Any]) -> dict[str, Any]:
+    """Restore credentials when a persisted thumbnail task contains an old card snapshot."""
+    effective = dict(card)
+    if str(effective.get("api_key") or "").strip():
+        return effective
+    card_id = str(effective.get("id") or "").strip()
+    stored_cards = settings.get("media_provider_cards")
+    if isinstance(stored_cards, list):
+        for stored in stored_cards:
+            if isinstance(stored, Mapping) and card_id and str(stored.get("id") or "").strip() == card_id:
+                key = str(stored.get("api_key") or stored.get("key") or "").strip()
+                if key:
+                    effective["api_key"] = key
+                    break
+    if not str(effective.get("api_key") or "").strip() and str(effective.get("provider") or "").strip().lower() == "agnes":
+        for key_name in ("agnes_api_key", "agnes_ai_api_key", "agnes_token", "media_agnes_api_key"):
+            key = str(settings.get(key_name) or "").strip()
+            if key:
+                effective["api_key"] = key
+                break
+    return effective
+
+
 def _base_url(card: Mapping[str, Any]) -> str:
     return str(card.get("base_url") or "").strip().rstrip("/")
 
@@ -363,7 +386,7 @@ def generate_image_for_card(
     thumbnail_blueprint: Mapping[str, Any] | None = None,
 ) -> Path:
     """Generate one image with the selected media card."""
-    card = dict(card)
+    card = _hydrate_media_card(settings, card)
     provider = str(card.get("provider") or "").strip().lower()
     if provider == "canva":
         ensure_storage()

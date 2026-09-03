@@ -203,6 +203,12 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertLessEqual(len(prompt), media_generation.AGNES_MAX_PROMPT_CHARS)
         self.assertIn("EXACT HEADLINE TO RENDER: <<<EXACT TEXT>>>", prompt)
 
+    def test_old_agnes_card_snapshot_recovers_key_from_persisted_card(self):
+        card = {"id": "media-agnes-1", "provider": "agnes"}
+        settings = {"media_provider_cards": [{"id": "media-agnes-1", "provider": "agnes", "api_key": "agnes-secret"}]}
+        hydrated = media_generation._hydrate_media_card(settings, card)
+        self.assertEqual(hydrated["api_key"], "agnes-secret")
+
     def test_other_openai_compatible_image_request_does_not_receive_pollinations_size(self):
         response = Mock(status_code=200)
         card = {"provider": "huggingface", "model": "black-forest-labs/FLUX.1-dev", "base_url": "https://router.huggingface.co/v1", "api_style": "huggingface"}
