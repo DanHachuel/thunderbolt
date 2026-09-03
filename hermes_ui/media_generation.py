@@ -252,6 +252,8 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
     explicit = str(card.get("image_endpoint") or "").strip()
     if explicit:
         return explicit
+    if style == "openrouter":
+        return f"{base}/images"
     if style in {"openai_compatible", "huggingface", "agnes", "kie"}:
         return f"{base}/images/generations"
     if style == "replicate":
@@ -309,6 +311,13 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
             "extra_body": {"response_format": "b64_json"},
         }
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=AGNES_IMAGE_TIMEOUT_SECONDS)
+    if style == "openrouter":
+        return requests.post(
+            endpoint,
+            headers=_headers(card),
+            json={"model": _model(card), "prompt": constrained_prompt, "n": 1, "aspect_ratio": "16:9"},
+            timeout=180,
+        )
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     if provider == "pollinations":
         body["size"] = "1792x1024"
@@ -480,6 +489,8 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
         if not _model(card):
             raise MediaGenerationError("FAL AI requer o identificador da rota/modelo para gerar vídeo.")
         return f"{base}/{_model(card).lstrip('/')}"
+    if style == "openrouter":
+        return f"{base}/videos"
     if style in {"openai_compatible", "agnes", "kie"}:
         return f"{base}/videos/generations"
     if style == "replicate":
@@ -503,6 +514,10 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
     }
     if image_url:
         body["image_url"] = image_url
+    if style == "openrouter":
+        body["aspect_ratio"] = str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO)
+        body["resolution"] = str(card.get("video_size") or INTERNAL_VIDEO_SIZE)
+        return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if style == "heygen":
         avatar_id = str(card.get("avatar_id") or "").strip()
         if not avatar_id:
@@ -534,7 +549,11 @@ def _video_result(payload: Mapping[str, Any]) -> tuple[str, str]:
     raw_output = payload.get("output")
     if isinstance(raw_output, list) and raw_output:
         raw_output = raw_output[0]
-    direct = str(payload.get("video_url") or payload.get("url") or raw_output or "").strip()
+    unsigned_urls = payload.get("unsigned_urls")
+    if isinstance(unsigned_urls, list) and unsigned_urls:
+        direct = str(unsigned_urls[0] or "").strip()
+    else:
+        direct = str(payload.get("content_url") or payload.get("video_url") or payload.get("url") or raw_output or "").strip()
     if direct.startswith(("http://", "https://")):
         return direct, ""
     result = payload.get("result")
@@ -576,6 +595,8 @@ def _poll_video(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
         endpoint = f"{base}/predictions/{request_id}"
     elif style == "heygen":
         endpoint = f"{base}/v3/videos/{request_id}"
+    elif style == "openrouter":
+        endpoint = f"{base}/videos/{request_id}"
     else:
         endpoint = f"{base}/videos/{request_id}"
     headers = _headers(card, fal=style == "fal_queue")

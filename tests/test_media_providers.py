@@ -13,12 +13,12 @@ from hermes_ui.provider_routing import POOL_IMAGE, RoutedResponse
 class MediaProvidersTests(unittest.TestCase):
     def test_catalog_contains_requested_current_providers_and_excludes_deprecated_names(self):
         codes = {item["code"] for item in media_providers.media_provider_catalog()}
-        self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai", "heygen"}.issubset(codes))
+        self.assertTrue({"nano_banana", "pollinations", "agnes", "huggingface", "cloudflare_workers_ai", "inferenceport", "alibaba_cloud", "kie_ai", "fal_ai", "heygen", "openrouter"}.issubset(codes))
         self.assertNotIn("nexaapi", codes)
         self.assertNotIn("openimagegen", codes)
         self.assertEqual(
             set(media_providers.FULL_IA_VIDEO_PROVIDER_CODES),
-            {"fal_ai", "kie_ai", "agnes", "nano_banana", "replicate", "pollinations", "huggingface", "inferenceport", "heygen"},
+            {"fal_ai", "kie_ai", "agnes", "nano_banana", "replicate", "pollinations", "huggingface", "inferenceport", "heygen", "openrouter"},
         )
 
     def test_legacy_nano_settings_migrate_to_image_card(self):
@@ -93,6 +93,39 @@ class MediaProvidersTests(unittest.TestCase):
                 output = media_generation.generate_image_for_card({}, card, "a clean image", topic="topic")
             self.assertEqual(output.read_bytes(), b"image")
             self.assertEqual(output.parent, Path(temp_dir) / "thumbnails")
+
+    def test_openrouter_image_request_uses_dedicated_images_endpoint(self):
+        response = Mock(status_code=200)
+        card = {"provider": "openrouter", "api_style": "openrouter", "api_key": "secret", "base_url": "https://openrouter.ai/api/v1", "model": "openai/gpt-image-2"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "clean image")
+        self.assertEqual(post.call_args.args[0], "https://openrouter.ai/api/v1/images")
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer secret")
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["model"], "openai/gpt-image-2")
+        self.assertEqual(body["n"], 1)
+        self.assertEqual(body["aspect_ratio"], "16:9")
+        self.assertNotIn("response_format", body)
+
+    def test_openrouter_video_request_uses_async_videos_endpoint(self):
+        response = Mock(status_code=200)
+        card = {"provider": "openrouter", "api_style": "openrouter", "api_key": "secret", "base_url": "https://openrouter.ai/api/v1", "model": "google/veo-3.1"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._video_request(card, "video prompt")
+        self.assertEqual(post.call_args.args[0], "https://openrouter.ai/api/v1/videos")
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(body["model"], "google/veo-3.1")
+        self.assertEqual(body["aspect_ratio"], "16:9")
+        self.assertEqual(body["resolution"], "1080p")
+
+    def test_openrouter_video_polling_reads_unsigned_url(self):
+        response = Mock(status_code=200)
+        response.json.return_value = {"status": "completed", "unsigned_urls": ["https://files.openrouter.ai/video.mp4"]}
+        card = {"provider": "openrouter", "api_style": "openrouter", "api_key": "secret", "base_url": "https://openrouter.ai/api/v1"}
+        with patch.object(media_generation.requests, "get", return_value=response) as get:
+            output = media_generation._poll_video(card, "job-123", attempts=1)
+        self.assertEqual(output, "https://files.openrouter.ai/video.mp4")
+        self.assertEqual(get.call_args.args[0], "https://openrouter.ai/api/v1/videos/job-123")
 
     def test_nano_card_delegates_to_existing_gemini_adapter(self):
         card = {"id": "nano", "provider": "nano_banana", "api_key": "secret", "model": "gemini-3.1-flash-image"}

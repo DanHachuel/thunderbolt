@@ -7087,6 +7087,24 @@ def _persist_media_cards(settings: dict[str, Any], cards: list[dict[str, Any]], 
 def _fetch_media_models(card: dict[str, Any]) -> list[str]:
     """Consultar modelos do provider, incluindo o catálogo nativo Gemini."""
     provider = str(card.get("provider") or "").strip().lower()
+    if provider == "openrouter":
+        base_url = str(card.get("base_url") or "https://openrouter.ai/api/v1").rstrip("/")
+        headers = {"Accept": "application/json", "Authorization": f"Bearer {str(card.get('api_key') or '').strip()}"}
+        discovered: set[str] = set()
+        failures: list[str] = []
+        for suffix in ("/images/models", "/videos/models"):
+            response = requests.get(f"{base_url}{suffix}", headers=headers, timeout=12)
+            if response.status_code >= 400:
+                failures.append(f"HTTP {response.status_code}")
+                continue
+            payload = response.json()
+            entries = payload.get("data") if isinstance(payload, dict) else []
+            if isinstance(entries, list):
+                discovered.update(str(item.get("id") or "").strip() for item in entries if isinstance(item, dict) and str(item.get("id") or "").strip())
+        if not discovered:
+            detail = f" ({', '.join(failures)})" if failures else ""
+            raise ValueError(f"O OpenRouter não devolveu modelos de imagem/vídeo{detail}.")
+        return sorted(discovered, key=str.casefold)
     if provider == "nano_banana":
         base_url = str(card.get("base_url") or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
         response = requests.get(
