@@ -75,7 +75,7 @@ def _design_id(value: Any) -> str:
             candidate = str(value.get(key) or "").strip()
             if candidate:
                 return candidate
-        for key in ("design", "resource", "data"):
+        for key in ("design", "design_summary", "resource", "data"):
             if isinstance(value.get(key), Mapping):
                 found = _design_id(value[key])
                 if found:
