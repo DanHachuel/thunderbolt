@@ -96,3 +96,13 @@ def test_launcher_routes_canva_callback_to_api_settings_page():
     assert 'requestUrl.pathname === "/oauth/redirect"' in source
     assert 'requestUrl.searchParams.set("page", "Configuração API")' in source
     assert 'Location: `${requestUrl.pathname}${requestUrl.search}`' in source
+
+
+def test_canva_authorization_persists_credentials_before_callback():
+    source = Path("app/main.py").read_text(encoding="utf-8")
+    start = source.index('def _render_media_provider_card')
+    end = source.index('def render_media_provider_cards', start)
+    canva_block = source[start:end]
+    assert 'if authorize_clicked:' in canva_block
+    assert '_persist_media_cards(settings, cards' in canva_block
+    assert canva_block.index('if authorize_clicked:') < canva_block.index('elif refresh_clicked:')
