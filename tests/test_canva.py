@@ -115,3 +115,33 @@ def test_canva_oauth_transaction_survives_streamlit_session_refresh():
     assert 'oauth_pending.get("code_verifier")' in source
     assert 'extra_values["oauth_pending"]' in source
     assert 'result["oauth_pending"]' in providers
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from hermes_ui.api_key_tests import test_canva_credentials as _test_canva_credentials
+from hermes_ui.api_key_tests import test_media_provider_card as _test_media_provider_card
+
+
+def test_canva_test_accepts_oauth_access_token():
+    response = Mock(status_code=200)
+    with patch("hermes_ui.api_key_tests.requests.get", return_value=response) as request:
+        result = _test_media_provider_card({"provider": "canva", "oauth_token": {"access_token": "oauth-token"}})
+    assert result["status"] == "success"
+    request.assert_called_once_with(
+        "https://api.canva.com/rest/v1/users/me",
+        headers={"Authorization": "Bearer oauth-token", "Accept": "application/json"},
+        timeout=20,
+    )
+
+
+def test_canva_test_accepts_legacy_api_key():
+    response = Mock(status_code=200)
+    with patch("hermes_ui.api_key_tests.requests.get", return_value=response):
+        result = _test_canva_credentials({"provider": "canva", "api_key": "canva-token"})
+    assert result["status"] == "success"
+
+
+def test_canva_test_does_not_require_model_or_generic_api_key():
+    result = _test_media_provider_card({"provider": "canva", "oauth_token": {}})
+    assert result["status"] == "missing"
+    assert "API key ou autorize" in result["message"]
