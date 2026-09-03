@@ -177,6 +177,20 @@ def _first_page(value: Any) -> tuple[str, list[dict[str, Any]]]:
     return page_id, pages
 
 
+def _thumbnail_layout_instructions() -> str:
+    """Return hard layout constraints for Canva's generated editable designs."""
+    return (
+        "LAYOUT REQUIREMENTS (mandatory): use separate editable bounding boxes for every text item; "
+        "never stack or merge text, numbers, badges, or icons. Keep a safe margin of at least 5% on all sides. "
+        "Use a clear 16:9 grid: primary headline in the left 58% of the canvas, secondary text below it with "
+        "at least 4% vertical separation, and any number/stat badge in the upper-right 30% inside its own box. "
+        "Place icons or decorative symbols in the right-side visual area, separated from every text box by at least 3% "
+        "of canvas width. Each box must have its own position, size, alignment, and layer; do not place two elements "
+        "at the same coordinates. Preserve readable contrast and leave breathing room between all elements. "
+        "Before finishing, check that no text, number, or icon intersects another element."
+    )
+
+
 def run_direct_canva_thumbnail(
     *,
     title: str,
@@ -231,11 +245,12 @@ def run_direct_canva_thumbnail(
                 "query": (
                     "Create one editable YouTube thumbnail in 16:9 format for this topic: "
                     f"{title}. Context: {topic}. Thumbnail prompt: {prompt[:1200]}. "
-                    "Use clearly editable headline text boxes, a strong background, readable text "
-                    "background shapes, relevant icons, depth/effects, and high-contrast lettering. "
+                    "Use clearly editable headline text boxes as independent headline and secondary text boxes, a strong background, "
+                    "readable text background shapes, relevant icons, depth/effects, and high-contrast lettering. "
+                    f"{_thumbnail_layout_instructions()} "
                     "Follow these local Thumbnail Blueprint rules: " + blueprint_text
                 ),
-                "user_intent": "Create an editable YouTube thumbnail with text boxes and visual elements when searched designs are not editable.",
+                "user_intent": "Create an editable YouTube thumbnail with separate non-overlapping text boxes, number/stat boxes and visual elements when searched designs are not editable.",
             }))
             job_id = _generation_job_id(generated)
             generated_candidates = _items(generated)
