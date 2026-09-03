@@ -24,6 +24,7 @@ def _generate_image_with_pool(
     lettering_text: str = "",
     lettering_prompt: str = "",
     reference_image: Path | None = None,
+    thumbnail_blueprint: dict[str, Any] | None = None,
 ) -> Path:
     """Use the legacy Nano adapter when it is the only active image card.
 
@@ -50,6 +51,7 @@ def _generate_image_with_pool(
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
         thumbnail_only=True,
+        thumbnail_blueprint=thumbnail_blueprint,
     )
 
 
@@ -289,6 +291,7 @@ def generate_thumbnail_for_task(
         variant_index=record["variant_index"],
         lettering_text=record.get("thumbnail_text") or "",
         lettering_prompt=record.get("lettering_prompt") or "",
+        thumbnail_blueprint=effective_blueprint,
     )
     updated = _update_thumbnail_task(
         task_id,
