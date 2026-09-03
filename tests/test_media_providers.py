@@ -194,6 +194,15 @@ class MediaProvidersTests(unittest.TestCase):
         self.assertNotIn("response_format", body)
         self.assertEqual(post.call_args.kwargs["timeout"], media_generation.AGNES_IMAGE_TIMEOUT_SECONDS)
 
+    def test_agnes_image_request_limits_oversized_thumbnail_prompt(self):
+        response = Mock(status_code=200)
+        card = {"provider": "agnes", "model": "agnes-image-2.1-flash", "base_url": "https://apihub.agnes-ai.com/v1", "api_style": "agnes"}
+        with patch.object(media_generation.requests, "post", return_value=response) as post:
+            media_generation._image_request(card, "visual brief " + ("details " * 2500), topic="A topic", lettering_text="EXACT TEXT")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertLessEqual(len(prompt), media_generation.AGNES_MAX_PROMPT_CHARS)
+        self.assertIn("EXACT HEADLINE TO RENDER: <<<EXACT TEXT>>>", prompt)
+
     def test_other_openai_compatible_image_request_does_not_receive_pollinations_size(self):
         response = Mock(status_code=200)
         card = {"provider": "huggingface", "model": "black-forest-labs/FLUX.1-dev", "base_url": "https://router.huggingface.co/v1", "api_style": "huggingface"}
