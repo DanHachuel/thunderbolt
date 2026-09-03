@@ -7105,14 +7105,17 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
     if card.get("provider") == "canva":
         callback_code = str(st.query_params.get("code") or "").strip()
         callback_state = str(st.query_params.get("state") or "").strip()
-        pending_state = str(st.session_state.get(f"canva_state_{card_id}") or "")
+        oauth_pending = card.get("oauth_pending") if isinstance(card.get("oauth_pending"), dict) else {}
+        pending_state = str(st.session_state.get(f"canva_state_{card_id}") or oauth_pending.get("state") or "")
+        pending_verifier = str(st.session_state.get(f"canva_verifier_{card_id}") or oauth_pending.get("code_verifier") or "")
         if callback_code:
-            if callback_state != pending_state:
+            if not pending_state or callback_state != pending_state:
                 st.error("Canva OAuth rejeitado: state inválido. Inicie a autorização novamente.")
             else:
                 try:
-                    token = exchange_code(str(card.get("client_id") or ""), str(card.get("client_secret") or ""), callback_code, str(card.get("redirect_uri") or ""), str(st.session_state.get(f"canva_verifier_{card_id}") or ""))
+                    token = exchange_code(str(card.get("client_id") or ""), str(card.get("client_secret") or ""), callback_code, str(card.get("redirect_uri") or ""), pending_verifier)
                     card["oauth_token"] = token
+                    card.pop("oauth_pending", None)
                     cards[index] = card
                     _persist_media_cards(settings, cards, str(settings.get(MEDIA_IMAGE_ACTIVE_CARD_KEY) or ""), str(settings.get(MEDIA_VIDEO_ACTIVE_CARD_KEY) or ""))
                     st.session_state.pop(f"canva_state_{card_id}", None)
@@ -7201,6 +7204,7 @@ def _render_media_provider_card(settings: dict[str, Any], cards: list[dict[str, 
                         st.session_state[f"canva_verifier_{card_id}"] = verifier
                         st.session_state[f"canva_state_{card_id}"] = state
                         st.session_state[f"canva_authorization_url_{card_id}"] = authorization_url(client_id, redirect_uri, state=state, code_challenge=challenge)
+                        extra_values["oauth_pending"] = {"state": state, "code_verifier": verifier}
                     authorization_link = str(st.session_state.get(f"canva_authorization_url_{card_id}") or "")
                     if authorization_link:
                         st.markdown(f"[Abrir autorização Canva]({authorization_link})")
