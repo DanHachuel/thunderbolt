@@ -67,6 +67,21 @@ function configuredMoneyPrinterPath() {
   }
 }
 
+function readStateJson(filename, fallback = []) {
+  try { return JSON.parse(readFileSync(join(thunderboltHome, "storage", "state", filename), "utf8")); }
+  catch { return fallback; }
+}
+
+function hasScheduledAutomation() {
+  const channels = readStateJson("channels.json", []);
+  return Array.isArray(channels) && channels.some((channel) => channel && channel.automation_on === true);
+}
+
+function hasPendingPipelineWork() {
+  const tasks = readStateJson("tasks.json", []);
+  return Array.isArray(tasks) && tasks.some((task) => ["queued", "pending", "processing", "running", "in_progress"].includes(String(task?.state || task?.status || "").toLowerCase()));
+}
+
 function ensureRuntimeStorage() {
   const storageRoot = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
   const directories = [
@@ -261,18 +276,18 @@ proxy.on("error", (error) => {
 proxy.listen(publicPort, "127.0.0.1", () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
-const worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
+const worker = hasScheduledAutomation() ? spawn(python, ["-m", "hermes_ui.automation_worker"], {
   cwd: root,
   stdio: "inherit",
   env: runtimeEnv,
   windowsHide: false,
-});
-const pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
+}) : null;
+const pipelineWorker = hasPendingPipelineWork() ? spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
   cwd: root,
   stdio: "inherit",
   env: runtimeEnv,
   windowsHide: false,
-});
+}) : null;
 const restartExitCode = 75;
 let shuttingDown = false;
 let child;
@@ -315,10 +330,10 @@ startStreamlit();
 const stopWorker = () => {
   shuttingDown = true;
   proxy.close();
-  if (!worker.killed) worker.kill();
-  if (!pipelineWorker.killed) pipelineWorker.kill();
+  if (worker && !worker.killed) worker.kill();
+  if (pipelineWorker && !pipelineWorker.killed) pipelineWorker.kill();
 };
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
-worker.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
-pipelineWorker.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
+worker?.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
+pipelineWorker?.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
