@@ -452,13 +452,9 @@ def _render_notification_toast_cycle() -> None:
     _save_notification_toast_seen_ids(seen_ids)
 
 
-if hasattr(st, "fragment"):
-    @st.fragment(run_every=NOTIFICATION_TOAST_INTERVAL)
-    def render_global_notification_toasts() -> None:
-        _render_notification_toast_cycle()
-else:
-    def render_global_notification_toasts() -> None:
-        _render_notification_toast_cycle()
+def render_global_notification_toasts() -> None:
+    """Render notifications once per app run; never start a background timer."""
+    _render_notification_toast_cycle()
 
 
 def localized_tab_labels(labels: list[str], language: str | None = None) -> list[str]:
@@ -4630,9 +4626,8 @@ def _render_pipeline_worker_banner(worker_status: dict[str, Any], active_count: 
         st.error(f"Último erro do worker: {worker_status['last_error']}")
 
 
-@st.fragment(run_every=5.0)
 def _render_pipeline_progress_live() -> None:
-    """Poll the persisted pipeline state only while video tasks are active."""
+    """Render pipeline state once; refresh occurs only after user interaction."""
     worker_status = load_pipeline_worker_status()
     tasks = read_json("tasks.json", [])
     active = [task for task in tasks if isinstance(task, dict) and str(task.get("state") or "") == "doing"]
