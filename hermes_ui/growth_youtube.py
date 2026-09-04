@@ -39,7 +39,7 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _public_videos(channel_url: str, limit: int = 10) -> list[dict[str, Any]]:
+def _public_videos(channel_url: str, limit: int = 3) -> list[dict[str, Any]]:
     try:
         import yt_dlp
     except ImportError as exc:
@@ -187,7 +187,7 @@ def _report_markdown(record: Mapping[str, Any]) -> str:
     pillar_names = {"Demanda validada": "Demanda", "Qualidade da thumbnail": "Thumbnail", "Qualidade do título": "Título", "Hook — retenção inicial": "Hook", "Ritmo e edição": "Pacing", "Origem do tráfego": "Tráfego", "Conversão em inscritos": "CTA", "Cadência de publicação": "Cadência"}
     for metric in record.get("metrics", []):
         lines.append(f"| **{pillar_names.get(metric['label'], metric['label'])}** | {metric['score']}/100 | {metric['value']} | {metric['diagnosis']} |")
-    lines += ["", "## 3. Últimos 10 vídeos", "", "| Título | Visualizações | Thumbnail | Transcrição | Nota do título |", "|---|---:|---|---|---:|"]
+    lines += ["", "## 3. Últimos 3 vídeos", "", "| Título | Visualizações | Thumbnail | Transcrição | Nota do título |", "|---|---:|---|---|---:|"]
     for video in record.get("videos", []):
         lines.append(f"| {video.get('title', '').replace('|', '/')} | {video.get('view_count', 0):,} | {video.get('thumbnail_status', '')} | {video.get('transcript_status', '')} | {video.get('title_score', 0)}/100 |")
     lines += ["", "## 4. Actionable Roadmap — Top 3 prioridades", "", "1. **REMAKE THUMBNAILS** dos vídeos abaixo de 70: aumentar contraste, sujeito claro, emoção forte e máximo de três palavras legíveis no telemóvel.", "2. **REWRITE TITLES** com Curiosity, Clarity e Urgency; colocar a keyword principal no início e usar números/adjectivos de poder quando forem verdadeiros.", "3. **EDIT HOOK**: começar pelo resultado, promessa ou estatística forte e introduzir pattern interrupts a cada 5–8 segundos.", "", "## 5. Estratégia de longo prazo", "", "Construir uma biblioteca de pelo menos 50 vídeos evergreen, publicar com cadência semanal fixa e procurar que Browse Features se torne a principal origem de tráfego. Para um criador solo, consistência supera frequência; melhorar Thumbnail + Título antes de alterar a produção.", "", "## Limitações", "", "CTR, retenção real, origem de tráfego, RPM e horas de visualização exigem dados autorizados do YouTube Studio e não são inventados a partir da página pública."]
@@ -202,9 +202,9 @@ def run_audit(channel: Mapping[str, Any], settings: Mapping[str, Any], *, vision
     channel_url = str(channel.get("url") or channel.get("handle") or "").strip()
     if not channel_url:
         raise RuntimeError("O canal seleccionado não tem URL pública ou handle YouTube.")
-    notify("A buscar o canal e os 10 vídeos mais recentes…")
+    notify("A buscar o canal e os 3 vídeos mais recentes…")
     try:
-        videos = _public_videos(channel_url, 10)
+        videos = _public_videos(channel_url, 3)
     except Exception as exc:
         failed = {"code": code, "channel_id": str(channel.get("id") or ""), "channel_name": str(channel.get("name") or "Canal"), "platform": "YouTube", "created_at": datetime.now(timezone.utc).isoformat(), "status": "failed", "error": str(exc)[:500]}
         analyses = read_json(ANALYSES_FILENAME, [])
