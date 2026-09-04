@@ -276,14 +276,37 @@ proxy.on("error", (error) => {
 proxy.listen(publicPort, "127.0.0.1", () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
-// Workers contínuos só devem ser iniciados explicitamente com `worker` ou
-// `pipeline-worker`; o arranque normal da interface não cria processos Python
-// em background nem faz polling periódico.
-const worker = null;
+// A worker de automação é necessária para canais com automação activa. É
+// iniciada no máximo uma vez por launcher e reiniciada com backoff se terminar
+// inesperadamente; não é criada quando não há trabalho agendado.
+let worker = null;
 const pipelineWorker = null;
 const restartExitCode = 75;
 let shuttingDown = false;
 let child;
+let workerRestartTimer = null;
+
+function startAutomationWorker() {
+  if (shuttingDown || worker || !hasScheduledAutomation()) return;
+  worker = spawn(python, ["-m", "hermes_ui.automation_worker"], {
+    cwd: root,
+    stdio: "inherit",
+    env: runtimeEnv,
+    windowsHide: false,
+  });
+  worker.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
+  worker.on("exit", (code, signal) => {
+    worker = null;
+    if (shuttingDown) return;
+    console.error(`Thunderbolt worker: terminou (código ${code ?? "-"}, sinal ${signal ?? "-"}).`);
+    if (hasScheduledAutomation()) {
+      workerRestartTimer = setTimeout(() => {
+        workerRestartTimer = null;
+        startAutomationWorker();
+      }, 5000);
+    }
+  });
+}
 
 function startStreamlit() {
   child = spawn(python, [streamlitBootstrap, "run", main, "--server.port", String(backendPort), "--server.address", "127.0.0.1"], {
@@ -323,10 +346,11 @@ startStreamlit();
 const stopWorker = () => {
   shuttingDown = true;
   proxy.close();
+  if (workerRestartTimer) clearTimeout(workerRestartTimer);
   if (worker && !worker.killed) worker.kill();
   if (pipelineWorker && !pipelineWorker.killed) pipelineWorker.kill();
 };
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
-worker?.on("error", (error) => console.error(`Thunderbolt worker: ${error.message}`));
 pipelineWorker?.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
+startAutomationWorker();
