@@ -21,6 +21,9 @@ class DefaultUiLanguageTests(unittest.TestCase):
         for code in ("pt", "es", "zh", "de", "vi", "tr", "ru", "id", "it"):
             self.assertIn(f'"{code}"', LAUNCHER_SOURCE)
 
+    def test_pipeline_worker_detects_manual_start_states_without_automation(self):
+        self.assertIn('["to_do", "doing"].includes', LAUNCHER_SOURCE)
+
 
 if __name__ == "__main__":
     unittest.main()

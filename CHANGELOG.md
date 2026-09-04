@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.76 — 2026-09-04
+
+- Corrigido o arranque do pipeline ao clicar em **Start** num vídeo parado, mesmo quando não existe nenhum canal com automação activa.
+- O launcher passa a monitorizar os estados `to_do` e `doing`, que são os estados realmente consumidos pelo worker do pipeline.
+
 ## 0.5.56 — 2026-09-04
 
 - Corrigido o encerramento por `Ctrl+C` no launcher Streamlit.
