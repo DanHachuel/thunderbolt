@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.80 — 2026-09-04
+
+- Corrigida a rotação das chaves individuais das fontes de vídeo stock.
+- Os cartões Pexels e Pixabay activos passam a ser tentados pela prioridade configurada, uma chave por tentativa, antes de avançar para o provider seguinte.
+- Falhas de actividade, quota ou credenciais numa chave passam correctamente para a próxima chave elegível; a configuração legada sem cartões mantém o comportamento anterior.
+
 ## 0.5.79 — 2026-09-04
 
 - Corrigido o refresh da versão 0.5.78: as páginas completas de Automação Youtube e Automação Tiktok deixaram de ser fragmentos.

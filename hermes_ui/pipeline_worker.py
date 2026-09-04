@@ -658,28 +658,37 @@ def _normalise_video_route(task: dict[str, Any], settings: dict[str, Any]) -> st
     return raw if raw in {"pexels", "pixabay", "local"} else "pexels"
 
 
-def _material_video_routes(task: dict[str, Any], settings: dict[str, Any]) -> list[str]:
-    """Return stock providers to try, starting with the task's selected source."""
+def _material_video_attempts(task: dict[str, Any], settings: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return one stock attempt per configured key in persisted priority order."""
     route = _normalise_video_route(task, settings)
     if route not in {"pexels", "pixabay"}:
-        return [route]
+        return [(route, "")]
 
-    ordered_providers: list[str] = []
-    for card in material_source_cards(settings, enabled_only=True):
+    has_explicit_cards = isinstance(settings.get("material_source_cards"), list) and bool(settings.get("material_source_cards"))
+    attempts: list[tuple[str, str]] = []
+    for card in material_source_cards(settings, enabled_only=True) if has_explicit_cards else []:
         provider = str(card.get("provider") or "").strip().casefold()
-        if provider not in {"pexels", "pixabay"} or provider in ordered_providers:
+        api_key = str(card.get("api_key") or "").strip()
+        if provider not in {"pexels", "pixabay"} or not api_key:
             continue
-        if material_api_keys(settings, provider):
-            ordered_providers.append(provider)
+        attempts.append((provider, api_key))
 
-    # A selected source is an explicit preference for this task. The remaining
-    # configured sources follow their persisted priority and are true fallbacks.
-    if route in ordered_providers:
-        ordered_providers.remove(route)
-        ordered_providers.insert(0, route)
-    elif material_api_keys(settings, route):
-        ordered_providers.insert(0, route)
-    return ordered_providers or [route]
+    # A selected source is an explicit preference for this task. Its individual
+    # keys remain in their configured priority order before other providers.
+    preferred = [item for item in attempts if item[0] == route]
+    fallback = [item for item in attempts if item[0] != route]
+    ordered = preferred + fallback
+    if ordered:
+        return ordered
+    # Legacy settings keep the complete key list in one config field. Let
+    # MoneyPrinterTurbo retain its own list handling when no individual cards
+    # are available, preserving backwards compatibility for older installs.
+    return [(route, "")]
+
+
+def _material_video_routes(task: dict[str, Any], settings: dict[str, Any]) -> list[str]:
+    """Return provider names for compatibility with diagnostics and callers."""
+    return [provider for provider, _api_key in _material_video_attempts(task, settings)]
 
 
 def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
@@ -890,6 +899,7 @@ def _run_video_helper_once(
     task: dict[str, Any],
     *,
     route_override: str = "",
+    api_key_override: str = "",
     settings: dict[str, Any] | None = None,
 ) -> Path:
     helper_dir = Path(__file__).resolve().parents[1] / "seed" / "skills"
@@ -917,6 +927,8 @@ def _run_video_helper_once(
     definition = provider_definition(provider)
     route = str(route_override or _normalise_video_route(task, settings)).strip().casefold()
     source_keys = material_api_keys(settings, route) if route in {"pexels", "pixabay"} else []
+    if api_key_override and route in {"pexels", "pixabay"}:
+        source_keys = [str(api_key_override).strip()]
     if route in {"pexels", "pixabay"} and not source_keys:
         source_label = "Pexels" if route == "pexels" else "Pixabay"
         message = f"Configure pelo menos uma API key de {source_label} em Configurações > Configuração API > Fontes de materiais."
@@ -1175,31 +1187,31 @@ def _stock_fallback_is_eligible(route: str, error: PipelineError) -> bool:
 def _run_video_helper(task: dict[str, Any]) -> Path:
     """Run the stock helper with provider fallback in the configured priority order."""
     settings = _settings()
-    routes = _material_video_routes(task, settings)
-    if len(routes) <= 1:
-        return _run_video_helper_once(task, route_override=routes[0] if routes else "", settings=settings)
-
-    for index, route in enumerate(routes):
+    attempts = _material_video_attempts(task, settings)
+    if len(attempts) <= 1:
+        route, api_key = attempts[0] if attempts else ("", "")
+        return _run_video_helper_once(task, route_override=route, api_key_override=api_key, settings=settings)
+    for index, (route, api_key) in enumerate(attempts):
         attempt_task = dict(task)
         generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
         attempt_task["material_source"] = route
         attempt_task["generation_settings"] = {**generation_settings, "material_source": route}
         try:
-            return _run_video_helper_once(attempt_task, route_override=route, settings=settings)
+            return _run_video_helper_once(attempt_task, route_override=route, api_key_override=api_key, settings=settings)
         except PipelineStopped:
             raise
         except PipelineError as exc:
-            if not _stock_fallback_is_eligible(route, exc) or index == len(routes) - 1:
+            if not _stock_fallback_is_eligible(route, exc) or index == len(attempts) - 1:
                 metadata = dict(getattr(exc, "failure_metadata", {}) or {})
                 metadata["failure_route"] = route
-                metadata["fallback_attempts"] = " → ".join(_provider_api_label(item) for item in routes[: index + 1])
+                metadata["fallback_attempts"] = " → ".join(_provider_api_label(item[0]) for item in attempts[: index + 1])
                 message = (
                     f"Falha no provider {_provider_api_label(route)} após tentar "
                     f"{metadata['fallback_attempts']}. Último erro: {exc}"
                 )
                 raise PipelineError(message, failure_metadata=metadata) from exc
 
-    raise PipelineError("Nenhum provider de vídeo stock configurado.")
+    raise PipelineError("Nenhuma chave de provider de vídeo stock configurada.")
 
 
 def _read_persisted_script(task: dict[str, Any], channel: dict[str, Any], blueprint: dict[str, Any], topic: str) -> dict[str, Any] | None:
