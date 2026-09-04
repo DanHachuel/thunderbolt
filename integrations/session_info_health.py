@@ -8,6 +8,7 @@ conta Google/YouTube.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,10 +16,10 @@ from typing import Any
 
 from integrations.youtube_direct_credentials import credentials_document_path, load_credentials_document
 
-DEFAULT_SESSION_INFO_TTL_HOURS = 36
+DEFAULT_SESSION_INFO_TTL_HOURS = 19
 DEFAULT_SESSION_INFO_ALERT_HOURS = 6
-MIN_SESSION_INFO_TTL_HOURS = 24
-MAX_SESSION_INFO_TTL_HOURS = 48
+MIN_SESSION_INFO_TTL_HOURS = 1
+MAX_SESSION_INFO_TTL_HOURS = 72
 
 
 def utc_now() -> datetime:
@@ -28,6 +29,11 @@ def utc_now() -> datetime:
 
 def parse_timestamp(value: Any) -> datetime | None:
     """Parse ISO-8601 timestamps used in local credential documents."""
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            return None
     text = str(value or "").strip()
     if not text:
         return None
@@ -118,11 +124,17 @@ def health_check_session_info(
     file_text = str(credential_file or "")
     if not session_info:
         return SessionInfoHealth("missing", "Falta sessionInfo nesta conta Google/YouTube.", None, None, None, None, account_id, account_label, file_text, False, True)
+    if str(document.get("sessionInfoHealthStatus") or "").strip() == "blocked_by_google":
+        return SessionInfoHealth("blocked_by_google", "Sessão bloqueada pelo Google; é necessário login manual.", None, None, None, captured.isoformat() if captured else None, account_id, account_label, file_text, True, True)
+    if str(document.get("sessionInfoHealthStatus") or "").strip() == "invalid_format":
+        return SessionInfoHealth("invalid_format", "sessionInfo capturado, mas o formato foi rejeitado.", None, None, None, captured.isoformat() if captured else None, account_id, account_label, file_text, True, True)
     if captured is None:
-        return SessionInfoHealth("unknown", "sessionInfo existe, mas a data de captura não é conhecida; guarde novamente o token para activar o alerta de expiração.", None, None, None, None, account_id, account_label, file_text, True, True)
+        # Legacy documents without a capture date remain compatible with the
+        # existing uploader, while the UI still asks for a manual renewal.
+        return SessionInfoHealth("unknown", "sessionInfo existe, mas a data de captura não é conhecida; renove a sessão para activar o alerta de expiração.", None, None, None, None, account_id, account_label, file_text, True, True)
     age = max(0.0, (current - captured.astimezone(timezone.utc)).total_seconds() / 3600)
-    remaining = float(ttl) - age
-    expires = captured.astimezone(timezone.utc) + timedelta(hours=ttl)
+    expires = parse_timestamp(document.get("expires_at")) or (captured.astimezone(timezone.utc) + timedelta(hours=ttl))
+    remaining = (expires - current.astimezone(timezone.utc)).total_seconds() / 3600
     if remaining <= 0:
         return SessionInfoHealth("expired", f"sessionInfo expirou há {abs(remaining):.1f} horas; renove-o manualmente antes de criar ou enviar conteúdos.", age, remaining, expires.isoformat(), captured.isoformat(), account_id, account_label, file_text, True, True)
     if remaining <= alert:
@@ -160,6 +172,14 @@ def check_account_session_info_health(
     """Load one account document and return its safe SessionInfo health state."""
     settings = settings or {}
     document = load_credentials_document(storage_root, account, settings, create=False)
+    state_path = credentials_document_path(storage_root, account).with_name("renewal_state.json")
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        state = {}
+    if isinstance(state, dict) and state.get("status") in {"blocked_by_google", "invalid_format"}:
+        document = dict(document)
+        document["sessionInfoHealthStatus"] = state["status"]
     return session_info_health_from_settings(
         account,
         document,

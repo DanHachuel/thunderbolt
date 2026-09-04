@@ -48,8 +48,8 @@ def test_session_info_health_states_are_bounded_and_secret_free():
     assert expired.status == "expired"
     assert unknown.status == "unknown"
     assert "secret-token" not in str(healthy.as_dict())
-    assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoCapturedAt": now.isoformat()}, now=now, ttl_hours=1).status == "healthy"
-    assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoCapturedAt": (now - timedelta(hours=20)).isoformat()}, now=now, ttl_hours=1).status == "expiring"
+    assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoCapturedAt": now.isoformat()}, now=now, ttl_hours=1).status == "expiring"
+    assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoCapturedAt": (now - timedelta(hours=20)).isoformat()}, now=now, ttl_hours=1).status == "expired"
 
 
 def test_first_manual_session_info_save_records_capture_timestamp(tmp_path):
