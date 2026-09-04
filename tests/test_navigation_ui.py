@@ -68,7 +68,7 @@ def test_models_ai_has_meta_tutorial_renderer():
 
 
 def test_google_configuration_keeps_account_fields_and_api_page_does_not_duplicate_them():
-    google_start = MAIN_SOURCE.index("def render_google_accounts():")
+    google_start = MAIN_SOURCE.index("def render_google_accounts(")
     settings_start = MAIN_SOURCE.index("def render_settings():")
     notifications_start = MAIN_SOURCE.index("def render_notifications():")
     google_page = MAIN_SOURCE[google_start:settings_start]
@@ -76,9 +76,9 @@ def test_google_configuration_keeps_account_fields_and_api_page_does_not_duplica
     assert "INNERTUBE_API_KEY" in google_page
     assert "sessionInfo" in google_page
     assert "google_global_api_settings_form" in google_page
-    assert "google_page_youtube_client_id" in google_page
-    assert "google_page_youtube_client_secret" in google_page
     assert "google_page_youtube_api_key" in google_page
+    assert "Configuração Global: YouTube Data API v3 (API Key)" in google_page
+    assert "Directamente via OAuth das Contas Google/YouTube cadastradas" in google_page
     assert 'YouTube OAuth Client ID' not in api_page
     assert 'YouTube OAuth Client Secret' not in api_page
     assert 'YouTube Data API Key' not in api_page

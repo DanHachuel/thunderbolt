@@ -10,7 +10,10 @@ from typing import Any
 
 from integrations.platforms import IntegrationResult
 
-BATCH_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
+BATCH_SCOPES = [
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+]
 DEFAULT_LOOPBACK_HOST = "127.0.0.1"
 DEFAULT_LOOPBACK_PORT = 8765
 
