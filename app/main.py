@@ -7043,7 +7043,7 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
                     "meta/llama-3.1-70b-instruct",
                     "meta/llama-3.3-70b-instruct",
                     "nvidia/llama-3.1-nemotron-70b-instruct",
-                ] if definition.code == "openai" else []
+                ] if definition.code == "openai" else (["google/paligemma"] if definition.code == "nvidia_nim_paligemma" else [])
                 options = ["__select_model__", *list(dict.fromkeys([*discovered_models, *default_models]))]
                 # Mantém modelos guardados mesmo quando a descoberta ainda não foi
                 # executada ou quando o provider deixou de os devolver temporariamente.
@@ -7128,11 +7128,17 @@ def _render_llm_card(settings: dict[str, Any], cards: list[dict[str, Any]], inde
             try:
                 from integrations.openai_model_discovery import fetch_openai_compatible_models
                 discovered = fetch_openai_compatible_models(edited.get("api_key", ""), edited.get("base_url", ""))
+                if definition.code == "nvidia_nim_paligemma" and "google/paligemma" not in discovered:
+                    discovered.insert(0, "google/paligemma")
                 st.session_state[f"llm_model_catalog_{card_id}"] = discovered
                 _persist_llm_cards(settings, cards)
                 st.success(f"{len(discovered)} modelo(s) disponíveis neste endpoint.")
             except Exception:
-                st.error("Não foi possível consultar os modelos deste endpoint.")
+                if definition.code == "nvidia_nim_paligemma" and str(edited.get("api_key") or "").strip():
+                    st.session_state[f"llm_model_catalog_{card_id}"] = ["google/paligemma"]
+                    st.warning("O catálogo NIM não expôs modelos, mas o modelo Paligemma foi disponibilizado para este provider.")
+                else:
+                    st.error("Não foi possível consultar os modelos deste endpoint.")
         elif save_clicked:
             _persist_llm_cards(settings, cards)
             st.success("Cartão LLM guardado.")

@@ -48,6 +48,11 @@ class LlmProviderCardTests(TestCase):
         self.assertTrue(provider_definition("ollama").show_base_url)
         self.assertFalse(provider_definition("ollama").requires_api_key)
 
+    def test_paligemma_provider_uses_integrated_nim_and_is_isolated(self) -> None:
+        definition = provider_definition("nvidia_nim_paligemma")
+        self.assertEqual(definition.default_base_url, "https://integrate.api.nvidia.com/v1")
+        self.assertTrue(definition.excluded_from_normal_pool)
+
     def test_multiple_cards_can_repeat_the_same_provider(self) -> None:
         cards = [
             {"id": "one", "provider": "openai", "api_key": "a", "model": "m", "base_url": "https://one/v1"},
