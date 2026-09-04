@@ -1243,6 +1243,22 @@ def _valid_artifact_path(value: Any) -> Path | None:
         return None
 
 
+def _existing_thumbnail_path(task: dict[str, Any], artifacts: dict[str, Any], variant: dict[str, Any]) -> Path | None:
+    """Find a thumbnail made previously by Pipeline Vídeos or the UI."""
+    candidates: list[Any] = [
+        artifacts.get("thumbnail"),
+        task.get("thumbnail_path"),
+        variant.get("image_path"),
+    ]
+    variants = task.get("thumbnail_variants") if isinstance(task.get("thumbnail_variants"), list) else []
+    candidates.extend(item.get("image_path") for item in variants if isinstance(item, dict))
+    for value in candidates:
+        path = _valid_artifact_path(value)
+        if path is not None:
+            return path
+    return None
+
+
 def _read_json_artifact(value: Any) -> dict[str, Any] | None:
     path = _valid_artifact_path(value)
     if path is None:
@@ -1482,7 +1498,8 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
 
     _update(task_id, stage="thumbnail", state="doing", progress=max(86, int(task.get("progress") or 0)), error=None)
     current_artifacts = dict((_task_by_id(task_id) or {}).get("artifacts") or artifacts)
-    existing_thumbnail = _valid_artifact_path(current_artifacts.get("thumbnail") or variant.get("image_path"))
+    current_task = _task_by_id(task_id) or task
+    existing_thumbnail = _existing_thumbnail_path(current_task, current_artifacts, variant)
     if existing_thumbnail is not None:
         thumbnail_path = existing_thumbnail
     else:

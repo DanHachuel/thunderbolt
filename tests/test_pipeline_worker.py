@@ -108,6 +108,25 @@ def test_run_task_reuses_prepared_title_and_thumbnail_without_full_creative_gene
     assert any(update.get("stage") == "upload" and update.get("state") == "done" for update in updates)
 
 
+def test_existing_thumbnail_path_is_reused_from_pipeline_artifacts(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    thumbnail = tmp_path / "thumbnail-pipeline.jpg"
+    thumbnail.write_bytes(b"thumbnail")
+    task = {
+        "thumbnail_path": str(thumbnail),
+        "thumbnail_variant": {"image_path": str(thumbnail)},
+        "thumbnail_variants": [{"image_path": str(thumbnail)}],
+    }
+
+    monkeypatch.setattr(
+        pipeline_worker,
+        "_generate_pipeline_thumbnail",
+        lambda *args, **kwargs: pytest.fail("não deve regenerar thumbnail existente"),
+    )
+
+    assert pipeline_worker._existing_thumbnail_path(task, {}, task["thumbnail_variant"]) == thumbnail
+
+
 def test_retried_video_uses_settings_reloaded_at_execution_time(tmp_path, monkeypatch):
     """A tarefa preserva o conteúdo, mas entrega a configuração actual ao provider."""
     _isolate_storage(tmp_path, monkeypatch)
