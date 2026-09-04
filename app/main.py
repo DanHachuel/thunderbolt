@@ -6728,19 +6728,21 @@ def render_google_accounts(*, include_innertube: bool = True):
             st.rerun()
 
     st.divider()
-    st.markdown("### Adicionar outra conta Gmail")
-    st.caption("Este formulário fica fora dos cartões das contas existentes. A associação de canais não depende da completude deste documento; ela apenas ficará pendente para Upload directo até os campos serem preenchidos.")
-    with st.form("add_batch_account_form"):
-        add_cols = st.columns(2)
-        with add_cols[0]:
-            new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
-            new_account_email = st.text_input("E-mail/Gmail", key="new_batch_account_email")
-            new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
-        with add_cols[1]:
-            new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
-            new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
-            new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
-        add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
+    add_account = False
+    with st.expander("Adicionar conta Google/YouTube", expanded=False):
+        st.markdown("### Nova conta Gmail")
+        st.caption("Este formulário fica fora dos cartões das contas existentes. A associação de canais não depende da completude deste documento; ela apenas ficará pendente para Upload directo até os campos serem preenchidos.")
+        with st.form("add_batch_account_form"):
+            add_cols = st.columns(2)
+            with add_cols[0]:
+                new_account_label = st.text_input("Nome da nova conta", value="Canais YouTube", key="new_batch_account_label")
+                new_account_email = st.text_input("E-mail/Gmail", key="new_batch_account_email")
+                new_account_client_id = st.text_input("OAuth Client ID", key="new_batch_account_client_id")
+            with add_cols[1]:
+                new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
+                new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
+                new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
+            add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
     if add_account:
         document_error = ""
         if "@" not in new_account_email.strip():
