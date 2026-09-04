@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from hermes_ui import growth_youtube
+from integrations import youtube_growth_api
 
 
 def test_analysis_code_has_stable_gya_pattern():
@@ -62,3 +63,13 @@ def test_paligemma_payload_is_isolated_and_uses_bearer(tmp_path):
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
     assert post.call_args.kwargs["json"]["model"] == "google/paligemma"
     assert post.call_args.args[0] == "https://ai.api.nvidia.com/v1/vlm/google/paligemma"
+
+
+def test_growth_oauth_account_matches_channel_id():
+    account = {"id": "google-one", "email": "one@example.com", "channels": [{"youtube_channel_id": "UC123"}]}
+    assert youtube_growth_api.find_account_for_channel({"youtube_channel_id": "UC123"}, {"youtube_batch_accounts": [account]}) == account
+
+
+def test_growth_analytics_is_explicitly_unavailable_without_matching_account(tmp_path):
+    result = youtube_growth_api.query_channel_analytics({"youtube_channel_id": "UC123"}, {}, tmp_path)
+    assert result["status"] == "not_connected"
