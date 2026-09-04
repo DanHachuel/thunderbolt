@@ -79,7 +79,9 @@ function hasScheduledAutomation() {
 
 function hasPendingPipelineWork() {
   const tasks = readStateJson("tasks.json", []);
-  return Array.isArray(tasks) && tasks.some((task) => ["queued", "pending", "processing", "running", "in_progress"].includes(String(task?.state || task?.status || "").toLowerCase()));
+  // A UI Start coloca a tarefa em `doing`; `to_do` também é consumido pelo
+  // pipeline worker. Estes estados não dependem de automação de canal activa.
+  return Array.isArray(tasks) && tasks.some((task) => ["to_do", "doing"].includes(String(task?.state || task?.status || "").toLowerCase()));
 }
 
 function ensureRuntimeStorage() {
