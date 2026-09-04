@@ -125,8 +125,9 @@ class ApiKeyDiagnosticsTests(unittest.TestCase):
                 "base_url": "https://router.huggingface.co/v1",
             })
         self.assertEqual(result["status"], "success")
-        self.assertEqual(get.call_args.args[0], "https://router.huggingface.co/v1/models")
+        self.assertEqual(get.call_args.args[0], "https://huggingface.co/api/models")
         self.assertEqual(get.call_args.kwargs["headers"], {"Authorization": "Bearer hf-secret"})
+        self.assertEqual(get.call_args.kwargs["params"], {"pipeline_tag": "text-to-image", "limit": 1})
         self.assertNotIn("hf-secret", str(result))
 
         with patch.object(api_key_tests.requests, "get", return_value=self.response(200)) as get:

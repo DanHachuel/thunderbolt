@@ -108,22 +108,26 @@ class MediaProvidersTests(unittest.TestCase):
     def test_kie_image_request_id_reads_nested_task_id(self):
         self.assertEqual(media_generation._image_request_id({"code": 200, "data": {"taskId": "task-123"}}), "task-123")
 
-    def test_openai_compatible_image_base64_is_saved(self):
-        encoded = base64.b64encode(b"image").decode("ascii")
+    def test_huggingface_image_uses_inference_client(self):
         card = {
             "id": "hf",
             "provider": "huggingface",
             "api_key": "secret",
             "model": "black-forest-labs/FLUX.1-dev",
-            "base_url": "https://router.huggingface.co/v1",
+            "base_url": "https://huggingface.co",
             "api_style": "huggingface",
         }
-        routed = RoutedResponse(card=card, payload={"data": [{"b64_json": encoded}]}, attempts=())
+        image = Mock()
+        image.save.side_effect = lambda buffer, format: buffer.write(b"image")
+        client = Mock()
+        client.text_to_image.return_value = image
+        fake_huggingface = type("FakeHuggingFace", (), {"InferenceClient": staticmethod(lambda **kwargs: client)})()
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(media_generation, "STORAGE", Path(temp_dir)), patch.object(media_generation, "ensure_storage", lambda: None), patch.object(media_generation, "route_json_request", return_value=routed):
+            with patch.object(media_generation, "STORAGE", Path(temp_dir)), patch.object(media_generation, "ensure_storage", lambda: None), patch.dict("sys.modules", {"huggingface_hub": fake_huggingface}):
                 output = media_generation.generate_image_for_card({}, card, "a clean image", topic="topic")
             self.assertEqual(output.read_bytes(), b"image")
             self.assertEqual(output.parent, Path(temp_dir) / "thumbnails")
+        client.text_to_image.assert_called_once()
 
     def test_openrouter_image_request_uses_dedicated_images_endpoint(self):
         response = Mock(status_code=200)

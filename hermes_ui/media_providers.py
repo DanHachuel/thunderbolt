@@ -113,11 +113,11 @@ MEDIA_PROVIDER_CATALOG: tuple[MediaProviderDefinition, ...] = (
     MediaProviderDefinition(
         "huggingface",
         "Hugging Face Inference API",
-        default_base_url="https://router.huggingface.co/v1",
+        default_base_url="https://huggingface.co",
         supports_image=True,
-        supports_text=True,
+        supports_text=False,
         api_style="huggingface",
-        description="Inference Providers; a capacidade depende do modelo seleccionado.",
+        description="Hugging Face Inference API para imagens via InferenceClient com provider hf-inference; não usa endpoint OpenAI-compatible.",
     ),
     MediaProviderDefinition(
         "cloudflare_workers_ai",
@@ -230,7 +230,7 @@ def normalize_media_card(card: Any, index: int = 0) -> dict[str, Any]:
         "provider": provider,
         "api_key": str(source.get("api_key") or source.get("key") or "").strip(),
         "model": str(source.get("model") or source.get("model_name") or "").strip(),
-        "base_url": str(source.get("base_url") or "").strip() or definition.default_base_url,
+        "base_url": definition.default_base_url if provider == "huggingface" else (str(source.get("base_url") or "").strip() or definition.default_base_url),
         "enabled": bool(source.get("enabled", True)),
         "priority": max(0, int(source.get("priority", index)) if str(source.get("priority", index)).strip().lstrip("-").isdigit() else index),
         "supports_image": bool(source.get("supports_image", definition.supports_image)),

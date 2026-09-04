@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import io
 import json
 import mimetypes
 import os
@@ -452,6 +453,35 @@ def generate_image_for_card(
 
     ensure_storage()
     destination = STORAGE / "thumbnails" / f"media-{provider}-{abs(hash((topic, prompt, variant_index))) & 0xffffffffffffffff:x}.jpg"
+
+    if provider == "huggingface":
+        model = _model(card)
+        token = _api_key(card)
+        if not model:
+            raise MediaGenerationError("Hugging Face requer a selecção de um modelo text-to-image.")
+        try:
+            image_prompt, _headline = _compose_thumbnail_prompt(
+                prompt,
+                topic=topic,
+                lettering_text=lettering_text,
+                lettering_prompt=lettering_prompt,
+            )
+            constrained_prompt = _append_generation_constraints(
+                image_prompt,
+                kind="image",
+                aspect_ratio="16:9",
+                size="1280x720 minimum",
+            )
+            from huggingface_hub import InferenceClient
+            image = InferenceClient(token=token or None, provider="hf-inference").text_to_image(
+                prompt=constrained_prompt,
+                model=model,
+            )
+            buffer = io.BytesIO()
+            image.save(buffer, format="PNG")
+            return _download_or_write(buffer.getvalue(), "", destination, card)
+        except Exception as exc:
+            raise MediaGenerationError(f"Hugging Face text-to-image falhou: {str(exc)[:240]}") from exc
 
     def request(current: dict[str, Any]) -> Any:
         return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt)

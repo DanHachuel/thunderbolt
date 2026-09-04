@@ -7281,6 +7281,9 @@ def _persist_media_cards(settings: dict[str, Any], cards: list[dict[str, Any]], 
 def _fetch_media_models(card: dict[str, Any]) -> list[str]:
     """Consultar modelos do provider, incluindo o catálogo nativo Gemini."""
     provider = str(card.get("provider") or "").strip().lower()
+    if provider == "huggingface":
+        from integrations.openai_model_discovery import fetch_huggingface_text_to_image_models
+        return fetch_huggingface_text_to_image_models(str(card.get("api_key") or ""))
     if provider == "replicate":
         from integrations.openai_model_discovery import fetch_replicate_models
         return fetch_replicate_models(str(card.get("api_key") or ""), str(card.get("base_url") or ""))

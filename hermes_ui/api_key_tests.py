@@ -169,6 +169,14 @@ def test_media_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     api_style = str(source.get("api_style") or "").strip().lower()
     if provider == "nano_banana":
         return test_nano_banana_credentials(api_key, model)
+    if provider == "huggingface":
+        if not api_key:
+            return _missing("Introduza o token Hugging Face antes de testar.")
+        return _get(
+            "https://huggingface.co/api/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            params={"pipeline_tag": "text-to-image", "limit": 1},
+        )
     if not base_url:
         return _result("missing", "Complete a Base URL antes de testar.")
     if provider not in {"inferenceport", "ollama", "lmstudio"} and not api_key:

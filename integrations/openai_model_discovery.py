@@ -210,6 +210,40 @@ def fetch_openai_compatible_models(
     return normalize_model_ids(payload)
 
 
+def fetch_huggingface_text_to_image_models(
+    api_key: str,
+    *,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    limit: int = 2000,
+) -> list[str]:
+    """List only public Hugging Face models tagged with ``text-to-image``."""
+    token = str(api_key or "").strip()
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        response = requests.get(
+            "https://huggingface.co/api/models",
+            params={"pipeline_tag": "text-to-image", "limit": min(max(int(limit), 1), MAX_MODEL_IDS), "sort": "downloads", "direction": -1},
+            headers=headers,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise ModelDiscoveryError(f"Não foi possível consultar o catálogo text-to-image da Hugging Face: {exc}") from exc
+    if response.status_code >= 400:
+        raise ModelDiscoveryError(f"O catálogo text-to-image da Hugging Face devolveu HTTP {response.status_code}.")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise ModelDiscoveryError("O catálogo Hugging Face devolveu uma resposta que não é JSON.") from exc
+    if not isinstance(payload, list):
+        raise ModelDiscoveryError("O catálogo Hugging Face não devolveu uma lista de modelos.")
+    models = sorted({str(item.get("id") or "").strip() for item in payload if isinstance(item, dict) and str(item.get("id") or "").strip()}, key=str.casefold)
+    if not models:
+        raise ModelDiscoveryError("A Hugging Face não devolveu modelos com pipeline text-to-image.")
+    return models[:MAX_MODEL_IDS]
+
+
 def fetch_replicate_models(
     api_key: str,
     base_url: str,
