@@ -181,3 +181,9 @@ def test_youtube_cards_format_large_counts_with_pt_separators():
     assert 'def _format_channel_count(value: Any) -> str:' in MAIN_SOURCE
     assert 'f"{int(value):,}".replace(",", ".")' in MAIN_SOURCE
     assert 'st.metric("Visualizações", _format_channel_count(channel.get("view_count")))' in MAIN_SOURCE
+
+
+def test_tiktok_cards_use_shared_large_count_formatter():
+    assert 'return f"{int(normalized):,}".replace(",", ".")' in MAIN_SOURCE
+    assert 'st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))' in MAIN_SOURCE
+    assert 'st.metric("Vídeos", format_metric_number(channel.get("video_count")))' in MAIN_SOURCE

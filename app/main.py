@@ -2057,7 +2057,8 @@ def format_metric_number(value: Any) -> str:
     if value in (None, ""):
         return "—"
     try:
-        return f"{int(value):,}".replace(",", ".")
+        normalized = str(value).strip().replace(".", "").replace(",", "")
+        return f"{int(normalized):,}".replace(",", ".")
     except (TypeError, ValueError):
         return str(value)
 
@@ -2207,6 +2208,8 @@ def render_tiktok_channels():
                         st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
                     with card_cols[3]:
                         st.metric("Curtidas", format_metric_number(channel.get("likes_count")))
+                    with card_cols[4]:
+                        st.metric("Vídeos", format_metric_number(channel.get("video_count")))
                     with card_cols[5]:
                         active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
                         if active != bool(channel.get("active", True)):
