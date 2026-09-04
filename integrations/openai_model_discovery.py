@@ -276,8 +276,14 @@ def validate_paligemma_api_key(
     if "integrate.api.nvidia.com" in configured:
         configured = configured.replace("integrate.api.nvidia.com", "ai.api.nvidia.com")
     endpoint = configured if "/vlm/google/paligemma" in configured else f"{configured}/vlm/google/paligemma"
+    # O endpoint VLM devolve 422 quando recebe apenas texto; uma imagem mínima
+    # permite testar autenticação e validação do contrato sem usar ficheiros do utilizador.
+    one_pixel_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     payload = {
-        "messages": [{"role": "user", "content": "Describe this image in one word."}],
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": "Describe this image in one word."},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{one_pixel_png}"}},
+        ]}],
         "max_tokens": 8,
         "temperature": 0,
     }
