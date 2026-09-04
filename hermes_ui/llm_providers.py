@@ -13,6 +13,7 @@ from integrations.openai_model_discovery import (
     DEFAULT_NVIDIA_NIM_BASE_URL,
     OpenAICompatibleAPIError,
     fetch_openai_compatible_models,
+    validate_paligemma_api_key,
     validate_openai_compatible_api_key,
     validate_openrouter_api_key,
 )
@@ -431,7 +432,9 @@ def test_llm_provider_card(card: Mapping[str, Any]) -> dict[str, Any]:
     if not model:
         return {"ok": False, "status": "error", "message": "Missing configuration — introduza o modelo antes do teste."}
     try:
-        if normalized["provider"] == "openrouter":
+        if normalized["provider"] == "nvidia_nim_paligemma":
+            validate_paligemma_api_key(api_key, base_url)
+        elif normalized["provider"] == "openrouter":
             validate_openrouter_api_key(api_key, base_url, model)
         else:
             validate_openai_compatible_api_key(api_key, base_url, model)

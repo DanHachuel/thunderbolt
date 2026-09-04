@@ -9,11 +9,18 @@ from integrations.openai_model_discovery import (
     fetch_replicate_models,
     models_endpoint,
     validate_openai_compatible_api_key,
+    validate_paligemma_api_key,
     validate_openrouter_api_key,
 )
 
 
 class OpenAICompatibleApiValidationTests(TestCase):
+    def test_paligemma_validation_uses_vlm_route_from_integrated_base(self) -> None:
+        response = Mock(status_code=200)
+        with patch("integrations.openai_model_discovery.requests.post", return_value=response) as post:
+            validate_paligemma_api_key("nim-secret", "https://integrate.api.nvidia.com/v1")
+        self.assertEqual(post.call_args.args[0], "https://ai.api.nvidia.com/v1/vlm/google/paligemma")
+
     def test_replicate_catalog_uses_native_results_endpoint_and_latest_version(self) -> None:
         response = Mock(status_code=200)
         response.json.return_value = {
