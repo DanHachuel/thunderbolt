@@ -909,9 +909,9 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             style_value = {"pexels": "Pexels/Pixabay", "music": "Apenas Música"}.get(str(channel.get("style_wide") or "pexels"), str(channel.get("style_wide") or "Pexels/Pixabay"))
             edited_style = st.selectbox("Estilo wide", style_options, index=style_options.index(style_value) if style_value in style_options else 0)
             edited_niche = st.text_input("Canais de Referência / Nicho", value=str(channel.get("niche") or channel_niche_label(channel) if channel_niche_label(channel) != "SEM NICHO CONFIGURADO" else "") )
-            edited_subscribers = st.number_input("Inscritos", min_value=0, value=_channel_count_value(channel.get("subscriber_count")), step=1)
-            edited_videos = st.number_input("Vídeos", min_value=0, value=_channel_count_value(channel.get("video_count")), step=1)
-            edited_views = st.number_input("Visualizações", min_value=0, value=_channel_count_value(channel.get("view_count")), step=1)
+            edited_subscribers = st.text_input("Inscritos", value=_channel_count_text(channel.get("subscriber_count")))
+            edited_videos = st.text_input("Vídeos", value=_channel_count_text(channel.get("video_count")))
+            edited_views = st.text_input("Visualizações", value=_channel_count_text(channel.get("view_count")))
         with edit_cols[1]:
             edited_blueprint = st.selectbox("Prompts do Canal", blueprint_ids, index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"))
             edited_voice = st.selectbox("Narrador", voice_options, index=voice_options.index(current_voice) if current_voice in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
@@ -938,7 +938,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
                 "default_voice": edited_voice.strip(), "voice": edited_voice.strip(),
                 "google_account_id": edited_account.strip(), "google_account_email": str(youtube_accounts_by_id.get(edited_account, {}).get("email", "")),
                 "description": edited_description.strip(), "automation_on": bool(edited_automation), "automation_time": edited_time.strip(),
-                "subscriber_count": int(edited_subscribers) or None, "video_count": int(edited_videos) or None, "view_count": int(edited_views) or None,
+                "subscriber_count": _channel_count_value(edited_subscribers) or None, "video_count": _channel_count_value(edited_videos) or None, "view_count": _channel_count_value(edited_views) or None,
             })
             st.session_state.pop(f"edit_channel_{channel_id}", None)
             st.success("Canal actualizado.")
@@ -956,6 +956,11 @@ def _channel_count_value(value: Any) -> int:
         return max(0, int(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _channel_count_text(value: Any) -> str:
+    parsed = _channel_count_value(value)
+    return f"{parsed:,}".replace(",", ".") if parsed else ""
 
 
 def _format_channel_count(value: Any) -> str:
