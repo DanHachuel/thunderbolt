@@ -1549,20 +1549,25 @@ def render_growth_youtube():
         else:
             st.button("BAIXAR ANALISE COMPLETA", disabled=True, use_container_width=True, key="growth_download_disabled")
     st.subheader("Dashboard de Growth")
-    st.caption("Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100. Clique em ANALISAR CANAL para recolher dados públicos actualizados.")
-    for row_start in range(0, len(metrics), 4):
-        cols = st.columns(4, gap="small")
-        for col, metric in zip(cols, metrics[row_start:row_start + 4]):
-            with col:
-                score = metric["score"]
-                st.markdown(
-                    f'<div style="min-height:142px;border:1px solid #263447;border-radius:10px;padding:14px;background:#0d141e;">'
-                    f'<div style="font-size:13px;color:#cbd5e1;min-height:34px;">{metric["label"]}</div>'
-                    f'<div style="font-size:30px;font-weight:800;color:{_growth_score_color(score)};">{score}<span style="font-size:13px;color:#94a3b8;">/100</span></div>'
-                    f'<div style="font-size:12px;color:#e2e8f0;margin-top:5px;">{metric["value"]}</div>'
-                    f'<div style="font-size:11px;color:#64748b;margin-top:5px;">{metric.get("diagnosis", "")[:100]}</div></div>',
-                    unsafe_allow_html=True,
-                )
+    st.caption("Visão híbrida: os 3 pilares críticos em destaque e os 5 pilares operacionais abaixo. Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100.")
+    source_names = {"public": "PÚBLICO", "paligemma": "PALIGEMMA", "estimated": "DADO ESTIMADO", "unavailable": "INDISPONÍVEL", "youtube_analytics_oauth": "ANALYTICS OAUTH"}
+    featured, secondary = metrics[:3], metrics[3:]
+
+    def growth_card(metric: dict[str, Any], featured_card: bool = False) -> str:
+        score = int(metric.get("score", 0))
+        source = source_names.get(str(metric.get("source", "unknown")), "A VERIFICAR")
+        height = "min-height:238px" if featured_card else "min-height:190px"
+        return (
+            f'<div style="{height};border:1px solid #2b3b52;border-radius:14px;padding:18px;background:linear-gradient(145deg,#111c2b,#0b121c);box-shadow:0 8px 22px rgba(0,0,0,.16);">'
+            f'<div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#7dd3fc;text-transform:uppercase;">{source}</div>'
+            f'<div style="font-size:{"18px" if featured_card else "15px"};font-weight:750;color:#f8fafc;margin-top:9px;min-height:40px;">{metric.get("label", "Métrica")}</div>'
+            f'<div style="display:flex;align-items:baseline;gap:5px;margin-top:7px;"><span style="font-size:{"42px" if featured_card else "32px"};font-weight:850;color:{_growth_score_color(score)};">{score}</span><span style="font-size:13px;color:#94a3b8;">/100</span></div>'
+            f'<div style="border-top:1px solid #263447;margin-top:10px;padding-top:10px;font-size:13px;color:#e2e8f0;"><b>KPI observado</b><br>{metric.get("value", "—")}</div>'
+            f'<div style="font-size:11px;color:#94a3b8;margin-top:9px;line-height:1.35;">{metric.get("diagnosis", "")[:150]}</div></div>'
+        )
+
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0 18px;">' + "".join(growth_card(metric, True) for metric in featured) + '</div>', unsafe_allow_html=True)
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 18px;">' + "".join(growth_card(metric) for metric in secondary) + '</div>', unsafe_allow_html=True)
     st.divider()
     history_tab, dashboard_tab = st.tabs(["Últimas análises", "Leitura estratégica"])
     with dashboard_tab:
