@@ -11,7 +11,7 @@ def test_analysis_code_has_stable_gya_pattern():
     assert len(code) == len("GYA-20260903-190000-") + 6
 
 
-def test_public_videos_limits_to_ten_and_uses_ytdlp():
+def test_public_videos_limits_to_three_and_uses_ytdlp():
     entries = [{"id": str(i), "title": f"Video {i}"} for i in range(15)]
     fake = Mock()
     fake.extract_info.return_value = {"entries": entries}
@@ -19,11 +19,11 @@ def test_public_videos_limits_to_ten_and_uses_ytdlp():
     fake.__exit__ = Mock(return_value=None)
     factory = Mock(return_value=fake)
     with patch.dict("sys.modules", {"yt_dlp": Mock(YoutubeDL=factory)}):
-        result = growth_youtube._public_videos("https://youtube.com/@channel", 10)
-    assert len(result) == 10
+        result = growth_youtube._public_videos("https://youtube.com/@channel")
+    assert len(result) == 3
     assert result[0]["id"] == "0"
     factory.assert_called_once()
-    assert factory.call_args.args[0]["playlistend"] == 10
+    assert factory.call_args.args[0]["playlistend"] == 3
 
 
 def test_score_color_ranges_match_product_requirement():
