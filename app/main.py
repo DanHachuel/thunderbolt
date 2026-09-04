@@ -2340,6 +2340,16 @@ def is_youtube_channel_record(channel: Any) -> bool:
     return classify_channel_platform(channel) == "youtube"
 
 
+def _format_channel_count(value: Any) -> str:
+    """Mostrar contadores inteiros com ponto a cada três algarismos."""
+    if value is None or str(value).strip() == "":
+        return "—"
+    try:
+        return f"{int(value):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -2810,7 +2820,7 @@ def render_channels():
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
-            header_cols = st.columns([0.7, 3.5, 1.3, 1.3, 1.5])
+            header_cols = st.columns([0.7, 3.1, 1.25, 1.15, 1.55, 1.5])
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=64)
@@ -2821,10 +2831,12 @@ def render_channels():
                 st.caption(channel_niche_label(channel))
                 st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
             with header_cols[2]:
-                st.metric("Inscritos", channel.get("subscriber_count") if channel.get("subscriber_count") is not None else "—")
+                st.metric("Inscritos", _format_channel_count(channel.get("subscriber_count")))
             with header_cols[3]:
-                st.metric("Vídeos", channel.get("video_count") if channel.get("video_count") is not None else "—")
+                st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
             with header_cols[4]:
+                st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
+            with header_cols[5]:
                 active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel_id}")
                 if active != channel.get("active"):
                     update_channel(channel_id, {"active": active})
