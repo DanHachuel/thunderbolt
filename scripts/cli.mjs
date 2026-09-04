@@ -276,18 +276,11 @@ proxy.on("error", (error) => {
 proxy.listen(publicPort, "127.0.0.1", () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
-const worker = hasScheduledAutomation() ? spawn(python, ["-m", "hermes_ui.automation_worker"], {
-  cwd: root,
-  stdio: "inherit",
-  env: runtimeEnv,
-  windowsHide: false,
-}) : null;
-const pipelineWorker = hasPendingPipelineWork() ? spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
-  cwd: root,
-  stdio: "inherit",
-  env: runtimeEnv,
-  windowsHide: false,
-}) : null;
+// Workers contínuos só devem ser iniciados explicitamente com `worker` ou
+// `pipeline-worker`; o arranque normal da interface não cria processos Python
+// em background nem faz polling periódico.
+const worker = null;
+const pipelineWorker = null;
 const restartExitCode = 75;
 let shuttingDown = false;
 let child;
