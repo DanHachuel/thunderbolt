@@ -276,15 +276,17 @@ proxy.on("error", (error) => {
 proxy.listen(publicPort, "127.0.0.1", () => {
   console.log(`Thunderbolt: interface disponível em http://localhost:${publicPort}/`);
 });
-// A worker de automação é necessária para canais com automação activa. É
-// iniciada no máximo uma vez por launcher e reiniciada com backoff se terminar
-// inesperadamente; não é criada quando não há trabalho agendado.
+// Os workers são geridos pelo launcher para que um clique em Start na UI
+// também active o processamento, mesmo sem automação de canal configurada.
+// Cada worker só existe enquanto a respectiva fila tiver trabalho pendente.
 let worker = null;
-const pipelineWorker = null;
+let pipelineWorker = null;
 const restartExitCode = 75;
 let shuttingDown = false;
 let child;
 let workerRestartTimer = null;
+let pipelineRestartTimer = null;
+let workerMonitorTimer = null;
 
 function startAutomationWorker() {
   if (shuttingDown || worker || !hasScheduledAutomation()) return;
@@ -306,6 +308,44 @@ function startAutomationWorker() {
       }, 5000);
     }
   });
+}
+
+function stopPipelineWorker() {
+  if (pipelineRestartTimer) {
+    clearTimeout(pipelineRestartTimer);
+    pipelineRestartTimer = null;
+  }
+  if (pipelineWorker && !pipelineWorker.killed) pipelineWorker.kill();
+  pipelineWorker = null;
+}
+
+function startPipelineWorker() {
+  if (shuttingDown || pipelineWorker || !hasPendingPipelineWork()) return;
+  pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
+    cwd: root,
+    stdio: "inherit",
+    env: runtimeEnv,
+    windowsHide: false,
+  });
+  pipelineWorker.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
+  pipelineWorker.on("exit", (code, signal) => {
+    pipelineWorker = null;
+    if (shuttingDown) return;
+    console.error(`Thunderbolt pipeline worker: terminou (código ${code ?? "-"}, sinal ${signal ?? "-"}).`);
+    if (hasPendingPipelineWork()) {
+      pipelineRestartTimer = setTimeout(() => {
+        pipelineRestartTimer = null;
+        startPipelineWorker();
+      }, 5000);
+    }
+  });
+}
+
+function monitorWorkers() {
+  if (shuttingDown) return;
+  if (hasPendingPipelineWork()) startPipelineWorker();
+  else if (pipelineWorker) stopPipelineWorker();
+  startAutomationWorker();
 }
 
 function startStreamlit() {
@@ -347,10 +387,13 @@ const stopWorker = () => {
   shuttingDown = true;
   proxy.close();
   if (workerRestartTimer) clearTimeout(workerRestartTimer);
+  if (workerMonitorTimer) clearInterval(workerMonitorTimer);
   if (worker && !worker.killed) worker.kill();
-  if (pipelineWorker && !pipelineWorker.killed) pipelineWorker.kill();
+  stopPipelineWorker();
 };
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
-pipelineWorker?.on("error", (error) => console.error(`Thunderbolt pipeline worker: ${error.message}`));
-startAutomationWorker();
+monitorWorkers();
+// O launcher verifica apenas os JSONs locais; não existe timer no Streamlit
+// nem worker persistente quando não há tarefa pendente.
+workerMonitorTimer = setInterval(monitorWorkers, 2000);
