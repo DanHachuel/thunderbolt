@@ -121,6 +121,7 @@ from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_co
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.session_info_health import check_account_session_info_health
+from integrations.youtube_session_manager import renew_account_session
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -6570,6 +6571,8 @@ def render_google_accounts(*, include_innertube: bool = True):
                 st.error(health_message, icon="⚠️")
             elif session_health.status == "unknown":
                 st.warning(health_message, icon="⚠️")
+            elif session_health.status in {"blocked_by_google", "invalid_format"}:
+                st.error(health_message, icon="⚠️")
             with st.expander("Detalhes da conta Google", expanded=False):
                 with st.form(f"batch_account_form_{account_id}"):
                     account_cols = st.columns(2)
@@ -6686,6 +6689,30 @@ def render_google_accounts(*, include_innertube: bool = True):
                             st.rerun()
                         except ValueError as exc:
                             st.error(str(exc))
+
+                st.markdown("**Renovação de sessionInfo e cookies**")
+                st.caption("A renovação é manual ou opt-in antes do upload; não há timer residente nem execução ao seleccionar a conta.")
+                renewal_cols = st.columns([2, 1, 1])
+                auto_renew = renewal_cols[0].checkbox(
+                    "Renovar automaticamente antes do upload",
+                    value=bool(batch_account.get("auto_renew_before_upload", False)),
+                    key=f"auto_renew_before_upload_{account_id}",
+                )
+                if renewal_cols[1].button("Renovar agora", key=f"renew_session_info_{account_id}", type="primary", use_container_width=True):
+                    result = renew_account_session(STORAGE, batch_account, settings, force=True, wait_seconds=10)
+                    (st.success if result.ok else st.error)(result.message)
+                    if result.ok:
+                        st.rerun()
+                with renewal_cols[2]:
+                    _api_status_badge(
+                        "Configured" if session_health.status == "healthy" else ("Missing key" if session_health.status == "missing" else "Missing configuration"),
+                        "ready" if session_health.status == "healthy" else "missing",
+                    )
+                if auto_renew != bool(batch_account.get("auto_renew_before_upload", False)):
+                    batch_account["auto_renew_before_upload"] = bool(auto_renew)
+                    settings["youtube_batch_accounts"] = batch_accounts
+                    write_json("settings.json", settings)
+                    st.success("Preferência de renovação guardada para esta conta.")
 
     if youtube_accounts_missing_document:
         st.info("Contas que ainda precisam de dados no documento: " + ", ".join(youtube_accounts_missing_document))

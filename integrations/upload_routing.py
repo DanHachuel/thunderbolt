@@ -18,6 +18,7 @@ from integrations.postiz import PostizAdapter
 from integrations.session_info_health import check_account_session_info_health, emit_session_info_health_alerts
 from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
+from integrations.youtube_session_manager import renew_account_session
 from integrations.composio_upload import ComposioUploadError, execute_upload
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.languages import language_locale
@@ -157,6 +158,16 @@ def upload_with_default_route(
     direct_ready = False
     if account:
         try:
+            renewal_warning = ""
+            if bool(account.get("auto_renew_before_upload", settings.get("auto_renew_before_upload", False))):
+                current_health = check_account_session_info_health(storage_root, account, settings)
+                if current_health.status in {"expiring", "expired"}:
+                    renewal = renew_account_session(storage_root, account, settings, wait_seconds=10)
+                    if not renewal.ok:
+                        renewal_warning = f"Renovação automática não concluída ({renewal.status}); o upload pode falhar."
+                        attempts.append({"route": "Renovação sessionInfo", "status": "failed", "message": renewal_warning, "data": {"status": renewal.status}})
+                    else:
+                        attempts.append({"route": "Renovação sessionInfo", "status": "success", "message": renewal.message, "data": {"status": renewal.status}})
             status = document_status(storage_root, account, channel, settings, [channel])
             health = check_account_session_info_health(storage_root, account, settings)
             emit_session_info_health_alerts([health])
@@ -165,7 +176,7 @@ def upload_with_default_route(
                 direct_result = IntegrationResult(
                     False,
                     f"Upload directo indisponível: {health.message}",
-                    {"missing": ["sessionInfo"], "session_info_health": health.as_dict()},
+                    {"missing": ["sessionInfo"], "session_info_health": health.as_dict(), "renewal_warning": renewal_warning},
                 )
             elif not direct_ready:
                 missing = list(status.get("missing_cookies", []))
@@ -175,7 +186,7 @@ def upload_with_default_route(
                     missing.append("INNERTUBE_API_KEY")
                 if not status.get("has_delegated_session_id"):
                     missing.append("DELEGATED_SESSION_ID")
-                direct_result = IntegrationResult(False, f"Upload directo indisponível: {', '.join(missing)}.", {"missing": missing})
+                direct_result = IntegrationResult(False, f"Upload directo indisponível: {', '.join(missing)}. {renewal_warning}".strip(), {"missing": missing, "renewal_warning": renewal_warning})
             else:
                 direct_result = None
         except Exception as exc:
