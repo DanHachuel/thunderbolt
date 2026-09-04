@@ -4798,6 +4798,14 @@ def _render_video_task_state(task: dict[str, Any]) -> None:
                     st.caption(f"Manifesto: {task.get('video_result')}")
 
 
+def _start_pipeline_task(task_id: str, state: str) -> None:
+    """Start or retry a video task from any platform automation card."""
+    if state in {"blocked", "failed"}:
+        retry_task_with_current_settings(task_id)
+    else:
+        transition_task(task_id, "doing")
+
+
 def render_videos():
     st.subheader("Backlog Videos")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
@@ -4854,7 +4862,7 @@ def render_videos():
                 start_col, stop_col = st.columns(2)
                 with start_col:
                     if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                        transition_task(task["id"], "doing")
+                        _start_pipeline_task(str(task["id"]), state)
                         st.rerun()
                 with stop_col:
                     if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
@@ -5236,7 +5244,7 @@ def render_tiktok_automation():
             with cols[3]:
                 state = str(task.get("state") or "")
                 if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
-                    retry_task_with_current_settings(task_id) if state in {"blocked", "failed"} else transition_task(task_id, "doing")
+                    _start_pipeline_task(task_id, state)
                     st.rerun()
                 if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
                     stop_task_by_user(task_id)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.77 — 2026-09-04
+
+- Aplicado à aba **Automação Tiktok** o mesmo arranque manual do pipeline usado no YouTube.
+- O botão **Start** de tarefas TikTok agora usa a rotina comum para iniciar tarefas `to_do` e `doing` ou repetir tarefas `blocked`/`failed`, permitindo ao launcher iniciar o worker e o processo de geração do vídeo sem automação horária activa.
+
 ## 0.5.76 — 2026-09-04
 
 - Corrigido o arranque do pipeline ao clicar em **Start** num vídeo parado, mesmo quando não existe nenhum canal com automação activa.
