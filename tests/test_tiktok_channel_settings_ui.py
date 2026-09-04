@@ -24,7 +24,7 @@ def test_tiktok_cards_show_requested_channel_settings():
 
 
 def test_tiktok_automation_start_uses_shared_pipeline_start_helper():
-    block = SOURCE.split("def render_tiktok_automation():", 1)[1].split("def render_automation():", 1)[0]
-    assert 'key=f"tiktok_automation_start_{task_id}"' in block
-    assert '_start_pipeline_task(task_id, state)' in block
-    assert 'disabled=state not in {"to_do", "blocked", "failed"}' in block
+    assert '@st.fragment(run_every=5.0)\ndef _render_tiktok_automation_cards()' in SOURCE
+    assert 'key=f"tiktok_automation_start_{task_id}"' in SOURCE
+    assert '_start_pipeline_task(task_id, state)' in SOURCE
+    assert 'disabled=state not in {"to_do", "blocked", "failed"}' in SOURCE

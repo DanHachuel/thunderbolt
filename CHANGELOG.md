@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.79 — 2026-09-04
+
+- Corrigido o refresh da versão 0.5.78: as páginas completas de Automação Youtube e Automação Tiktok deixaram de ser fragmentos.
+- O refresh automático de cinco segundos ficou limitado exclusivamente às secções dos cards de vídeos e respectivas barras de progresso.
+
 ## 0.5.78 — 2026-09-04
 
 - Corrigida a actualização das barras de progresso nas abas **Automação Youtube** e **Automação Tiktok**.

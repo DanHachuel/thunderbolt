@@ -5162,6 +5162,39 @@ def render_thumbnails():
 
 
 @st.fragment(run_every=5.0)
+def _render_tiktok_automation_cards():
+        st.divider()
+        st.subheader("Vídeos cadastrados TikTok")
+        st.caption("Esta fila mostra exclusivamente tarefas associadas a canais TikTok.")
+        tiktok_tasks = load_automation_tasks_for_platform("tiktok")
+        if not tiktok_tasks:
+            st.info("Ainda não existem vídeos TikTok cadastrados.")
+        for task in tiktok_tasks:
+            task_id = str(task["id"])
+            with st.container(border=True):
+                cols = st.columns([2.4, 1.4, 1.1, 1.6])
+                with cols[0]:
+                    thumbnail_path = _task_thumbnail_path(task)
+                    if thumbnail_path:
+                        st.image(str(thumbnail_path), width=150, caption="Thumbnail")
+                    st.write(f"**{task.get('title') or task.get('topic') or 'Vídeo TikTok'}**")
+                    st.caption(f"{task.get('channel_name') or 'Canal TikTok'} · {task_id}")
+                with cols[1]:
+                    _render_video_task_state(task)
+                with cols[2]:
+                    st.caption("Plataforma")
+                    st.write("TikTok")
+                    st.caption("Portrait 9:16")
+                with cols[3]:
+                    state = str(task.get("state") or "")
+                    if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
+                        _start_pipeline_task(task_id, state)
+                        st.rerun()
+                    if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
+                        stop_task_by_user(task_id)
+                        st.rerun()
+
+
 def render_tiktok_automation():
     st.title("Automação Tiktok")
     st.caption("Agendamento diário da geração por canal. A fila TikTok usa Prompt Master e mantém exclusivamente o formato Portrait 9:16.")
@@ -5220,39 +5253,115 @@ def render_tiktok_automation():
                         update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
-    st.divider()
-    st.subheader("Vídeos cadastrados TikTok")
-    st.caption("Esta fila mostra exclusivamente tarefas associadas a canais TikTok.")
-    tiktok_tasks = load_automation_tasks_for_platform("tiktok")
-    if not tiktok_tasks:
-        st.info("Ainda não existem vídeos TikTok cadastrados.")
-    for task in tiktok_tasks:
-        task_id = str(task["id"])
-        with st.container(border=True):
-            cols = st.columns([2.4, 1.4, 1.1, 1.6])
-            with cols[0]:
-                thumbnail_path = _task_thumbnail_path(task)
-                if thumbnail_path:
-                    st.image(str(thumbnail_path), width=150, caption="Thumbnail")
-                st.write(f"**{task.get('title') or task.get('topic') or 'Vídeo TikTok'}**")
-                st.caption(f"{task.get('channel_name') or 'Canal TikTok'} · {task_id}")
-            with cols[1]:
-                _render_video_task_state(task)
-            with cols[2]:
-                st.caption("Plataforma")
-                st.write("TikTok")
-                st.caption("Portrait 9:16")
-            with cols[3]:
-                state = str(task.get("state") or "")
-                if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
-                    _start_pipeline_task(task_id, state)
-                    st.rerun()
-                if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
-                    stop_task_by_user(task_id)
-                    st.rerun()
-
+    _render_tiktok_automation_cards()
 
 @st.fragment(run_every=5.0)
+def _render_youtube_automation_cards():
+        st.divider()
+        st.subheader("Vídeos cadastrados")
+        st.caption("Start retoma as etapas já concluídas e só gera novamente o que ainda não estiver pronto. Em tarefas falhadas ou bloqueadas, a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas. Apagar remove o card da fila após confirmação e preserva os artefactos locais.")
+        tasks = load_automation_tasks_for_platform("youtube")
+        if not tasks:
+            st.info("Ainda não existem vídeos cadastrados.")
+        for task in tasks:
+            with st.container(border=True):
+                task_cols = st.columns([2.25, 1.55, 1.05, 2.15], gap="small")
+                script_path = _task_artifact_path(task, "script")
+                video_path = _task_artifact_path(task, "video")
+                thumbnail_path = _task_thumbnail_path(task)
+                thumbnail_prompt_path = _task_artifact_path(task, "thumbnail_prompt_json")
+                thumbnail_prompt = str(task.get("thumbnail_prompt") or "").strip()
+                with task_cols[0]:
+                    if thumbnail_path:
+                        st.image(str(thumbnail_path), width=180, caption="Thumbnail")
+                    else:
+                        st.caption("Thumbnail ainda não pronta")
+                    st.write(f"**{task.get('topic', 'Sem tópico')}**")
+                    st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
+                    thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
+                    with thumbnail_download_col:
+                        st.download_button(
+                            "Baixar Thumbnail",
+                            data=thumbnail_path.read_bytes() if thumbnail_path else b"",
+                            file_name=thumbnail_path.name if thumbnail_path else "thumbnail.png",
+                            mime="image/png",
+                            key=f"automation_download_thumbnail_{task['id']}",
+                            use_container_width=True,
+                            disabled=thumbnail_path is None,
+                        )
+                    with prompt_download_col:
+                        prompt_data = thumbnail_prompt_path.read_bytes() if thumbnail_prompt_path else thumbnail_prompt.encode("utf-8")
+                        st.download_button(
+                            "Baixar Thumbnail Prompt",
+                            data=prompt_data,
+                            file_name=thumbnail_prompt_path.name if thumbnail_prompt_path else "thumbnail-prompt.txt",
+                            mime="application/json" if thumbnail_prompt_path else "text/plain",
+                            key=f"automation_download_thumbnail_prompt_{task['id']}",
+                            use_container_width=True,
+                            disabled=thumbnail_prompt_path is None and not thumbnail_prompt,
+                        )
+                with task_cols[1]:
+                    _render_video_task_state(task)
+                with task_cols[2]:
+                    st.caption("Formato")
+                    st.write(_video_task_format(task))
+                with task_cols[3]:
+                    state = str(task.get("state") or "")
+                    start_col, stop_col, delete_col = st.columns(3)
+                    with start_col:
+                        if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                            if state in {"failed", "blocked"}:
+                                retry_task_with_current_settings(task["id"])
+                            else:
+                                transition_task(task["id"], "doing")
+                            st.rerun()
+                    with stop_col:
+                        if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
+                            stop_task_by_user(task["id"])
+                            st.rerun()
+                    script_download_col, video_download_col = st.columns(2, gap="small")
+                    with script_download_col:
+                        st.download_button(
+                            "Baixar Roteiro",
+                            data=script_path.read_bytes() if script_path else b"",
+                            file_name=script_path.name if script_path else "roteiro.md",
+                            mime="text/markdown",
+                            key=f"automation_download_script_{task['id']}",
+                            use_container_width=True,
+                            disabled=script_path is None,
+                        )
+                    with video_download_col:
+                        st.download_button(
+                            "Baixar Vídeo",
+                            data=video_path.read_bytes() if video_path else b"",
+                            file_name=video_path.name if video_path else "video.mp4",
+                            mime="video/mp4",
+                            key=f"automation_download_video_{task['id']}",
+                            use_container_width=True,
+                            disabled=video_path is None,
+                        )
+                    with delete_col:
+                        confirm_delete_key = f"automation_confirm_delete_{task['id']}"
+                        if st.button("Apagar", key=f"automation_delete_{task['id']}", use_container_width=True, disabled=state == "doing"):
+                            st.session_state[confirm_delete_key] = True
+                            st.rerun()
+                        if st.session_state.get(confirm_delete_key):
+                            st.warning("Remover este vídeo da fila? Os ficheiros de artefactos serão preservados.")
+                            confirm_col, cancel_col = st.columns(2)
+                            with confirm_col:
+                                if st.button("Confirmar", key=f"automation_confirm_delete_button_{task['id']}", use_container_width=True, type="primary"):
+                                    try:
+                                        delete_task(task["id"])
+                                        st.session_state.pop(confirm_delete_key, None)
+                                        st.rerun()
+                                    except ValueError as exc:
+                                        st.error(str(exc))
+                            with cancel_col:
+                                if st.button("Cancelar", key=f"automation_cancel_delete_{task['id']}", use_container_width=True):
+                                    st.session_state.pop(confirm_delete_key, None)
+                                    st.rerun()
+
+
 def render_automation():
     st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
@@ -5338,110 +5447,7 @@ def render_automation():
                         st.success("Agendamento guardado.")
                         st.rerun()
 
-    st.divider()
-    st.subheader("Vídeos cadastrados")
-    st.caption("Start retoma as etapas já concluídas e só gera novamente o que ainda não estiver pronto. Em tarefas falhadas ou bloqueadas, a nova tentativa lê as chaves, prioridades e configurações actualmente guardadas. Apagar remove o card da fila após confirmação e preserva os artefactos locais.")
-    tasks = load_automation_tasks_for_platform("youtube")
-    if not tasks:
-        st.info("Ainda não existem vídeos cadastrados.")
-    for task in tasks:
-        with st.container(border=True):
-            task_cols = st.columns([2.25, 1.55, 1.05, 2.15], gap="small")
-            script_path = _task_artifact_path(task, "script")
-            video_path = _task_artifact_path(task, "video")
-            thumbnail_path = _task_thumbnail_path(task)
-            thumbnail_prompt_path = _task_artifact_path(task, "thumbnail_prompt_json")
-            thumbnail_prompt = str(task.get("thumbnail_prompt") or "").strip()
-            with task_cols[0]:
-                if thumbnail_path:
-                    st.image(str(thumbnail_path), width=180, caption="Thumbnail")
-                else:
-                    st.caption("Thumbnail ainda não pronta")
-                st.write(f"**{task.get('topic', 'Sem tópico')}**")
-                st.caption(f"{task.get('channel_name', 'Canal')} · {task.get('id', '')}")
-                thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
-                with thumbnail_download_col:
-                    st.download_button(
-                        "Baixar Thumbnail",
-                        data=thumbnail_path.read_bytes() if thumbnail_path else b"",
-                        file_name=thumbnail_path.name if thumbnail_path else "thumbnail.png",
-                        mime="image/png",
-                        key=f"automation_download_thumbnail_{task['id']}",
-                        use_container_width=True,
-                        disabled=thumbnail_path is None,
-                    )
-                with prompt_download_col:
-                    prompt_data = thumbnail_prompt_path.read_bytes() if thumbnail_prompt_path else thumbnail_prompt.encode("utf-8")
-                    st.download_button(
-                        "Baixar Thumbnail Prompt",
-                        data=prompt_data,
-                        file_name=thumbnail_prompt_path.name if thumbnail_prompt_path else "thumbnail-prompt.txt",
-                        mime="application/json" if thumbnail_prompt_path else "text/plain",
-                        key=f"automation_download_thumbnail_prompt_{task['id']}",
-                        use_container_width=True,
-                        disabled=thumbnail_prompt_path is None and not thumbnail_prompt,
-                    )
-            with task_cols[1]:
-                _render_video_task_state(task)
-            with task_cols[2]:
-                st.caption("Formato")
-                st.write(_video_task_format(task))
-            with task_cols[3]:
-                state = str(task.get("state") or "")
-                start_col, stop_col, delete_col = st.columns(3)
-                with start_col:
-                    if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                        if state in {"failed", "blocked"}:
-                            retry_task_with_current_settings(task["id"])
-                        else:
-                            transition_task(task["id"], "doing")
-                        st.rerun()
-                with stop_col:
-                    if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
-                        stop_task_by_user(task["id"])
-                        st.rerun()
-                script_download_col, video_download_col = st.columns(2, gap="small")
-                with script_download_col:
-                    st.download_button(
-                        "Baixar Roteiro",
-                        data=script_path.read_bytes() if script_path else b"",
-                        file_name=script_path.name if script_path else "roteiro.md",
-                        mime="text/markdown",
-                        key=f"automation_download_script_{task['id']}",
-                        use_container_width=True,
-                        disabled=script_path is None,
-                    )
-                with video_download_col:
-                    st.download_button(
-                        "Baixar Vídeo",
-                        data=video_path.read_bytes() if video_path else b"",
-                        file_name=video_path.name if video_path else "video.mp4",
-                        mime="video/mp4",
-                        key=f"automation_download_video_{task['id']}",
-                        use_container_width=True,
-                        disabled=video_path is None,
-                    )
-                with delete_col:
-                    confirm_delete_key = f"automation_confirm_delete_{task['id']}"
-                    if st.button("Apagar", key=f"automation_delete_{task['id']}", use_container_width=True, disabled=state == "doing"):
-                        st.session_state[confirm_delete_key] = True
-                        st.rerun()
-                    if st.session_state.get(confirm_delete_key):
-                        st.warning("Remover este vídeo da fila? Os ficheiros de artefactos serão preservados.")
-                        confirm_col, cancel_col = st.columns(2)
-                        with confirm_col:
-                            if st.button("Confirmar", key=f"automation_confirm_delete_button_{task['id']}", use_container_width=True, type="primary"):
-                                try:
-                                    delete_task(task["id"])
-                                    st.session_state.pop(confirm_delete_key, None)
-                                    st.rerun()
-                                except ValueError as exc:
-                                    st.error(str(exc))
-                        with cancel_col:
-                            if st.button("Cancelar", key=f"automation_cancel_delete_{task['id']}", use_container_width=True):
-                                st.session_state.pop(confirm_delete_key, None)
-                                st.rerun()
-
+    _render_youtube_automation_cards()
 
 def render_upload_direct():
     st.subheader("Upload directo")
