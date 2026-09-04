@@ -183,14 +183,15 @@ def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict
 
 
 def _report_markdown(record: Mapping[str, Any]) -> str:
-    lines = [f"# CHANNEL AUDIT REPORT: {record.get('channel_name', 'Canal')}", "", f"- Código: `{record.get('code')}`", "- Plataforma: YouTube", f"- Data: {record.get('created_at')}", f"- Nota geral: **{record.get('overall_score', 0)}/100**", "", "## 1. Projecção financeira e contexto", "", "A análise pública não expõe RPM, país da audiência nem horas de visualização. O relatório não inventa estes valores. Para referência do agente, o YPP usa 1.000 inscritos e 4.000 horas de vídeos longos em 12 meses ou 10 milhões de visualizações de Shorts em 90 dias até 31/01/2027; a partir de 01/02/2027 a meta de Shorts indicada pelo agente é 20 milhões.", "", "## 2. Resumo do diagnóstico", "", "| Pilar | Nota | Métrica observada | Resultado |", "|---|---:|---|---|"]
+    analytics = record.get("analytics") or {}
+    lines = [f"# CHANNEL AUDIT REPORT: {record.get('channel_name', 'Canal')}", "", f"- Código: `{record.get('code')}`", "- Plataforma: YouTube", f"- Data: {record.get('created_at')}", f"- Nota geral: **{record.get('overall_score', 0)}/100**", "", "## 1. Projecção financeira e contexto", "", "A análise pública não expõe RPM, país da audiência nem horas de visualização. O relatório não inventa estes valores. Para referência do agente, o YPP usa 1.000 inscritos e 4.000 horas de vídeos longos em 12 meses ou 10 milhões de visualizações de Shorts em 90 dias até 31/01/2027; a partir de 01/02/2027 a meta de Shorts indicada pelo agente é 20 milhões.", "", "## 2. Resumo do diagnóstico", "", "| Pilar | Nota | Métrica observada | Origem | Diagnóstico |", "|---|---:|---|---|---|"]
     pillar_names = {"Demanda validada": "Demanda", "Qualidade da thumbnail": "Thumbnail", "Qualidade do título": "Título", "Hook — retenção inicial": "Hook", "Ritmo e edição": "Pacing", "Origem do tráfego": "Tráfego", "Conversão em inscritos": "CTA", "Cadência de publicação": "Cadência"}
     for metric in record.get("metrics", []):
-        lines.append(f"| **{pillar_names.get(metric['label'], metric['label'])}** | {metric['score']}/100 | {metric['value']} | {metric['diagnosis']} |")
+        lines.append(f"| **{pillar_names.get(metric['label'], metric['label'])}** | {metric['score']}/100 | {metric['value']} | {metric.get('source', 'unknown')} | {metric['diagnosis']} |")
     lines += ["", "## 3. Últimos 3 vídeos", "", "| Título | Visualizações | Thumbnail | Transcrição | Nota do título |", "|---|---:|---|---|---:|"]
     for video in record.get("videos", []):
         lines.append(f"| {video.get('title', '').replace('|', '/')} | {video.get('view_count', 0):,} | {video.get('thumbnail_status', '')} | {video.get('transcript_status', '')} | {video.get('title_score', 0)}/100 |")
-    lines += ["", "## 4. Actionable Roadmap — Top 3 prioridades", "", "1. **REMAKE THUMBNAILS** dos vídeos abaixo de 70: aumentar contraste, sujeito claro, emoção forte e máximo de três palavras legíveis no telemóvel.", "2. **REWRITE TITLES** com Curiosity, Clarity e Urgency; colocar a keyword principal no início e usar números/adjectivos de poder quando forem verdadeiros.", "3. **EDIT HOOK**: começar pelo resultado, promessa ou estatística forte e introduzir pattern interrupts a cada 5–8 segundos.", "", "## 5. Estratégia de longo prazo", "", "Construir uma biblioteca de pelo menos 50 vídeos evergreen, publicar com cadência semanal fixa e procurar que Browse Features se torne a principal origem de tráfego. Para um criador solo, consistência supera frequência; melhorar Thumbnail + Título antes de alterar a produção.", "", "## Limitações", "", "CTR, retenção real, origem de tráfego, RPM e horas de visualização exigem dados autorizados do YouTube Studio e não são inventados a partir da página pública."]
+    lines += ["", "## 4. Dados internos do YouTube Studio", "", f"Estado Analytics: **{analytics.get('status', 'not_connected')}**. {analytics.get('message', 'Sem OAuth Analytics autorizado; os valores privados permanecem indisponíveis ou estimados.')}", "", "## 5. Actionable Roadmap — Top 3 prioridades", "", "1. **REMAKE THUMBNAILS** dos vídeos abaixo de 70: aumentar contraste, sujeito claro, emoção forte e máximo de três palavras legíveis no telemóvel.", "2. **REWRITE TITLES** com Curiosity, Clarity e Urgency; colocar a keyword principal no início e usar números/adjectivos de poder quando forem verdadeiros.", "3. **EDIT HOOK**: começar pelo resultado, promessa ou estatística forte e introduzir pattern interrupts a cada 5–8 segundos.", "", "## 6. Estratégia de longo prazo", "", "Construir uma biblioteca de pelo menos 50 vídeos evergreen, publicar com cadência semanal fixa e procurar que Browse Features se torne a principal origem de tráfego. Para um criador solo, consistência supera frequência; melhorar Thumbnail + Título antes de alterar a produção.", "", "## Limitações", "", "CTR, retenção real, origem de tráfego, RPM e horas de visualização exigem dados autorizados do YouTube Studio e não são inventados a partir da página pública."]
     return "\n".join(lines) + "\n"
 
 
@@ -242,19 +243,29 @@ def run_audit(channel: Mapping[str, Any], settings: Mapping[str, Any], *, vision
             try: video["vision"] = analyse_thumbnail_with_paligemma(video["thumbnail_path"], vision_card)
             except Exception as exc: video["vision"] = {"score": 50, "status": "erro", "diagnosis": str(exc)[:220]}
         else: video["vision"] = {"score": 50, "status": "sem_dados", "diagnosis": "Provider Paligemma não configurado."}
+    analytics: dict[str, Any]
+    try:
+        from integrations.youtube_growth_api import query_channel_analytics
+        analytics = query_channel_analytics(channel, settings, STORAGE)
+    except Exception as exc:
+        analytics = {"status": "query_failed", "message": str(exc)[:300]}
+    analytics_values = analytics.get("values", {}) if analytics.get("status") == "ready" else {}
+    analytics_source = "youtube_analytics_oauth" if analytics_values else "estimated_proxy"
+    analytics_note = "YouTube Analytics OAuth" if analytics_values else str(analytics.get("message") or "Sem dados internos; proxy estimado")
     thumb_scores = [int((video.get("vision") or {}).get("score", 50)) for video in videos]
     metrics = [
-        {"label": "Demanda validada", "score": 50, "value": f"{len(videos)} vídeos públicos", "diagnosis": "Amostra pública recolhida; volume de pesquisa/concorrência não disponível."},
-        {"label": "Qualidade da thumbnail", "score": round(sum(thumb_scores) / len(thumb_scores)), "value": f"{len(videos)} thumbnails analisadas", "diagnosis": "Avaliação Paligemma/NIM ou sem dados quando não configurado."},
-        {"label": "Qualidade do título", "score": round(sum(title_scores) / len(title_scores)), "value": f"{len(videos)} títulos analisados", "diagnosis": "Curiosidade, clareza, urgência, palavras-chave e números."},
-        {"label": "Hook — retenção inicial", "score": round(sum(transcript_scores) / len(transcript_scores)), "value": "Análise textual das aberturas", "diagnosis": "Inferência textual; retenção percentual real não está disponível."},
-        {"label": "Ritmo e edição", "score": 50, "value": "Sem vídeo/curva de retenção", "diagnosis": "Requer gráfico de retenção do YouTube Studio."},
-        {"label": "Origem do tráfego", "score": 50, "value": "Sem dados públicos", "diagnosis": "Requer YouTube Studio."},
-        {"label": "Conversão em inscritos", "score": 50, "value": "Sem inscritos por vídeo", "diagnosis": "Requer Analytics autorizado."},
-        {"label": "Cadência de publicação", "score": 50, "value": "Datas públicas recolhidas", "diagnosis": "Cadência detalhada será calculada quando datas válidas forem fornecidas."},
+        {"label": "Demanda validada", "score": 50, "value": f"{len(videos)} vídeos públicos", "source": "public", "diagnosis": "Amostra pública recolhida; volume de pesquisa/concorrência não disponível."},
+        {"label": "Qualidade da thumbnail", "score": round(sum(thumb_scores) / len(thumb_scores)), "value": f"{len(videos)} thumbnails analisadas", "source": "paligemma" if any((video.get("vision") or {}).get("status") == "analisado" for video in videos) else "estimated", "diagnosis": "Avaliação Paligemma/NIM ou sem dados quando não configurado."},
+        {"label": "Qualidade do título", "score": round(sum(title_scores) / len(title_scores)), "value": f"{len(videos)} títulos analisados", "source": "public", "diagnosis": "Curiosidade, clareza, urgência, palavras-chave e números."},
+        {"label": "Hook — retenção inicial", "score": round(sum(transcript_scores) / len(transcript_scores)), "value": "Análise textual das aberturas", "source": "estimated", "diagnosis": "Inferência textual; retenção percentual real não está disponível."},
+        {"label": "Ritmo e edição", "score": _safe_int(analytics_values.get("averageViewPercentage"), 50) if analytics_values else 50, "value": "Percentagem média assistida (OAuth)" if analytics_values else "Proxy: sem curva de retenção", "source": analytics_source, "diagnosis": analytics_note},
+        {"label": "Origem do tráfego", "score": 50, "value": "Dados de tráfego (OAuth)" if analytics_values else "Indisponível sem OAuth", "source": analytics_source if analytics_values else "unavailable", "diagnosis": analytics_note},
+        {"label": "Conversão em inscritos", "score": 50, "value": f"{analytics_values.get('subscribersGained', '—')} ganhos / {analytics_values.get('subscribersLost', '—')} perdidos" if analytics_values else "Indisponível sem Analytics", "source": analytics_source if analytics_values else "unavailable", "diagnosis": analytics_note},
+        {"label": "Cadência de publicação", "score": 50, "value": "Datas públicas recolhidas", "source": "public", "diagnosis": "Cadência detalhada será calculada quando datas válidas forem fornecidas."},
     ]
-    overall = round(sum(metric["score"] for metric in metrics) / len(metrics))
-    record = {"code": code, "channel_id": str(channel.get("id") or ""), "channel_name": str(channel.get("name") or "Canal"), "platform": "YouTube", "created_at": datetime.now(timezone.utc).isoformat(), "overall_score": overall, "score_color": _score_color(overall), "metrics": metrics, "videos": videos, "status": "completed"}
+    weights = {"Qualidade da thumbnail": 0.30, "Qualidade do título": 0.25, "Hook — retenção inicial": 0.25, "Conversão em inscritos": 0.20}
+    overall = round(sum(metric["score"] * weights.get(metric["label"], 0) for metric in metrics) / sum(weights.values()))
+    record = {"code": code, "channel_id": str(channel.get("youtube_channel_id") or channel.get("id") or ""), "channel_name": str(channel.get("name") or "Canal"), "platform": "YouTube", "created_at": datetime.now(timezone.utc).isoformat(), "overall_score": overall, "score_color": _score_color(overall), "score_weights": weights, "analytics": analytics, "metrics": metrics, "videos": videos, "status": "completed"}
     report_path = root / f"{code}.md"
     report_path.write_text(_report_markdown(record), encoding="utf-8")
     record["report_path"] = str(report_path)

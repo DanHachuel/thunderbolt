@@ -1521,6 +1521,14 @@ def render_growth_youtube():
         for label in ("Demanda validada", "Qualidade da thumbnail", "Qualidade do título", "Hook — retenção inicial", "Ritmo e edição", "Origem do tráfego", "Conversão em inscritos", "Cadência de publicação")
     ]
     overall = int(selected_record.get("overall_score", 0)) if selected_record else None
+    if selected_record:
+        analytics_state = (selected_record.get("analytics") or {}).get("status", "not_connected")
+        if analytics_state == "ready":
+            st.success("Dados internos activos: YouTube Analytics OAuth aplicado à análise.")
+        elif analytics_state in {"requires_authorization", "not_connected"}:
+            st.info("Dados públicos activos. Para CTR, retenção, tráfego, RPM e demografia, autorize a conta Google proprietária do canal; os valores privados não são estimados como reais.")
+        else:
+            st.warning("A consulta YouTube Analytics não ficou disponível; os cartões afectados estão marcados como estimados ou indisponíveis.")
     color = _growth_score_color(overall) if overall is not None else "#64748b"
     score_text = str(overall) if overall is not None else "—"
     score_suffix = "/100" if overall is not None else ""
