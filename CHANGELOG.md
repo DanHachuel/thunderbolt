@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.78 — 2026-09-04
+
+- Corrigida a actualização das barras de progresso nas abas **Automação Youtube** e **Automação Tiktok**.
+- As duas filas passam a actualizar automaticamente a cada cinco segundos enquanto a aba está aberta, sem necessidade de premir F5.
+- O refresh só ocorre enquanto a respectiva aba está aberta, sem afectar as restantes páginas.
+
 ## 0.5.77 — 2026-09-04
 
 - Aplicado à aba **Automação Tiktok** o mesmo arranque manual do pipeline usado no YouTube.

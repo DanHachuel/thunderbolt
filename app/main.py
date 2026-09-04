@@ -5161,6 +5161,7 @@ def render_thumbnails():
                         st.error(str(exc))
 
 
+@st.fragment(run_every=5.0)
 def render_tiktok_automation():
     st.title("Automação Tiktok")
     st.caption("Agendamento diário da geração por canal. A fila TikTok usa Prompt Master e mantém exclusivamente o formato Portrait 9:16.")
@@ -5251,6 +5252,7 @@ def render_tiktok_automation():
                     st.rerun()
 
 
+@st.fragment(run_every=5.0)
 def render_automation():
     st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
