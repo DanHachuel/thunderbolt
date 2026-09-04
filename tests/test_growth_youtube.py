@@ -61,4 +61,4 @@ def test_paligemma_payload_is_isolated_and_uses_bearer(tmp_path):
     assert result["score"] == 82
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
     assert post.call_args.kwargs["json"]["model"] == "google/paligemma"
-    assert post.call_args.args[0] == "https://integrate.api.nvidia.com/v1/chat/completions"
+    assert post.call_args.args[0] == "https://ai.api.nvidia.com/v1/vlm/google/paligemma"

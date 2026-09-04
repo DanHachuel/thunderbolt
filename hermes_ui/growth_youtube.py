@@ -161,7 +161,9 @@ def _vision_prompt(video: Mapping[str, Any]) -> str:
 def analyse_thumbnail_with_paligemma(path: str, card: Mapping[str, Any]) -> dict[str, Any]:
     key = str(card.get("api_key") or "").strip()
     base = str(card.get("base_url") or "https://integrate.api.nvidia.com/v1").rstrip("/")
-    endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
+    if "integrate.api.nvidia.com" in base:
+        base = base.replace("integrate.api.nvidia.com", "ai.api.nvidia.com")
+    endpoint = base if "/vlm/google/paligemma" in base else f"{base}/vlm/google/paligemma"
     model = str(card.get("model") or "google/paligemma").strip()
     if not key:
         return {"score": 50, "diagnosis": "API key NVIDIA NIM Paligemma não configurada.", "status": "sem_dados"}

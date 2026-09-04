@@ -258,3 +258,39 @@ def fetch_replicate_models(
     if not models:
         raise ModelDiscoveryError("O endpoint Replicate não devolveu modelos com versão disponível.")
     return sorted(models, key=str.casefold)[:MAX_MODEL_IDS]
+
+
+def validate_paligemma_api_key(
+    api_key: str,
+    base_url: str,
+    *,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> None:
+    """Validate the Paligemma VLM route instead of the text-only chat route."""
+    token = str(api_key or "").strip()
+    if not token:
+        raise OpenAICompatibleAPIError("Informe a API key antes do teste.")
+    configured = str(base_url or DEFAULT_NVIDIA_NIM_BASE_URL).rstrip("/")
+    if configured.endswith("/chat/completions"):
+        configured = configured.removesuffix("/chat/completions")
+    if "integrate.api.nvidia.com" in configured:
+        configured = configured.replace("integrate.api.nvidia.com", "ai.api.nvidia.com")
+    endpoint = configured if "/vlm/google/paligemma" in configured else f"{configured}/vlm/google/paligemma"
+    payload = {
+        "messages": [{"role": "user", "content": "Describe this image in one word."}],
+        "max_tokens": 8,
+        "temperature": 0,
+    }
+    try:
+        response = requests.post(
+            endpoint,
+            headers={"Accept": "application/json", "Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise OpenAICompatibleAPIError(f"Não foi possível testar o endpoint Paligemma: {exc}") from exc
+    if response.status_code >= 400:
+        if response.status_code in (401, 403):
+            raise OpenAICompatibleAPIError(f"O endpoint Paligemma recusou a API key (HTTP {response.status_code}).")
+        raise OpenAICompatibleAPIError(f"O endpoint Paligemma devolveu HTTP {response.status_code}.")
