@@ -1619,7 +1619,7 @@ def render_channels():
                 st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
             with header_cols[2]:
                 st.metric("Inscritos", _format_channel_count(channel.get("subscriber_count")))
-                with header_cols[3]:
+            with header_cols[3]:
                 st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
             with header_cols[4]:
                 active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel_id}")
