@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import signal
 import sys
 
 # Este ficheiro é o primeiro módulo Python executado pelo launcher. As
@@ -27,6 +28,26 @@ def _utf8_stream(stream: object) -> object:
 
 sys.stdout = _utf8_stream(sys.stdout)
 sys.stderr = _utf8_stream(sys.stderr)
+
+
+def _custom_sigint_handler(signum: int, frame: object) -> None:
+    """Encerrar sem executar ``server.stop``/Click do handler do Streamlit."""
+    print("\nEncerrando servidor...", file=sys.stderr, flush=True)
+    raise SystemExit(0)
+
+
+_original_signal = signal.signal
+
+
+def _protected_signal(signum: signal.Signals, handler: object) -> object:
+    """Não permitir que Streamlit substitua o handler seguro de SIGINT."""
+    if signum == signal.SIGINT:
+        return _original_signal(signal.SIGINT, _custom_sigint_handler)
+    return _original_signal(signum, handler)
+
+
+_original_signal(signal.SIGINT, _custom_sigint_handler)
+signal.signal = _protected_signal
 
 from streamlit.web.cli import main  # noqa: E402
 

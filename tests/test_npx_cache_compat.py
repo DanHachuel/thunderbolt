@@ -58,6 +58,14 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('from streamlit.web.cli import main', bootstrap)
         self.assertLess(bootstrap.index('os.environ["PYTHONIOENCODING"]'), bootstrap.index('from streamlit.web.cli import main'))
 
+    def test_streamlit_bootstrap_owns_sigint_without_click_shutdown(self):
+        bootstrap = (ROOT / "scripts" / "streamlit_bootstrap.py").read_text(encoding="utf-8")
+        self.assertIn("def _custom_sigint_handler", bootstrap)
+        self.assertIn("raise SystemExit(0)", bootstrap)
+        self.assertIn("_original_signal(signal.SIGINT, _custom_sigint_handler)", bootstrap)
+        self.assertIn("signal.signal = _protected_signal", bootstrap)
+        self.assertNotIn("server.stop()", bootstrap)
+
     def test_package_manifest_includes_python_streamlit_bootstrap(self):
         manifest = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         self.assertIn("scripts/*.py", manifest["files"])
