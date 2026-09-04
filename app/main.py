@@ -6799,26 +6799,10 @@ def render_google_accounts(*, include_innertube: bool = True):
             st.rerun()
 
     st.divider()
-    st.subheader("Configuração Global: YouTube Data API v3 (API Key) + YouTube Analytics API (OAuth 2.0)")
-    st.caption("1. YouTube Data API v3: Metadados públicos (títulos, views, likes) Via MCP integrado.\n\n2. YouTube Analytics API: Métricas internas (CTR, retenção, RPM, tráfego, demografia) Via OAuth 2.0")
+    st.subheader("Configuração Global: YouTube Data API v3 (API Key)")
+    st.caption("1. YouTube Data API v3: Metadados públicos (títulos, views, likes) Via MCP integrado.\n\n2. YouTube Analytics API: Métricas internas (CTR, retenção, RPM, tráfego, demografia) Via OAuth 2.0 (Directamente via OAuth das Contas Google/YouTube cadastradas)")
     with st.form("google_global_api_settings_form"):
-        google_api_cols = st.columns(2)
-        with google_api_cols[0]:
-            youtube_client_id = st.text_input(
-                "YouTube OAuth Client ID",
-                value=str(settings.get("youtube_client_id", "") or ""),
-                key="google_page_youtube_client_id",
-                help="Client ID OAuth 2.0 criado no Google Cloud para autorizar a conta YouTube.",
-            )
-        with google_api_cols[1]:
-            youtube_client_secret = st.text_input(
-                "YouTube OAuth Client Secret",
-                value=str(settings.get("youtube_client_secret", "") or ""),
-                type="password",
-                key="google_page_youtube_client_secret",
-                help="Client Secret do mesmo cliente OAuth 2.0. Não é uma API Key.",
-            )
-        st.caption(f"OAuth local: use um cliente do tipo Desktop app. Se o Google Cloud pedir uma URI autorizada, registe exactamente `{loopback_redirect_uri()}`.")
+        st.caption("A autorização OAuth 2.0 é gerida por cada Conta Google/YouTube cadastrada e associada ao canal.")
         youtube_api_key = st.text_input(
             "YouTube Data API Key (opcional)",
             value=str(settings.get("youtube_api_key", "") or ""),
@@ -6829,10 +6813,10 @@ def render_google_accounts(*, include_innertube: bool = True):
         save_google_global = st.form_submit_button("Guardar configuração global do YouTube", type="primary", use_container_width=True)
     if save_google_global:
         settings.update({
-            "youtube_client_id": youtube_client_id.strip(),
-            "youtube_client_secret": youtube_client_secret.strip(),
             "youtube_api_key": youtube_api_key.strip(),
         })
+        settings.pop("youtube_client_id", None)
+        settings.pop("youtube_client_secret", None)
         write_json("settings.json", settings)
         st.success("Configuração global do YouTube guardada em Contas Google.")
         st.rerun()
