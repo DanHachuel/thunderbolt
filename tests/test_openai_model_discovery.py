@@ -20,6 +20,9 @@ class OpenAICompatibleApiValidationTests(TestCase):
         with patch("integrations.openai_model_discovery.requests.post", return_value=response) as post:
             validate_paligemma_api_key("nim-secret", "https://integrate.api.nvidia.com/v1")
         self.assertEqual(post.call_args.args[0], "https://ai.api.nvidia.com/v1/vlm/google/paligemma")
+        content = post.call_args.kwargs["json"]["messages"][0]["content"]
+        self.assertEqual(content[1]["type"], "image_url")
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
 
     def test_replicate_catalog_uses_native_results_endpoint_and_latest_version(self) -> None:
         response = Mock(status_code=200)
