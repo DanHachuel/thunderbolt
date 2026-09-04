@@ -175,3 +175,9 @@ def test_growth_pages_keep_other_placeholders_and_render_youtube_auditor():
     assert '("Analista Bilibili", ":material/analytics:", "Analista Bilibili")' in MAIN_SOURCE
     assert '"Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", "")' in MAIN_SOURCE
     assert '"Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", "")' in MAIN_SOURCE
+
+
+def test_youtube_cards_format_large_counts_with_pt_separators():
+    assert 'def _format_channel_count(value: Any) -> str:' in MAIN_SOURCE
+    assert 'f"{int(value):,}".replace(",", ".")' in MAIN_SOURCE
+    assert 'st.metric("Visualizações", _format_channel_count(channel.get("view_count")))' in MAIN_SOURCE
