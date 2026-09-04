@@ -6799,7 +6799,11 @@ def render_google_accounts(*, include_innertube: bool = True):
             st.rerun()
 
     st.divider()
-    st.subheader("Configuração Global: YouTube Data API v3 (API Key)")
+    youtube_global_cols = st.columns([3.2, 1.2])
+    with youtube_global_cols[0]:
+        st.subheader("Configuração Global: YouTube Data API v3 (API Key)")
+    with youtube_global_cols[1]:
+        _render_credential_status(settings.get("youtube_api_key"), required=True)
     st.caption("1. YouTube Data API v3: Metadados públicos (títulos, views, likes) Via MCP integrado.\n\n2. YouTube Analytics API: Métricas internas (CTR, retenção, RPM, tráfego, demografia) Via OAuth 2.0 (Directamente via OAuth das Contas Google/YouTube cadastradas)")
     with st.form("google_global_api_settings_form"):
         st.caption("A autorização OAuth 2.0 é gerida por cada Conta Google/YouTube cadastrada e associada ao canal.")
@@ -7848,6 +7852,9 @@ def render_settings():
         with st.expander("API Tiktok", expanded=False):
             render_tiktok_api_cards(settings)
         with st.expander("API Bilibili", expanded=False):
+            bilibili_cards = settings.get("bilibili_api_cards") if isinstance(settings.get("bilibili_api_cards"), list) else []
+            bilibili_ready = any(bool(card.get("active", True) and card.get("sessdata") and card.get("bili_jct") and card.get("buvid3")) for card in bilibili_cards if isinstance(card, dict))
+            _api_status_badge("Configured" if bilibili_ready else "Missing configuration", "ready" if bilibili_ready else "missing")
             render_bilibili_api_cards(settings)
         with st.expander("Composio", expanded=False):
             st.caption("A API key é guardada apenas no storage local. O slug da ferramenta e o provider são descobertos no Upload via Composio; a autenticação da conta é feita pelo Connect Link do Composio.")
@@ -7887,6 +7894,7 @@ def render_settings():
             upload_post_user_upload = st.text_input("Upload-Post username", value=str(settings.get("upload_post_username") or ""), key="upload_tab_upload_post_user")
             upload_post_platforms_upload = st.text_input("Plataformas Upload-Post", value=str(settings.get("upload_post_platforms") or "youtube,tiktok"), key="upload_tab_upload_post_platforms")
             upload_post_auto_upload = st.checkbox("Publicar automaticamente após gerar", bool(settings.get("upload_post_auto_upload", False)), key="upload_tab_upload_post_auto")
+            _render_credential_status(upload_post_key_upload, required=True)
             if st.button("Guardar Upload-Post", type="primary", use_container_width=True, key="upload_tab_save_upload_post"):
                 settings.update({"upload_post_enabled": bool(upload_post_enabled_upload), "upload_post_api_key": upload_post_key_upload.strip(), "upload_post_username": upload_post_user_upload.strip(), "upload_post_platforms": upload_post_platforms_upload.strip(), "upload_post_auto_upload": bool(upload_post_auto_upload)})
                 write_json("settings.json", settings)
@@ -7899,6 +7907,7 @@ def render_settings():
             postiz_mcp_upload = st.text_input("Postiz MCP URL", value=str(settings.get("postiz_mcp_url") or "https://api.postiz.com/mcp"), key="upload_tab_postiz_mcp")
             postiz_integration_upload = st.text_input("Postiz integração padrão", value=str(settings.get("postiz_integration_id") or ""), key="upload_tab_postiz_integration")
             postiz_auto_upload = st.checkbox("Permitir publicação imediata no Postiz", bool(settings.get("postiz_auto_publish", False)), key="upload_tab_postiz_auto")
+            _render_credential_status(postiz_key_upload, required=True)
             if st.button("Guardar Postiz", type="primary", use_container_width=True, key="upload_tab_save_postiz"):
                 settings.update({"postiz_enabled": bool(postiz_enabled_upload), "postiz_api_key": postiz_key_upload.strip(), "postiz_base_url": postiz_base_upload.strip(), "postiz_mcp_url": postiz_mcp_upload.strip(), "postiz_integration_id": postiz_integration_upload.strip(), "postiz_auto_publish": bool(postiz_auto_upload)})
                 write_json("settings.json", settings)
