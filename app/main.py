@@ -6799,8 +6799,8 @@ def render_google_accounts(*, include_innertube: bool = True):
             st.rerun()
 
     st.divider()
-    st.subheader("Configuração global do YouTube")
-    st.caption("Estas credenciais pertencem à aplicação Google/YouTube e ficam separadas das restantes APIs do Thunderbolt.")
+    st.subheader("Configuração Global: YouTube Data API v3 (API Key) + YouTube Analytics API (OAuth 2.0)")
+    st.caption("1. YouTube Data API v3: Metadados públicos (títulos, views, likes) Via MCP integrado.\n\n2. YouTube Analytics API: Métricas internas (CTR, retenção, RPM, tráfego, demografia) Via OAuth 2.0")
     with st.form("google_global_api_settings_form"):
         google_api_cols = st.columns(2)
         with google_api_cols[0]:
