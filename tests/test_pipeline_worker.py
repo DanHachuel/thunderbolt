@@ -526,6 +526,23 @@ def test_video_helper_falls_back_from_pexels_to_pixabay_by_priority(tmp_path, mo
     assert video_commands[1][1].get("MPT_PEXELS_API_KEY", "") == ""
 
 
+def test_material_video_attempts_rotate_each_prioritized_key_before_next_provider():
+    settings = {
+        "video_source": "pexels",
+        "material_source_cards": [
+            {"id": "pexels-1", "provider": "pexels", "api_key": "pexels-one", "enabled": True, "priority": 1},
+            {"id": "pexels-2", "provider": "pexels", "api_key": "pexels-two", "enabled": True, "priority": 2},
+            {"id": "pixabay-1", "provider": "pixabay", "api_key": "pixabay-one", "enabled": True, "priority": 3},
+        ],
+    }
+
+    assert pipeline_worker._material_video_attempts({"style_wide": "pexels"}, settings) == [
+        ("pexels", "pexels-one"),
+        ("pexels", "pexels-two"),
+        ("pixabay", "pixabay-one"),
+    ]
+
+
 def test_video_helper_does_not_fallback_when_moneyprinter_reports_llm_credentials(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     root = tmp_path / "MoneyPrinterTurbo"
