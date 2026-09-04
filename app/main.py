@@ -6729,7 +6729,11 @@ def render_google_accounts(*, include_innertube: bool = True):
 
     st.divider()
     add_account = False
-    with st.expander("Adicionar conta Google/YouTube", expanded=False):
+    add_form_open = bool(st.session_state.get("add_batch_account_form_open", False))
+    if not add_form_open and st.button("Adicionar conta Google/YouTube", type="primary", use_container_width=True, key="open_add_batch_account_form"):
+        st.session_state["add_batch_account_form_open"] = True
+        st.rerun()
+    if add_form_open:
         st.markdown("### Nova conta Gmail")
         st.caption("Este formulário fica fora dos cartões das contas existentes. A associação de canais não depende da completude deste documento; ela apenas ficará pendente para Upload directo até os campos serem preenchidos.")
         with st.form("add_batch_account_form"):
@@ -6742,7 +6746,10 @@ def render_google_accounts(*, include_innertube: bool = True):
                 new_account_client_secret = st.text_input("OAuth Client Secret", type="password", key="new_batch_account_client_secret")
                 new_account_session_info = st.text_input("sessionInfo token desta conta Google", type="password", key="new_batch_account_session_info", help="Token sessionInfo desta conta. Os cookies e delegated_session_ids ficam no documento; a INNERTUBE_API_KEY é configurada no bloco próprio acima.")
                 new_account_document = st.file_uploader("Documento de cookies/credenciais opcional", type=["json"], key="new_batch_account_credentials_document", help="Pode subir agora um JSON completo ou apenas o documento de cookies. Se não subir, será criado um credentials.json padrão vazio.")
-            add_account = st.form_submit_button("Adicionar conta Google/YouTube", type="primary", use_container_width=True)
+            add_account = st.form_submit_button("Guardar conta Google/YouTube", type="primary", use_container_width=True)
+        if st.button("Cancelar", key="cancel_add_batch_account_form"):
+            st.session_state["add_batch_account_form_open"] = False
+            st.rerun()
     if add_account:
         document_error = ""
         if "@" not in new_account_email.strip():
@@ -6772,6 +6779,7 @@ def render_google_accounts(*, include_innertube: bool = True):
                 st.success(f"Conta {new_account['email']} adicionada e documento incorporado.")
             else:
                 st.warning(f"Conta {new_account['email']} adicionada. Foi criado um credentials.json padrão; suba o documento de cookies nesta conta quando estiver pronto.")
+            st.session_state["add_batch_account_form_open"] = False
             st.rerun()
 
     st.divider()
