@@ -4,7 +4,7 @@ Este tutorial explica como criar um projecto no Google Cloud, activar a YouTube 
 
 ## Pré-requisitos
 
-Antes de começar, certifique-se de que tem uma conta Google, acesso ao [Google Cloud Console](https://console.cloud.google.com/) e o Thunderbolt instalado e em execução localmente. A aplicação em execução é necessária para confirmar a URI de redireccionamento OAuth utilizada pelo projecto.
+Antes de começar, certifique-se de que tem uma conta Google, acesso ao [Google Cloud Console](https://console.cloud.google.com/) e o Thunderbolt instalado e em execução localmente. A aplicação em execução é necessária para concluir o callback OAuth local.
 
 ## Passo 1 — Aceder ao Google Cloud Console
 
@@ -68,30 +68,11 @@ Na página da tela de consentimento OAuth, abra o separador **Público-alvo** e,
 
 ## Passo 6 — Criar as credenciais OAuth
 
-No menu lateral, abra **APIs e Serviços → Credenciais** e clique em **+ Criar credenciais → ID do cliente OAuth**. Em **Tipo de aplicativo**, seleccione **Aplicativo da Web** e atribua um nome, por exemplo, `Thunderbolt Web Client`.
+No menu lateral, abra **APIs e Serviços → Credenciais** e clique em **+ Criar credenciais → ID do cliente OAuth**. Em **Tipo de aplicativo**, seleccione **Aplicativo para computador** (também apresentado como **Desktop app**) e atribua um nome, por exemplo, `Thunderbolt Desktop Client`.
 
-### Origens JavaScript autorizadas
+> **Importante:** o Thunderbolt usa `InstalledAppFlow` com um callback local loopback. Não seleccione **Aplicativo da Web**. Essa credencial exige URIs fixas e causa `Erro 400: redirect_uri_mismatch` neste fluxo.
 
-Clique em **Adicionar URI** e introduza a origem onde o frontend é executado, por exemplo:
-
-```text
-http://localhost:3000
-```
-
-Se existir um ambiente de produção, adicione também a origem HTTPS correspondente, por exemplo `https://seudominio.com`.
-
-### URIs de redireccionamento autorizadas
-
-Esta é a parte mais crítica. Clique em **Adicionar URI** e introduza a URI exacta utilizada pelo Thunderbolt para o callback OAuth. Exemplos de desenvolvimento local:
-
-```text
-http://localhost:3000/api/auth/google/callback
-http://localhost:5173/oauth2callback
-```
-
-> **A URI tem de ser exactamente igual à configurada no código do Thunderbolt.** Uma barra final diferente, o uso de `http` em vez de `https` ou uma porta diferente causa o erro `redirect_uri_mismatch`.
-
-Se não souber qual é a URI utilizada, consulte a configuração ou o ficheiro de ambiente do Thunderbolt e confirme também os logs da aplicação.
+Uma credencial **Desktop app** não precisa de **Origens JavaScript autorizadas** nem de adicionar manualmente uma URI de redireccionamento. O Thunderbolt inicia o callback local em `http://127.0.0.1:8765/`; se essa porta estiver ocupada, escolhe automaticamente outra porta loopback livre.
 
 Clique em **Criar**. Na janela apresentada, copie o **ID do cliente (Client ID)** e a **Chave secreta do cliente (Client Secret)** e guarde-os num local seguro.
 
@@ -99,34 +80,26 @@ Clique em **Criar**. Na janela apresentada, copie o **ID do cliente (Client ID)*
 
 ## Passo 7 — Configurar o Thunderbolt
 
-O projecto utiliza variáveis de ambiente para as credenciais OAuth. Localize o ficheiro de ambiente do Thunderbolt, normalmente `.env`, `.env.local` ou o ficheiro de configuração equivalente, e adicione:
+Na aba **Configurações → Configuração API → API Keys Upload → Contas Google**, crie ou edite a conta Google e cole o **Client ID** e o **Client Secret** da credencial **Desktop app**. Guarde a conta e clique em **Autorizar/Reautorizar**.
 
-```env
-GOOGLE_CLIENT_ID=seu_client_id_aqui
-GOOGLE_CLIENT_SECRET=sua_client_secret_aqui
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
-```
-
-Substitua `seu_client_id_aqui` e `sua_client_secret_aqui` pelos valores copiados no passo anterior. Confirme que `GOOGLE_REDIRECT_URI` é exactamente igual à URI registada no Google Cloud Console.
+Não é necessário configurar `GOOGLE_REDIRECT_URI` nem adicionar uma URI de callback de `localhost` no Google Cloud Console: o callback loopback é criado pelo `InstalledAppFlow` durante a autorização.
 
 ## Passo 8 — Testar a autenticação
 
-Reinicie o servidor do Thunderbolt para carregar as novas variáveis de ambiente. Abra a interface e tente iniciar sessão com o Google.
+Abra a interface do Thunderbolt e tente autorizar a conta Google.
 
 O fluxo esperado é:
 
 1. O Google apresenta a tela de consentimento com o nome do app e os escopos solicitados.
 2. O utilizador autoriza o acesso.
-3. O Google redirecciona para a URI de callback do Thunderbolt.
-4. A autenticação é concluída com sucesso na aplicação.
+3. O Google redirecciona para o callback local do Thunderbolt.
+4. A autenticação é concluída e o token é guardado no storage local da conta.
 
 ## Solução de problemas
 
 ### Erro `redirect_uri_mismatch`
 
-Este erro significa que a URI enviada pelo Thunderbolt não corresponde exactamente à URI registada no Google Cloud Console.
-
-Verifique a URI utilizada nos logs ou no código do Thunderbolt. Depois, abra **Credenciais**, seleccione o ID do cliente e adicione a URI exacta em **URIs de redireccionamento autorizadas**. Aguarde um a dois minutos para a configuração se propagar, limpe o cache do navegador e tente novamente.
+Este erro ocorre normalmente quando foi criada uma credencial **Aplicativo da Web** para o fluxo local. Abra **APIs e Serviços → Credenciais**, crie uma nova credencial **ID do cliente OAuth → Aplicativo para computador (Desktop app)**, substitua o Client ID e o Client Secret na conta Google do Thunderbolt e tente novamente. Não tente corrigir este fluxo adicionando uma URI de `localhost` numa credencial Web.
 
 ### Erro `invalid_request` ou `access_denied`
 
@@ -134,7 +107,7 @@ Confirme se o seu e-mail foi adicionado como utilizador de teste no passo 5. Ver
 
 ### Mensagem “Acesso bloqueado: solicitação inválida”
 
-Na maioria dos casos, esta mensagem está relacionada com uma URI de redireccionamento incorrecta. Reveja cuidadosamente os passos 6 e 7, verificando protocolo, domínio, porta, caminho e barras finais.
+Confirme primeiro que a credencial é **Aplicativo para computador (Desktop app)** e não **Aplicativo da Web**. Depois confirme que a conta Google foi adicionada como utilizador de teste e que a YouTube Data API v3 está activa.
 
 ## Escopos importantes para o YouTube
 

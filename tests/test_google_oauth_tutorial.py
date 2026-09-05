@@ -29,8 +29,9 @@ def test_google_oauth_tutorial_contains_required_setup_sections_and_safe_secret_
     ):
         assert heading in tutorial
 
-    assert "GOOGLE_CLIENT_ID=" in tutorial
-    assert "GOOGLE_CLIENT_SECRET=" in tutorial
+    assert "Aplicativo para computador" in tutorial
+    assert "Desktop app" in tutorial
+    assert "Configurações → Configuração API → API Keys Upload → Contas Google" in tutorial
     assert "Nunca partilhe o Client Secret" in tutorial
     assert "redirect_uri_mismatch" in tutorial
     assert "youtube.upload" in tutorial
