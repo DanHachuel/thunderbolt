@@ -48,6 +48,14 @@ def test_oauth_uses_client_pair_without_data_api_key(tmp_path: Path):
     assert uploader.client_secret == "oauth-client-secret"
 
 
+def test_selected_account_uses_batch_token_path(tmp_path: Path):
+    account = {"id": "account-1", "email": "channel@example.com", "client_id": "account-client", "client_secret": "account-secret"}
+    uploader = YouTubeAutomationAgentUploader({}, tmp_path, account=account)
+    assert uploader.client_id == "account-client"
+    assert uploader.client_secret == "account-secret"
+    assert any("youtube_batch_tokens" in str(path) for path in uploader._token_candidates())
+
+
 def test_invalid_video_is_rejected(tmp_path: Path):
     invalid = tmp_path / "video.mov"
     invalid.write_bytes(b"not-a-video")
