@@ -25,6 +25,18 @@ def test_check_version_reports_an_available_registry_release():
     assert status.update_available is True
 
 
+def test_zero_padded_versions_are_not_reported_as_newer():
+    status = update_manager.check_version("0.6.05", get=lambda *args, **kwargs: _Response("0.6.5"))
+
+    assert status.update_available is False
+
+
+def test_lower_registry_version_is_not_reported_as_an_update():
+    status = update_manager.check_version("0.6.05", get=lambda *args, **kwargs: _Response("0.6.4"))
+
+    assert status.update_available is False
+
+
 def test_update_uses_npx_install_without_passing_settings_or_secrets():
     captured = {}
 
