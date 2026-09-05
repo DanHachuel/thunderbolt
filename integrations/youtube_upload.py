@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from integrations.platforms import IntegrationResult
-from integrations.youtube_batch import loopback_host, loopback_port, loopback_redirect_uri, token_path as batch_token_path
+from integrations.youtube_batch import account_key, loopback_host, loopback_port, loopback_redirect_uri, token_path as batch_token_path
 
 
 # O fluxo de upload precisa apenas do scope de publicação; Analytics e leitura
@@ -25,6 +25,13 @@ class UploadAttempt:
 
 def _safe_text(value: Any, default: str = "") -> str:
     return str(value if value is not None else default).strip()
+
+
+def _upload_account_token_path(storage_root: Path, account: dict[str, Any] | None, purpose: str) -> Path | None:
+    if not isinstance(account, dict) or not (account.get("id") or account.get("email")):
+        return None
+    safe_purpose = str(purpose or "upload").strip().lower() or "upload"
+    return Path(storage_root) / "state" / "youtube_upload_tokens" / f"{account_key(account)}-{safe_purpose}.json"
 
 
 def _path_value(value: Any) -> Path | None:
@@ -103,8 +110,16 @@ class _GoogleYouTubeBase:
         return any(path.exists() and path.stat().st_size > 0 for path in self._token_candidates())
 
     def _token_candidates(self) -> list[Path]:
-        paths = [self.token_path]
+        paths: list[Path] = []
+        account_token = _upload_account_token_path(self.token_path.parents[1], self.account, self.__class__.__name__)
+        if account_token is not None:
+            paths.append(account_token)
+        if not self.account:
+            paths.append(self.token_path)
         if self.account:
+            # Compatibilidade com autorizações de publicação antigas guardadas
+            # no caminho global; o token de leitura/listagem continua separado.
+            paths.append(self.token_path)
             paths.append(batch_token_path(self.token_path.parents[1], self.account))
         if self.alternate_token_path and self.alternate_token_path not in paths:
             paths.append(self.alternate_token_path)
@@ -146,19 +161,20 @@ class _GoogleYouTubeBase:
         return credentials
 
     def _save_credentials(self, credentials: Any, *, nested: bool = False) -> None:
-        self.token_path.parent.mkdir(parents=True, exist_ok=True)
+        destination = _upload_account_token_path(self.token_path.parents[1], self.account, self.__class__.__name__) or self.token_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
         payload = json.loads(credentials.to_json())
         if nested:
             payload = {"youtube": payload}
-        temporary = self.token_path.with_name(f".{self.token_path.name}.{secrets.token_hex(6)}.tmp")
+        temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(6)}.tmp")
         temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         try:
             os.chmod(temporary, 0o600)
         except OSError:
             pass
-        temporary.replace(self.token_path)
+        temporary.replace(destination)
         try:
-            os.chmod(self.token_path, 0o600)
+            os.chmod(destination, 0o600)
         except OSError:
             pass
 
@@ -382,12 +398,12 @@ def upload_youtube_with_fallback(
     return IntegrationResult(False, f"O agente de upload falhou e o fallback OAuth também falhou. Agente: {primary_result.message} Fallback: {fallback_result.message}", {"status": "all_upload_mechanisms_failed", "attempts": attempts})
 
 
-def authorize_youtube_agent(settings: dict[str, Any], storage_root: Path, *, open_browser: bool = True) -> IntegrationResult:
-    return YouTubeAutomationAgentUploader(settings, storage_root).authorize(open_browser=open_browser)
+def authorize_youtube_agent(settings: dict[str, Any], storage_root: Path, *, account: dict[str, Any] | None = None, open_browser: bool = True) -> IntegrationResult:
+    return YouTubeAutomationAgentUploader(settings, storage_root, account=account).authorize(open_browser=open_browser)
 
 
-def authorize_youtube_fallback(settings: dict[str, Any], storage_root: Path, *, open_browser: bool = True) -> IntegrationResult:
-    return DirectYouTubeOAuthUploader(settings, storage_root).authorize(open_browser=open_browser)
+def authorize_youtube_fallback(settings: dict[str, Any], storage_root: Path, *, account: dict[str, Any] | None = None, open_browser: bool = True) -> IntegrationResult:
+    return DirectYouTubeOAuthUploader(settings, storage_root, account=account).authorize(open_browser=open_browser)
 
 
 def youtube_upload_status(settings: dict[str, Any], storage_root: Path) -> dict[str, IntegrationResult]:

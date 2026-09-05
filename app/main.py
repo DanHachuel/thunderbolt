@@ -124,6 +124,7 @@ from integrations.youtube_direct_credentials import delete_credentials_document,
 from integrations.session_info_health import check_account_session_info_health
 from integrations.youtube_session_manager import renew_account_session
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
+from integrations.youtube_upload import authorize_youtube_agent
 from integrations.youtube_growth_api import find_account_for_channel as find_youtube_growth_account
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -6767,7 +6768,7 @@ def render_google_accounts(*, include_innertube: bool = True):
                 document_save = st.button("Guardar documento nesta conta", key=f"save_direct_account_{account_id}", use_container_width=True)
 
                 account_status = youtube_batch_account_status(batch_account, STORAGE)
-                status_cols = st.columns(3)
+                status_cols = st.columns(4)
                 with status_cols[0]:
                     (st.success if account_status.ok else st.warning)(account_status.message)
                 with status_cols[1]:
@@ -6777,6 +6778,12 @@ def render_google_accounts(*, include_innertube: bool = True):
                         if result.ok:
                             st.rerun()
                 with status_cols[2]:
+                    if st.button("Autorizar upload YouTube", key=f"batch_authorize_upload_{account_id}", use_container_width=True, help="Autoriza esta conta com o escopo de publicação YouTube; é separado da autorização de leitura/listagem dos canais." ):
+                        result = authorize_youtube_agent(settings, STORAGE, account=batch_account)
+                        (st.success if result.ok else st.error)(result.message)
+                        if result.ok:
+                            st.rerun()
+                with status_cols[3]:
                     if st.button("Apagar conta", icon=":material/delete:", key=f"batch_remove_settings_{account_id}", use_container_width=True):
                         delete_youtube_batch_token(batch_account, STORAGE)
                         delete_credentials_document(STORAGE, batch_account)
@@ -8034,7 +8041,8 @@ def render_settings():
             composio_enabled = st.checkbox("Activar Composio", value=bool(settings.get("composio_enabled", False)), key="upload_composio_enabled")
             composio_auto_upload = st.checkbox("Usar Composio por defeito na Automação Youtube", value=bool(settings.get("composio_auto_upload", True)), key="upload_composio_auto_upload", help="Quando estiver configurado, Composio é tentado antes da API Oficial, Upload directo e Postiz.")
             composio_api_key = st.text_input("Composio API key", value=str(settings.get("composio_api_key") or ""), type="password", key="upload_composio_api_key", help="Use a API key de projecto do Composio Platform. Nunca coloque esta chave no GitHub, em URLs ou em mensagens.")
-            composio_user_id = st.text_input("Composio user ID", value=str(settings.get("composio_user_id") or "thunderbolt-local"), key="upload_composio_user_id", help="Identidade estável usada para associar as contas conectadas no Composio.")
+            composio_user_id = st.text_input("Composio user ID", value=str(settings.get("composio_user_id") or "thunderbolt-local"), key="upload_composio_user_id", help="Tem de ser o mesmo user ID usado quando as contas YouTube foram ligadas no Composio.")
+            composio_connected_account_id = st.text_input("Connected account YouTube (ID ou alias)", value=str(settings.get("composio_connected_account_id") or ""), key="upload_composio_connected_account_id", help="Opcional. Selecciona uma conta activa do Composio. Use o ID exacto ou alias configurado.")
             current_tool_slug = str(settings.get("composio_tool_slug") or "upload_video")
             if current_tool_slug not in composio_operation_slugs:
                 current_tool_slug = "upload_video"
@@ -8068,7 +8076,7 @@ def render_settings():
             with composio_action_cols[1]:
                 test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
             if save_composio:
-                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit, "composio_tool_slug": composio_tool_slug, "composio_file_field": "videoFilePath", "composio_channel_field": composio_channel_field, "composio_privacy_status": composio_privacy_status, "composio_category_id": composio_category_id, "composio_language": composio_language, "composio_privacy_field": "privacyStatus", "composio_category_field": "categoryId", "composio_language_field": "defaultLanguage", "composio_arguments_json": composio_arguments_json or "{}"})
+                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_connected_account_id": composio_connected_account_id.strip(), "composio_toolkit": composio_toolkit, "composio_tool_slug": composio_tool_slug, "composio_file_field": "videoFilePath", "composio_channel_field": composio_channel_field, "composio_privacy_status": composio_privacy_status, "composio_category_id": composio_category_id, "composio_language": composio_language, "composio_privacy_field": "privacyStatus", "composio_category_field": "categoryId", "composio_language_field": "defaultLanguage", "composio_arguments_json": composio_arguments_json or "{}"})
                 write_json("settings.json", settings)
                 st.success("Configuração Composio guardada.")
                 st.rerun()

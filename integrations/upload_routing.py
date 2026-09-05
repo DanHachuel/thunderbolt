@@ -338,6 +338,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
             str(kwargs.get("video_path") or ""),
             file_field,
             json.dumps(parsed_arguments, ensure_ascii=False),
+            str(settings.get("composio_connected_account_id") or channel.get("composio_connected_account_id") or "").strip(),
         )
     except ComposioUploadError as exc:
         return IntegrationResult(False, str(exc), {})
