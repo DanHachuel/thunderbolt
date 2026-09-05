@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,6 +42,22 @@ def _download_root() -> Path:
     storage.ensure_storage()
     storage.MEDIA_DOWNLOADS.mkdir(parents=True, exist_ok=True)
     return storage.MEDIA_DOWNLOADS.resolve()
+
+
+def _deno_runtime_path() -> str | None:
+    """Resolve the project-managed Deno binary, with a PATH fallback."""
+    try:
+        import deno  # type: ignore
+
+        finder = getattr(deno, "find_deno_bin", None)
+        if callable(finder):
+            candidate = Path(str(finder())).expanduser()
+            if candidate.is_file():
+                return str(candidate.resolve())
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError):
+        pass
+    candidate = shutil.which("deno")
+    return str(Path(candidate).resolve()) if candidate else None
 
 
 def _safe_download_path(value: str | Path) -> Path | None:
@@ -136,6 +153,10 @@ def build_download_options(
         "overwrites": False,
         "paths": {"home": str(root)},
     }
+    deno_path = _deno_runtime_path()
+    if deno_path:
+        # Equivalent to the CLI argument --js-runtimes deno:<path>.
+        options["js_runtimes"] = {"deno": deno_path}
     if progress_hook is not None:
         options["progress_hooks"] = [progress_hook]
     if normalized_mode == "audio":
@@ -183,7 +204,13 @@ def media_download_file(record: dict[str, Any], filename: str) -> Path | None:
 
 
 def dependency_status() -> dict[str, Any]:
-    return {"yt_dlp": yt_dlp is not None, "ffmpeg_note": "A conversão/combinação de streams pode exigir FFmpeg."}
+    deno_path = _deno_runtime_path()
+    return {
+        "yt_dlp": yt_dlp is not None,
+        "deno": bool(deno_path),
+        "deno_path": deno_path or "",
+        "ffmpeg_note": "A conversão/combinação de streams pode exigir FFmpeg.",
+    }
 
 
 def _files_from_info(info: Any, started_at: float) -> list[Path]:
