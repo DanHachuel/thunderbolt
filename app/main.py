@@ -703,9 +703,14 @@ def generate_video_content_for_ui(
     blueprint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate the subject, script and English keywords in one MoneyPrinter-style action."""
-    subject = str(subject or "").strip()
+    entered_subject = str(subject or "").strip()
+    subject = entered_subject
     topic_result: dict[str, Any] | None = None
-    if not subject:
+    if entered_subject:
+        # Um Video Subject escrito pelo utilizador é sempre o tema editorial;
+        # nunca o substituímos por um tópico aleatório gerado pela IA.
+        subject = entered_subject
+    else:
         selected_blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
         topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)
         subject = str(topic_result.get("topic") or "").strip()

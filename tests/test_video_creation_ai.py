@@ -30,6 +30,15 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('generate_thumbnail_prompt(', MAIN_SOURCE)
         self.assertNotIn('Gerar títulos e thumbnails com IA', MAIN_SOURCE)
 
+    def test_video_subject_is_used_before_ai_topic_generation(self):
+        generator = MAIN_SOURCE.split("def generate_video_content_for_ui(", 1)[1].split("def _generate_video_content_callback", 1)[0]
+        self.assertIn('entered_subject = str(subject or "").strip()', generator)
+        self.assertIn('if entered_subject:', generator)
+        self.assertIn('topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)', generator)
+        self.assertLess(generator.index("if entered_subject:"), generator.index("topic_result = generate_topic_for_channel"))
+        self.assertIn('brief=subject', generator)
+        self.assertIn('generate_video_keywords(', generator)
+
     def test_audio_upload_is_available_and_quantity_control_is_removed(self):
         self.assertNotIn('st.number_input("Quantidade"', MAIN_SOURCE)
         self.assertIn('uploaded_voiceover = st.file_uploader(', MAIN_SOURCE)
