@@ -5,6 +5,9 @@ from unittest.mock import Mock, patch
 from hermes_ui import growth_youtube
 from integrations import youtube_growth_api
 
+ROOT = Path(__file__).resolve().parents[1]
+MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+
 
 def test_analysis_code_has_stable_gya_pattern():
     code = growth_youtube.analysis_code(datetime(2026, 9, 3, 19, 0, 0, tzinfo=timezone.utc))
@@ -70,6 +73,20 @@ def test_growth_oauth_account_matches_channel_id():
     assert youtube_growth_api.find_account_for_channel({"youtube_channel_id": "UC123"}, {"youtube_batch_accounts": [account]}) == account
 
 
+def test_growth_oauth_does_not_use_unrelated_account_when_channel_has_explicit_account():
+    unrelated = {"id": "google-one", "email": "one@example.com", "channels": [{"youtube_channel_id": "UC123"}]}
+    channel = {"youtube_channel_id": "UC123", "google_account_id": "google-two"}
+    assert youtube_growth_api.find_account_for_channel(channel, {"youtube_batch_accounts": [unrelated]}) is None
+
+
 def test_growth_analytics_is_explicitly_unavailable_without_matching_account(tmp_path):
-    result = youtube_growth_api.query_channel_analytics({"youtube_channel_id": "UC123"}, {}, tmp_path)
+    result = youtube_growth_api.query_channel_analytics({"youtube_channel_id": "UC123", "google_account_id": "google-two"}, {"youtube_batch_accounts": [{"id": "google-one", "channels": [{"youtube_channel_id": "UC123"}]}]}, tmp_path)
     assert result["status"] == "not_connected"
+
+
+def test_growth_indicator_uses_the_selected_channel_account_only():
+    block = MAIN_SOURCE.split("def render_growth_youtube():", 1)[1].split("def render_", 1)[0]
+    assert "selected = st.selectbox(\"Canal a analisar\"" in block
+    assert "matched_growth_account = find_youtube_growth_account(selected, growth_settings)" in block
+    assert "youtube_batch_account_status(matched_growth_account, STORAGE).ok" in block
+    assert "for growth_account in growth_accounts" not in block

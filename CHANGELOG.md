@@ -1,4 +1,9 @@
 # Changelog
+## 0.5.94 — 2026-09-05
+- Corrigido o indicador **YouTube Analytics API: Métricas internas** da aba **Analista Growth Youtube** para validar exclusivamente a conta Google associada ao canal seleccionado.
+- Uma conta Google configurada para outro canal deixa de activar falsamente o estado verde.
+- Adicionados testes de regressão para associação explícita e ausência de fallback para contas não relacionadas.
+
 ## 0.5.93 — 2026-09-05
 - Removidos das abas de **Documentação** os botões e referências de fonte externa adicionados sem autorização.
 - Removido o link do Google Drive e o título Markdown duplicado do tutorial **YouTube Data API Key (Public Data)**.

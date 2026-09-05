@@ -124,6 +124,7 @@ from integrations.youtube_direct_credentials import delete_credentials_document,
 from integrations.session_info_health import check_account_session_info_health
 from integrations.youtube_session_manager import renew_account_session
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
+from integrations.youtube_growth_api import find_account_for_channel as find_youtube_growth_account
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.openai_model_discovery import DEFAULT_NVIDIA_NIM_BASE_URL
@@ -1496,21 +1497,6 @@ def render_growth_youtube():
     st.caption("Auditoria pública baseada nos 3 pilares críticos e nas métricas secundárias do agente Growth.")
     growth_settings = read_json("settings.json", {})
     youtube_data_api_ready = bool(str(growth_settings.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY") or "").strip())
-    growth_accounts = growth_settings.get("youtube_batch_accounts", [])
-    analytics_accounts_ready = False
-    if isinstance(growth_accounts, list):
-        for growth_account in growth_accounts:
-            if isinstance(growth_account, dict) and youtube_batch_account_status(growth_account, STORAGE).ok:
-                analytics_accounts_ready = True
-                break
-    st.markdown("**Estado das APIs de Growth**")
-    api_status_cols = st.columns(2, gap="small")
-    with api_status_cols[0]:
-        st.caption("YouTube Data API v3: Metadados públicos")
-        _api_status_badge("Configured" if youtube_data_api_ready else "Missing configuration", "ready" if youtube_data_api_ready else "missing")
-    with api_status_cols[1]:
-        st.caption("YouTube Analytics API: Métricas internas")
-        _api_status_badge("Configured" if analytics_accounts_ready else "Missing configuration", "ready" if analytics_accounts_ready else "missing")
     channels = [item for item in read_json("channels.json", []) if isinstance(item, dict) and item.get("active", True) and is_youtube_channel_record(item)]
     if not channels:
         st.info("Cadastre pelo menos um canal YouTube em Canais YouTube para iniciar a análise.")
@@ -1526,6 +1512,16 @@ def render_growth_youtube():
         with action_status_col:
             if st.session_state.get("growth_analysis_status") == "complete":
                 st.markdown('<div style="padding-top:9px;color:#22c55e;font-weight:700;white-space:nowrap;">✓ Análise concluída</div>', unsafe_allow_html=True)
+    matched_growth_account = find_youtube_growth_account(selected, growth_settings)
+    analytics_accounts_ready = bool(matched_growth_account and youtube_batch_account_status(matched_growth_account, STORAGE).ok)
+    st.markdown("**Estado das APIs de Growth**")
+    api_status_cols = st.columns(2, gap="small")
+    with api_status_cols[0]:
+        st.caption("YouTube Data API v3: Metadados públicos")
+        _api_status_badge("Configured" if youtube_data_api_ready else "Missing configuration", "ready" if youtube_data_api_ready else "missing")
+    with api_status_cols[1]:
+        st.caption("YouTube Analytics API: Métricas internas")
+        _api_status_badge("Configured" if analytics_accounts_ready else "Missing configuration", "ready" if analytics_accounts_ready else "missing")
     if analyse_clicked:
         settings = read_json("settings.json", {})
         llm_settings, _ = ensure_llm_provider_cards(settings)
