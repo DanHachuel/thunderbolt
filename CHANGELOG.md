@@ -1,4 +1,8 @@
 # Changelog
+## 0.5.96 — 2026-09-05
+- Integrado explicitamente o MoviePy 2.2.1 no runtime MoneyPrinterTurbo, alinhando o motor de composição/renderização com o upstream.
+- O helper valida a versão MoviePy antes da geração e executa o CLI upstream com essa dependência garantida.
+
 ## 0.5.95 — 2026-09-05
 - Forçado `h264_nvenc` na configuração de renderização do runtime MoneyPrinterTurbo.
 - Actualizadas as operações locais de clips e editor de vídeo para usar NVENC com `p1` e `yuv420p`.
