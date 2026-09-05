@@ -37,7 +37,8 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")
         self.assertIn('const markerPath = join(venvPath, `.${stateKey}.sha256`);', source)
         self.assertIn('const persistedHashMatches = hashMatches || markerHash === currentHash;', source)
-        self.assertIn('"yt_dlp", "youtube_transcript_api"', source)
+        self.assertIn('"yt_dlp"', source)
+        self.assertIn('"youtube_transcript_api"', source)
 
     def test_npx_storage_migration_is_one_time(self):
         source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")

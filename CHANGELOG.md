@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.87 — 2026-09-04
+
+- Corrigida a renovação de `sessionInfo` quando o executável Chromium do Playwright não existe no cache do Windows.
+- O instalador passa a executar `playwright install chromium` depois de instalar as dependências Python.
+- A renovação tenta primeiro o Google Chrome instalado e, se necessário, instala automaticamente o Chromium gerido pelo Playwright antes de falhar.
+- Adicionada validação explícita da dependência Playwright no diagnóstico do launcher e cobertura de testes para o fallback do browser.
+
 ## 0.5.86 — 2026-09-04
 
 - Adicionada a dependência Python `deno`, com binário gerido automaticamente e suporte multiplataforma.

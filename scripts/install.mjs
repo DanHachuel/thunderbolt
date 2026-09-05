@@ -452,6 +452,17 @@ function installRequirementIfNeeded(requirementsPath, stateKey, modules, label) 
   writeDependencyState({ [stateKey]: currentHash });
 }
 
+function installPlaywrightBrowsers() {
+  if (!existsSync(pythonBin)) return;
+  console.log("Playwright: a verificar o browser Chromium... ");
+  const result = spawnSync(pythonBin, ["-m", "playwright", "install", "chromium"], { stdio: "inherit", env: pythonEnvironment });
+  if (result.status !== 0) {
+    console.error("Não foi possível instalar o browser Chromium do Playwright.");
+    console.error("Execute novamente o instalador depois de confirmar o acesso à Internet.");
+    process.exit(result.status || 1);
+  }
+}
+
 function writeSettings(moneyprinterPath) {
   const stateDir = join(thunderboltHome, "storage", "state");
   mkdirSync(stateDir, { recursive: true });
@@ -470,7 +481,8 @@ function writeSettings(moneyprinterPath) {
 
 function installThunderboltDependencies(python) {
   if (!existsSync(pythonBin)) run(python.command, [...python.args, "-m", "venv", venvPath]);
-  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "google.auth", "google_auth_oauthlib", "googleapiclient", "yt_dlp", "deno", "youtube_transcript_api", "huggingface_hub"], "Thunderbolt");
+  installRequirementIfNeeded(join(root, "requirements.txt"), "thunderbolt_requirements_sha256", ["streamlit", "requests", "pandas", "toml", "imageio_ffmpeg", "edge_tts", "google.auth", "google_auth_oauthlib", "googleapiclient", "yt_dlp", "deno", "youtube_transcript_api", "huggingface_hub", "playwright"], "Thunderbolt");
+  installPlaywrightBrowsers();
 }
 
 function installMoneyPrinterDependencies(moneyprinterPath) {
