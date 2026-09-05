@@ -1494,6 +1494,23 @@ def _growth_channel_metrics(channel: dict[str, Any]) -> tuple[list[dict[str, Any
 def render_growth_youtube():
     st.title("Analista Growth Youtube")
     st.caption("Auditoria pública baseada nos 3 pilares críticos e nas métricas secundárias do agente Growth.")
+    growth_settings = read_json("settings.json", {})
+    youtube_data_api_ready = bool(str(growth_settings.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY") or "").strip())
+    growth_accounts = growth_settings.get("youtube_batch_accounts", [])
+    analytics_accounts_ready = False
+    if isinstance(growth_accounts, list):
+        for growth_account in growth_accounts:
+            if isinstance(growth_account, dict) and youtube_batch_account_status(growth_account, STORAGE).ok:
+                analytics_accounts_ready = True
+                break
+    st.markdown("**Estado das APIs de Growth**")
+    api_status_cols = st.columns(2, gap="small")
+    with api_status_cols[0]:
+        st.caption("YouTube Data API v3: Metadados públicos")
+        _api_status_badge("Configured" if youtube_data_api_ready else "Missing configuration", "ready" if youtube_data_api_ready else "missing")
+    with api_status_cols[1]:
+        st.caption("YouTube Analytics API: Métricas internas")
+        _api_status_badge("Configured" if analytics_accounts_ready else "Missing configuration", "ready" if analytics_accounts_ready else "missing")
     channels = [item for item in read_json("channels.json", []) if isinstance(item, dict) and item.get("active", True) and is_youtube_channel_record(item)]
     if not channels:
         st.info("Cadastre pelo menos um canal YouTube em Canais YouTube para iniciar a análise.")
