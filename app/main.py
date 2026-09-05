@@ -694,6 +694,25 @@ def generate_topic_for_ui(settings: dict[str, Any], channel: dict, user_context:
     return generate_topic_for_channel(settings, channel, blueprint_for_channel(channel), user_context=user_context)
 
 
+def resolve_video_subject_for_generation(
+    settings: dict[str, Any],
+    channel: dict,
+    entered_subject: str,
+    blueprint: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Keep the user's Video Subject or generate one only when the field is empty."""
+    manual_subject = str(entered_subject or "").strip()
+    if manual_subject:
+        return manual_subject, None
+
+    selected_blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
+    topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)
+    generated_subject = str(topic_result.get("topic") or "").strip()
+    if not generated_subject:
+        raise CreativeGenerationError("A IA não devolveu um Video Subject válido.")
+    return generated_subject, topic_result
+
+
 def generate_video_content_for_ui(
     settings: dict[str, Any],
     channel: dict,
@@ -703,19 +722,7 @@ def generate_video_content_for_ui(
     blueprint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate the subject, script and English keywords in one MoneyPrinter-style action."""
-    entered_subject = str(subject or "").strip()
-    subject = entered_subject
-    topic_result: dict[str, Any] | None = None
-    if entered_subject:
-        # Um Video Subject escrito pelo utilizador é sempre o tema editorial;
-        # nunca o substituímos por um tópico aleatório gerado pela IA.
-        subject = entered_subject
-    else:
-        selected_blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
-        topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)
-        subject = str(topic_result.get("topic") or "").strip()
-    if not subject:
-        raise CreativeGenerationError("A IA não devolveu um Video Subject válido.")
+    subject, topic_result = resolve_video_subject_for_generation(settings, channel, subject, blueprint)
 
     blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
     script_result = generate_script_document(

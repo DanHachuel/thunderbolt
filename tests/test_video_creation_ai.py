@@ -24,20 +24,27 @@ class VideoCreationAITests(unittest.TestCase):
         self.assertIn('topic_value = str(generation_settings.get("video_subject") or "").strip()', MAIN_SOURCE)
         self.assertIn('"Salvar rascunho"', MAIN_SOURCE)
         self.assertIn('if save_draft_callback is not None:', MAIN_SOURCE)
-        self.assertIn('render_new_video(page_title="Criação de Músicas", prefix="new_music")', MAIN_SOURCE)
         self.assertIn('def generate_thumbnail_for_ui(', MAIN_SOURCE)
         self.assertIn('def generate_thumbnail_variants_for_ui(', MAIN_SOURCE)
         self.assertIn('generate_thumbnail_prompt(', MAIN_SOURCE)
         self.assertNotIn('Gerar títulos e thumbnails com IA', MAIN_SOURCE)
 
     def test_video_subject_is_used_before_ai_topic_generation(self):
+        resolver = MAIN_SOURCE.split("def resolve_video_subject_for_generation(", 1)[1].split("def generate_video_content_for_ui", 1)[0]
         generator = MAIN_SOURCE.split("def generate_video_content_for_ui(", 1)[1].split("def _generate_video_content_callback", 1)[0]
-        self.assertIn('entered_subject = str(subject or "").strip()', generator)
-        self.assertIn('if entered_subject:', generator)
-        self.assertIn('topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)', generator)
-        self.assertLess(generator.index("if entered_subject:"), generator.index("topic_result = generate_topic_for_channel"))
+        self.assertIn('manual_subject = str(entered_subject or "").strip()', resolver)
+        self.assertIn('if manual_subject:', resolver)
+        self.assertIn('return manual_subject, None', resolver)
+        self.assertIn('topic_result = generate_topic_for_channel(settings, channel, selected_blueprint)', resolver)
+        self.assertLess(resolver.index("return manual_subject, None"), resolver.index("topic_result = generate_topic_for_channel"))
+        self.assertIn('subject, topic_result = resolve_video_subject_for_generation(settings, channel, subject, blueprint)', generator)
         self.assertIn('brief=subject', generator)
         self.assertIn('generate_video_keywords(', generator)
+
+    def test_both_video_creation_pages_use_the_combined_generation_callback(self):
+        self.assertIn('"Criação de Vídeos": render_new_video', MAIN_SOURCE)
+        self.assertIn('"Criação de Shorts": lambda: render_new_video("Criação de Shorts", "new_shorts"', MAIN_SOURCE)
+        self.assertIn('generate_content_callback=lambda: _generate_video_content_callback(', MAIN_SOURCE)
 
     def test_audio_upload_is_available_and_quantity_control_is_removed(self):
         self.assertNotIn('st.number_input("Quantidade"', MAIN_SOURCE)
