@@ -31,7 +31,21 @@ class VersionCheck:
 
     @property
     def update_available(self) -> bool:
+        latest_key = _version_key(self.latest_version)
+        current_key = _version_key(self.current_version)
+        if latest_key is not None and current_key is not None:
+            return latest_key > current_key
         return bool(self.latest_version and self.current_version and self.latest_version != self.current_version)
+
+
+def _version_key(value: str) -> tuple[int, int, int] | None:
+    """Return a numeric SemVer core so zero-padded patches compare correctly."""
+    raw = str(value or "").strip().lstrip("v")
+    core = raw.split("+", 1)[0].split("-", 1)[0]
+    parts = core.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)  # type: ignore[return-value]
 
 
 @dataclass(frozen=True)
