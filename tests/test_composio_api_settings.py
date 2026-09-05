@@ -19,6 +19,8 @@ def test_composio_api_ui_uses_internal_operation_lists_and_defaults():
     assert 'composio_privacy_options = ["unlisted", "listed"]' in MAIN_SOURCE
     assert 'range(1, 101)' in MAIN_SOURCE
     assert 'composio_language_options = list(LANGUAGE_CODES)' in MAIN_SOURCE
+    assert 'settings.get("composio_language") or "en"' in MAIN_SOURCE
+    assert '"composio_language": "en"' in STORAGE_SOURCE
     assert '"composio_tool_slug": "upload_video"' in STORAGE_SOURCE
     assert '"composio_privacy_status": "unlisted"' in STORAGE_SOURCE
     assert '"composio_category_id": "22"' in STORAGE_SOURCE
@@ -43,7 +45,7 @@ def test_composio_backend_forces_video_file_path_and_sanitises_values(monkeypatc
             "composio_file_field": "wrongEditableField",
             "composio_privacy_status": "invalid",
             "composio_category_id": "999",
-            "composio_language": "pt",
+            "composio_language": "en",
             "composio_privacy_field": "privacyStatus",
             "composio_category_field": "categoryId",
             "composio_language_field": "defaultLanguage",
@@ -59,7 +61,7 @@ def test_composio_backend_forces_video_file_path_and_sanitises_values(monkeypatc
     assert captured["file_field"] == "videoFilePath"
     assert captured["arguments"]["privacyStatus"] == "unlisted"
     assert captured["arguments"]["categoryId"] == "22"
-    assert captured["arguments"]["defaultLanguage"] == "pt-BR"
+    assert captured["arguments"]["defaultLanguage"] == "en-US"
 
 
 def test_composio_upload_video_does_not_require_a_manual_channel_field(monkeypatch, tmp_path):
