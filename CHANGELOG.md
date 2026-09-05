@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.84 — 2026-09-04
+
+- Corrigida a regressão de percentagem nos cards de vídeos em `doing` quando tarefas antigas são retomadas.
+- O progresso persistido passa a ser monotónico: uma actualização posterior nunca reduz o maior avanço confirmado.
+- Mantido o watchdog de actividade para marcar tarefas sem heartbeat como falhadas, evitando execução indefinida.
+
 ## 0.5.83 — 2026-09-04
 
 - Adicionados ao Analista Growth Youtube os indicadores de configuração da YouTube Data API v3 e da YouTube Analytics API.

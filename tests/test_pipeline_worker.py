@@ -328,6 +328,13 @@ def test_backlog_has_live_progress_and_stale_recovery_ui():
     assert "Worker de vídeo sem heartbeat recente" in source
 
 
+def test_worker_progress_is_monotonic_when_resuming_old_checkpoints():
+    source = Path(__file__).resolve().parents[1].joinpath("hermes_ui", "pipeline_worker.py").read_text(encoding="utf-8")
+
+    assert 'updates["progress"] = max(previous_progress, requested_progress)' in source
+    assert "Nunca deixar a percentagem persistida recuar" in source
+
+
 class _FakeStdout:
     def __init__(self, lines):
         self._lines = iter(lines)
