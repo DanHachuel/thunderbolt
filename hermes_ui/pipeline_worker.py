@@ -268,6 +268,20 @@ def _update(task_id: str, **updates: Any) -> dict[str, Any]:
     if str(current.get("state") or "") in {"blocked", "cancelled"}:
         raise PipelineStopped("A tarefa foi parada pelo utilizador.")
     updates = dict(updates)
+    if "progress" in updates:
+        try:
+            previous_progress = max(0, min(100, int(current.get("progress") or 0)))
+        except (TypeError, ValueError):
+            previous_progress = 0
+        try:
+            requested_progress = max(0, min(100, int(updates.get("progress") or 0)))
+        except (TypeError, ValueError):
+            requested_progress = previous_progress
+        # A geração pode ser retomada a partir de um checkpoint avançado,
+        # enquanto o subprocesso expõe uma faixa própria para a etapa actual.
+        # Nunca deixar a percentagem persistida recuar evita a oscilação visual
+        # e mantém o card fiel ao maior avanço já confirmado.
+        updates["progress"] = max(previous_progress, requested_progress)
     updates["orchestration"] = _cascade_metadata(current, updates)
     updated = update_task(task_id, updates)
     if not updated:
