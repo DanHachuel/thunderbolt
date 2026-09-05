@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.83 — 2026-09-04
+
+- Adicionados ao Analista Growth Youtube os indicadores de configuração da YouTube Data API v3 e da YouTube Analytics API.
+- Os estados usam o padrão visual existente: verde “Configured” e amarelo “Missing configuration”.
+
 ## 0.5.82 — 2026-09-04
 
 - Reorganizados os cards de canais da aba Automação Youtube numa grelha compacta de duas linhas.
