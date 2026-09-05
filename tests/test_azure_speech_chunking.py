@@ -21,6 +21,21 @@ CHUNKED = _load_module(ROOT / "seed" / "skills" / "azure_tts_chunked.py", "azure
 MPT_AGENT = _load_module(ROOT / "seed" / "skills" / "mpt_agent.py", "mpt_agent_test")
 
 
+def test_mpt_agent_requires_moneyprinter_moviepy_release(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run_checked(command, *, cwd):
+        calls.append((command, cwd))
+
+    monkeypatch.setattr(MPT_AGENT, "run_checked", fake_run_checked)
+    MPT_AGENT.ensure_moviepy(tmp_path, "uv")
+
+    command, cwd = calls[0]
+    assert cwd == tmp_path
+    assert command[:4] == ["uv", "run", "--with", "moviepy==2.2.1"]
+    assert command[-2:] == ["-c", "import moviepy; assert moviepy.__version__ == '2.2.1'"]
+
+
 def test_split_text_keeps_chunks_below_safe_request_size():
     text = "Parágrafo inicial. " + ("palavra " * 700) + "Fim."
     chunks = CHUNKED.split_text(text, limit=1800)

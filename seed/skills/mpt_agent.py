@@ -24,6 +24,7 @@ PROJECT_ARCHIVE_URL = (
     "https://github.com/harry0703/MoneyPrinterTurbo/archive/refs/heads/main.zip"
 )
 DEFAULT_ROOT = Path.home() / "MoneyPrinterTurbo"
+MOVIEPY_REQUIREMENT = "moviepy==2.2.1"
 CHUNKED_SYNTHESIS_TIMEOUT_SECONDS = 15 * 60
 DEPENDENCY_SYNC_TIMEOUT_SECONDS = 15 * 60
 DEFAULT_VOICE_NAME = "zh-CN-XiaoxiaoNeural-Female"
@@ -686,6 +687,22 @@ def run_checked(command: list[str], *, cwd: Path) -> None:
     log("project dependencies verified with uv")
 
 
+def ensure_moviepy(root: Path, uv: str) -> None:
+    """Ensure the render engine matches MoneyPrinterTurbo's MoviePy release."""
+    run_checked(
+        [
+            uv,
+            "run",
+            "--with",
+            MOVIEPY_REQUIREMENT,
+            "python",
+            "-c",
+            "import moviepy; assert moviepy.__version__ == '2.2.1'",
+        ],
+        cwd=root,
+    )
+
+
 def generate_video(
     root: Path,
     subject: str,
@@ -696,6 +713,7 @@ def generate_video(
     if not uv:
         raise SkillError("uv was not found; reopen the terminal or add uv to PATH")
     run_checked([uv, "sync", "--frozen"], cwd=root)
+    ensure_moviepy(root, uv)
     config_path = ensure_config(root)
 
     task_id = str(uuid.uuid4())
@@ -748,6 +766,8 @@ def generate_video(
     command = [
         uv,
         "run",
+        "--with",
+        MOVIEPY_REQUIREMENT,
         "python",
         "cli.py",
         *forwarded_args,
