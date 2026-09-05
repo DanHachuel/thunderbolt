@@ -25,6 +25,15 @@ from hermes_ui.languages import language_locale
 
 OFFICIAL_DAILY_LIMIT = 5
 QUOTA_FILENAME = "official_upload_quota.json"
+COMPOSIO_VIDEO_FILE_FIELD = "videoFilePath"
+COMPOSIO_OPERATION_OPTIONS = {
+    "upload_video": "Upload Video",
+    "update_video": "Update video",
+    "upload_tiktok_video": "Upload TikTok Video",
+    "upload_instagram_media": "Upload Instagram vídeo/Reel/foto",
+}
+COMPOSIO_PRIVACY_VALUES = {"listed", "unlisted"}
+COMPOSIO_CATEGORY_RANGE = range(1, 101)
 
 
 def _attempt_record(name: str, result: IntegrationResult, *, skipped: bool = False) -> dict[str, Any]:
@@ -232,7 +241,8 @@ def upload_with_default_route(
 def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwargs: Any) -> IntegrationResult:
     slug = str(settings.get("composio_tool_slug") or "").strip()
     normalized_slug = slug.upper().replace("-", "_")
-    youtube_upload_tool = normalized_slug in {"YOUTUBE_UPLOAD", "YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"} or ("YOUTUBE" in normalized_slug and "UPLOAD" in normalized_slug)
+    connected_account_tool = normalized_slug in {"UPLOAD_VIDEO", "UPDATE_VIDEO", "UPLOAD_TIKTOK_VIDEO", "UPLOAD_INSTAGRAM_MEDIA"}
+    youtube_upload_tool = normalized_slug in {"UPLOAD_VIDEO", "YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"} or ("YOUTUBE" in normalized_slug and "UPLOAD" in normalized_slug and normalized_slug != "YOUTUBE_UPLOAD")
     channel_id = str(
         channel.get("youtube_channel_id")
         or channel.get("youtube_id")
@@ -245,24 +255,32 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
         match = re.search(r"/channel/(UC[\w-]+)", str(channel.get("url") or ""))
         channel_id = match.group(1) if match else ""
     channel_field = str(settings.get("composio_channel_field") or "channel_id").strip()
-    if not youtube_upload_tool and not channel_id:
+    if not connected_account_tool and not youtube_upload_tool and not channel_id:
         return IntegrationResult(False, "Composio não foi executado: o canal da tarefa não tem um YouTube channel ID sincronizado.", {"missing": ["youtube_channel_id"]})
-    if not youtube_upload_tool and not channel_field:
+    if not connected_account_tool and not youtube_upload_tool and not channel_field:
         return IntegrationResult(False, "Composio não foi executado: configure o campo de canal da ferramenta.", {"missing": ["composio_channel_field"]})
-    file_field = str(settings.get("composio_file_field") or "").strip()
-    if not file_field or (youtube_upload_tool and file_field == "file"):
-        file_field = "videoFilePath"
+    # O path técnico nunca vem da configuração editável: é injectado pelo backend.
+    file_field = COMPOSIO_VIDEO_FILE_FIELD
     try:
         arguments = str(settings.get("composio_arguments_json") or "{}").strip() or "{}"
         import json
         parsed_arguments = json.loads(arguments)
         if not isinstance(parsed_arguments, dict):
             return IntegrationResult(False, "Composio não foi executado: os argumentos JSON devem ser um objecto.", {})
+        privacy_value = str(settings.get("composio_privacy_status") or kwargs.get("privacy_status") or "unlisted").strip().lower()
+        if privacy_value not in COMPOSIO_PRIVACY_VALUES:
+            privacy_value = "unlisted"
+        try:
+            category_value = int(str(settings.get("composio_category_id") or kwargs.get("category_id") or "22").strip())
+        except ValueError:
+            category_value = 22
+        if category_value not in COMPOSIO_CATEGORY_RANGE:
+            category_value = 22
         locked_values = {
             **({channel_field: channel_id} if channel_field and not youtube_upload_tool else {}),
-            str(settings.get("composio_privacy_field") or "privacy_status").strip(): str(kwargs.get("privacy_status") or "unlisted"),
-            str(settings.get("composio_category_field") or "category_id").strip(): str(kwargs.get("category_id") or "22"),
-            str(settings.get("composio_language_field") or "language").strip(): language_locale(kwargs.get("language") or channel.get("language") or "pt"),
+            str(settings.get("composio_privacy_field") or "privacy_status").strip(): privacy_value,
+            str(settings.get("composio_category_field") or "category_id").strip(): str(category_value),
+            str(settings.get("composio_language_field") or "language").strip(): language_locale(settings.get("composio_language") or kwargs.get("language") or channel.get("language") or "pt"),
         }
         for field, expected in locked_values.items():
             if not field:
