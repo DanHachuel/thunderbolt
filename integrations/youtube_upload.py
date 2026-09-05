@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from integrations.platforms import IntegrationResult
-from integrations.youtube_batch import loopback_host, loopback_port, loopback_redirect_uri
+from integrations.youtube_batch import loopback_host, loopback_port, loopback_redirect_uri, token_path as batch_token_path
 
 
 # Mantemos os mesmos escopos usados pelo youtube-automation-agent.
@@ -89,10 +89,11 @@ def build_agent_video_metadata(
 
 
 class _GoogleYouTubeBase:
-    def __init__(self, settings: dict[str, Any], token_path: Path, scopes: list[str], alternate_token_path: Path | None = None):
+    def __init__(self, settings: dict[str, Any], token_path: Path, scopes: list[str], alternate_token_path: Path | None = None, account: dict[str, Any] | None = None):
         self.settings = settings
-        self.client_id = _safe_text(settings.get("youtube_client_id")) or os.getenv("YOUTUBE_CLIENT_ID", "")
-        self.client_secret = _safe_text(settings.get("youtube_client_secret")) or os.getenv("YOUTUBE_CLIENT_SECRET", "")
+        self.account = account if isinstance(account, dict) else None
+        self.client_id = _safe_text((self.account or {}).get("client_id")) or _safe_text(settings.get("youtube_client_id")) or os.getenv("YOUTUBE_CLIENT_ID", "")
+        self.client_secret = _safe_text((self.account or {}).get("client_secret")) or _safe_text(settings.get("youtube_client_secret")) or os.getenv("YOUTUBE_CLIENT_SECRET", "")
         self.token_path = token_path
         self.alternate_token_path = alternate_token_path
         self.scopes = scopes
@@ -107,9 +108,11 @@ class _GoogleYouTubeBase:
 
     def _token_candidates(self) -> list[Path]:
         paths = [self.token_path]
+        if self.account:
+            paths.append(batch_token_path(self.token_path.parents[1], self.account))
         if self.alternate_token_path and self.alternate_token_path not in paths:
             paths.append(self.alternate_token_path)
-        return paths
+        return list(dict.fromkeys(paths))
 
     def _client_config(self) -> dict[str, Any]:
         return {
@@ -135,6 +138,10 @@ class _GoogleYouTubeBase:
         if isinstance(raw, dict) and isinstance(raw.get("youtube"), dict):
             raw = raw["youtube"]
         credentials = Credentials.from_authorized_user_info(raw, self.scopes)
+        granted_scopes = {str(scope).strip() for scope in (credentials.scopes or [])}
+        if "https://www.googleapis.com/auth/youtube.upload" in self.scopes and granted_scopes and "https://www.googleapis.com/auth/youtube.upload" not in granted_scopes:
+            email = _safe_text((self.account or {}).get("email")) or "a conta seleccionada"
+            raise RuntimeError(f"{email} está autorizada apenas para leitura/listagem. Autorize novamente esta conta com o escopo de upload YouTube.")
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
             self._save_credentials(credentials)
@@ -292,8 +299,8 @@ class _GoogleYouTubeBase:
 class YouTubeAutomationAgentUploader(_GoogleYouTubeBase):
     """Adaptation of the source agent's PublishingSchedulingAgent inside Thunderbolt."""
 
-    def __init__(self, settings: dict[str, Any], storage_root: Path):
-        super().__init__(settings, storage_root / "state" / "youtube_agent_tokens.json", AGENT_SCOPES)
+    def __init__(self, settings: dict[str, Any], storage_root: Path, account: dict[str, Any] | None = None):
+        super().__init__(settings, storage_root / "state" / "youtube_agent_tokens.json", AGENT_SCOPES, account=account)
 
     def upload(self, **kwargs: Any) -> IntegrationResult:
         result = self._upload_common(**kwargs)
@@ -304,12 +311,13 @@ class YouTubeAutomationAgentUploader(_GoogleYouTubeBase):
 class DirectYouTubeOAuthUploader(_GoogleYouTubeBase):
     """Independent minimal OAuth upload path used only after the primary path fails."""
 
-    def __init__(self, settings: dict[str, Any], storage_root: Path):
+    def __init__(self, settings: dict[str, Any], storage_root: Path, account: dict[str, Any] | None = None):
         super().__init__(
             settings,
             storage_root / "state" / "youtube_oauth_fallback_token.json",
             FALLBACK_SCOPES,
             alternate_token_path=storage_root / "state" / "youtube_agent_tokens.json",
+            account=account,
         )
 
     def upload(self, **kwargs: Any) -> IntegrationResult:
@@ -332,6 +340,7 @@ def upload_youtube_with_fallback(
     publish_at: str | None = None,
     thumbnail_path: str | None = None,
     captions_path: str | None = None,
+    account: dict[str, Any] | None = None,
     on_attempt: Callable[[UploadAttempt], None] | None = None,
 ) -> IntegrationResult:
     """Run the adapted agent path first and OAuth direct only as redundancy."""
@@ -348,7 +357,7 @@ def upload_youtube_with_fallback(
         "captions_path": captions_path,
     }
     attempts: list[dict[str, Any]] = []
-    primary = YouTubeAutomationAgentUploader(settings, storage_root)
+    primary = YouTubeAutomationAgentUploader(settings, storage_root, account=account)
     primary_result = primary.upload(**kwargs)
     primary_result.data.setdefault("mechanism", "youtube-automation-agent-adaptado")
     primary_attempt = UploadAttempt("youtube-automation-agent-adaptado", primary_result)
@@ -359,7 +368,7 @@ def upload_youtube_with_fallback(
         primary_result.data["attempts"] = attempts
         return primary_result
 
-    fallback = DirectYouTubeOAuthUploader(settings, storage_root)
+    fallback = DirectYouTubeOAuthUploader(settings, storage_root, account=account)
     fallback_result = fallback.upload(**kwargs)
     fallback_result.data.setdefault("mechanism", "oauth-direct-fallback")
     fallback_attempt = UploadAttempt("oauth-direct-fallback", fallback_result)

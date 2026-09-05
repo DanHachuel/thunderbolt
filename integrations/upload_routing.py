@@ -142,6 +142,7 @@ def upload_with_default_route(
                 privacy_status=privacy_status,
                 thumbnail_path=thumbnail_path,
                 captions_path=captions_path,
+                account=account,
             )
         except Exception as exc:  # Keep fallback actionable and deterministic.
             official_result = IntegrationResult(False, f"API Oficial falhou: {exc}", {})
