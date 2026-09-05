@@ -4874,12 +4874,16 @@ def _render_video_task_state(task: dict[str, Any]) -> None:
                     st.caption(f"Manifesto: {task.get('video_result')}")
 
 
-def _start_pipeline_task(task_id: str, state: str) -> None:
+def _start_pipeline_task(task_id: str, state: str) -> bool:
     """Start or retry a video task from any platform automation card."""
     if state in {"blocked", "failed"}:
-        retry_task_with_current_settings(task_id)
+        updated = retry_task_with_current_settings(task_id)
     else:
-        transition_task(task_id, "doing")
+        updated = transition_task(task_id, "doing")
+    if not updated:
+        st.error("Não foi possível iniciar este vídeo: a tarefa já não existe na fila.")
+        return False
+    return True
 
 
 def render_videos():
@@ -5386,11 +5390,8 @@ def _render_youtube_automation_cards():
                     start_col, stop_col, delete_col = st.columns(3)
                     with start_col:
                         if st.button("Start", key=f"automation_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                            if state in {"failed", "blocked"}:
-                                retry_task_with_current_settings(task["id"])
-                            else:
-                                transition_task(task["id"], "doing")
-                            st.rerun()
+                            if _start_pipeline_task(str(task["id"]), state):
+                                st.rerun()
                     with stop_col:
                         if st.button("Stop", key=f"automation_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
                             stop_task_by_user(task["id"])

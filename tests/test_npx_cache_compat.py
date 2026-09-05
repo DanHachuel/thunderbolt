@@ -32,6 +32,15 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('readFileSync(join(storageDir, "state", filename)', source)
         self.assertNotIn('readFileSync(join(thunderboltHome, "storage", "state", filename)', source)
 
+    def test_pipeline_worker_stays_available_for_manual_start(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        start_block = source.split("function startPipelineWorker()", 1)[1].split("function monitorWorkers()", 1)[0]
+        monitor_block = source.split("function monitorWorkers()", 1)[1].split("function startStreamlit()", 1)[0]
+        self.assertIn('if (shuttingDown || pipelineWorker) return;', start_block)
+        self.assertNotIn('!hasPendingPipelineWork()', start_block)
+        self.assertIn('startPipelineWorker();', monitor_block)
+        self.assertNotIn('stopPipelineWorker();', monitor_block)
+
     def test_install_recovers_ai_influencer_database_from_previous_npx_cache(self):
         source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")
         self.assertIn('function migrateLegacyNpxStorage()', source)

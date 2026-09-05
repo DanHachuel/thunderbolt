@@ -322,7 +322,7 @@ function stopPipelineWorker() {
 }
 
 function startPipelineWorker() {
-  if (shuttingDown || pipelineWorker || !hasPendingPipelineWork()) return;
+  if (shuttingDown || pipelineWorker) return;
   pipelineWorker = spawn(python, ["-m", "hermes_ui.pipeline_worker"], {
     cwd: root,
     stdio: "inherit",
@@ -334,19 +334,16 @@ function startPipelineWorker() {
     pipelineWorker = null;
     if (shuttingDown) return;
     console.error(`Thunderbolt pipeline worker: terminou (código ${code ?? "-"}, sinal ${signal ?? "-"}).`);
-    if (hasPendingPipelineWork()) {
-      pipelineRestartTimer = setTimeout(() => {
-        pipelineRestartTimer = null;
-        startPipelineWorker();
-      }, 5000);
-    }
+    pipelineRestartTimer = setTimeout(() => {
+      pipelineRestartTimer = null;
+      startPipelineWorker();
+    }, 5000);
   });
 }
 
 function monitorWorkers() {
   if (shuttingDown) return;
-  if (hasPendingPipelineWork()) startPipelineWorker();
-  else if (pipelineWorker) stopPipelineWorker();
+  startPipelineWorker();
   startAutomationWorker();
 }
 
@@ -396,6 +393,6 @@ const stopWorker = () => {
 process.on("SIGINT", stopWorker);
 process.on("SIGTERM", stopWorker);
 monitorWorkers();
-// O launcher verifica apenas os JSONs locais; não existe timer no Streamlit
-// nem worker persistente quando não há tarefa pendente.
+// O pipeline worker permanece disponível para recolher imediatamente tarefas
+// colocadas em `doing` pelo botão Start, mesmo quando a fila estava vazia.
 workerMonitorTimer = setInterval(monitorWorkers, 2000);
