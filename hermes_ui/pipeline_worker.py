@@ -1583,7 +1583,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
             failed = [
                 f"{item.get('route')}: {item.get('message')}"
                 for item in attempts
-                if isinstance(item, dict) and item.get("status") == "failed" and item.get("message")
+                if isinstance(item, dict) and item.get("status") in {"failed", "skipped"} and item.get("message")
             ]
             if failed:
                 detail = " Detalhes: " + " | ".join(failed[-4:])
