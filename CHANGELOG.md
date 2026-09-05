@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.88 — 2026-09-04
+
+- Corrigido o erro Windows `WinError 10048` ao autorizar contas Google via OAuth quando a porta local `8765` já está ocupada.
+- O callback OAuth tenta primeiro a porta configurada e faz retry automático numa porta loopback livre, mantendo a autenticação normal do Google.
+- Adicionado teste de regressão que reproduz a porta ocupada e confirma a autorização na porta dinâmica.
+
 ## 0.5.87 — 2026-09-04
 
 - Corrigida a renovação de `sessionInfo` quando o executável Chromium do Playwright não existe no cache do Windows.
