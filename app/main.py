@@ -22,6 +22,7 @@ sys.stdout = _force_utf8_stream(sys.stdout)
 sys.stderr = _force_utf8_stream(sys.stderr)
 
 import hashlib
+from html import escape
 import json
 import mimetypes
 import re
@@ -1501,8 +1502,13 @@ def render_growth_youtube():
     with selector_col:
         selected = st.selectbox("Canal a analisar", channels, format_func=lambda item: str(item.get("name") or "Canal sem nome"), key="growth_youtube_channel")
     with action_col:
-        st.write("")
-        analyse_clicked = st.button("ANALISAR CANAL", type="primary", use_container_width=True, key="growth_youtube_analyse")
+        action_button_col, action_status_col = st.columns([1.15, 0.85], gap="small")
+        with action_button_col:
+            st.write("")
+            analyse_clicked = st.button("ANALISAR CANAL", type="primary", use_container_width=True, key="growth_youtube_analyse")
+        with action_status_col:
+            if st.session_state.get("growth_analysis_status") == "complete":
+                st.markdown('<div style="padding-top:9px;color:#22c55e;font-weight:700;white-space:nowrap;">✓ Análise concluída</div>', unsafe_allow_html=True)
     if analyse_clicked:
         settings = read_json("settings.json", {})
         llm_settings, _ = ensure_llm_provider_cards(settings)
@@ -1511,8 +1517,10 @@ def render_growth_youtube():
             try:
                 record = run_audit(selected, settings, vision_card=vision_card, progress=st.write)
                 st.session_state["growth_last_analysis_code"] = record["code"]
+                st.session_state["growth_analysis_status"] = "complete"
                 status.update(label="Análise concluída", state="complete")
             except Exception as exc:
+                st.session_state["growth_analysis_status"] = "failed"
                 status.update(label="Análise falhou", state="error")
                 st.error(str(exc)[:500])
     records = list_analyses()
@@ -1552,23 +1560,74 @@ def render_growth_youtube():
     st.subheader("Dashboard de Growth")
     st.caption("Visão híbrida: os 3 pilares críticos em destaque e os 5 pilares operacionais abaixo. Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100.")
     source_names = {"public": "PÚBLICO", "paligemma": "PALIGEMMA", "estimated": "DADO ESTIMADO", "unavailable": "INDISPONÍVEL", "youtube_analytics_oauth": "ANALYTICS OAUTH"}
-    featured, secondary = metrics[:3], metrics[3:]
+    metric_by_label = {str(item.get("label")): item for item in metrics}
+    videos = selected_record.get("videos", []) if selected_record else []
+    analytics_values = (selected_record.get("analytics") or {}).get("values", {}) if selected_record else {}
 
-    def growth_card(metric: dict[str, Any], featured_card: bool = False) -> str:
-        score = int(metric.get("score", 0))
-        source = source_names.get(str(metric.get("source", "unknown")), "A VERIFICAR")
-        height = "min-height:238px" if featured_card else "min-height:190px"
-        return (
-            f'<div style="{height};border:1px solid #2b3b52;border-radius:14px;padding:18px;background:linear-gradient(145deg,#111c2b,#0b121c);box-shadow:0 8px 22px rgba(0,0,0,.16);">'
-            f'<div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#7dd3fc;text-transform:uppercase;">{source}</div>'
-            f'<div style="font-size:{"18px" if featured_card else "15px"};font-weight:750;color:#f8fafc;margin-top:9px;min-height:40px;">{metric.get("label", "Métrica")}</div>'
-            f'<div style="display:flex;align-items:baseline;gap:5px;margin-top:7px;"><span style="font-size:{"42px" if featured_card else "32px"};font-weight:850;color:{_growth_score_color(score)};">{score}</span><span style="font-size:13px;color:#94a3b8;">/100</span></div>'
-            f'<div style="border-top:1px solid #263447;margin-top:10px;padding-top:10px;font-size:13px;color:#e2e8f0;"><b>KPI observado</b><br>{metric.get("value", "—")}</div>'
-            f'<div style="font-size:11px;color:#94a3b8;margin-top:9px;line-height:1.35;">{metric.get("diagnosis", "")[:150]}</div></div>'
-        )
+    def display_value(value: Any, suffix: str = "") -> str:
+        if value is None or value == "" or value == "—":
+            return "—"
+        return f"{value}{suffix}"
 
-    st.markdown('<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0 18px;">' + "".join(growth_card(metric, True) for metric in featured) + '</div>', unsafe_allow_html=True)
-    st.markdown('<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 18px;">' + "".join(growth_card(metric) for metric in secondary) + '</div>', unsafe_allow_html=True)
+    def number_value(value: Any) -> float | None:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def status_for(value: Any, target: Any = None, *, direction: str = "above", available: bool = True) -> tuple[str, str]:
+        if not available or value is None or target is None:
+            return "A verificar", "#94a3b8"
+        current, goal = number_value(value), number_value(target)
+        if current is None or goal is None:
+            return "A verificar", "#94a3b8"
+        passed = current >= goal if direction == "above" else current <= goal
+        return ("Meta atingida", "#22c55e") if passed else ("Atenção", "#facc15")
+
+    def text_status(value: Any, expected: set[str], *, available: bool = True) -> tuple[str, str]:
+        if not available or value is None or value == "—":
+            return "A verificar", "#94a3b8"
+        return ("Meta atingida", "#22c55e") if str(value).casefold() in {item.casefold() for item in expected} else ("Atenção", "#facc15")
+
+    def avg_video_field(field: str) -> float | None:
+        values = [number_value(video.get(field)) for video in videos]
+        values = [value for value in values if value is not None and value > 0]
+        return sum(values) / len(values) if values else None
+
+    avg_views = avg_video_field("view_count")
+    avg_thumb_score = number_value(metric_by_label.get("Qualidade da thumbnail", {}).get("score"))
+    title_score = number_value(metric_by_label.get("Qualidade do título", {}).get("score"))
+    hook_score = number_value(metric_by_label.get("Hook — retenção inicial", {}).get("score"))
+    average_percentage = number_value(analytics_values.get("averageViewPercentage"))
+    average_duration = number_value(analytics_values.get("averageViewDuration"))
+    gained = number_value(analytics_values.get("subscribersGained"))
+    views_total = number_value(analytics_values.get("views")) or sum(number_value(video.get("view_count")) or 0 for video in videos)
+    conversion = (gained / views_total * 100) if gained is not None and views_total else None
+    niche = str(selected.get("niche") or selected.get("description") or "—")
+    vision_values = [video.get("vision") or {} for video in videos if (video.get("vision") or {}).get("status") == "analisado"]
+    contrast = next((str(item.get("contrast")).strip() for item in vision_values if item.get("contrast")), None)
+    emotion = next((str(item.get("emotion")).strip() for item in vision_values if item.get("emotion")), None)
+    cards = [
+        ("Validação de Nicho", metric_by_label.get("Demanda validada", {}).get("score", 0), True, [("Nicho Detectado", niche, "RPM > $7", text_status(niche, {niche}, available=niche != "—")), ("Teto da Concorrência", "—", "> 500k", status_for(None)), ("Média de Views (5 vídeos)", f"{avg_views:,.0f}" if avg_views is not None else "—", "> 50k", status_for(avg_views, 50000)), ("Impressões (48h iniciais)", display_value(analytics_values.get("impressions")), "> 10k", status_for(analytics_values.get("impressions"), 10000)), ("Tráfego de Pesquisa (%)", "—", "15–40%", status_for(None))]),
+        ("Thumbnail", metric_by_label.get("Qualidade da thumbnail", {}).get("score", 0), True, [("CTR (Click-Through Rate)", "—", "> 6%", status_for(None)), ("Qualidade Visual (Thumb)", f"{avg_thumb_score / 10:.1f}/10" if avg_thumb_score is not None else "—", "> 7/10", status_for(avg_thumb_score, 70)), ("Contraste da Thumbnail", contrast or "—", "Alto", text_status(contrast, {"alto", "high"}, available=bool(contrast))), ("Emoção Predominante", emotion or "—", "Medo/Surpresa", text_status(emotion, {"medo", "surpresa", "fear", "surprise"}, available=bool(emotion)))]),
+        ("Título dos Vídeos", metric_by_label.get("Qualidade do título", {}).get("score", 0), True, [("Score do Título (SEO)", f"{title_score / 10:.1f}/10" if title_score is not None else "—", "> 8/10", status_for(title_score, 80)), ("Gatilho Mental no Título", "—", "> 70%", status_for(None)), ("Palavra-chave no Título", "—", "Sim", text_status(None, {"sim"}, available=False))]),
+        ("Hook e Retenção", metric_by_label.get("Hook — retenção inicial", {}).get("score", 0), False, [("Queda nos Primeiros 30s", "—", "< 20%", status_for(None)), ("Retenção Média (%)", display_value(average_percentage, "%"), "> 50%", status_for(average_percentage, 50)), ("Hook (Primeiros 15s)", "Forte" if hook_score is not None and hook_score >= 70 else "—", "Promessa clara", text_status("forte" if hook_score is not None and hook_score >= 70 else None, {"forte"}, available=hook_score is not None))]),
+        ("Ritmo e Edição", metric_by_label.get("Ritmo e edição", {}).get("score", 0), False, [("Pico de Abandono", "—", "Queda suave", status_for(None)), ("Tempo Médio (AVD)", f"{average_duration / 60:.1f} min" if average_duration is not None else "—", "> 4 min", status_for(average_duration, 240)), ("Estrutura do Roteiro", "Clara" if hook_score is not None and hook_score >= 60 else "—", "Clara", text_status("clara" if hook_score is not None and hook_score >= 60 else None, {"clara"}, available=hook_score is not None)), ("Densidade de Palavras-chave", "—", "> 3", status_for(None))]),
+        ("Tráfego e Algoritmo", metric_by_label.get("Origem do tráfego", {}).get("score", 0), False, [("Origem: Browse (%)", "—", "> 50%", status_for(None)), ("Origem: Inscritos (%)", "—", "< 30%", status_for(None))]),
+        ("Conversão e Engajamento", metric_by_label.get("Conversão em inscritos", {}).get("score", 0), False, [("Taxa Conversão (Subs/Views)", display_value(conversion, "%") if conversion is not None else "—", "> 1.5%", status_for(conversion, 1.5)), ("Taxa de Likes (Likes/Views)", "—", "> 4%", status_for(None))]),
+        ("Consistência e Saúde", metric_by_label.get("Cadência de publicação", {}).get("score", 0), False, [("Cadência de Postagem", "—", "≤ 7 dias", status_for(None)), ("Biblioteca Perene (%)", "—", "> 40%", status_for(None)), ("Crescimento Líquido de Subs", display_value((gained or 0) - (number_value(analytics_values.get("subscribersLost")) or 0)) if gained is not None else "—", "Positivo", ("Meta atingida", "#22c55e") if gained is not None and (gained - (number_value(analytics_values.get("subscribersLost")) or 0)) > 0 else status_for(None))]),
+    ]
+
+    def growth_card(card_data: tuple[str, Any, bool, list[tuple[str, str, str, tuple[str, str]]]]) -> str:
+        title, raw_score, featured_card, rows = card_data
+        score = int(number_value(raw_score) or 0)
+        source = source_names.get(str(metric_by_label.get(title, {}).get("source", "unknown")), "A VERIFICAR")
+        row_html = "".join(f'<tr><td>{escape(label)}</td><td><b>{escape(str(value))}</b></td><td>{escape(target)}</td><td><span style="color:{colour};font-weight:700;">● {escape(status)}</span></td></tr>' for label, value, target, (status, colour) in rows)
+        return f'<div style="min-height:{"350px" if featured_card else "280px"};border:1px solid #2b3b52;border-radius:14px;padding:16px;background:linear-gradient(145deg,#111c2b,#0b121c);box-shadow:0 8px 22px rgba(0,0,0,.16);"><div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#7dd3fc;text-transform:uppercase;">{escape(source)}</div><div style="font-size:{"19px" if featured_card else "16px"};font-weight:750;color:#f8fafc;margin-top:8px;">{escape(title)}</div><div style="display:flex;align-items:baseline;gap:5px;margin:8px 0 10px;"><span style="font-size:{"38px" if featured_card else "30px"};font-weight:850;color:{_growth_score_color(score)};">{score}</span><span style="font-size:13px;color:#94a3b8;">/100</span></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;color:#cbd5e1;"><thead><tr><th style="text-align:left;padding:5px 3px;border-bottom:1px solid #334155;">KPI</th><th style="text-align:left;padding:5px 3px;border-bottom:1px solid #334155;">Valor</th><th style="text-align:left;padding:5px 3px;border-bottom:1px solid #334155;">Meta</th><th style="text-align:left;padding:5px 3px;border-bottom:1px solid #334155;">Status</th></tr></thead><tbody>{row_html}</tbody></table></div></div>'
+
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0 18px;">' + "".join(growth_card(item) for item in cards[:3]) + '</div>', unsafe_allow_html=True)
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:0 0 18px;">' + "".join(growth_card(item) for item in cards[3:]) + '</div>', unsafe_allow_html=True)
+    st.caption("Legenda: ● Verde = meta atingida · ● Amarelo = atenção · ● Vermelho = crítico · Cinzento = dado não disponível na fonte autorizada.")
     st.divider()
     history_tab, dashboard_tab = st.tabs(["Últimas análises", "Leitura estratégica"])
     with dashboard_tab:

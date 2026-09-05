@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.81 — 2026-09-04
+
+- Implementado o Dashboard de Growth Youtube com Nota Geral do canal e oito cards categorizados.
+- Adicionados os três cards de destaque — Validação de Nicho, Thumbnail e Título dos Vídeos — e cinco cards secundários com tabelas KPI, Valor, Meta e Status.
+- Adicionada a indicação “Análise concluída” junto ao botão de análise.
+- KPIs sem dados disponíveis continuam identificados como “A verificar”, sem inventar métricas privadas do YouTube Analytics.
+
 ## 0.5.80 — 2026-09-04
 
 - Corrigida a rotação das chaves individuais das fontes de vídeo stock.
