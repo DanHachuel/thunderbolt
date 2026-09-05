@@ -8055,10 +8055,10 @@ def render_settings():
                 current_category = "22"
             composio_category_id = st.selectbox("Campo de categoria", composio_category_options, index=composio_category_options.index(current_category), key="upload_composio_category_id", help="Categorias YouTube de 1 a 100; `22` é o default.")
             composio_language_options = list(LANGUAGE_CODES)
-            current_language = str(settings.get("composio_language") or "pt")
+            current_language = str(settings.get("composio_language") or "en")
             if current_language not in composio_language_options:
-                current_language = "pt"
-            composio_language = st.selectbox("Campo de idioma", composio_language_options, index=composio_language_options.index(current_language), format_func=language_label, key="upload_composio_language", help="Idioma usado pelo backend nos argumentos da ferramenta.")
+                current_language = "en"
+            composio_language = st.selectbox("Campo de idioma", composio_language_options, index=composio_language_options.index(current_language), format_func=language_label, key="upload_composio_language", help="Idioma usado pelo backend nos argumentos da ferramenta; inglês é o default.")
             composio_channel_field = str(settings.get("composio_channel_field") or "")
             composio_arguments_json = str(settings.get("composio_arguments_json") or "{}")
             _render_credential_status(composio_api_key)

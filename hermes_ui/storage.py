@@ -297,7 +297,7 @@ DEFAULTS: dict[str, Any] = {
         "composio_channel_field": "",
         "composio_privacy_status": "unlisted",
         "composio_category_id": "22",
-        "composio_language": "pt",
+        "composio_language": "en",
         "composio_privacy_field": "privacyStatus",
         "composio_category_field": "categoryId",
         "composio_language_field": "defaultLanguage",

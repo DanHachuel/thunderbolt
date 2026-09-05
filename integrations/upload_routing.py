@@ -280,7 +280,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
             **({channel_field: channel_id} if channel_field and not youtube_upload_tool else {}),
             str(settings.get("composio_privacy_field") or "privacy_status").strip(): privacy_value,
             str(settings.get("composio_category_field") or "category_id").strip(): str(category_value),
-            str(settings.get("composio_language_field") or "language").strip(): language_locale(settings.get("composio_language") or kwargs.get("language") or channel.get("language") or "pt"),
+            str(settings.get("composio_language_field") or "language").strip(): language_locale(settings.get("composio_language") or kwargs.get("language") or channel.get("language") or "en"),
         }
         for field, expected in locked_values.items():
             if not field:
