@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import errno
 import json
 import os
 import re
@@ -44,6 +45,14 @@ def _authorization_error_message(email: str, exc: Exception) -> str:
             "Não use uma URI sem a porta, com localhost diferente ou sem a barra final."
         )
     return f"A autorização da conta {email} falhou: {detail}"
+
+
+def _is_address_in_use_error(exc: BaseException) -> bool:
+    """Return whether an OAuth callback bind failed because its port is busy."""
+    if getattr(exc, "winerror", None) == 10048 or getattr(exc, "errno", None) == errno.EADDRINUSE:
+        return True
+    detail = str(exc).lower()
+    return "10048" in detail or "address already in use" in detail or "only one usage" in detail
 
 
 def _text(value: Any) -> str:
@@ -115,15 +124,26 @@ def authorize_account(account: dict[str, Any], storage_root: Path, *, open_brows
     except ImportError as exc:
         return IntegrationResult(False, "As dependências Google OAuth ainda não estão instaladas. Execute a instalação do Thunderbolt novamente.", {"status": "missing_dependencies", "error": str(exc)})
     try:
-        flow = InstalledAppFlow.from_client_config(_client_config(account), BATCH_SCOPES)
-        credentials = flow.run_local_server(
-            host=loopback_host(),
-            port=loopback_port(),
-            open_browser=open_browser,
-            access_type="offline",
-            prompt="consent",
-            include_granted_scopes="true",
-        )
+        credentials = None
+        configured_port = loopback_port()
+        for attempt, port in enumerate((configured_port, 0)):
+            flow = InstalledAppFlow.from_client_config(_client_config(account), BATCH_SCOPES)
+            try:
+                credentials = flow.run_local_server(
+                    host=loopback_host(),
+                    port=port,
+                    open_browser=open_browser,
+                    access_type="offline",
+                    prompt="consent",
+                    include_granted_scopes="true",
+                )
+                break
+            except OSError as exc:
+                if attempt == 0 and _is_address_in_use_error(exc):
+                    continue
+                raise
+        if credentials is None:
+            raise RuntimeError("Não foi possível iniciar o callback OAuth local.")
         path = token_path(storage_root, account)
         _save_credentials(path, credentials)
         return IntegrationResult(True, f"Conta Google autorizada para listagem de canais: {email}.", {"status": "authorized", "email": email, "token_path": str(path)})

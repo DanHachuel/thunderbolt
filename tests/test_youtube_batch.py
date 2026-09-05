@@ -28,6 +28,44 @@ def test_redirect_uri_mismatch_message_is_actionable():
     assert "http://127.0.0.1:8765/" in result
 
 
+def test_authorize_retries_with_dynamic_port_when_loopback_port_is_busy(tmp_path, monkeypatch):
+    calls = []
+
+    class AddressInUseError(OSError):
+        winerror = 10048
+
+    class Credentials:
+        def to_json(self):
+            return '{"refresh_token":"refresh-token"}'
+
+    class Flow:
+        @classmethod
+        def from_client_config(cls, config, scopes):
+            assert config["installed"]["redirect_uris"] == ["http://127.0.0.1:8765/"]
+            assert scopes == youtube_batch.BATCH_SCOPES
+            return cls()
+
+        def run_local_server(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                raise AddressInUseError("[WinError 10048] socket already in use")
+            return Credentials()
+
+    fake_flow = types.ModuleType("google_auth_oauthlib.flow")
+    fake_flow.InstalledAppFlow = Flow
+    monkeypatch.setitem(sys.modules, "google_auth_oauthlib.flow", fake_flow)
+
+    result = youtube_batch.authorize_account(
+        {"id": "google-one", "email": "one@example.com", "client_id": "client", "client_secret": "secret"},
+        tmp_path,
+        open_browser=False,
+    )
+
+    assert result.ok
+    assert [call["port"] for call in calls] == [8765, 0]
+    assert youtube_batch.token_path(tmp_path, {"id": "google-one", "email": "one@example.com"}).exists()
+
+
 def test_account_key_and_token_path_are_separate_per_account(tmp_path):
     first = {"id": "google_batch_one", "email": "one@example.com"}
     second = {"id": "google_batch_two", "email": "two@example.com"}
