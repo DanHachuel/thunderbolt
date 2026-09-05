@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
+from integrations import youtube_session_manager as session_manager
 from integrations.session_info_health import health_check_session_info
 from integrations.youtube_session_manager import (
     account_lock,
@@ -62,3 +65,31 @@ def test_health_uses_expires_at_and_new_states():
     assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoCapturedAt": captured, "expires_at": (now + timedelta(hours=5)).isoformat()}, now=now).status == "expiring"
     assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoHealthStatus": "blocked_by_google", "sessionInfoCapturedAt": captured}, now=now).status == "blocked_by_google"
     assert health_check_session_info(account, {"sessionInfo": "x", "sessionInfoHealthStatus": "invalid_format", "sessionInfoCapturedAt": captured}, now=now).status == "invalid_format"
+
+
+def test_playwright_browser_falls_back_to_chrome_and_reinstalls_missing_bundle(monkeypatch):
+    calls = []
+
+    class Chromium:
+        def launch(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                raise RuntimeError("Executable doesn't exist at C:\\Users\\user\\AppData\\Local\\ms-playwright\\chromium\\chrome.exe")
+            if len(calls) == 2:
+                raise RuntimeError("Chromium distribution 'chrome' is not found")
+            return object()
+
+    class Playwright:
+        chromium = Chromium()
+
+    monkeypatch.delenv("THUNDERBOLT_CHROME_PATH", raising=False)
+    monkeypatch.setattr(session_manager, "_install_playwright_chromium", lambda: True)
+
+    assert session_manager._launch_playwright_browser(Playwright()) is not None
+    assert calls == [{"headless": True}, {"headless": True, "channel": "chrome"}, {"headless": True}]
+
+
+def test_configured_browser_path_must_exist(monkeypatch):
+    monkeypatch.setenv("THUNDERBOLT_CHROME_PATH", "/path/that/does/not/exist")
+    with pytest.raises(RuntimeError, match="não encontrado"):
+        session_manager._launch_playwright_browser(type("Playwright", (), {})())

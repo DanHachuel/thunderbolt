@@ -14,6 +14,8 @@ import os
 import re
 import shutil
 import signal
+import subprocess
+import sys
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -51,6 +53,70 @@ DESCRIPTION_SELECTORS = [
     'ytcp-mention-drawer textarea',
 ]
 BLOCKED_TEXT = ("verify", "verificação", "verification", "captcha", "confirme que você é humano", "confirm it's you", "confirme que é você")
+
+
+class _BrowserUnavailableError(RuntimeError):
+    """Raised when Playwright cannot find or prepare a usable browser."""
+
+
+def _looks_like_missing_playwright_browser(error: BaseException) -> bool:
+    message = str(error).lower()
+    return "executable doesn't exist" in message or "executable does not exist" in message or "playwright was just installed" in message
+
+
+def _install_playwright_chromium() -> bool:
+    """Install the bundled Chromium once when Playwright reports it missing."""
+    try:
+        result = subprocess.run(
+            [os.fspath(sys.executable), "-m", "playwright", "install", "chromium"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("Não foi possível preparar o Chromium do Playwright: %s", _safe_error(exc))
+        return False
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        logger.warning("A instalação automática do Chromium falhou: %s", detail[-1] if detail else "erro desconhecido")
+        return False
+    return True
+
+
+def _launch_playwright_browser(playwright: Any) -> Any:
+    """Launch the configured browser, recovering from a missing Playwright binary."""
+    configured_path = str(os.environ.get("THUNDERBOLT_CHROME_PATH") or "").strip()
+    launch_kwargs: dict[str, Any] = {"headless": True}
+    if configured_path:
+        if not Path(configured_path).is_file():
+            raise _BrowserUnavailableError(f"Executável Chrome/Chromium não encontrado: {configured_path}")
+        launch_kwargs["executable_path"] = configured_path
+
+    try:
+        return playwright.chromium.launch(**launch_kwargs)
+    except Exception as initial_error:
+        if configured_path or not _looks_like_missing_playwright_browser(initial_error):
+            raise
+
+        # Prefer an already installed Google Chrome before downloading another
+        # browser. This is particularly useful on Windows machines where the
+        # Playwright cache was removed but Chrome itself is still available.
+        try:
+            return playwright.chromium.launch(headless=True, channel="chrome")
+        except Exception as chrome_error:
+            if not _looks_like_missing_playwright_browser(initial_error):
+                raise initial_error
+            if not _install_playwright_chromium():
+                raise _BrowserUnavailableError(
+                    "O Chromium do Playwright não está instalado e não foi possível prepará-lo automaticamente."
+                ) from chrome_error
+            try:
+                return playwright.chromium.launch(headless=True)
+            except Exception as retry_error:
+                raise _BrowserUnavailableError(
+                    "O Chromium do Playwright continua indisponível depois da instalação automática."
+                ) from retry_error
 
 try:
     from yt_cm import YouTubeCookieManager  # type: ignore
@@ -203,7 +269,11 @@ def _capture_with_playwright(document: dict[str, Any], *, logs_dir: Path, video_
     logs_dir.mkdir(parents=True, exist_ok=True)
     cookies = [{"name": key, "value": str(document["cookies"][key]), "domain": ".youtube.com", "path": "/"} for key in COOKIE_KEYS if document.get("cookies", {}).get(key)]
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        try:
+            browser = _launch_playwright_browser(playwright)
+        except _BrowserUnavailableError as exc:
+            logger.error("Browser Playwright indisponível: %s", _safe_error(exc))
+            return "browser_unavailable", None
         context = browser.new_context()
         context.add_cookies(cookies)
         page = context.new_page()
@@ -298,6 +368,14 @@ def renew_account_session(storage_root: Path, account: dict[str, Any], settings:
                 return RenewalResult(False, "cookie_renewal_failed", f"Falha na renovação de cookies: {_safe_error(exc)}", account_id)
             for attempt in range(1, MAX_CAPTURE_ATTEMPTS + 1):
                 capture_status, token = _capture_with_playwright(document, logs_dir=logs_dir, video_id=str(account.get("video_id") or ""))
+                if capture_status == "browser_unavailable":
+                    return RenewalResult(
+                        False,
+                        "browser_unavailable",
+                        "Renovação falhou: o Chromium do Playwright não está disponível. Execute novamente a instalação do Thunderbolt e tente renovar outra vez.",
+                        account_id,
+                        attempt,
+                    )
                 if capture_status == "blocked_by_google":
                     _write_renewal_state(directory, "blocked_by_google")
                     return RenewalResult(False, "blocked_by_google", "🔒 Sessão bloqueada pelo Google. Renovação manual necessária.", account_id, attempt)
