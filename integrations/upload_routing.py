@@ -45,11 +45,41 @@ def _attempt_record(name: str, result: IntegrationResult, *, skipped: bool = Fal
     }
 
 
+def resolve_youtube_account(settings: dict[str, Any], channel: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Resolve the configured Google account without relying only on the channel ID.
+
+    Older channel records may retain the account e-mail while the account ID is
+    missing or stale. Prefer an exact ID match, then use a case-insensitive
+    e-mail match, and finally accept a sole configured account only when the
+    channel has no contradictory account reference.
+    """
+    if not isinstance(channel, dict):
+        return None
+    accounts = [item for item in settings.get("youtube_batch_accounts", []) if isinstance(item, dict) and item.get("id")]
+    if not accounts:
+        return None
+    account_id = str(channel.get("google_account_id") or "").strip()
+    if account_id:
+        match = next((item for item in accounts if str(item.get("id") or "").strip() == account_id), None)
+        if match is not None:
+            return match
+    account_email = str(channel.get("google_account_email") or "").strip().casefold()
+    if account_email:
+        match = next((item for item in accounts if str(item.get("email") or "").strip().casefold() == account_email), None)
+        if match is not None:
+            return match
+    if not account_id and not account_email and len(accounts) == 1:
+        return accounts[0]
+    return None
+
+
 def _quota_key(channel: dict[str, Any], account: dict[str, Any] | None) -> str:
     if account and account.get("id"):
         return f"account:{account['id']}"
     if channel.get("google_account_id"):
         return f"account:{channel['google_account_id']}"
+    if channel.get("google_account_email"):
+        return f"account-email:{str(channel['google_account_email']).strip().casefold()}"
     return f"channel:{channel.get('id', 'unknown')}"
 
 
@@ -107,6 +137,7 @@ def upload_with_default_route(
     composio_publisher: Callable[..., IntegrationResult] | None = None,
 ) -> IntegrationResult:
     attempts: list[dict[str, Any]] = []
+    account = account or resolve_youtube_account(settings, channel)
     composio_enabled = bool(settings.get("composio_enabled", False)) and bool(settings.get("composio_auto_upload", True))
     composio_ready = composio_enabled and bool(settings.get("composio_api_key")) and bool(settings.get("composio_tool_slug"))
     if composio_enabled and not composio_ready:

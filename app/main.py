@@ -118,7 +118,7 @@ from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPT
 from integrations.bilibili_upload import BilibiliApiAdapter, BILIBILI_DEFAULT_TID, BILIBILI_VIDEO_EXTENSIONS, normalise_bilibili_api_cards
 from integrations.distrokid_upload import DistroKidAdapter, DISTROKID_AUDIO_EXTENSIONS, DISTROKID_COVER_EXTENSIONS, close_distrokid_session
 from integrations.music_uploads import JewelMusicAdapter, PushtunesAdapter, YTMusicApiAdapter, MUSIC_UPLOAD_EXTENSIONS, PUSHTUNES_OPERATIONS, PUSHTUNES_SOURCES, PUSHTUNES_TARGETS, YT_MUSIC_UPLOAD_EXTENSIONS
-from integrations.upload_routing import COMPOSIO_OPERATION_OPTIONS, OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
+from integrations.upload_routing import COMPOSIO_OPERATION_OPTIONS, OFFICIAL_DAILY_LIMIT, official_upload_count, resolve_youtube_account, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.session_info_health import check_account_session_info_health
@@ -5597,7 +5597,7 @@ def render_upload_direct():
         with st.container(border=True):
             st.write(f"**{task.get('topic', 'Sem tópico')}** — {task.get('channel_name', 'Canal')}")
             st.caption(video_path or "Sem caminho de vídeo registado")
-            account = direct_accounts.get(str(channel.get("google_account_id", "")))
+            account = resolve_youtube_account(settings, channel)
             credential_status = document_status(STORAGE, account, channel, settings, channels) if account else None
             if not account:
                 st.warning("Este canal não tem uma conta Google associada. Associe a conta no cartão deste canal em Canais cadastrados.")
@@ -6364,7 +6364,7 @@ def render_upload_conventional():
             st.caption(video_path or "Sem caminho de vídeo registado")
             selected_youtube_channel = upload_targets.get("YouTube") if "YouTube" in destination else None
             channel = selected_youtube_channel or channel_map.get(str(task.get("channel_id")), {})
-            account = direct_accounts.get(str(channel.get("google_account_id", "")))
+            account = resolve_youtube_account(settings, channel)
             if "YouTube" in destination:
                 detected_language = normalize_video_language(task.get("language") or channel.get("language") or "pt")
                 language_state_key = f"yt_language_{task['id']}"

@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.08 — 2026-09-05
+- Corrigida a resolução da conta Google usada no upload YouTube quando o canal conserva o e-mail mas perdeu ou tem um ID de conta desactualizado.
+- A interface manual, o worker automático e o routing oficial/direct passam a usar um resolver comum por ID, e-mail ou conta única não ambígua.
+- O erro de conta YouTube não ligada no Composio continua a ser tratado como falha de fallback, permitindo avançar para a API Oficial e para o upload directo quando a conta OAuth local está configurada.
+
 ## 0.5.96 — 2026-09-05
 - Integrado explicitamente o MoviePy 2.2.1 no runtime MoneyPrinterTurbo, alinhando o motor de composição/renderização com o upstream.
 - O helper valida a versão MoviePy antes da geração e executa o CLI upstream com essa dependência garantida.
