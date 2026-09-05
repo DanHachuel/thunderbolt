@@ -53,6 +53,18 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "style_wide": "pexels",
         "voice": "",
         "default_voice": "",
+        "default_enable_subtitles": True,
+        "default_subtitle_font": "MicrosoftYaHeiBold.ttc",
+        "default_subtitle_position": "Bottom (Recommended)",
+        "default_subtitle_color": "#FFFFFF",
+        "default_subtitle_background": True,
+        "default_subtitle_background_color": "#000000",
+        "default_subtitle_rounded_background": False,
+        "default_subtitle_font_size": 60,
+        "default_subtitle_outline": "#000000",
+        "default_subtitle_outline_width": 1.5,
+        "default_background_music_source": "Sem música",
+        "default_background_music_volume": "20%",
         "delegated_session_id": "",
         "automation_on": False,
         "automation_time": "00:00",
@@ -164,6 +176,19 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
             if thumbnail_path:
                 artifacts.setdefault("thumbnail", thumbnail_path)
             initial_stage = "topic" if pending_creative else "script"
+            channel_generation_defaults = {
+                key.removeprefix("default_"): channel[key]
+                for key in (
+                    "default_enable_subtitles", "default_subtitle_font", "default_subtitle_position", "default_subtitle_color",
+                    "default_subtitle_background", "default_subtitle_background_color", "default_subtitle_rounded_background",
+                    "default_subtitle_font_size", "default_subtitle_outline", "default_subtitle_outline_width",
+                    "default_background_music_source", "default_background_music_volume",
+                )
+                if key in channel
+            }
+            configured_generation_settings = options.get("generation_settings") if isinstance(options.get("generation_settings"), dict) else {}
+            payload_generation_settings = payload.get("generation_settings") if isinstance(payload.get("generation_settings"), dict) else {}
+            generation_settings = {**channel_generation_defaults, **configured_generation_settings, **payload_generation_settings}
             task = {
                 "id": make_id("video"),
                 "batch_id": batch["id"],
@@ -183,7 +208,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "music_path": payload.get("music_path", options.get("music_path", "")),
                 "music_source": payload.get("music_source", options.get("music_source", "")),
                 "background_mode": payload.get("background_mode", options.get("background_mode", "stock")),
-                "generation_settings": payload.get("generation_settings", options.get("generation_settings", {})),
+                "generation_settings": generation_settings,
                 "blueprint_id": payload.get("blueprint_id") or channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
                 "blueprint_name": payload.get("blueprint_name", ""),
                 "thumbnail_blueprint_id": payload.get("thumbnail_blueprint_id") or channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or GENERIC_THUMBNAIL_BLUEPRINT_ID,
