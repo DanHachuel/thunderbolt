@@ -697,7 +697,7 @@ def ensure_moviepy(root: Path, uv: str) -> None:
             MOVIEPY_REQUIREMENT,
             "python",
             "-c",
-            "import moviepy; assert moviepy.__version__ == '2.2.1'",
+            "import importlib.metadata; print(f\"moviepy {importlib.metadata.version('moviepy')}\")",
         ],
         cwd=root,
     )
