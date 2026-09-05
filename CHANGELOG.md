@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.92 — 2026-09-05
+
+- Corrigido o botão **Start** dos cards da aba **Automação Youtube**, que agora usa o mesmo helper de arranque verificado pelo Backlog e TikTok.
+- O Start confirma a actualização persistida da tarefa antes de recarregar a interface e apresenta erro explícito se a tarefa tiver sido removida entretanto.
+- O launcher mantém o pipeline worker disponível mesmo com a fila inicialmente vazia, permitindo recolher imediatamente novas tarefas manuais.
+
 ## 0.5.91 — 2026-09-05
 
 - Corrigido o arranque de vídeos pelo botão **Start** na aba **Automação Youtube**.
