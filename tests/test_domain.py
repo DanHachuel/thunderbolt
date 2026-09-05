@@ -145,6 +145,10 @@ def test_automation_defaults_are_carried_into_created_tasks(tmp_path, monkeypatc
     channel = create_channel("Canal automático", metadata={
         "default_blueprint_id": "bp_default",
         "default_voice": "pt-BR-FranciscaNeural-Female",
+        "default_enable_subtitles": True,
+        "default_subtitle_position": "Top",
+        "default_background_music_source": "Sem música",
+        "default_background_music_volume": "0%",
         "automation_on": True,
         "automation_time": "08:30",
     })
@@ -156,6 +160,10 @@ def test_automation_defaults_are_carried_into_created_tasks(tmp_path, monkeypatc
     assert task["automation_time"] == "08:30"
     assert task["blueprint_id"] == "bp_default"
     assert task["voice"] == "pt-BR-FranciscaNeural-Female"
+    assert task["generation_settings"]["enable_subtitles"] is True
+    assert task["generation_settings"]["subtitle_position"] == "Top"
+    assert task["generation_settings"]["background_music_source"] == "Sem música"
+    assert task["generation_settings"]["background_music_volume"] == "0%"
 
 
 def test_set_channel_defaults_syncs_aliases_and_tasks(tmp_path, monkeypatch):

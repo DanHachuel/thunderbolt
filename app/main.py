@@ -1311,6 +1311,45 @@ def render_channel_videos(channel: dict) -> None:
                     render_channel_video_editor(video, channel_id)
 
 
+def render_channel_audio_subtitle_defaults(channel: dict) -> None:
+    """Render and persist the audio/subtitle defaults used by channel automations."""
+    channel_id = str(channel.get("id") or "")
+    subtitle_font = str(channel.get("default_subtitle_font") or SUBTITLE_FONT_OPTIONS[0])
+    subtitle_position = str(channel.get("default_subtitle_position") or SUBTITLE_POSITION_OPTIONS[0])
+    music_source = str(channel.get("default_background_music_source") or "Sem música")
+    music_volume = str(channel.get("default_background_music_volume") or "20%")
+    with st.expander("Configurações de legendas", expanded=False):
+        subtitle_cols = st.columns(2)
+        with subtitle_cols[0]:
+            enable_subtitles = st.checkbox("Enable Subtitles", value=bool(channel.get("default_enable_subtitles", True)), key=f"channel_default_subtitles_{channel_id}")
+            selected_font = st.selectbox("Font", SUBTITLE_FONT_OPTIONS, index=SUBTITLE_FONT_OPTIONS.index(subtitle_font) if subtitle_font in SUBTITLE_FONT_OPTIONS else 0, key=f"channel_default_subtitle_font_{channel_id}")
+            selected_position = st.selectbox("Position", SUBTITLE_POSITION_OPTIONS, index=SUBTITLE_POSITION_OPTIONS.index(subtitle_position) if subtitle_position in SUBTITLE_POSITION_OPTIONS else 0, key=f"channel_default_subtitle_position_{channel_id}")
+            subtitle_color = st.color_picker("Color", str(channel.get("default_subtitle_color") or "#FFFFFF"), key=f"channel_default_subtitle_color_{channel_id}")
+            subtitle_background = st.checkbox("Background", value=bool(channel.get("default_subtitle_background", True)), key=f"channel_default_subtitle_background_{channel_id}")
+            subtitle_background_color = st.color_picker("Background Color", str(channel.get("default_subtitle_background_color") or "#000000"), key=f"channel_default_subtitle_background_color_{channel_id}")
+            subtitle_rounded_background = st.checkbox("Rounded Background", value=bool(channel.get("default_subtitle_rounded_background", False)), key=f"channel_default_subtitle_rounded_background_{channel_id}")
+        with subtitle_cols[1]:
+            subtitle_font_size = st.slider("Font Size", min_value=12, max_value=96, value=int(channel.get("default_subtitle_font_size") or 60), key=f"channel_default_subtitle_font_size_{channel_id}")
+            subtitle_outline = st.color_picker("Outline", str(channel.get("default_subtitle_outline") or "#000000"), key=f"channel_default_subtitle_outline_{channel_id}")
+            subtitle_outline_width = st.slider("Outline Width", min_value=0.0, max_value=5.0, value=float(channel.get("default_subtitle_outline_width") or 1.5), step=0.25, key=f"channel_default_subtitle_outline_width_{channel_id}")
+        if st.button("Guardar configurações de legendas", type="primary", key=f"save_channel_subtitle_defaults_{channel_id}", use_container_width=True):
+            update_channel(channel_id, {
+                "default_enable_subtitles": bool(enable_subtitles), "default_subtitle_font": selected_font, "default_subtitle_position": selected_position,
+                "default_subtitle_color": subtitle_color, "default_subtitle_background": bool(subtitle_background), "default_subtitle_background_color": subtitle_background_color,
+                "default_subtitle_rounded_background": bool(subtitle_rounded_background), "default_subtitle_font_size": int(subtitle_font_size),
+                "default_subtitle_outline": subtitle_outline, "default_subtitle_outline_width": float(subtitle_outline_width),
+            })
+            st.success("Default de legendas guardado para este canal.")
+            st.rerun()
+    with st.expander("Configurações de Audio", expanded=False):
+        selected_music_source = st.selectbox("Fonte da música de fundo", BACKGROUND_MUSIC_SOURCE_OPTIONS, index=BACKGROUND_MUSIC_SOURCE_OPTIONS.index(music_source) if music_source in BACKGROUND_MUSIC_SOURCE_OPTIONS else BACKGROUND_MUSIC_SOURCE_OPTIONS.index("Sem música"), key=f"channel_default_music_source_{channel_id}")
+        selected_music_volume = st.selectbox("Volume da música de fundo", BACKGROUND_MUSIC_VOLUME_OPTIONS, index=BACKGROUND_MUSIC_VOLUME_OPTIONS.index(music_volume) if music_volume in BACKGROUND_MUSIC_VOLUME_OPTIONS else 2, key=f"channel_default_music_volume_{channel_id}")
+        if st.button("Guardar configurações de Audio", type="primary", key=f"save_channel_audio_defaults_{channel_id}", use_container_width=True):
+            update_channel(channel_id, {"default_background_music_source": selected_music_source, "default_background_music_volume": selected_music_volume})
+            st.success("Default de Audio guardado para este canal.")
+            st.rerun()
+
+
 def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], youtube_account_labels: dict[str, str], youtube_accounts_by_id: dict[str, dict[str, Any]]) -> None:
     channel_id = str(channel["id"])
     blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
@@ -2341,6 +2380,7 @@ def render_tiktok_channels():
                                     update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "niche": edit_niche.strip(), "reference_channels": [edit_niche.strip()] if edit_niche.strip() else [], "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
                                     st.session_state.pop(f"tiktok_edit_{channel_id}", None)
                                     st.rerun()
+                    render_channel_audio_subtitle_defaults(channel)
                     with st.expander("Últimos 10 vídeos publicados", expanded=False):
                         recent_videos = channel_videos_for(channel, limit=10)
                         if not recent_videos:
@@ -3032,6 +3072,7 @@ def render_channels():
                     st.success("Conta Google e DELEGATED_SESSION_ID individual do canal guardados.")
                     st.rerun()
 
+            render_channel_audio_subtitle_defaults(channel)
             render_channel_videos(channel)
 
 
