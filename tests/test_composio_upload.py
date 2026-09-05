@@ -52,6 +52,26 @@ def test_response_reads_nested_error_and_success_flags():
     assert result["log_id"] == "req-1"
 
 
+def test_resolve_upload_video_alias_uses_a_real_youtube_slug(monkeypatch):
+    monkeypatch.setattr(
+        composio_upload,
+        "discover_tools",
+        lambda *args, **kwargs: [
+            {"slug": "YOUTUBE_UPLOAD_VIDEO", "name": "Upload Video", "toolkit": "youtube"},
+            {"slug": "YOUTUBE_UPDATE_VIDEO", "name": "Update Video", "toolkit": "youtube"},
+        ],
+    )
+
+    assert composio_upload.resolve_tool_slug("ak_123456789", "user-1", "upload_video") == "YOUTUBE_UPLOAD_VIDEO"
+
+
+def test_resolve_upload_video_alias_reports_missing_real_tool(monkeypatch):
+    monkeypatch.setattr(composio_upload, "discover_tools", lambda *args, **kwargs: [])
+
+    with pytest.raises(composio_upload.ComposioUploadError, match="Não foi encontrada"):
+        composio_upload.resolve_tool_slug("ak_123456789", "user-1", "upload_video")
+
+
 def test_youtube_upload_accepts_current_video_file_path(monkeypatch, tmp_path):
     video = tmp_path / "demo.mp4"
     video.write_bytes(b"video")

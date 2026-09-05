@@ -43,7 +43,8 @@ def test_composio_is_first_route_when_configured(tmp_path: Path):
     assert calls == [("composio", str(tmp_path / "video.mp4"))]
 
 
-def test_composio_failure_falls_back_to_official(tmp_path: Path):
+def test_composio_failure_falls_back_to_official(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("integrations.upload_routing.official_upload_count", lambda *args, **kwargs: 0)
     calls = []
 
     def composio(settings, **kwargs):

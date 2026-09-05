@@ -10,6 +10,14 @@ class ComposioUploadError(ValueError):
     """Safe, user-facing validation or integration error."""
 
 
+COMPOSIO_OPERATION_SEARCH = {
+    "upload_video": {"query": "Upload Video", "toolkit": "YOUTUBE"},
+    "update_video": {"query": "Update Video", "toolkit": "YOUTUBE"},
+    "upload_tiktok_video": {"query": "Upload Video", "toolkit": "TIKTOK"},
+    "upload_instagram_media": {"query": "Upload Video Reel Photo", "toolkit": "INSTAGRAM"},
+}
+
+
 def _safe_value(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -117,6 +125,38 @@ def discover_tools(api_key: str, user_id: str, query: str, toolkit: str = "") ->
         raise
     except Exception as exc:
         raise ComposioUploadError(f"Não foi possível descobrir ferramentas Composio: {type(exc).__name__}: {exc}") from exc
+
+
+def resolve_tool_slug(api_key: str, user_id: str, configured_slug: str, toolkit: str = "") -> str:
+    """Resolve a Thunderbolt operation alias to a real Composio tool slug."""
+    slug = str(configured_slug or "").strip()
+    operation = COMPOSIO_OPERATION_SEARCH.get(slug)
+    if operation is None:
+        return slug
+    search_toolkit = str(operation["toolkit"] or toolkit or "").strip()
+    tools = discover_tools(api_key, user_id, str(operation["query"]), search_toolkit)
+    if not tools:
+        raise ComposioUploadError(
+            f"Não foi encontrada uma ferramenta Composio para `{slug}`. "
+            f"Ligue o toolkit {search_toolkit or 'correspondente'} e use Descobrir ferramentas."
+        )
+
+    def score(item: dict[str, Any]) -> tuple[int, str]:
+        candidate = str(item.get("slug") or "").strip()
+        normalized = candidate.upper().replace("-", "_")
+        if slug == "upload_video":
+            priority = {
+                "YOUTUBE_UPLOAD_VIDEO": 0,
+                "YOUTUBE_MULTIPART_UPLOAD_VIDEO": 1,
+                "YOUTUBE_UPLOAD": 2,
+            }.get(normalized, 3)
+        elif slug == "update_video":
+            priority = 0 if normalized == "YOUTUBE_UPDATE_VIDEO" else 1
+        else:
+            priority = 0 if "VIDEO" in normalized and "UPLOAD" in normalized else 1
+        return priority, candidate
+
+    return min((item for item in tools if item.get("slug")), key=score)["slug"]
 
 
 def authorize_toolkit(api_key: str, user_id: str, toolkit: str) -> dict[str, Any]:
