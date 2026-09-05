@@ -26,7 +26,8 @@ const venvPython = platform() === "win32" ? join(venvDir, "Scripts", "python.exe
 const python = process.env.THUNDERBOLT_PYTHON || process.env.HERMES_PYTHON || (existsSync(venvPython) ? venvPython : (platform() === "win32" ? "python" : "python3"));
 const main = resolve(root, "app", "main.py");
 const streamlitBootstrap = resolve(root, "scripts", "streamlit_bootstrap.py");
-const settingsPath = join(thunderboltHome, "storage", "state", "settings.json");
+const storageDir = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
+const settingsPath = join(storageDir, "state", "settings.json");
 const pythonEnvironment = { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1", PYTHONLEGACYWINDOWSSTDIO: "1", CLICK_NO_WIN_CONSOLE: "1" };
 
 function run(command, commandArgs, label = "comando", environment = process.env) {
@@ -68,7 +69,7 @@ function configuredMoneyPrinterPath() {
 }
 
 function readStateJson(filename, fallback = []) {
-  try { return JSON.parse(readFileSync(join(thunderboltHome, "storage", "state", filename), "utf8")); }
+  try { return JSON.parse(readFileSync(join(storageDir, "state", filename), "utf8")); }
   catch { return fallback; }
 }
 
@@ -85,7 +86,7 @@ function hasPendingPipelineWork() {
 }
 
 function ensureRuntimeStorage() {
-  const storageRoot = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
+  const storageRoot = storageDir;
   const directories = [
     storageRoot,
     join(storageRoot, "state"),
@@ -168,7 +169,6 @@ if (!existsSync(main)) {
   process.exit(1);
 }
 ensureRuntimeStorage();
-const storageDir = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");
 const runtimeEnv = {
   ...process.env,
   PYTHONIOENCODING: "utf-8",

@@ -26,6 +26,12 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('"worker de automação", runtimeEnv', source)
         self.assertIn('"worker do pipeline de vídeos", runtimeEnv', source)
 
+    def test_launcher_detects_pipeline_tasks_in_configured_storage(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        self.assertIn('const storageDir = process.env.THUNDERBOLT_STORAGE_DIR || join(thunderboltHome, "storage");', source)
+        self.assertIn('readFileSync(join(storageDir, "state", filename)', source)
+        self.assertNotIn('readFileSync(join(thunderboltHome, "storage", "state", filename)', source)
+
     def test_install_recovers_ai_influencer_database_from_previous_npx_cache(self):
         source = (ROOT / "scripts" / "install.mjs").read_text(encoding="utf-8")
         self.assertIn('function migrateLegacyNpxStorage()', source)

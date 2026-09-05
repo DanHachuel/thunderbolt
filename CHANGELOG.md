@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.91 — 2026-09-05
+
+- Corrigido o arranque de vídeos pelo botão **Start** na aba **Automação Youtube**.
+- O launcher passa a procurar `tasks.json` no mesmo `THUNDERBOLT_STORAGE_DIR` usado pela interface e pelo pipeline worker, permitindo iniciar imediatamente o worker quando uma tarefa entra em `doing`.
+- Adicionado teste de regressão para impedir divergência entre o storage detectado pelo launcher e o storage persistente da aplicação.
+
 ## 0.5.90 — 2026-09-05
 
 - Adicionada em **Documentação** a aba **Tutorial YouTube Data API Key (Public Data)**, baseada no documento fornecido do Google Drive.
