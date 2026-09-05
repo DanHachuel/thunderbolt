@@ -8,6 +8,8 @@ from typing import Any
 from hermes_ui.languages import language_code
 from hermes_ui.material_sources import all_material_api_keys, selected_material_source
 
+NVENC_VIDEO_CODEC = "h264_nvenc"
+
 try:
     import toml
 except ImportError:  # pragma: no cover - installation fallback
@@ -118,6 +120,10 @@ def build_moneyprinter_config(settings: dict[str, Any], existing: dict[str, Any]
     for settings_key, config_key in app_map.items():
         if settings_key in settings:
             app[config_key] = settings[settings_key]
+    # The bundled video pipeline is required to use NVIDIA NVENC.  The
+    # MoneyPrinterTurbo runtime falls back to libx264 when this encoder is not
+    # available on the host, preserving a playable output instead of failing.
+    app["video_codec"] = NVENC_VIDEO_CODEC
     # Edge TTS V1 is retained as a keyless fallback, but its default 30-second
     # stream deadline is too short for longer scripts or slow networks.
     try:

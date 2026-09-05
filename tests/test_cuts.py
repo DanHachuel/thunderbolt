@@ -55,6 +55,9 @@ def test_build_clip_command_contains_format_filter_and_no_shell_interpolation(tm
     assert "-t" in command and "20.000" in command
     assert "scale=1080:1920" in command[command.index("-vf") + 1]
     assert "-i" in command
+    assert command[command.index("-c:v") + 1] == "h264_nvenc"
+    assert command[command.index("-preset") + 1] == "p1"
+    assert command[command.index("-pix_fmt") + 1] == "yuv420p"
 
 
 def test_generate_clips_persists_manifest_and_zip(tmp_path: Path, monkeypatch):

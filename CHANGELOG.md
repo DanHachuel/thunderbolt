@@ -1,4 +1,10 @@
 # Changelog
+## 0.5.95 — 2026-09-05
+- Forçado `h264_nvenc` na configuração de renderização do runtime MoneyPrinterTurbo.
+- Actualizadas as operações locais de clips e editor de vídeo para usar NVENC com `p1` e `yuv420p`.
+- Adicionado fallback automático para `libx264` quando NVENC/driver CUDA não estiver disponível, preservando ficheiros reproduzíveis.
+- Confirmado que este fork não contém chamadas `write_videofile`; a renderização principal é feita pelo runtime FFmpeg/MoneyPrinterTurbo.
+
 ## 0.5.94 — 2026-09-05
 - Corrigido o indicador **YouTube Analytics API: Métricas internas** da aba **Analista Growth Youtube** para validar exclusivamente a conta Google associada ao canal seleccionado.
 - Uma conta Google configurada para outro canal deixa de activar falsamente o estado verde.

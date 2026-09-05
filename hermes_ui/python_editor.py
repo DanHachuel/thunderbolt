@@ -150,10 +150,17 @@ def store_uploaded_asset(name: str, content: bytes, *, audio: bool = False) -> P
 
 def _run(command: list[str], output: Path, operation: str, source: Path, *, extra: dict[str, Any] | None = None) -> tuple[Path, dict[str, Any]]:
     output.parent.mkdir(parents=True, exist_ok=True)
+    executed_command = list(command)
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, check=False)
+        completed = subprocess.run(executed_command, capture_output=True, text=True, check=False)
     except OSError as exc:
         raise PythonEditorError(f"Não foi possível iniciar FFmpeg: {exc}") from exc
+    if completed.returncode != 0 and "h264_nvenc" in executed_command:
+        fallback = ["libx264" if item == "h264_nvenc" else "veryfast" if item == "p1" else item for item in executed_command]
+        if output.exists():
+            output.unlink()
+        completed = subprocess.run(fallback, capture_output=True, text=True, check=False)
+        executed_command = fallback
     if completed.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
         if output.exists():
             output.unlink()
@@ -163,7 +170,7 @@ def _run(command: list[str], output: Path, operation: str, source: Path, *, extr
         "operation": operation,
         "source": str(source),
         "output": str(output),
-        "command": command,
+        "command": executed_command,
         "created_at": _now(),
     }
     if extra:
@@ -224,7 +231,7 @@ def resize_video(source: Path, width: int, height: int, *, ffmpeg_path: str | No
         raise PythonEditorError("As dimensões do vídeo devem ser pelo menos 16x16.")
     output = _output_path(source, "redimensionado")
     scale = f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
-    command = [_ffmpeg(ffmpeg_path), "-y", "-hide_banner", "-loglevel", "error", "-i", str(source), "-vf", scale, "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-movflags", "+faststart", str(output)]
+    command = [_ffmpeg(ffmpeg_path), "-y", "-hide_banner", "-loglevel", "error", "-i", str(source), "-vf", scale, "-c:v", "h264_nvenc", "-preset", "p1", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output)]
     return _run(command, output, "redimensionamento", source, extra={"width": width, "height": height})
 
 
@@ -234,7 +241,7 @@ def change_speed(source: Path, speed: float, *, ffmpeg_path: str | None = None) 
     if speed < 0.25 or speed > 4.0:
         raise PythonEditorError("A velocidade deve estar entre 0,25x e 4x.")
     output = _output_path(source, "velocidade")
-    command = [_ffmpeg(ffmpeg_path), "-y", "-hide_banner", "-loglevel", "error", "-i", str(source), "-filter:v", f"setpts=PTS/{speed:.6f}", "-filter:a", _atempo_chain(speed), "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-movflags", "+faststart", str(output)]
+    command = [_ffmpeg(ffmpeg_path), "-y", "-hide_banner", "-loglevel", "error", "-i", str(source), "-filter:v", f"setpts=PTS/{speed:.6f}", "-filter:a", _atempo_chain(speed), "-c:v", "h264_nvenc", "-preset", "p1", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output)]
     return _run(command, output, "alteração de velocidade", source, extra={"speed": speed})
 
 
