@@ -23,7 +23,9 @@ def test_youtube_data_api_key_tutorial_covers_public_data_setup_and_security():
         "API_KEY_INVALID",
         "OAuth 2.0",
         "Nunca publique a API Key",
-        "1ypzaR1v8khBxyUQmZ12ZAY0pGTD49mqt",
     ):
         assert expected in tutorial
+    assert "# Tutorial YouTube Data API Key (Public Data)" not in tutorial
+    assert "Google Drive" not in tutorial
+    assert "drive.google.com" not in tutorial
     assert len(tutorial) > 3000

@@ -171,5 +171,3 @@ You'll see this interface below.
 2. The Instagram account id which you'll need to set in the `Configure` node in the n8n workflow
 
 ---
-
-> **Source:** [ai_agents_az/episode_8/guide-instagram.md](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md)

@@ -1,4 +1,8 @@
 # Changelog
+## 0.5.93 — 2026-09-05
+- Removidos das abas de **Documentação** os botões e referências de fonte externa adicionados sem autorização.
+- Removido o link do Google Drive e o título Markdown duplicado do tutorial **YouTube Data API Key (Public Data)**.
+- Preservados os links operacionais que já faziam parte dos documentos, incluindo os links úteis do tutorial Meta/Facebook.
 
 ## 0.5.92 — 2026-09-05
 

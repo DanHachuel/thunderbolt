@@ -8341,17 +8341,15 @@ def render_notifications():
 
 
 def render_models_ai_tutorial():
-    tutorial_url = "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-instagram.md"
     tutorial_path = ROOT / "seed" / "references" / "guide-instagram.md"
     st.title("Tutorial Meta")
     st.caption("Guia de configuração de uma conta Instagram profissional e das credenciais Meta para automações com n8n.")
-    st.markdown(f"[Abrir fonte original no GitHub]({tutorial_url})")
     try:
         tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
     except OSError:
         tutorial_content = ""
     if not tutorial_content:
-        st.error("O conteúdo local do tutorial não está disponível. Consulte a fonte original no GitHub.")
+        st.error("O conteúdo local do tutorial não está disponível.")
         return
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
@@ -8363,18 +8361,16 @@ def render_niche_tutorial(tutorial_kind: str):
 
 
 def render_supabase_tutorial():
-    tutorial_url = "https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-supabase.md"
     tutorial_path = ROOT / "seed" / "references" / "guide-supabase.md"
     ui_language = current_ui_language()
     st.title(ui_text("Tutorial Supabase", ui_language))
     st.caption(ui_text("Guia de configuração do Supabase para automações com n8n.", ui_language))
-    st.markdown(f"[Abrir fonte original no GitHub]({tutorial_url})")
     try:
         tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
     except OSError:
         tutorial_content = ""
     if not tutorial_content:
-        st.error("O conteúdo local do tutorial não está disponível. Consulte a fonte original no GitHub.")
+        st.error("O conteúdo local do tutorial não está disponível.")
         return
     st.markdown(tutorial_content, unsafe_allow_html=True)
 
@@ -8384,13 +8380,12 @@ def render_google_oauth_tutorial():
     tutorial_path = ROOT / "seed" / "references" / "tutorial-oauth-google.md"
     st.title("Tutorial OAuth do Google")
     st.caption("Guia completo para configurar a autenticação OAuth do Google e o acesso à YouTube Data API v3.")
-    st.markdown("[Abrir Google Cloud Console](https://console.cloud.google.com/)")
     try:
         tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
     except OSError:
         tutorial_content = ""
     if not tutorial_content:
-        st.error("O conteúdo local do tutorial não está disponível. Consulte a documentação OAuth do Google.")
+        st.error("O conteúdo local do tutorial não está disponível.")
         return
     st.markdown(tutorial_content, unsafe_allow_html=False)
 
@@ -8400,13 +8395,12 @@ def render_youtube_frontend_upload_tutorial():
     tutorial_path = ROOT / "seed" / "references" / "youtube-video-upload-frontend.md"
     st.title("Tutorial YouTube Video-Upload Frontend")
     st.caption("Guia prático e seguro para rever metadados, sessão e envio directo de vídeos concluídos.")
-    st.markdown("[Abrir referência técnica no GitHub](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api)")
     try:
         tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
     except OSError:
         tutorial_content = ""
     if not tutorial_content:
-        st.error("O conteúdo local do tutorial não está disponível. Consulte a referência técnica no GitHub.")
+        st.error("O conteúdo local do tutorial não está disponível.")
         return
     st.markdown(tutorial_content, unsafe_allow_html=False)
 
@@ -8416,13 +8410,12 @@ def render_youtube_data_api_key_tutorial():
     tutorial_path = ROOT / "seed" / "references" / "tutorial-youtube-data-api-key.md"
     st.title("Tutorial YouTube Data API Key (Public Data)")
     st.caption("Guia para criar e configurar uma YouTube Data API Key para consultas de dados públicos.")
-    st.markdown("[Abrir documento fonte no Google Drive](https://drive.google.com/file/d/1ypzaR1v8khBxyUQmZ12ZAY0pGTD49mqt/view)")
     try:
         tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
     except OSError:
         tutorial_content = ""
     if not tutorial_content:
-        st.error("O conteúdo local do tutorial não está disponível. Consulte o documento fonte no Google Drive.")
+        st.error("O conteúdo local do tutorial não está disponível.")
         return
     st.markdown(tutorial_content, unsafe_allow_html=False)
 
