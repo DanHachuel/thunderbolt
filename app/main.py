@@ -118,7 +118,7 @@ from integrations.upload_post import UploadPostAdapter, UPLOAD_POST_PLATFORM_OPT
 from integrations.bilibili_upload import BilibiliApiAdapter, BILIBILI_DEFAULT_TID, BILIBILI_VIDEO_EXTENSIONS, normalise_bilibili_api_cards
 from integrations.distrokid_upload import DistroKidAdapter, DISTROKID_AUDIO_EXTENSIONS, DISTROKID_COVER_EXTENSIONS, close_distrokid_session
 from integrations.music_uploads import JewelMusicAdapter, PushtunesAdapter, YTMusicApiAdapter, MUSIC_UPLOAD_EXTENSIONS, PUSHTUNES_OPERATIONS, PUSHTUNES_SOURCES, PUSHTUNES_TARGETS, YT_MUSIC_UPLOAD_EXTENSIONS
-from integrations.upload_routing import OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
+from integrations.upload_routing import COMPOSIO_OPERATION_OPTIONS, OFFICIAL_DAILY_LIMIT, official_upload_count, upload_with_default_route
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_direct_credentials import delete_credentials_document, direct_account_status, document_status, ensure_credentials_document, load_credentials_document, merge_credentials_document, parse_credentials_document, save_credentials_document, update_credentials_document_session_info
 from integrations.session_info_health import check_account_session_info_health
@@ -8028,19 +8028,39 @@ def render_settings():
             _api_status_badge("Configured" if bilibili_ready else "Missing configuration", "ready" if bilibili_ready else "missing")
             render_bilibili_api_cards(settings)
         with st.expander("Composio", expanded=False):
-            st.caption("A API key é guardada apenas no storage local. O slug da ferramenta e o provider são descobertos no Upload via Composio; a autenticação da conta é feita pelo Connect Link do Composio.")
+            composio_operation_options = COMPOSIO_OPERATION_OPTIONS
+            composio_operation_slugs = list(composio_operation_options)
+            st.caption("Os slugs e parâmetros técnicos do Composio são definidos pelo Thunderbolt conforme a operação; a autenticação da conta continua a ser feita pelo Connect Link do Composio.")
             composio_enabled = st.checkbox("Activar Composio", value=bool(settings.get("composio_enabled", False)), key="upload_composio_enabled")
             composio_auto_upload = st.checkbox("Usar Composio por defeito na Automação Youtube", value=bool(settings.get("composio_auto_upload", True)), key="upload_composio_auto_upload", help="Quando estiver configurado, Composio é tentado antes da API Oficial, Upload directo e Postiz.")
             composio_api_key = st.text_input("Composio API key", value=str(settings.get("composio_api_key") or ""), type="password", key="upload_composio_api_key", help="Use a API key de projecto do Composio Platform. Nunca coloque esta chave no GitHub, em URLs ou em mensagens.")
             composio_user_id = st.text_input("Composio user ID", value=str(settings.get("composio_user_id") or "thunderbolt-local"), key="upload_composio_user_id", help="Identidade estável usada para associar as contas conectadas no Composio.")
-            composio_toolkit = st.text_input("Toolkit preferido (opcional)", value=str(settings.get("composio_toolkit") or ""), key="upload_composio_toolkit", help="Deixe vazio para descobrir ferramentas em todos os toolkits.")
-            composio_tool_slug = st.text_input("Slug da ferramenta para Automação Youtube", value=str(settings.get("composio_tool_slug") or ""), key="upload_composio_tool_slug", help="Depois de descobrir uma ferramenta em Upload via Composio, copie aqui o slug para a Automação Youtube.")
-            composio_file_field = st.text_input("Campo do ficheiro na ferramenta", value=str(settings.get("composio_file_field") or "videoFilePath"), key="upload_composio_file_field", help="Para YOUTUBE_UPLOAD_VIDEO use videoFilePath; o Composio envia para o canal da conta YouTube ligada.")
-            composio_channel_field = st.text_input("Campo do canal na ferramenta (opcional)", value=str(settings.get("composio_channel_field") or ""), key="upload_composio_channel_field", help="As ferramentas YouTube actuais usam a conta ligada e não aceitam channel_id. Preencha apenas se a ferramenta descoberta exigir explicitamente esse campo.")
-            composio_privacy_field = st.text_input("Campo de privacidade", value=str(settings.get("composio_privacy_field") or "privacy_status"), key="upload_composio_privacy_field", help="Recebe sempre `unlisted` (Não listado), como no upload oficial.")
-            composio_category_field = st.text_input("Campo de categoria", value=str(settings.get("composio_category_field") or "category_id"), key="upload_composio_category_field", help="Recebe sempre `22`, categoria Pessoas e blogs, como no upload oficial.")
-            composio_language_field = st.text_input("Campo de idioma", value=str(settings.get("composio_language_field") or "language"), key="upload_composio_language_field", help="Recebe o locale do idioma do vídeo/canal, por exemplo `pt-BR`.")
-            composio_arguments_json = st.text_area("Argumentos JSON da Automação Youtube", value=str(settings.get("composio_arguments_json") or "{}"), key="upload_composio_arguments_json", height=120)
+            current_tool_slug = str(settings.get("composio_tool_slug") or "upload_video")
+            if current_tool_slug not in composio_operation_slugs:
+                current_tool_slug = "upload_video"
+            composio_tool_slug = st.selectbox("Slug da ferramenta para Automação Youtube", composio_operation_slugs, index=composio_operation_slugs.index(current_tool_slug), format_func=lambda slug: f"{composio_operation_options[slug]} ({slug})", key="upload_composio_tool_slug", help="O Thunderbolt selecciona internamente o slug da operação; `upload_video` é o default.")
+            current_toolkit = str(settings.get("composio_toolkit") or composio_tool_slug)
+            if current_toolkit not in composio_operation_slugs:
+                current_toolkit = composio_tool_slug
+            composio_toolkit = st.selectbox("Toolkit preferido (opcional)", composio_operation_slugs, index=composio_operation_slugs.index(current_toolkit), format_func=lambda slug: f"{composio_operation_options[slug]} ({slug})", key="upload_composio_toolkit", help="A lista segue as operações suportadas pelo Thunderbolt.")
+            st.text_input("Campo do ficheiro na ferramenta", value="videoFilePath", disabled=True, help="Configurado internamente pelo backend. O path do vídeo é injectado automaticamente a partir do artefacto da tarefa.")
+            composio_privacy_options = ["unlisted", "listed"]
+            current_privacy = str(settings.get("composio_privacy_status") or "unlisted")
+            if current_privacy not in composio_privacy_options:
+                current_privacy = "unlisted"
+            composio_privacy_status = st.selectbox("Campo de privacidade", composio_privacy_options, index=composio_privacy_options.index(current_privacy), key="upload_composio_privacy_status", help="O valor é enviado pelo backend para a operação de publicação; `unlisted` é o default.")
+            composio_category_options = [str(category_id) for category_id in range(1, 101)]
+            current_category = str(settings.get("composio_category_id") or "22")
+            if current_category not in composio_category_options:
+                current_category = "22"
+            composio_category_id = st.selectbox("Campo de categoria", composio_category_options, index=composio_category_options.index(current_category), key="upload_composio_category_id", help="Categorias YouTube de 1 a 100; `22` é o default.")
+            composio_language_options = list(LANGUAGE_CODES)
+            current_language = str(settings.get("composio_language") or "pt")
+            if current_language not in composio_language_options:
+                current_language = "pt"
+            composio_language = st.selectbox("Campo de idioma", composio_language_options, index=composio_language_options.index(current_language), format_func=language_label, key="upload_composio_language", help="Idioma usado pelo backend nos argumentos da ferramenta.")
+            composio_channel_field = str(settings.get("composio_channel_field") or "")
+            composio_arguments_json = str(settings.get("composio_arguments_json") or "{}")
             _render_credential_status(composio_api_key)
             composio_action_cols = st.columns(2)
             with composio_action_cols[0]:
@@ -8048,7 +8068,7 @@ def render_settings():
             with composio_action_cols[1]:
                 test_composio = st.button("Testar configuração", use_container_width=True, key="upload_composio_test")
             if save_composio:
-                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit.strip(), "composio_tool_slug": composio_tool_slug.strip(), "composio_file_field": composio_file_field.strip() or "videoFilePath", "composio_channel_field": composio_channel_field.strip(), "composio_privacy_field": composio_privacy_field.strip() or "privacy_status", "composio_category_field": composio_category_field.strip() or "category_id", "composio_language_field": composio_language_field.strip() or "language", "composio_arguments_json": composio_arguments_json.strip() or "{}"})
+                settings.update({"composio_enabled": bool(composio_enabled), "composio_auto_upload": bool(composio_auto_upload), "composio_api_key": composio_api_key.strip(), "composio_user_id": composio_user_id.strip() or "thunderbolt-local", "composio_toolkit": composio_toolkit, "composio_tool_slug": composio_tool_slug, "composio_file_field": "videoFilePath", "composio_channel_field": composio_channel_field, "composio_privacy_status": composio_privacy_status, "composio_category_id": composio_category_id, "composio_language": composio_language, "composio_privacy_field": "privacyStatus", "composio_category_field": "categoryId", "composio_language_field": "defaultLanguage", "composio_arguments_json": composio_arguments_json or "{}"})
                 write_json("settings.json", settings)
                 st.success("Configuração Composio guardada.")
                 st.rerun()

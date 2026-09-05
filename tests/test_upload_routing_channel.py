@@ -44,7 +44,7 @@ def test_default_composio_route_injects_task_youtube_channel_id(monkeypatch, tmp
         "category_id": "22",
         "language": "pt-BR",
     }
-    assert captured["file_field"] == "video"
+    assert captured["file_field"] == "videoFilePath"
 
 
 def test_default_composio_route_blocks_conflicting_channel(monkeypatch, tmp_path: Path):
@@ -65,7 +65,7 @@ def test_default_composio_route_blocks_conflicting_channel(monkeypatch, tmp_path
     assert called == []
 
 
-def test_automation_source_configures_channel_field():
+def test_automation_source_keeps_channel_field_internal():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
-    assert "upload_composio_channel_field" in source
+    assert "composio_channel_field = str(settings.get(\"composio_channel_field\") or \"\")" in source
     assert "composio_channel_field" in source
