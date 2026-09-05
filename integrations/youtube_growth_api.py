@@ -23,9 +23,9 @@ def find_account_for_channel(channel: Mapping[str, Any], settings: Mapping[str, 
     channel_id = _text(channel.get("youtube_channel_id") or channel.get("id"))
     account_id = _text(channel.get("google_account_id"))
     accounts = _accounts(settings)
+    if account_id:
+        return next((account for account in accounts if _text(account.get("id")) == account_id), None)
     for account in accounts:
-        if account_id and _text(account.get("id")) == account_id:
-            return account
         known_channels = account.get("channels", [])
         if isinstance(known_channels, list) and any(_text(item.get("youtube_channel_id") or item.get("id")) == channel_id for item in known_channels if isinstance(item, Mapping)):
             return account
