@@ -97,3 +97,25 @@ def test_current_youtube_composio_tool_uses_connected_account(monkeypatch, tmp_p
     assert captured["args"][2] == "YOUTUBE_UPLOAD_VIDEO"
     assert captured["args"][4] == "videoFilePath"
     assert "channel_id" not in captured["args"][5]
+
+
+def test_youtube_upload_slug_does_not_require_legacy_channel_id(monkeypatch, tmp_path: Path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    captured = {}
+
+    def fake_execute(*args):
+        captured["args"] = args
+        return {"successful": True, "data": {"id": "yt-2"}}
+
+    monkeypatch.setattr("integrations.upload_routing.execute_upload", fake_execute)
+    result = _composio_upload(
+        {**_settings(), "composio_tool_slug": "youtube_upload", "composio_file_field": "file"},
+        channel={"youtube_id": "UC-legacy"},
+        video_path=str(video),
+        privacy_status="unlisted",
+        category_id="22",
+        language="pt-BR",
+    )
+    assert result.ok
+    assert captured["args"][4] == "videoFilePath"

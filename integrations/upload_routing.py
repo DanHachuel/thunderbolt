@@ -231,8 +231,19 @@ def upload_with_default_route(
 
 def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwargs: Any) -> IntegrationResult:
     slug = str(settings.get("composio_tool_slug") or "").strip()
-    youtube_upload_tool = slug.upper() in {"YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"}
-    channel_id = str(channel.get("youtube_channel_id") or "").strip()
+    normalized_slug = slug.upper().replace("-", "_")
+    youtube_upload_tool = normalized_slug in {"YOUTUBE_UPLOAD", "YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"} or ("YOUTUBE" in normalized_slug and "UPLOAD" in normalized_slug)
+    channel_id = str(
+        channel.get("youtube_channel_id")
+        or channel.get("youtube_id")
+        or channel.get("google_channel_id")
+        or channel.get("channel_id")
+        or ""
+    ).strip()
+    if not channel_id:
+        import re
+        match = re.search(r"/channel/(UC[\w-]+)", str(channel.get("url") or ""))
+        channel_id = match.group(1) if match else ""
     channel_field = str(settings.get("composio_channel_field") or "channel_id").strip()
     if not youtube_upload_tool and not channel_id:
         return IntegrationResult(False, "Composio não foi executado: o canal da tarefa não tem um YouTube channel ID sincronizado.", {"missing": ["youtube_channel_id"]})

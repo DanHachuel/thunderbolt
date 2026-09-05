@@ -16,7 +16,7 @@ def test_composio_matches_official_upload_parameters(monkeypatch, tmp_path):
         {
             "composio_api_key": "composio-test-key",
             "composio_user_id": "user-1",
-            "composio_tool_slug": "YOUTUBE_UPLOAD",
+            "composio_tool_slug": "YOUTUBE_UPLOAD_VIDEO",
             "composio_file_field": "video",
             "composio_channel_field": "channelId",
             "composio_privacy_field": "privacyStatus",
@@ -32,7 +32,6 @@ def test_composio_matches_official_upload_parameters(monkeypatch, tmp_path):
     )
     assert result.ok
     assert captured["arguments"] == {
-        "channelId": "UC-PT",
         "privacyStatus": "unlisted",
         "categoryId": "22",
         "defaultLanguage": "en-US",
@@ -44,7 +43,7 @@ def test_composio_rejects_conflicting_official_parameters(tmp_path):
         {
             "composio_api_key": "composio-test-key",
             "composio_user_id": "user-1",
-            "composio_tool_slug": "YOUTUBE_UPLOAD",
+            "composio_tool_slug": "VIDEO_UPLOAD",
             "composio_arguments_json": '{"category_id":"10"}',
         },
         channel={"youtube_channel_id": "UC-PT"},
