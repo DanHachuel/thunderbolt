@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.10 — 2026-09-05
+- Adicionado suporte à selecção explícita de uma connected account YouTube no Composio por ID ou alias.
+- O executor resolve o alias contra as contas activas da mesma entidade antes de chamar a ferramenta, evitando depender da conta predefinida errada.
+- A configuração passa a permitir guardar o `connected_account_id` e clarifica que o `composio_user_id` tem de ser exactamente o mesmo usado no momento da ligação das contas.
+
 ## 0.6.09 — 2026-09-05
 - Corrigido o falso `AssertionError` durante a verificação do MoviePy: o helper passa a validar o metadado da distribuição instalada, que identifica correctamente `moviepy==2.2.1` mesmo quando o módulo expõe uma versão interna diferente.
 - Eliminadas tentativas repetidas do mesmo provider no fallback de vídeo. Pexels e Pixabay deixam de ser executados uma vez por cada cartão/chave, evitando reinstalações redundantes e cascatas como Pexels → Pexels → Pixabay.

@@ -291,6 +291,7 @@ DEFAULTS: dict[str, Any] = {
         "composio_auto_upload": True,
         "composio_api_key": "",
         "composio_user_id": "thunderbolt-local",
+        "composio_connected_account_id": "",
         "composio_toolkit": "upload_video",
         "composio_tool_slug": "upload_video",
         "composio_file_field": "videoFilePath",
