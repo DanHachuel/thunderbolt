@@ -23,7 +23,7 @@ from typing import Any
 
 from integrations.moneyprinter_config import sync_moneyprinter_config
 from integrations.session_info_health import check_all_accounts_session_info_health, emit_session_info_health_alerts
-from integrations.upload_routing import upload_with_default_route
+from integrations.upload_routing import resolve_youtube_account, upload_with_default_route
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_title_and_keywords, generate_thumbnail_prompt, generate_topic_for_channel
 from hermes_ui.script_documents import save_script_document
 from hermes_ui.script_generation import generate_script_document
@@ -1566,7 +1566,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         settings,
         storage_root=STORAGE,
         channel=channel,
-        account=next((item for item in settings.get("youtube_batch_accounts", []) if isinstance(item, dict) and str(item.get("id")) == str(channel.get("google_account_id"))), None),
+        account=resolve_youtube_account(settings, channel),
         video_path=str(video_path),
         title=title,
         description=str(script.get("summary") or "") + "\n\n" + str(script.get("content") or "")[:5000],
