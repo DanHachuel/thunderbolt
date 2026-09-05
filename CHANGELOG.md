@@ -1,4 +1,8 @@
 # Changelog
+## 0.6.09 — 2026-09-05
+- Corrigido o falso `AssertionError` durante a verificação do MoviePy: o helper passa a validar o metadado da distribuição instalada, que identifica correctamente `moviepy==2.2.1` mesmo quando o módulo expõe uma versão interna diferente.
+- Eliminadas tentativas repetidas do mesmo provider no fallback de vídeo. Pexels e Pixabay deixam de ser executados uma vez por cada cartão/chave, evitando reinstalações redundantes e cascatas como Pexels → Pexels → Pixabay.
+
 ## 0.6.08 — 2026-09-05
 - Corrigida a resolução da conta Google usada no upload YouTube quando o canal conserva o e-mail mas perdeu ou tem um ID de conta desactualizado.
 - A interface manual, o worker automático e o routing oficial/direct passam a usar um resolver comum por ID, e-mail ou conta única não ambígua.

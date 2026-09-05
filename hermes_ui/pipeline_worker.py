@@ -693,7 +693,18 @@ def _material_video_attempts(task: dict[str, Any], settings: dict[str, Any]) -> 
     fallback = [item for item in attempts if item[0] != route]
     ordered = preferred + fallback
     if ordered:
-        return ordered
+        # Uma execução do helper já recebe a lista de chaves do provider
+        # configurado; não repetir o mesmo provider por cada cartão/key.
+        # Repetições anteriores reinstalavam dependências e produziam cascatas
+        # como Pexels → Pexels → Pixabay sem acrescentar uma estratégia real.
+        unique: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for provider, api_key in ordered:
+            if provider in seen:
+                continue
+            seen.add(provider)
+            unique.append((provider, api_key))
+        return unique
     # Legacy settings keep the complete key list in one config field. Let
     # MoneyPrinterTurbo retain its own list handling when no individual cards
     # are available, preserving backwards compatibility for older installs.
