@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.85 — 2026-09-04
+
+- Corrigido o `UnboundLocalError` em Automação Youtube ao renderizar o Thumbnail Blueprint dos cards de canais.
+- O valor inicial é agora calculado antes da renderização e continua a ser actualizado após a selecção do Blueprint.
+
 ## 0.5.84 — 2026-09-04
 
 - Corrigida a regressão de percentagem nos cards de vídeos em `doing` quando tarefas antigas são retomadas.
