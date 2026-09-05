@@ -5461,6 +5461,7 @@ def render_automation():
             blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
             automation_blueprint = current_blueprint
             automation_voice = current_voice
+            paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
             automation_format = str(channel.get("format") or "wide")
             header_cols = st.columns([0.62, 2.15, 1.55, 1.25, 1.25, 1.45, 1.3], gap="small")
             with header_cols[0]:
