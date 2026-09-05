@@ -23,8 +23,11 @@ def test_normalize_urls_rejects_non_http_and_cli_flags():
         media_downloader.normalize_urls("--cookies cookies.txt")
 
 
-def test_build_options_are_constrained_for_video_and_audio(tmp_path):
+def test_build_options_are_constrained_for_video_and_audio(tmp_path, monkeypatch):
     _isolated_storage(tmp_path)
+    fake_deno = tmp_path / "deno"
+    fake_deno.write_bytes(b"deno")
+    monkeypatch.setattr(media_downloader, "_deno_runtime_path", lambda: str(fake_deno))
     video = media_downloader.build_download_options(mode="video", quality="720p ou inferior", container="mp4", allow_playlist=False, download_subtitles=True, embed_metadata=True)
     assert video["noplaylist"] is True
     assert "height<=720" in video["format"]
@@ -32,6 +35,7 @@ def test_build_options_are_constrained_for_video_and_audio(tmp_path):
     assert video["writesubtitles"] is True
     assert video["addmetadata"] is True
     assert "%(title).200B" in video["outtmpl"]
+    assert video["js_runtimes"] == {"deno": str(fake_deno)}
     audio = media_downloader.build_download_options(mode="audio", audio_format="mp3", allow_playlist=True)
     assert audio["noplaylist"] is False
     assert audio["format"] == "bestaudio/best"

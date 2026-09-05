@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.86 — 2026-09-04
+
+- Adicionada a dependência Python `deno`, com binário gerido automaticamente e suporte multiplataforma.
+- O downloader yt-dlp passa a receber explicitamente `--js-runtimes deno:<caminho>` através da API Python.
+- Actualizado o yt-dlp para o extra `default`, incluindo os scripts EJS necessários para os desafios JavaScript do YouTube.
+- Adicionado fallback para um executável `deno` disponível no `PATH` e diagnóstico do runtime em `dependency_status()`.
+
 ## 0.5.85 — 2026-09-04
 
 - Corrigido o `UnboundLocalError` em Automação Youtube ao renderizar o Thumbnail Blueprint dos cards de canais.
