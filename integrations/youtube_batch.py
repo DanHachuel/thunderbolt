@@ -40,9 +40,9 @@ def _authorization_error_message(email: str, exc: Exception) -> str:
     if "redirect_uri_mismatch" in detail.lower():
         return (
             f"A autorização da conta {email} foi rejeitada pelo Google (redirect_uri_mismatch). "
-            f"Use um cliente OAuth do tipo Desktop app ou adicione exactamente {loopback_redirect_uri()} "
-            "em Google Cloud > APIs e serviços > Credenciais > URIs de redireccionamento autorizados. "
-            "Não use uma URI sem a porta, com localhost diferente ou sem a barra final."
+            "Este fluxo usa um callback local loopback; crie ou seleccione uma credencial OAuth do tipo "
+            "Aplicativo para computador (Desktop app), não Aplicativo da Web. "
+            f"A porta predefinida é {loopback_redirect_uri()} e pode mudar automaticamente se estiver ocupada."
         )
     return f"A autorização da conta {email} falhou: {detail}"
 
