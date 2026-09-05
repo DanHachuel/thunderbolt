@@ -28,6 +28,19 @@ def test_agent_metadata_matches_publishing_shape():
     assert payload["status"]["publishAt"].endswith("Z")
 
 
+def test_upload_oauth_uses_only_youtube_upload_scope():
+    from integrations.youtube_upload import AGENT_SCOPES, FALLBACK_SCOPES
+
+    assert AGENT_SCOPES == ["https://www.googleapis.com/auth/youtube.upload"]
+    assert FALLBACK_SCOPES == AGENT_SCOPES
+
+
+def test_oauth_fallback_does_not_reuse_agent_token(tmp_path: Path):
+    uploader = DirectYouTubeOAuthUploader({}, tmp_path)
+
+    assert uploader.alternate_token_path is None
+
+
 def test_oauth_uses_fixed_loopback_redirect_uri(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_HOST", raising=False)
     monkeypatch.delenv("THUNDERBOLT_OAUTH_LOOPBACK_PORT", raising=False)

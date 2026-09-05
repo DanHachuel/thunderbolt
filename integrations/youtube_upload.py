@@ -11,13 +11,9 @@ from integrations.platforms import IntegrationResult
 from integrations.youtube_batch import loopback_host, loopback_port, loopback_redirect_uri, token_path as batch_token_path
 
 
-# Mantemos os mesmos escopos usados pelo youtube-automation-agent.
-AGENT_SCOPES = [
-    "https://www.googleapis.com/auth/youtube.upload",
-    "https://www.googleapis.com/auth/youtube",
-    "https://www.googleapis.com/auth/youtube.readonly",
-    "https://www.googleapis.com/auth/yt-analytics.readonly",
-]
+# O fluxo de upload precisa apenas do scope de publicação; Analytics e leitura
+# são autorizados separadamente e não devem ser enviados neste refresh OAuth.
+AGENT_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 FALLBACK_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 
@@ -137,7 +133,9 @@ class _GoogleYouTubeBase:
         raw = json.loads(token_source.read_text(encoding="utf-8"))
         if isinstance(raw, dict) and isinstance(raw.get("youtube"), dict):
             raw = raw["youtube"]
-        credentials = Credentials.from_authorized_user_info(raw, self.scopes)
+        # Não reenviar self.scopes durante o refresh: o Google deve reutilizar
+        # os scopes efectivamente concedidos no token guardado.
+        credentials = Credentials.from_authorized_user_info(raw, None)
         granted_scopes = {str(scope).strip() for scope in (credentials.scopes or [])}
         if "https://www.googleapis.com/auth/youtube.upload" in self.scopes and granted_scopes and "https://www.googleapis.com/auth/youtube.upload" not in granted_scopes:
             email = _safe_text((self.account or {}).get("email")) or "a conta seleccionada"
@@ -316,7 +314,9 @@ class DirectYouTubeOAuthUploader(_GoogleYouTubeBase):
             settings,
             storage_root / "state" / "youtube_oauth_fallback_token.json",
             FALLBACK_SCOPES,
-            alternate_token_path=storage_root / "state" / "youtube_agent_tokens.json",
+            # Não reutilizar o token do agente: pode conter scopes de leitura/Analytics
+            # que provocam invalid_scope no refresh do fallback de upload.
+            alternate_token_path=None,
             account=account,
         )
 

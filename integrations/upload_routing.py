@@ -19,7 +19,7 @@ from integrations.session_info_health import check_account_session_info_health, 
 from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_session_manager import renew_account_session
-from integrations.composio_upload import ComposioUploadError, execute_upload
+from integrations.composio_upload import ComposioUploadError, execute_upload, resolve_tool_slug
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.languages import language_locale
 
@@ -239,7 +239,16 @@ def upload_with_default_route(
 
 
 def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwargs: Any) -> IntegrationResult:
-    slug = str(settings.get("composio_tool_slug") or "").strip()
+    configured_slug = str(settings.get("composio_tool_slug") or "").strip()
+    try:
+        slug = resolve_tool_slug(
+            str(settings.get("composio_api_key") or ""),
+            str(settings.get("composio_user_id") or ""),
+            configured_slug,
+            str(settings.get("composio_toolkit") or ""),
+        )
+    except ComposioUploadError as exc:
+        return IntegrationResult(False, str(exc), {"status": "tool_resolution_failed", "configured_slug": configured_slug})
     normalized_slug = slug.upper().replace("-", "_")
     connected_account_tool = normalized_slug in {"UPLOAD_VIDEO", "UPDATE_VIDEO", "UPLOAD_TIKTOK_VIDEO", "UPLOAD_INSTAGRAM_MEDIA"}
     youtube_upload_tool = normalized_slug in {"UPLOAD_VIDEO", "YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"} or ("YOUTUBE" in normalized_slug and "UPLOAD" in normalized_slug and normalized_slug != "YOUTUBE_UPLOAD")
@@ -294,7 +303,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
         result = execute_upload(
             str(settings.get("composio_api_key") or ""),
             str(settings.get("composio_user_id") or ""),
-            str(settings.get("composio_tool_slug") or ""),
+            slug,
             str(kwargs.get("video_path") or ""),
             file_field,
             json.dumps(parsed_arguments, ensure_ascii=False),
@@ -304,5 +313,5 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
     return IntegrationResult(
         bool(result.get("successful")),
         str(result.get("error") or "Upload via Composio concluído."),
-        {"composio_data": result.get("data") or {}, "log_id": result.get("log_id") or "", "tool_slug": result.get("tool_slug") or slug},
+        {"composio_data": result.get("data") or {}, "log_id": result.get("log_id") or "", "tool_slug": result.get("tool_slug") or slug, "configured_tool_slug": configured_slug},
     )
