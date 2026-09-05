@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.82 — 2026-09-04
+
+- Reorganizados os cards de canais da aba Automação Youtube numa grelha compacta de duas linhas.
+- Removidos o selector Formato e a informação Formato redundantes dos cards de canais.
+- Reduzido o espaço vertical vazio e ajustadas as larguras dos controlos.
+- O botão Guardar passou a usar o estilo azul primário da interface.
+
 ## 0.5.81 — 2026-09-04
 
 - Implementado o Dashboard de Growth Youtube com Nota Geral do canal e oito cards categorizados.

@@ -57,14 +57,16 @@ def test_shorts_use_tiktok_channels_and_prompt_master():
 
 def test_automation_card_matches_reference_layout_without_changing_control_keys():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
-    assert 'header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])' in source
-    assert 'enabled = st.toggle("Automação ligada"' in source
-    assert 'key=f"automation_on_{channel_id}"' in source
-    assert 'key=f"automation_time_{channel_id}"' in source
-    assert 'key=f"automation_save_{channel_id}"' in source
-    assert 'default_cols = st.columns([1.15, 1.15, 1.5, 1.7, 1.35], gap="small")' in source
-    assert 'with default_cols[0]:' in source and 'with default_cols[1]:' in source
-    assert 'with default_cols[2]:' in source and 'with default_cols[3]:' in source
+    block = source.split('def render_automation():', 1)[1].split('def render_upload_direct():', 1)[0]
+    assert 'header_cols = st.columns([0.62, 2.15, 1.55, 1.25, 1.25, 1.45, 1.3], gap="small")' in block
+    assert 'enabled = st.toggle("Automação ligada"' in block
+    assert 'key=f"automation_on_{channel_id}"' in block
+    assert 'key=f"automation_time_{channel_id}"' in block
+    assert 'key=f"automation_save_{channel_id}"' in block
+    assert 'control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")' in block
+    assert 'type="primary"' in block
+    assert 'automation_format = st.selectbox' not in block
+    assert 'st.markdown("**Formato**")' not in block
 
 
 def test_general_mode_uses_all_registered_channels_without_partial_selector():

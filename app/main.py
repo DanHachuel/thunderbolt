@@ -5441,7 +5441,11 @@ def render_automation():
     for channel in channels:
         channel_id = channel["id"]
         with st.container(border=True):
-            header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
+            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
+            automation_blueprint = current_blueprint
+            automation_voice = current_voice
+            automation_format = str(channel.get("format") or "wide")
+            header_cols = st.columns([0.62, 2.15, 1.55, 1.25, 1.25, 1.45, 1.3], gap="small")
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=48)
@@ -5451,18 +5455,24 @@ def render_automation():
                 st.write(f"**{channel.get('name', 'Sem nome')}**")
                 st.caption(channel.get("handle") or channel.get("url") or "sem URL")
             with header_cols[2]:
-                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
+                st.markdown("**Thumbnail Blueprint**")
+                st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
             with header_cols[3]:
-                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
-            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
-            with default_cols[0]:
                 st.markdown("**Idioma do roteiro**")
                 st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
-            with default_cols[1]:
+            with header_cols[4]:
                 st.markdown("**Nicho Padrão**")
                 st.caption(channel_niche_label(channel))
-            with default_cols[3]:
+            with header_cols[5]:
+                st.markdown("**Fonte do vídeo**")
+                st.caption(channel_video_source_value(channel.get("style_wide")))
+                st.markdown("**Proporção do vídeo**")
+                st.caption(str(channel.get("video_aspect_ratio") or "Landscape 16:9"))
+            with header_cols[6]:
+                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
+
+            control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")
+            with control_cols[0]:
                 automation_blueprint = st.selectbox(
                     "Blueprint Padrão",
                     blueprint_ids,
@@ -5470,19 +5480,8 @@ def render_automation():
                     format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
                     key=f"automation_blueprint_{channel_id}",
                 )
-            with default_cols[2]:
-                paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
-                st.markdown("**Fonte do vídeo**")
-                st.caption(channel_video_source_value(channel.get("style_wide")))
-                st.markdown("**Proporção do vídeo**")
-                st.caption(str(channel.get("video_aspect_ratio") or "Landscape 16:9"))
-                st.markdown("**Formato**")
-                st.caption(str(channel.get("format") or "wide"))
-                st.markdown("**Thumbnail Blueprint**")
-                st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
-            with default_cols[4]:
-                automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "wide")) if str(channel.get("format") or "wide") in CHANNEL_FORMAT_OPTIONS else 0, key=f"automation_format_{channel_id}")
-            with default_cols[5]:
+            paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
+            with control_cols[1]:
                 automation_voice = st.selectbox(
                     "Narrador/Voz Padrão",
                     voice_options,
@@ -5490,8 +5489,10 @@ def render_automation():
                     format_func=lambda item: item or "Sem voz padrão",
                     key=f"automation_voice_{channel_id}",
                 )
-            with default_cols[5]:
-                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True):
+            with control_cols[2]:
+                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
+            with control_cols[3]:
+                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True, type="primary"):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
                     else:
