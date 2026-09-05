@@ -60,6 +60,11 @@ def test_moneyprinter_config_accepts_local_source_and_legacy_fallback():
     assert payload["app"]["pixabay_api_keys"] == ["legacy-a", "legacy-b"]
 
 
+def test_moneyprinter_config_forces_nvenc_even_when_legacy_codec_is_cpu():
+    payload = build_moneyprinter_config({"video_codec": "libx264"})
+    assert payload["app"]["video_codec"] == "h264_nvenc"
+
+
 def test_sync_moneyprinter_config_preserves_previous_toml_when_replace_fails(tmp_path, monkeypatch):
     root = tmp_path / "MoneyPrinterTurbo"
     root.mkdir()

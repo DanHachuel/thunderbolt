@@ -223,7 +223,7 @@ DEFAULTS: dict[str, Any] = {
         "sonilo_api_key": "",
         "subtitle_provider": "edge",
         "ffmpeg_path": "",
-        "video_codec": "",
+        "video_codec": "h264_nvenc",
         "material_directory": "",
         "whisper_model_size": "large-v3",
         "whisper_device": "cpu",

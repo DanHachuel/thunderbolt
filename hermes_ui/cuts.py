@@ -277,9 +277,11 @@ def build_clip_command(source: Path, output: Path, segment: dict[str, float], ou
         "-vf",
         _video_filter(output_format),
         "-c:v",
-        "libx264",
+        "h264_nvenc",
         "-preset",
-        "veryfast",
+        "p1",
+        "-pix_fmt",
+        "yuv420p",
         "-crf",
         "22",
         "-c:a",
@@ -295,12 +297,19 @@ def _run_ffmpeg(command: list[str], output: Path, *, source: Path, segment: dict
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
     except OSError as exc:
         raise CutsError(f"Não foi possível iniciar FFmpeg: {exc}") from exc
+    executed_command = list(command)
+    if completed.returncode != 0 and "h264_nvenc" in executed_command:
+        fallback = ["libx264" if item == "h264_nvenc" else "veryfast" if item == "p1" else item for item in executed_command]
+        if output.exists():
+            output.unlink()
+        completed = subprocess.run(fallback, capture_output=True, text=True, check=False)
+        executed_command = fallback
     if completed.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
         if output.exists():
             output.unlink()
         detail = (completed.stderr or completed.stdout or "erro desconhecido").strip()
         raise CutsError(f"O clip não pôde ser gerado: {detail[-1200:]}")
-    return {"source": str(source), "output": str(output), "command": command, "segment": segment, "created_at": _now()}
+    return {"source": str(source), "output": str(output), "command": executed_command, "segment": segment, "created_at": _now()}
 
 
 def _write_manifest(record: dict[str, Any], run_dir: Path) -> Path:

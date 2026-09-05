@@ -75,6 +75,30 @@ def test_trim_video_builds_controlled_ffmpeg_command(tmp_path, monkeypatch):
     assert str(source) in calls[0]
 
 
+def test_resize_video_retries_with_cpu_codec_when_nvenc_fails(tmp_path, monkeypatch):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+    output = tmp_path / "output.mp4"
+    calls = []
+
+    monkeypatch.setattr(python_editor, "_ffmpeg", lambda *_args, **_kwargs: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(python_editor, "_output_path", lambda *_args, **_kwargs: output)
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if len(calls) == 2:
+            output.write_bytes(b"result")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+        return SimpleNamespace(returncode=1, stderr="h264_nvenc unavailable", stdout="")
+
+    monkeypatch.setattr(python_editor.subprocess, "run", fake_run)
+    result, info = python_editor.resize_video(source, 1280, 720)
+    assert result == output
+    assert calls[0][calls[0].index("-c:v") + 1] == "h264_nvenc"
+    assert calls[1][calls[1].index("-c:v") + 1] == "libx264"
+    assert info["command"] == calls[1]
+
+
 def test_save_edit_record_uses_dedicated_history(tmp_path, monkeypatch):
     writes = []
     monkeypatch.setattr(python_editor.storage, "append_json", lambda name, record: writes.append((name, record)) or record)
