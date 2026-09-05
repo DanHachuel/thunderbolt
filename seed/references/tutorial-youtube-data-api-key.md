@@ -1,8 +1,4 @@
-# Tutorial YouTube Data API Key (Public Data)
-
 Este tutorial explica como criar uma **YouTube Data API Key** no Google Cloud e configurá-la no Thunderbolt para consultar dados públicos do YouTube, como vídeos, canais e estatísticas públicas.
-
-> **Fonte:** [Tutorial YouTube Data API Key (Public Data) no Google Drive](https://drive.google.com/file/d/1ypzaR1v8khBxyUQmZ12ZAY0pGTD49mqt/view)
 
 ## Quando usar uma API Key
 
@@ -93,4 +89,3 @@ Uma API Key só identifica o projecto e permite chamadas autorizadas para dados 
 - [Google Cloud Console](https://console.cloud.google.com/)
 - [YouTube Data API v3](https://developers.google.com/youtube/v3)
 - [Documentação de quotas da YouTube Data API](https://developers.google.com/youtube/v3/determine_quota_cost)
-- [Documento fonte no Google Drive](https://drive.google.com/file/d/1ypzaR1v8khBxyUQmZ12ZAY0pGTD49mqt/view)

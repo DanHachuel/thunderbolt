@@ -42,7 +42,3 @@ Depois de confirmar o canal, a privacidade e os metadados, seleccione o fluxo de
 | Falha de rede | Não repita automaticamente sem confirmar se o vídeo foi criado no YouTube Studio. |
 | Metadados incompletos | Corrija título, descrição, tags, idioma ou privacidade no formulário antes de enviar. |
 | Limite ou política da plataforma | Pare o processo e siga as políticas e limites actualmente aplicáveis do YouTube. |
-
-## Referência técnica
-
-O material fornecido pelo utilizador cita o repositório [Nojus10/YouTube-Video-Upload-Frontend-Api](https://github.com/Nojus10/YouTube-Video-Upload-Frontend-Api). O Thunderbolt apresenta este tutorial como orientação de integração segura; não replica segredos, valores de autenticação nem instruções de extracção de credenciais.

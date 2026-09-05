@@ -65,5 +65,3 @@ No Thunderbolt, abra **Configurações > Configuração API > AI Influencers > B
 O Thunderbolt usa o Supabase como backend seleccionado, não como executor de n8n: os assets são enviados ao Storage, os metadados ficam nas tabelas e os estados de geração ficam em `influencer_content`. Para uma execução totalmente local, seleccione **SQLite** no mesmo painel; a alternativa cria `storage/state/ai_influencers.db` e não utiliza a conta Supabase.
 
 A conta Supabase está pronta para ser utilizada pela automação.
-
-Fonte original: [guide-supabase.md no GitHub](https://github.com/gyoridavid/ai_agents_az/blob/main/episode_8/guide-supabase.md)
