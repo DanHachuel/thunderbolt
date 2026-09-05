@@ -8410,6 +8410,22 @@ def render_youtube_frontend_upload_tutorial():
     st.markdown(tutorial_content, unsafe_allow_html=False)
 
 
+def render_youtube_data_api_key_tutorial():
+    """Render the YouTube Data API key guide for public data workflows."""
+    tutorial_path = ROOT / "seed" / "references" / "tutorial-youtube-data-api-key.md"
+    st.title("Tutorial YouTube Data API Key (Public Data)")
+    st.caption("Guia para criar e configurar uma YouTube Data API Key para consultas de dados públicos.")
+    st.markdown("[Abrir documento fonte no Google Drive](https://drive.google.com/file/d/1ypzaR1v8khBxyUQmZ12ZAY0pGTD49mqt/view)")
+    try:
+        tutorial_content = tutorial_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        tutorial_content = ""
+    if not tutorial_content:
+        st.error("O conteúdo local do tutorial não está disponível. Consulte o documento fonte no Google Drive.")
+        return
+    st.markdown(tutorial_content, unsafe_allow_html=False)
+
+
 def render_mcp():
     st.title("MCP")
     st.caption("Clientes externos, servidor MCP do Thunderbolt e a skill local ficam separados para evitar confundir funções diferentes.")
@@ -8812,6 +8828,7 @@ def main():
         ("Tutorial Apify", ":material/menu_book:", "Tutorial Apify"),
         ("Tutorial YouTube Video-Upload Frontend", ":material/video_library:", "Tutorial YouTube Video-Upload Frontend"),
         ("Tutorial OAuth do Google", ":material/key:", "Tutorial OAuth do Google"),
+        ("Tutorial YouTube Data API Key (Public Data)", ":material/vpn_key:", "Tutorial YouTube Data API Key (Public Data)"),
     ]
     settings_items = [
         ("MCP", ":material/hub:", "MCP"),
@@ -8867,7 +8884,7 @@ def main():
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
-        "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend", "Tutorial OAuth do Google": "/documentacao/oauth-google",
+        "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend", "Tutorial OAuth do Google": "/documentacao/oauth-google", "Tutorial YouTube Data API Key (Public Data)": "/documentacao/youtube-data-api-key",
         "Configurações": "/configuracoes", "MCP": "/configuracoes/mcp", "Notificações": "/configuracoes/notificacoes", "Logs": "/configuracoes/logs", "Configuração API": "/configuracoes/api",
     }
 
@@ -8989,6 +9006,7 @@ def main():
         "Tutorial Supabase": render_supabase_tutorial,
         "Tutorial YouTube Video-Upload Frontend": render_youtube_frontend_upload_tutorial,
         "Tutorial OAuth do Google": render_google_oauth_tutorial,
+        "Tutorial YouTube Data API Key (Public Data)": render_youtube_data_api_key_tutorial,
         "Configurações": lambda: render_edit_placeholder("Configurações", "Seleccione uma opção no menu expansível."),
         "MCP": render_mcp,
         "Contas Google": render_google_accounts,
