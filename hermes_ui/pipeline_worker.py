@@ -1577,7 +1577,17 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         captions_path=str(artifacts.get("captions") or ""),
     )
     if not result.ok:
-        raise PipelineError(result.message)
+        attempts = (result.data or {}).get("attempts") if isinstance(result.data, dict) else None
+        detail = ""
+        if isinstance(attempts, list):
+            failed = [
+                f"{item.get('route')}: {item.get('message')}"
+                for item in attempts
+                if isinstance(item, dict) and item.get("status") == "failed" and item.get("message")
+            ]
+            if failed:
+                detail = " Detalhes: " + " | ".join(failed[-4:])
+        raise PipelineError(f"{result.message}{detail}")
     artifacts["upload"] = result.data
     return _update(task_id, stage="upload", state="done", progress=100, artifacts=artifacts, error=None)
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from integrations.platforms import IntegrationResult
-from integrations.upload_routing import upload_with_default_route
+from integrations.upload_routing import _composio_upload, upload_with_default_route
 
 
 def _settings():
@@ -73,3 +73,27 @@ def test_automation_worker_requires_configured_composio_or_another_route():
     source = Path(__file__).parents[1].joinpath("hermes_ui", "pipeline_worker.py").read_text(encoding="utf-8")
     assert "configured_composio" in source
     assert "configured_composio or configured_account_id" in source
+
+
+def test_current_youtube_composio_tool_uses_connected_account(monkeypatch, tmp_path: Path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    captured = {}
+
+    def fake_execute(*args):
+        captured["args"] = args
+        return {"successful": True, "data": {"id": "yt-1"}}
+
+    monkeypatch.setattr("integrations.upload_routing.execute_upload", fake_execute)
+    result = _composio_upload(
+        {**_settings(), "composio_tool_slug": "YOUTUBE_UPLOAD_VIDEO", "composio_file_field": "file", "composio_channel_field": "channel_id"},
+        channel={"youtube_channel_id": "UC-other"},
+        video_path=str(video),
+        privacy_status="unlisted",
+        category_id="22",
+        language="pt-BR",
+    )
+    assert result.ok
+    assert captured["args"][2] == "YOUTUBE_UPLOAD_VIDEO"
+    assert captured["args"][4] == "videoFilePath"
+    assert "channel_id" not in captured["args"][5]

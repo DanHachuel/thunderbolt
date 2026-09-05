@@ -59,10 +59,17 @@ def _response(result: Any) -> dict[str, Any]:
     raw = _safe_value(result)
     if not isinstance(raw, dict):
         raw = {"data": raw}
-    error = raw.get("error")
+    data = raw.get("data")
+    if not isinstance(data, dict):
+        data = {"value": data} if data is not None else {}
+    error = raw.get("error") or raw.get("message") or data.get("error") or data.get("message")
+    explicit_success = raw.get("successful")
+    if explicit_success is None:
+        explicit_success = raw.get("success")
+    successful = bool(explicit_success) if explicit_success is not None else not bool(error)
     return {
-        "successful": not bool(error),
-        "data": raw.get("data") or {},
+        "successful": successful and not bool(error),
+        "data": data,
         "error": str(error) if error else "",
         "log_id": str(raw.get("log_id") or raw.get("request_id") or ""),
     }
@@ -161,7 +168,11 @@ def execute_upload(api_key: str, user_id: str, slug: str, video_path: str, file_
             version="latest",
             dangerously_skip_version_check=True,
         )
-        return _response(result)
+        response = _response(result)
+        if not response["successful"] and not response["error"]:
+            response["error"] = f"A ferramenta `{slug}` devolveu uma resposta sem sucesso."
+        response["tool_slug"] = slug
+        return response
     except ComposioUploadError:
         raise
     except Exception as exc:

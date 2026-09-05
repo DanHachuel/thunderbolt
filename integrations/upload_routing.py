@@ -229,12 +229,17 @@ def upload_with_default_route(
 
 
 def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwargs: Any) -> IntegrationResult:
+    slug = str(settings.get("composio_tool_slug") or "").strip()
+    youtube_upload_tool = slug.upper() in {"YOUTUBE_UPLOAD_VIDEO", "YOUTUBE_MULTIPART_UPLOAD_VIDEO"}
     channel_id = str(channel.get("youtube_channel_id") or "").strip()
-    if not channel_id:
-        return IntegrationResult(False, "Composio não foi executado: o canal da tarefa não tem um YouTube channel ID sincronizado.", {"missing": ["youtube_channel_id"]})
     channel_field = str(settings.get("composio_channel_field") or "channel_id").strip()
-    if not channel_field:
+    if not youtube_upload_tool and not channel_id:
+        return IntegrationResult(False, "Composio não foi executado: o canal da tarefa não tem um YouTube channel ID sincronizado.", {"missing": ["youtube_channel_id"]})
+    if not youtube_upload_tool and not channel_field:
         return IntegrationResult(False, "Composio não foi executado: configure o campo de canal da ferramenta.", {"missing": ["composio_channel_field"]})
+    file_field = str(settings.get("composio_file_field") or "").strip()
+    if not file_field or (youtube_upload_tool and file_field == "file"):
+        file_field = "videoFilePath"
     try:
         arguments = str(settings.get("composio_arguments_json") or "{}").strip() or "{}"
         import json
@@ -242,7 +247,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
         if not isinstance(parsed_arguments, dict):
             return IntegrationResult(False, "Composio não foi executado: os argumentos JSON devem ser um objecto.", {})
         locked_values = {
-            channel_field: channel_id,
+            **({channel_field: channel_id} if channel_field and not youtube_upload_tool else {}),
             str(settings.get("composio_privacy_field") or "privacy_status").strip(): str(kwargs.get("privacy_status") or "unlisted"),
             str(settings.get("composio_category_field") or "category_id").strip(): str(kwargs.get("category_id") or "22"),
             str(settings.get("composio_language_field") or "language").strip(): language_locale(kwargs.get("language") or channel.get("language") or "pt"),
@@ -261,7 +266,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
             str(settings.get("composio_user_id") or ""),
             str(settings.get("composio_tool_slug") or ""),
             str(kwargs.get("video_path") or ""),
-            str(settings.get("composio_file_field") or "file"),
+            file_field,
             json.dumps(parsed_arguments, ensure_ascii=False),
         )
     except ComposioUploadError as exc:
@@ -269,5 +274,5 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
     return IntegrationResult(
         bool(result.get("successful")),
         str(result.get("error") or "Upload via Composio concluído."),
-        {"composio_data": result.get("data") or {}, "log_id": result.get("log_id") or ""},
+        {"composio_data": result.get("data") or {}, "log_id": result.get("log_id") or "", "tool_slug": result.get("tool_slug") or slug},
     )
