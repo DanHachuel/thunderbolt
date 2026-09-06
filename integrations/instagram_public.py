@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import json
+import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
@@ -96,24 +98,47 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
-    try:
-        response = requests.get(
-            f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
-            headers={
-                'x-ig-app-id': '936619743392459',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            timeout=15,
-        )
-        if response.status_code >= 400:
-            return None
-        payload = response.json()
-    except (requests.RequestException, ValueError, AttributeError):
-        return None
-    user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
-    return user if isinstance(user, dict) else None
+    headers = {
+        'x-ig-app-id': '936619743392459',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    # The www host is the current public web endpoint. The legacy i host is
+    # retained as a fallback because Instagram rate-limits the two hosts
+    # independently and their availability can vary by region.
+    endpoints = (
+        f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+        f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
+    )
+    for endpoint in endpoints:
+        try:
+            response = requests.get(endpoint, headers=headers, timeout=15)
+            if response.status_code >= 400:
+                continue
+            payload = response.json()
+        except (requests.RequestException, ValueError, AttributeError):
+            continue
+        user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+        if isinstance(user, dict):
+            return user
+    curl = shutil.which('curl')
+    if curl:
+        try:
+            completed = subprocess.run(
+                [curl, '-L', '--max-time', '20', '-sS', '-A', headers['User-Agent'], '-H', f"x-ig-app-id: {headers['x-ig-app-id']}", endpoint],
+                capture_output=True,
+                text=True,
+                timeout=25,
+                check=False,
+            )
+            payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
+            user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+            if isinstance(user, dict):
+                return user
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass
+    return None
 
 
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
@@ -161,15 +186,15 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
+    api_user = _fetch_web_profile_user(reference['username'])
+    if api_user:
+        return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=12)
     except requests.RequestException as exc:
         return IntegrationResult(False, f'Não foi possível consultar o perfil público do Instagram: {exc}', reference)
     if response.status_code >= 400:
         return IntegrationResult(False, f'O Instagram devolveu HTTP {response.status_code}. Confirme o @handle ou use o cadastro manual.', reference | {'status_code': response.status_code})
-    api_user = _fetch_web_profile_user(reference['username'])
-    if api_user:
-        return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
     title = _meta(response.text, 'og:title') or reference['username']
     description = _meta(response.text, 'og:description')
     avatar_url = _meta(response.text, 'og:image')
