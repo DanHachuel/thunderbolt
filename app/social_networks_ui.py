@@ -124,6 +124,12 @@ def _instagram_profile_storage_id(profile: Mapping[str, Any]) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value) or "unknown"
 
 
+def _clear_instagram_result_widget_state(profile: Mapping[str, Any]) -> None:
+    widget_id = _instagram_profile_storage_id(profile)
+    for field in ("name", "bio", "country", "language", "posts", "followers", "following", "character"):
+        st.session_state.pop(f"social_instagram_result_{field}_{widget_id}", None)
+
+
 def _normalise_instagram_posts(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
@@ -583,6 +589,8 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         if search_clicked:
             result = fetch_public_instagram_profile(source)
             result_data = dict(result.data) if isinstance(result.data, dict) else {}
+            if result_data:
+                _clear_instagram_result_widget_state(result_data)
             st.session_state["social_instagram_result"] = result_data
             st.session_state["social_instagram_ok"] = result.ok
             st.session_state["social_instagram_message"] = result.message

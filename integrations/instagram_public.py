@@ -140,7 +140,14 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
         f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
     )
     def profile_quality(user: Mapping[str, Any]) -> int:
-        return sum(bool(user.get(key)) for key in ('biography', 'edge_follow', 'edge_followed_by', 'edge_owner_to_timeline_media', 'username'))
+        groups = (
+            ('biography', 'bio', 'description'),
+            ('edge_follow', 'following', 'following_count', 'followingCount', 'follows'),
+            ('edge_followed_by', 'followers', 'follower_count', 'followers_count', 'followerCount'),
+            ('edge_owner_to_timeline_media', 'posts', 'post_count', 'media_count'),
+            ('username', 'user_name', 'handle'),
+        )
+        return sum(any(user.get(key) not in (None, '', {}, []) for key in group) for group in groups)
 
     def merge_profile(base: dict[str, Any] | None, candidate: Mapping[str, Any]) -> dict[str, Any]:
         merged = dict(base or {})
@@ -300,12 +307,13 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     followers = followers if followers is not None else _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
-    biography = str(user.get('biography') or '').strip()
+    media = media if media is not None else _profile_metric(user, 'posts', 'post_count', 'media_count')
+    biography = str(user.get('biography') or user.get('bio') or user.get('description') or '').strip()
     country = extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
     return {
         'id': f"instagram_{reference['username']}",
         **reference,
-        'name': str(user.get('full_name') or user.get('username') or reference['username']).strip(),
+        'name': str(user.get('full_name') or user.get('name') or user.get('username') or reference['username']).strip(),
         'bio': normalize_instagram_bio(biography),
         'bio_raw': biography,
         'country': country,
@@ -317,7 +325,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'public_lookup': True,
         'metrics_source': 'instagram_web_profile_info',
         'last_public_lookup_at': datetime.now(timezone.utc).isoformat(),
-        '_api_posts': (((user.get('edge_owner_to_timeline_media') or {}).get('edges') or []) if isinstance(user.get('edge_owner_to_timeline_media'), dict) else []),
+        '_api_posts': (((user.get('edge_owner_to_timeline_media') or {}).get('edges') or []) if isinstance(user.get('edge_owner_to_timeline_media'), dict) else (user.get('posts') if isinstance(user.get('posts'), list) else [])),
     }
 
 

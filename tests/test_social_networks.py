@@ -129,6 +129,17 @@ def test_public_instagram_endpoint_accepts_direct_user_payload_shape():
     assert user["edge_follow"]["count"] == 456
 
 
+def test_public_instagram_endpoint_accepts_direct_alias_payload_shape():
+    api_response = Mock(status_code=200, json=lambda: {"user": {
+        "user_name": "creator", "bio": "Bio real", "following_count": 456,
+        "followers_count": 123, "media_count": 78,
+    }})
+    with patch("integrations.instagram_public.requests.get", return_value=api_response):
+        user = _fetch_web_profile_user("creator")
+    assert user["bio"] == "Bio real"
+    assert user["following_count"] == 456
+
+
 def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint():
     api_response = Mock(
         status_code=200,
