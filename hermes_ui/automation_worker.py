@@ -22,6 +22,7 @@ from .domain import create_batch, create_tasks_for_batch
 from .languages import language_code
 from .material_sources import selected_material_source
 from .notifications import record_notification
+from .video_length import length_generation_settings
 from integrations.session_info_health import check_all_accounts_session_info_health, emit_session_info_health_alerts
 
 WORKER_STATE_FILE = "automation_worker.json"
@@ -165,6 +166,19 @@ def _blueprint_for_channel(channel: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _length_settings(channel: dict[str, Any], blueprint: dict[str, Any]) -> dict[str, Any]:
+    prompt_content = ""
+    prompt_id = str(channel.get("default_prompt_master") or channel.get("prompt_master") or "").strip()
+    if prompt_id:
+        prompt_path = storage.TIKTOK_PROMPT_MASTERS / prompt_id
+        if prompt_path.is_file():
+            try:
+                prompt_content = storage.load_prompt_master_file(prompt_path)
+            except (OSError, ValueError):
+                prompt_content = ""
+    return length_generation_settings(channel, blueprint, prompt_content)
+
+
 def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     settings = storage.read_json("settings.json", {})
     blueprint = _blueprint_for_channel(channel)
@@ -194,7 +208,7 @@ def _creative_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         "thumbnail_blueprint_id": str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or ""),
         "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
         "material_source": material_source,
-        "generation_settings": {"video_keywords": editorial.get("keywords", []), "material_source": material_source},
+        "generation_settings": {"video_keywords": editorial.get("keywords", []), "material_source": material_source, **_length_settings(channel, blueprint)},
         "ai_generation": {"topic": topic_package, "editorial": editorial},
     }
     return topic_package["topic"], payload
@@ -241,7 +255,7 @@ def _pending_payload(channel: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         "thumbnail_blueprint_id": str(channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or ""),
         "voice": str(channel.get("default_voice") or channel.get("voice") or ""),
         "material_source": material_source,
-        "generation_settings": {"material_source": material_source},
+        "generation_settings": {"material_source": material_source, **_length_settings(channel, blueprint)},
         "ai_generation": {},
     }
     return "", payload

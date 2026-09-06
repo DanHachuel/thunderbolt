@@ -43,6 +43,7 @@ def generate_script_document(
     blueprint_payload = blueprint or {}
     generation_settings_payload = generation_settings or {}
     if normalized_type == "video_script":
+        target_word_count = generation_settings_payload.get("target_word_count")
         output_requirements = {
             "content": "roteiro completo em Markdown, com título, gancho, cenas, narração e indicações visuais/sonoras",
             "summary": "resumo editorial em uma frase",
@@ -52,7 +53,8 @@ def generate_script_document(
             f"escrevendo título, resumo e conteúdo integralmente em {language_name} ({language_code}). "
             "alinhado exclusivamente ao nicho e às regras do Blueprint fornecido. Não inventes factos sensíveis, "
             "não uses introduções genéricas, não escrevas comentários sobre IA e não incluas um CTA vazio. "
-            "Responde apenas com JSON válido nas chaves title, summary e content."
+            + (f"Escreve aproximadamente {int(target_word_count)} palavras; trata este valor como uma referência média e não como um limite rígido. " if target_word_count else "")
+            + "Responde apenas com JSON válido nas chaves title, summary e content."
         )
     else:
         output_requirements = {
