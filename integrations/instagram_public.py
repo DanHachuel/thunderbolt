@@ -152,6 +152,17 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     merged[key] = value
         return merged
 
+    def extract_user(payload: Any) -> Mapping[str, Any] | None:
+        if not isinstance(payload, Mapping):
+            return None
+        candidates = [
+            payload.get('user'),
+            (payload.get('data') or {}).get('user') if isinstance(payload.get('data'), Mapping) else None,
+            (payload.get('graphql') or {}).get('user') if isinstance(payload.get('graphql'), Mapping) else None,
+            (payload.get('data') or {}).get('profile') if isinstance(payload.get('data'), Mapping) else None,
+        ]
+        return next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
+
     request_headers = [
         headers,
         {**headers, 'User-Agent': 'Instagram 390.0.0.0.50 Android', 'Accept': 'application/json, text/plain, */*'},
@@ -169,7 +180,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                 if best_user:
                     return best_user
                 continue
-            user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+            user = extract_user(payload)
             if isinstance(user, dict):
                 best_user = merge_profile(best_user, user)
                 if profile_quality(best_user) >= 4:
@@ -189,7 +200,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     check=False,
                 )
                 payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
-                user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+                user = extract_user(payload)
                 if isinstance(user, dict):
                     best_user = merge_profile(best_user, user)
                     if profile_quality(best_user) >= 4:
@@ -215,7 +226,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                         if response is None or response.status >= 400:
                             continue
                         payload = json.loads(page.locator('body').inner_text(timeout=5000))
-                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+                        user = extract_user(payload)
                         if isinstance(user, dict):
                             best_user = merge_profile(best_user, user)
                             if profile_quality(best_user) >= 4:

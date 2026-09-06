@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.40 — 2026-09-06
+- Corrigido o parser Instagram para aceitar também respostas Windows no formato directo `{"user": {...}}`, além de `data.user`, `graphql.user` e `data.profile`.
+- Evitado o fallback indevido para HTML parcial quando o endpoint já devolveu o perfil completo.
+- Mantidas integralmente as funcionalidades de 0.6.39 e nenhuma alteração de layout.
+
 ## 0.6.39 — 2026-09-06
 - Renumeração da correcção de compatibilidade Windows/Chromium que estava identificada como 0.6.38; inclui integralmente o fallback Chromium, as variantes de headers e a protecção contra payload Instagram parcial.
 - Mantidas todas as funcionalidades e correcções da 0.6.38, sem alteração de layout.
