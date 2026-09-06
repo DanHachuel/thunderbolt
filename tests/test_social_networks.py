@@ -106,6 +106,18 @@ def test_public_instagram_endpoint_uses_curl_fallback_after_http_429():
     assert run.call_args.kwargs["errors"] == "replace"
 
 
+def test_public_instagram_endpoint_prefers_complete_http_payload_over_curl():
+    api_response = Mock(status_code=200, json=lambda: {"data": {"user": {
+        "username": "creator", "biography": "Bio real", "edge_follow": {"count": 456},
+        "edge_followed_by": {"count": 123}, "edge_owner_to_timeline_media": {"count": 78},
+    }}})
+    with patch("integrations.instagram_public.requests.get", return_value=api_response), patch("integrations.instagram_public.shutil.which", return_value="/usr/bin/curl"), patch("integrations.instagram_public.subprocess.run") as run:
+        user = _fetch_web_profile_user("creator")
+    assert user["biography"] == "Bio real"
+    assert user["edge_follow"]["count"] == 456
+    run.assert_not_called()
+
+
 def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint():
     api_response = Mock(
         status_code=200,
