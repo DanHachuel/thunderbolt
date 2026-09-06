@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import io
-import logging
 import re
 import uuid
 import zipfile
 import unicodedata
-import hashlib
 from typing import Any, Callable, Mapping
 
 import requests
@@ -17,17 +15,8 @@ from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INF
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import (
-    extract_public_instagram_country,
-    fetch_public_instagram_posts,
-    fetch_public_instagram_profile,
-    normalize_instagram_bio,
-    normalize_instagram_metric,
-)
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
-
-
-LOGGER = logging.getLogger(__name__)
 
 
 def _clean(value: Any) -> str:
@@ -78,35 +67,11 @@ def _country_key(value: Any) -> str:
 COUNTRY_ALIASES = {
     "brazil": "Brasil",
     "brasil": "Brasil",
-    "br": "Brasil",
     "usa": "Estados Unidos",
     "us": "Estados Unidos",
     "united states": "Estados Unidos",
     "united states of america": "Estados Unidos",
-    "pt": "Portugal",
     "portugal": "Portugal",
-    "uk": "Reino Unido",
-    "gb": "Reino Unido",
-    "united kingdom": "Reino Unido",
-    "england": "Reino Unido",
-    "germany": "Alemanha",
-    "de": "Alemanha",
-    "france": "França",
-    "fr": "França",
-    "italy": "Itália",
-    "it": "Itália",
-    "spain": "Espanha",
-    "es": "Espanha",
-    "canada": "Canadá",
-    "ca": "Canadá",
-    "australia": "Austrália",
-    "au": "Austrália",
-    "japan": "Japão",
-    "jp": "Japão",
-    "mexico": "México",
-    "mx": "México",
-    "argentina": "Argentina",
-    "ar": "Argentina",
 }
 
 
@@ -124,17 +89,11 @@ def _normalise_country(value: Any) -> str:
 
 
 def _profile_country(profile: Mapping[str, Any]) -> str:
-    for key in ("country", "country_name", "country_of_registration", "account_country", "account_based_in", "country_code"):
-        raw_value = profile.get(key)
-        candidates = [raw_value]
-        if isinstance(raw_value, Mapping):
-            candidates.extend(raw_value.get(child) for child in ("name", "label", "display_name", "country", "country_name", "code"))
-        for candidate in candidates:
-            country = _normalise_country(candidate)
-            if country:
-                return country
-    extracted = _normalise_country(extract_public_instagram_country(profile))
-    return extracted
+    for key in ("country", "country_name", "country_of_registration", "account_country", "account_based_in"):
+        country = _normalise_country(profile.get(key))
+        if country:
+            return country
+    return ""
 
 
 def _language_index(value: Any) -> int:
@@ -165,41 +124,10 @@ def _instagram_profile_storage_id(profile: Mapping[str, Any]) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value) or "unknown"
 
 
-def _clear_instagram_result_widget_state(profile: Mapping[str, Any]) -> None:
-    """Clear every previous widget key for this profile before rebuilding the form."""
-    widget_id = _instagram_profile_storage_id(profile)
-    for field in ("name", "bio", "country", "language", "posts", "followers", "following", "character"):
-        prefix = f"social_instagram_result_{field}_{widget_id}"
-        for key in list(st.session_state.keys()):
-            if str(key).startswith(prefix):
-                st.session_state.pop(key, None)
-
-
-def _instagram_result_widget_id(profile: Mapping[str, Any]) -> str:
-    base_id = _instagram_profile_storage_id(profile)
-    signature = "|".join(_clean(profile.get(key)) for key in ("bio", "bio_raw", "following_count", "subscriber_count", "post_count", "country"))
-    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:10]
-    return f"{base_id}_{digest}"
-
-
 def _normalise_instagram_posts(value: Any) -> list[dict[str, Any]]:
-    if isinstance(value, Mapping):
-        value = value.get("posts") or value.get("items") or value.get("edges") or []
     if not isinstance(value, list):
         return []
-    normalised: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in value:
-        post = item.get("node") if isinstance(item, Mapping) and isinstance(item.get("node"), Mapping) else item
-        if not isinstance(post, Mapping):
-            continue
-        data = dict(post)
-        identifier = _clean(data.get("id") or data.get("shortcode") or data.get("url"))
-        if not identifier or identifier in seen:
-            continue
-        seen.add(identifier)
-        normalised.append(data)
-    return normalised
+    return [dict(post) for post in value if isinstance(post, Mapping) and _clean(post.get("id") or post.get("url"))]
 
 
 def _stored_instagram_posts(profile: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -248,8 +176,8 @@ def _instagram_posts_archive(posts: list[dict[str, Any]]) -> bytes:
                     elif "webp" in content_type:
                         extension = ".webp"
                     bundle.writestr(f"post-{index:02d}{extension}", response.content)
-                except requests.RequestException as exc:
-                    LOGGER.warning("Não foi possível descarregar a imagem do post Instagram %s: %s", url, exc)
+                except requests.RequestException:
+                    pass
             manifest.append(f"{index}. {_clean(post.get('url'))}\n{_clean(post.get('caption'))}\n")
         bundle.writestr("posts.txt", "\n".join(manifest))
     return archive.getvalue()
@@ -270,14 +198,13 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
-            # DEBUG WINDOWS INSTAGRAM: manter até a validação final do carregamento público.
-            st.write({"instagram_posts_ok": posts_ok, "instagram_posts_message": posts_message, "instagram_posts_count": len(loaded_posts)})
             if posts_ok:
-                posts = _normalise_instagram_posts(loaded_posts)
+                posts = loaded_posts
                 _persist_instagram_posts(profile, posts)
                 st.success(f"{len(posts)} posts carregados.")
+                st.rerun()
             else:
-                st.error(posts_message)
+                st.warning(posts_message)
         posts = st.session_state.get(state_key, posts)
         if not posts:
             st.info("Clique em Carregar últimos 10 para consultar os posts públicos desta conta.")
@@ -296,10 +223,9 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", use_container_width=True):
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=len(posts) + 10)
             if posts_ok:
-                posts = _normalise_instagram_posts(loaded_posts)
-                _persist_instagram_posts(profile, posts)
-            else:
-                st.error(posts_message)
+                _persist_instagram_posts(profile, loaded_posts)
+                st.rerun()
+            st.warning(posts_message)
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:
@@ -446,8 +372,7 @@ def _characters(settings: Mapping[str, Any]) -> tuple[list[dict[str, Any]], Any 
         repository = get_repository(settings)
         items = [item for item in repository.list_influencers() if _clean(item.get("id")) != STANDALONE_CONTENT_INFLUENCER_ID]
         return items, repository
-    except Exception as exc:
-        LOGGER.warning("Não foi possível carregar as personagens: %s", exc, exc_info=True)
+    except (InfluencerBackendError, Exception):
         return [], None
 
 
@@ -559,39 +484,19 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             refresh_col, edit_col = st.columns(2)
             with refresh_col:
                 if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
-                    try:
-                        refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
-                    except Exception as exc:
-                        st.error(f"Falha ao actualizar o perfil Instagram: {exc}")
-                        refreshed_ok, refreshed_message, refreshed = False, str(exc), {}
+                    refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
                     if refreshed_ok:
                         current_posts = _stored_instagram_posts(profile)
-                        try:
-                            posts_ok, posts_message, refreshed_posts = _load_instagram_posts(refreshed, limit=max(10, len(current_posts)))
-                        except Exception as exc:
-                            posts_ok, posts_message, refreshed_posts = False, str(exc), []
+                        posts_ok, _, refreshed_posts = _load_instagram_posts(refreshed, limit=max(10, len(current_posts)))
                         if posts_ok:
                             _persist_instagram_posts(profile, refreshed_posts)
-                        else:
-                            st.warning(f"Perfil actualizado, mas os posts não foram actualizados: {posts_message}")
-                        # Debug temporário removido após validação; manter para reactivar se necessário:
-                        # st.write({"profile_ok": refreshed_ok, "profile_message": refreshed_message, "profile_data": refreshed})
-                        # st.write({"posts_ok": posts_ok, "posts_message": posts_message, "posts_count": len(refreshed_posts)})
-                        try:
-                            updated = update_channel(profile_id, {**refreshed, "id": profile_id, "country": _profile_country(refreshed) or _profile_country(profile), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
-                        except (OSError, PermissionError) as exc:
-                            st.error(f"Não foi possível guardar os dados no Windows: {exc}")
-                            return
-                        except Exception as exc:
-                            st.error(f"Falha ao guardar os dados da conta Instagram: {exc}")
-                            return
+                        updated = update_channel(profile_id, {**refreshed, "id": profile_id, "country": _profile_country(refreshed) or _profile_country(profile), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
                         if updated is None:
-                            st.error("A conta Instagram já não existe no armazenamento local ou não foi possível escrever o ficheiro.")
+                            st.error("A conta Instagram já não existe no armazenamento local.")
                             return
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
-                    else:
-                        st.error(f"Não foi possível actualizar o perfil Instagram: {refreshed_message}")
+                    st.warning(refreshed_message)
             with edit_col:
                 if st.button("Editar", key=f"edit_instagram_button_{profile_id}", use_container_width=True):
                     for field in ("name", "handle", "bio", "country", "language", "posts", "followers", "following"):
@@ -678,20 +583,15 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         if search_clicked:
             result = fetch_public_instagram_profile(source)
             result_data = dict(result.data) if isinstance(result.data, dict) else {}
-            if result_data:
-                _clear_instagram_result_widget_state(result_data)
             st.session_state["social_instagram_result"] = result_data
             st.session_state["social_instagram_ok"] = result.ok
             st.session_state["social_instagram_message"] = result.message
         if st.session_state.get("social_instagram_message"):
-            if st.session_state.get("social_instagram_ok"):
-                st.success(st.session_state["social_instagram_message"])
-            else:
-                st.error(st.session_state["social_instagram_message"])
+            (st.success if st.session_state.get("social_instagram_ok") else st.warning)(st.session_state["social_instagram_message"])
         data = st.session_state.get("social_instagram_result", {}) if st.session_state.get("social_instagram_ok") else {}
         if data:
             characters, _ = _characters(settings)
-            result_widget_id = _instagram_result_widget_id(data)
+            result_widget_id = _instagram_profile_storage_id(data)
             with st.container(border=True):
                 st.subheader("Conta Instagram encontrada")
                 preview_cols = st.columns([0.8, 2.2, 1.2, 1.2, 1.2])

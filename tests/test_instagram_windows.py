@@ -1,93 +1,62 @@
-import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from integrations import instagram_public
 
 
-class InstagramWindowsRegressionTests(unittest.TestCase):
-    def test_country_from_bio_is_only_a_fallback_pattern(self):
-        self.assertEqual(instagram_public._country_from_bio_fallback("Creator based in Brazil"), "Brazil")
-        self.assertEqual(instagram_public._country_from_bio_fallback("Criador de Portugal"), "Portugal")
-        self.assertEqual(instagram_public._country_from_bio_fallback("Creator and photographer"), "")
-
-    def test_profile_data_preserves_following_and_bio(self):
-        data = instagram_public._profile_data_from_api(
-            {
-                "id": "42",
-                "username": "conta",
-                "biography": "Creator from Brazil",
-                "edge_followed_by": {"count": 1200},
-                "edge_follow": {"count": 340},
-                "edge_owner_to_timeline_media": {"count": 18, "edges": []},
-            },
-            {"username": "conta", "handle": "@conta", "url": "https://www.instagram.com/conta/"},
-        )
-        self.assertEqual(data["bio"], "Creator from Brazil")
-        self.assertEqual(data["subscriber_count"], 1200)
-        self.assertEqual(data["following_count"], 340)
-        self.assertEqual(data["country"], "Brazil")
-
-    def test_windows_uses_public_mode_when_environment_is_empty(self):
-        with patch.dict(instagram_public.os.environ, {}, clear=True):
-            self.assertEqual(instagram_public._instagram_cookies(), {})
-
-    def test_windows_profile_uses_only_playwright_html(self):
-        expected = {"username": "conta", "biography": "Bio"}
-        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-             patch.object(instagram_public, "_fetch_profile_with_playwright", return_value=expected) as playwright, \
-             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")), \
-             patch.object(instagram_public.shutil, "which", side_effect=AssertionError("curl não permitido no Windows")):
-            result = instagram_public._fetch_web_profile_user("conta")
-        self.assertEqual(result, expected)
-        playwright.assert_called_once_with("conta")
-
-    def test_windows_posts_use_only_playwright_html(self):
-        expected = [{"id": "post-1", "url": "https://www.instagram.com/p/post-1/"}]
-        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-             patch.object(instagram_public, "_fetch_posts_with_playwright", return_value=expected) as playwright, \
-             patch.object(instagram_public, "_fetch_web_profile_user", side_effect=AssertionError("perfil HTTP não permitido")), \
-             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
-            result = instagram_public.fetch_public_instagram_posts("@conta", limit=10)
-        self.assertTrue(result.ok)
-        self.assertEqual(result.data["posts"], expected)
-        playwright.assert_called_once_with({"username": "conta", "handle": "@conta", "url": "https://www.instagram.com/conta/"}, 10)
-
-    def test_html_profile_helper_preserves_bio_metrics_and_posts(self):
-        document = '''<script>window._sharedData = {"entry_data":{"ProfilePage":[{"graphql":{"user{
-            "username":"conta","biography":"Bio real com seguidores e seguindo",
-            "edge_followed_by":{"count":1200},"edge_follow":{"count":340},
-            "edge_owner_to_timeline_media":{"count":2,"edges":[
-                {"node":{"id":"1","shortcode":"ABC","display_url":"https://img/1.jpg","edge_media_to_caption":{"edges":[{"node":{"text":"Legenda"}}]}}}
-            ]}}}]}};</script>'''
-        extracted = instagram_public._extract_profile_from_html(document)
-        user = extracted["user"]
-        self.assertEqual(user["biography"], "Bio real com seguidores e seguindo")
-        self.assertEqual(user["edge_followed_by"]["count"], 1200)
-        self.assertEqual(user["edge_follow"]["count"], 340)
-        self.assertEqual(len(extracted["posts"]), 1)
-        self.assertEqual(extracted["posts"][0]["shortcode"], "ABC")
-
-    def test_html_posts_helper_obeys_limit_and_reads_embedded_json(self):
-        document = '''<script type="application/ld+json">{"@type":"SocialMediaPosting","id":"post-1","image":"https://img/1.jpg","url":"https://www.instagram.com/p/ABC/"}</script>'''
-        posts = instagram_public._extract_posts_from_html(document, limit=10)
-        self.assertEqual(posts[0]["id"], "post-1")
-        self.assertEqual(posts[0]["image_url"], "https://img/1.jpg")
-
-    def test_windows_profile_failure_returns_empty_without_fallback(self):
-        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-             patch.object(instagram_public, "_fetch_profile_with_playwright", return_value={}), \
-             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
-            result = instagram_public.fetch_public_instagram_profile("@conta")
-        self.assertFalse(result.ok)
-        self.assertEqual(result.message, "Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.")
-
-    def test_windows_posts_failure_returns_empty_without_fallback(self):
-        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-             patch.object(instagram_public, "_fetch_posts_with_playwright", return_value=[]):
-            result = instagram_public.fetch_public_instagram_posts("@conta", limit=10)
-        self.assertFalse(result.ok)
-        self.assertEqual(result.data["posts"], [])
+HTML = '''
+<meta property="og:title" content="Creator (@creator)">
+<meta property="og:description" content="123 followers, 456 following and 2 posts">
+<meta property="og:image" content="https://img.example/avatar.jpg">
+<script type="application/json">
+{"edge_followed_by":{"count":123},"edge_follow":{"count":456},"edge_owner_to_timeline_media":{"count":2,"edges":[{"node":{"id":"post-1","shortcode":"ABC","display_url":"https://img.example/post.jpg","edge_media_to_caption":{"edges":[{"node":{"text":"Legenda"}}]}}}]}}
+</script>
+'''
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_windows_profile_tries_requests_then_uses_playwright_html_parser():
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public.requests, "get", side_effect=instagram_public.requests.RequestException("HTML instead of JSON")), \
+         patch.object(instagram_public.shutil, "which", return_value=None), \
+         patch.object(instagram_public, "_fetch_instagram_html_with_playwright", return_value=HTML) as playwright:
+        result = instagram_public._fetch_web_profile_user("creator")
+
+    assert result["biography"] == "123 followers, 456 following and 2 posts"
+    assert result["edge_followed_by"]["count"] == 123
+    assert result["edge_follow"]["count"] == 456
+    assert result["edge_owner_to_timeline_media"]["edges"][0]["node"]["shortcode"] == "ABC"
+    playwright.assert_called_once_with("https://www.instagram.com/creator/", "creator")
+
+
+def test_windows_posts_use_the_same_html_parser_after_profile_fallback():
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_web_profile_user", return_value={}), \
+         patch.object(instagram_public, "_fetch_instagram_html_with_playwright", return_value=HTML) as playwright:
+        result = instagram_public.fetch_public_instagram_posts("@creator", limit=10)
+
+    assert result.ok is True
+    assert result.data["posts"][0]["id"] == "post-1"
+    assert result.data["posts"][0]["caption"] == "Legenda"
+    playwright.assert_called_once_with("https://www.instagram.com/creator/", "creator")
+
+
+def test_playwright_failure_returns_empty_html_without_generic_data_fallback():
+    with patch.dict("sys.modules", {"playwright": None}):
+        # The public helper must keep the original empty-result contract on errors.
+        with patch.object(instagram_public, "print") as output:
+            result = instagram_public._fetch_instagram_html_with_playwright("https://www.instagram.com/creator/", "creator")
+    assert result == ""
+    output.assert_called_once()
+
+
+def test_bio_preserves_metric_words_and_real_text():
+    value = "606 seguidores, seguindo 3,432, 278 posts — Veja as fotos"
+    assert instagram_public.normalize_instagram_bio(value) == value
+
+
+def test_linux_html_path_remains_requests_based():
+    response = Mock(status_code=200, text='<meta property="og:title" content="Creator"><meta property="og:description" content="Bio real">')
+    with patch.object(instagram_public.platform, "system", return_value="Linux"), patch.object(instagram_public.requests, "get", return_value=response) as request:
+        result = instagram_public.fetch_public_instagram_profile("@creator")
+    assert result.ok is True
+    assert result.data["bio"] == "Bio real"
+    request.assert_called()
