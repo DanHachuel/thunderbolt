@@ -94,6 +94,7 @@ from hermes_ui.update_manager import check_version, restart_current_process, upd
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
+from hermes_ui.video_length import channel_video_length, length_generation_settings, words_from_channel_time
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, cached_personal_voices, fetch_personal_voices, personal_voice_options
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
@@ -130,6 +131,7 @@ from integrations.session_info_health import check_account_session_info_health
 from integrations.youtube_session_manager import renew_account_session
 from integrations.youtube_batch import account_key as youtube_batch_account_key, account_status as youtube_batch_account_status, authorize_account as authorize_youtube_batch_account, delete_account_token as delete_youtube_batch_token, list_my_channels as list_youtube_batch_channels, loopback_redirect_uri
 from integrations.youtube_upload import authorize_youtube_agent
+from integrations.tiktok_public import fetch_public_tiktok_profile
 from integrations.youtube_growth_api import find_account_for_channel as find_youtube_growth_account
 from integrations.local_runtime import MoneyPrinterRuntime
 from integrations.moneyprinter_config import sync_moneyprinter_config
@@ -731,6 +733,10 @@ def generate_video_content_for_ui(
     subject, topic_result = resolve_video_subject_for_generation(settings, channel, subject, blueprint)
 
     blueprint = blueprint if isinstance(blueprint, dict) else blueprint_for_channel(channel)
+    generation_settings = {
+        **(generation_settings or {}),
+        **length_generation_settings(channel, blueprint),
+    }
     script_result = generate_script_document(
         settings,
         document_type="Roteiro de vídeo",
@@ -740,7 +746,7 @@ def generate_video_content_for_ui(
         channel=channel,
         blueprint=blueprint,
         structure_notes=str((generation_settings or {}).get("script_structure_notes") or ""),
-        generation_settings=generation_settings or {},
+        generation_settings=generation_settings,
     )
     script = str(script_result.get("content") or "").strip()
     keywords = generate_video_keywords(
@@ -2343,6 +2349,12 @@ def render_tiktok_channels():
                     with card_cols[4]:
                         st.metric("Vídeos", format_metric_number(channel.get("video_count")))
                     with card_cols[5]:
+                        if st.button("↻", key=f"refresh_tiktok_metrics_{channel_id}", help="Actualizar Seguidores, Vídeos e Curtidas", use_container_width=True):
+                            with st.spinner("A actualizar métricas TikTok…"):
+                                refreshed, message = _refresh_tiktok_channel_metrics(channel)
+                            (st.success if refreshed else st.warning)(message)
+                            if refreshed:
+                                st.rerun()
                         active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
                         if active != bool(channel.get("active", True)):
                             update_channel(channel_id, {"active": active})
@@ -2501,6 +2513,42 @@ def _format_channel_count(value: Any) -> str:
         return f"{_channel_count_value(value):,}".replace(",", ".")
     except (TypeError, ValueError):
         return str(value)
+
+
+def _channel_average_video_time(channel: dict[str, Any], *, prompt_master: str = "") -> tuple[str, str, int]:
+    blueprint = blueprint_for_channel(channel) if is_youtube_channel_record(channel) else {}
+    words, duration, source = channel_video_length(channel, blueprint, prompt_master)
+    return duration, source, words
+
+
+def _refresh_youtube_channel_metrics(channel: dict[str, Any], youtube: YouTubeAdapter) -> tuple[bool, str]:
+    result = youtube.fetch_channel_public(str(channel.get("url") or channel.get("handle") or ""))
+    if not result.ok or not isinstance(result.data, dict):
+        return False, result.message
+    data = result.data
+    update_channel(str(channel["id"]), {
+        "subscriber_count": data.get("subscriber_count"),
+        "video_count": data.get("video_count"),
+        "view_count": data.get("view_count"),
+        "metrics_source": data.get("metrics_source", "youtube_public_page"),
+        "last_public_lookup_at": data.get("last_public_lookup_at", now()),
+    })
+    return True, "Métricas YouTube actualizadas."
+
+
+def _refresh_tiktok_channel_metrics(channel: dict[str, Any]) -> tuple[bool, str]:
+    result = fetch_public_tiktok_profile(str(channel.get("url") or channel.get("handle") or ""))
+    if not result.ok or not isinstance(result.data, dict):
+        return False, result.message
+    data = result.data
+    update_channel(str(channel["id"]), {
+        "subscriber_count": data.get("subscriber_count"),
+        "likes_count": data.get("likes_count"),
+        "video_count": data.get("video_count"),
+        "metrics_source": data.get("metrics_source", "tiktok_public_page"),
+        "last_public_lookup_at": data.get("last_public_lookup_at", now()),
+    })
+    return True, "Métricas TikTok actualizadas."
 
 
 def render_channels():
@@ -2990,6 +3038,12 @@ def render_channels():
             with header_cols[4]:
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
             with header_cols[5]:
+                if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", use_container_width=True):
+                    with st.spinner("A actualizar métricas YouTube…"):
+                        refreshed, message = _refresh_youtube_channel_metrics(channel, youtube)
+                    (st.success if refreshed else st.warning)(message)
+                    if refreshed:
+                        st.rerun()
                 active = st.toggle("Activo", value=channel.get("active", True), key=f"active_{channel_id}")
                 if active != channel.get("active"):
                     update_channel(channel_id, {"active": active})
@@ -5349,7 +5403,7 @@ def render_tiktok_automation():
     for channel in channels:
         channel_id = str(channel["id"])
         with st.container(border=True):
-            header_cols = st.columns([0.55, 2.35, 1.35, 1.5, 1.35])
+            header_cols = st.columns([0.55, 2.15, 1.25, 1.35, 1.55, 1.2])
             with header_cols[0]:
                 profile_image = _tiktok_avatar_url(channel)
                 if profile_image:
@@ -5363,6 +5417,11 @@ def render_tiktok_automation():
                 enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
             with header_cols[3]:
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
+            with header_cols[4]:
+                prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
+                prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
+                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"tiktok_average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}. Use 00:00 para voltar ao Prompt Master.")
             default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
             with default_cols[0]:
                 st.markdown("**Idioma do roteiro**")
@@ -5385,9 +5444,11 @@ def render_tiktok_automation():
                 if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
+                    elif not valid_hhmm(average_video_time):
+                        st.error("O Tempo Medio de Video deve estar no formato HH:MM, por exemplo 00:02.")
                     else:
                         avatar_url = _tiktok_avatar_url(channel)
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
     _render_tiktok_automation_cards()
@@ -5521,7 +5582,7 @@ def render_automation():
             automation_voice = current_voice
             paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
             automation_format = str(channel.get("format") or "wide")
-            header_cols = st.columns([0.62, 2.15, 1.55, 1.25, 1.25, 1.45, 1.3], gap="small")
+            header_cols = st.columns([0.58, 1.95, 1.4, 1.15, 1.15, 1.25, 1.25, 1.45], gap="small")
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=48)
@@ -5546,6 +5607,9 @@ def render_automation():
                 st.caption(str(channel.get("video_aspect_ratio") or "Landscape 16:9"))
             with header_cols[6]:
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
+            with header_cols[7]:
+                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}. Use 00:00 para voltar ao Blueprint.")
 
             control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")
             with control_cols[0]:
@@ -5571,10 +5635,14 @@ def render_automation():
                 if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True, type="primary"):
                     if not valid_hhmm(schedule_time):
                         st.error("Use o formato HH:MM, por exemplo 08:30.")
+                    elif not valid_hhmm(average_video_time):
+                        st.error("O Tempo Medio de Video deve estar no formato HH:MM, por exemplo 00:02.")
                     else:
                         update_channel(channel_id, {
                             "automation_on": bool(enabled),
                             "automation_time": schedule_time.strip(),
+                            "average_video_time": average_video_time.strip() or "00:00",
+                            "average_video_word_count": words_from_channel_time(average_video_time),
                             "format": automation_format,
                         })
                         set_channel_defaults(channel_id, automation_blueprint, automation_voice)
