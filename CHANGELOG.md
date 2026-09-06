@@ -1,4 +1,8 @@
 # Changelog
+## 0.6.36 — 2026-09-06
+- Corrigida a selecção do payload público Instagram: a aplicação consulta primeiro a resposta HTTP completa e só usa `curl` como fallback, combinando respostas parciais em vez de aceitar um perfil incompleto.
+- Corrigido o caso reproduzido com **@simoes.vi**, que passa a preencher bio, seguindo, seguidores e posts no formulário sem qualquer alteração de layout.
+
 ## 0.6.35 — 2026-09-06
 - Corrigido o estado dos widgets do formulário de pesquisa Instagram: cada conta pesquisada passa a ter chaves próprias, impedindo que bio, posts, seguidores ou seguindo fiquem presos aos valores de uma pesquisa anterior.
 - Integrada a leitura do país pelo endpoint Bloks de **Sobre esta conta** quando existe sessão Instagram autenticada, sem inferência pela bio ou morada comercial.

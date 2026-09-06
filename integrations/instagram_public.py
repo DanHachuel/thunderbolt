@@ -139,25 +139,20 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
         f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
         f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
     )
-    curl = shutil.which('curl')
-    if curl:
-        for endpoint in endpoints:
-            try:
-                completed = subprocess.run(
-                    [curl, '-L', '--max-time', '20', '-sS', '-A', headers['User-Agent'], '-H', f"x-ig-app-id: {headers['x-ig-app-id']}", '-H', 'Accept: application/json, text/plain, */*', endpoint],
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace',
-                    timeout=25,
-                    check=False,
-                )
-                payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
-                user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
-                if isinstance(user, dict):
-                    return user
-            except (OSError, subprocess.SubprocessError, ValueError):
-                continue
+    def profile_quality(user: Mapping[str, Any]) -> int:
+        return sum(bool(user.get(key)) for key in ('biography', 'edge_follow', 'edge_followed_by', 'edge_owner_to_timeline_media', 'username'))
+
+    def merge_profile(base: dict[str, Any] | None, candidate: Mapping[str, Any]) -> dict[str, Any]:
+        merged = dict(base or {})
+        for key, value in candidate.items():
+            if value not in (None, '', [], {}):
+                if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
+                    merged[key] = {**merged[key], **value}
+                else:
+                    merged[key] = value
+        return merged
+
+    best_user: dict[str, Any] | None = None
     for endpoint in endpoints:
         try:
             response = requests.get(endpoint, headers=headers, timeout=15)
@@ -168,8 +163,32 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
             continue
         user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
         if isinstance(user, dict):
-            return user
-    return None
+            best_user = merge_profile(best_user, user)
+            if profile_quality(best_user) >= 4:
+                return best_user
+
+    curl = shutil.which('curl')
+    if curl:
+        for endpoint in endpoints:
+            try:
+                completed = subprocess.run(
+                    [curl, '-L', '--max-time', '20', '-sS', '-A', headers['User-Agent'], '-H', f"x-ig-app-id: {headers['x-ig-app-id']}", '-H', 'Accept', 'application/json, text/plain, */*', endpoint],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=25,
+                    check=False,
+                )
+                payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
+                user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+                if isinstance(user, dict):
+                    best_user = merge_profile(best_user, user)
+                    if profile_quality(best_user) >= 4:
+                        return best_user
+            except (OSError, subprocess.SubprocessError, ValueError):
+                continue
+    return best_user
 
 
 def _country_from_bloks(value: Any) -> str:
