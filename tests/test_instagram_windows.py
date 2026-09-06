@@ -43,6 +43,27 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
             cookies = instagram_public._instagram_cookies()
         self.assertEqual(cookies, {})
 
+    def test_windows_profile_skips_requests_and_curl(self):
+        expected = {"username": "conta", "biography": "Bio"}
+        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+             patch.object(instagram_public, "_fetch_profile_with_playwright", return_value=expected) as playwright, \
+             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")), \
+             patch.object(instagram_public.shutil, "which", side_effect=AssertionError("curl não permitido no Windows")):
+            result = instagram_public._fetch_web_profile_user("conta")
+        self.assertEqual(result, expected)
+        playwright.assert_called_once()
+
+    def test_windows_posts_skip_profile_requests_and_curl(self):
+        expected = [{"id": "post-1", "url": "https://www.instagram.com/p/post-1/"}]
+        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+             patch.object(instagram_public, "_fetch_posts_with_playwright", return_value=expected) as playwright, \
+             patch.object(instagram_public, "_fetch_web_profile_user", side_effect=AssertionError("perfil HTTP não permitido")), \
+             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
+            result = instagram_public.fetch_public_instagram_posts("@conta", limit=10)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["posts"], expected)
+        playwright.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
