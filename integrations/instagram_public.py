@@ -24,7 +24,6 @@ except ImportError:  # pragma: no cover - Streamlit is a runtime dependency
 
 LOGGER = logging.getLogger(__name__)
 _WINDOWS_PLAYWRIGHT_CHECKED = False
-_WINDOWS_COOKIE_WARNING_SHOWN = False
 
 
 ABOUT_ACCOUNT_URL = 'https://i.instagram.com/api/v1/bloks/apps/com.instagram.interactions.about_this_account/'
@@ -70,19 +69,11 @@ def _streamlit_message(level: str, message: str, key: str) -> None:
 
 def _ensure_windows_playwright() -> None:
     """Ensure Chromium exists on Windows before using the Playwright fallback."""
-    global _WINDOWS_PLAYWRIGHT_CHECKED, _WINDOWS_COOKIE_WARNING_SHOWN
+    global _WINDOWS_PLAYWRIGHT_CHECKED
     if os.name != 'nt' or _WINDOWS_PLAYWRIGHT_CHECKED:
         return
     _WINDOWS_PLAYWRIGHT_CHECKED = True
     _load_dotenv_compat()
-    cookie_names = ('INSTAGRAM_SESSIONID', 'IG_SESSIONID')
-    if not any(os.getenv(name, '').strip() for name in cookie_names) and not _WINDOWS_COOKIE_WARNING_SHOWN:
-        _WINDOWS_COOKIE_WARNING_SHOWN = True
-        message = ('Windows: cookies Instagram não configurados. O país da conta pode ficar indisponível; '
-                   'configure INSTAGRAM_SESSIONID (e, se necessário, INSTAGRAM_CSRFTOKEN, '
-                   'INSTAGRAM_DS_USER_ID, INSTAGRAM_MID e INSTAGRAM_IG_DID) no ficheiro .env.')
-        LOGGER.warning(message)
-        _streamlit_message('warning', message, 'windows_cookie_warning')
     try:
         completed = subprocess.run(
             [sys.executable, '-m', 'playwright', 'install', 'chromium'],
@@ -224,6 +215,7 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     _ensure_windows_playwright()
+    cookies = _instagram_cookies()
     headers = _instagram_headers()
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
     # The www host is the current public web endpoint. The legacy i host is
@@ -273,7 +265,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     for request_header in request_headers:
         for endpoint in endpoints:
             try:
-                response = requests.get(endpoint, headers=request_header, timeout=15)
+                response = requests.get(endpoint, headers=request_header, cookies=cookies or None, timeout=15)
                 LOGGER.debug('Instagram profile URL=%s status=%s content_type=%s', endpoint, response.status_code, response.headers.get('content-type', ''))
                 if response.status_code >= 400:
                     continue
@@ -330,6 +322,8 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     user_agent=headers['User-Agent'],
                     extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9'},
                 )
+                if cookies:
+                    page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
                 for endpoint in endpoints:
                     try:
                         response = page.goto(endpoint, wait_until='domcontentloaded', timeout=30000)
@@ -632,7 +626,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
         if api_user.get('is_private'):
             return IntegrationResult(False, 'Esta conta é privada. O Instagram não disponibiliza posts sem uma sessão autenticada.', reference | {'posts': [], 'is_private': True})
     try:
-        response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
+        response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, cookies=_instagram_cookies() or None, timeout=15)
     except requests.RequestException as exc:
         LOGGER.warning('Falha HTTP nos posts Instagram URL=%s: %s', reference['url'], exc, exc_info=True)
         return IntegrationResult(False, f'Não foi possível consultar os posts públicos do Instagram: {exc}', reference)
@@ -662,6 +656,9 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                         user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
                         extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9'},
                     )
+                    cookies = _instagram_cookies()
+                    if cookies:
+                        page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
                     page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
                     browser_document = page.content()
                     for document in _embedded_json_documents(browser_document):

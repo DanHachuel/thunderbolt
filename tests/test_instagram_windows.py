@@ -37,6 +37,12 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
         self.assertFalse(result.ok)
         request.assert_called_once()
 
+    def test_windows_uses_public_mode_when_environment_is_empty(self):
+        with patch.object(instagram_public.os, "name", "nt"), \
+             patch.dict(instagram_public.os.environ, {}, clear=True):
+            cookies = instagram_public._instagram_cookies()
+        self.assertEqual(cookies, {})
+
 
 if __name__ == "__main__":
     unittest.main()
