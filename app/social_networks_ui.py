@@ -152,7 +152,16 @@ def render_meta_api_cards(settings: dict[str, Any], kind: str) -> None:
 
 def _instagram_profiles() -> list[dict[str, Any]]:
     records = read_json("channels.json", [])
-    return [item for item in records if isinstance(item, dict) and _clean(item.get("platform")).lower() == "instagram"]
+    profiles: list[dict[str, Any]] = []
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        platform = _clean(item.get("platform")).lower()
+        network = _clean(item.get("social_network")).lower()
+        url = _clean(item.get("url")).lower()
+        if platform == "instagram" or network == "instagram" or "instagram.com/" in url:
+            profiles.append(item)
+    return profiles
 
 
 def _characters(settings: Mapping[str, Any]) -> tuple[list[dict[str, Any]], Any | None]:

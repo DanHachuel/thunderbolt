@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _normalise_api_cards
+from app.social_networks_ui import _api_card_status, _instagram_profiles, _normalise_api_cards
+from hermes_ui.domain import create_channel
 from integrations.instagram_public import fetch_public_instagram_profile
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 
@@ -32,3 +33,52 @@ def test_public_instagram_parser_keeps_posts_following_and_followers():
     assert result.data["subscriber_count"] == 123
     assert result.data["following_count"] == 456
     assert result.data["post_count"] == 78
+
+
+def test_public_instagram_parser_reads_structured_following_counter():
+    response = Mock(
+        status_code=200,
+        text=(
+            '<meta property="og:title" content="Creator (@creator)">'
+            '<meta property="og:description" content="Creator profile">'
+            '<script>"edge_followed_by":{"count":123},'
+            '"edge_follow":{"count":456},'
+            '"edge_owner_to_timeline_media":{"count":78}</script>'
+        ),
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.ok is True
+    assert result.data["subscriber_count"] == 123
+    assert result.data["following_count"] == 456
+    assert result.data["post_count"] == 78
+
+
+def test_create_channel_keeps_social_metadata_for_instagram_accounts():
+    saved = []
+
+    with patch("hermes_ui.domain.read_json", return_value=[]), patch(
+        "hermes_ui.domain.write_json", side_effect=lambda _name, data: saved.append(data)
+    ):
+        channel = create_channel(
+            "Creator",
+            "https://www.instagram.com/creator/",
+            {"platform": "instagram", "social_network": "Instagram", "following_count": 456},
+        )
+
+    assert channel["platform"] == "instagram"
+    assert channel["social_network"] == "Instagram"
+    assert channel["following_count"] == 456
+    assert saved[-1][0]["platform"] == "instagram"
+
+
+def test_instagram_profiles_include_legacy_records_by_public_url():
+    with patch(
+        "app.social_networks_ui.read_json",
+        return_value=[
+            {"id": "legacy", "url": "https://www.instagram.com/creator/"},
+            {"id": "youtube", "url": "https://www.youtube.com/@creator"},
+        ],
+    ):
+        profiles = _instagram_profiles()
+    assert [profile["id"] for profile in profiles] == ["legacy"]
