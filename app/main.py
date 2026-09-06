@@ -110,6 +110,7 @@ from hermes_ui.creative_generation import CreativeGenerationError, generate_crea
 from hermes_ui.media_generation import MediaGenerationError, format_media_generation_error, generate_image_for_card, generate_video_for_card
 from hermes_ui.growth_youtube import list_analyses, run_audit
 from hermes_ui.growth_tiktok import render_growth_tiktok
+from hermes_ui.growth_instagram import render_growth_instagram
 from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -2198,6 +2199,8 @@ def classify_channel_platform(channel: Any) -> str:
         return "youtube"
     if value in {"tiktok", "tik-tok", "tt"}:
         return "tiktok"
+    if value in {"instagram", "ig"}:
+        return "instagram"
     def has_tiktok_marker(item: Any) -> bool:
         if isinstance(item, dict):
             return any(has_tiktok_marker(key) or has_tiktok_marker(value) for key, value in item.items())
@@ -9070,7 +9073,7 @@ def main():
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Analista Growth Youtube": render_growth_youtube,
         "Analista Growth Tiktok": render_growth_tiktok,
-        "Analista Growth Instagram": lambda: render_edit_placeholder("Analista Growth Instagram", ""),
+        "Analista Growth Instagram": render_growth_instagram,
         "Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", ""),
         "Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", ""),
         "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
