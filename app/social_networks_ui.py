@@ -277,7 +277,7 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
                 _persist_instagram_posts(profile, posts)
                 st.success(f"{len(posts)} posts carregados.")
             else:
-                st.warning(posts_message)
+                st.error(posts_message)
         posts = st.session_state.get(state_key, posts)
         if not posts:
             st.info("Clique em Carregar últimos 10 para consultar os posts públicos desta conta.")
@@ -299,7 +299,7 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
                 posts = _normalise_instagram_posts(loaded_posts)
                 _persist_instagram_posts(profile, posts)
             else:
-                st.warning(posts_message)
+                st.error(posts_message)
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:
@@ -684,7 +684,10 @@ def render_social_networks(settings: dict[str, Any]) -> None:
             st.session_state["social_instagram_ok"] = result.ok
             st.session_state["social_instagram_message"] = result.message
         if st.session_state.get("social_instagram_message"):
-            (st.success if st.session_state.get("social_instagram_ok") else st.warning)(st.session_state["social_instagram_message"])
+            if st.session_state.get("social_instagram_ok"):
+                st.success(st.session_state["social_instagram_message"])
+            else:
+                st.error(st.session_state["social_instagram_message"])
         data = st.session_state.get("social_instagram_result", {}) if st.session_state.get("social_instagram_ok") else {}
         if data:
             characters, _ = _characters(settings)

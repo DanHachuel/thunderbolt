@@ -804,7 +804,7 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
             return IntegrationResult(True, 'Perfil encontrado via fallback instaloader. O país pode não estar disponível.', data)
         return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
     if platform.system() == 'Windows':
-        return IntegrationResult(False, 'Não foi possível extrair os dados públicos do Instagram com o Playwright.', reference)
+        return IntegrationResult(False, 'Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.', reference)
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=12)
     except requests.RequestException as exc:
@@ -977,7 +977,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                 _streamlit_message('info', 'Dados obtidos via fallback (instaloader). O país pode não estar disponível.', 'posts_instaloader_fallback')
             else:
                 _streamlit_message('error', 'Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.', 'posts_instagram_failed')
-        return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
+        return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.', reference | {'posts': posts[:max(1, int(limit))]})
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         api_posts: list[dict[str, Any]] = []
@@ -1014,7 +1014,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     if not posts:
         posts = _fetch_posts_with_playwright(reference, limit, _instagram_cookies())
     LOGGER.debug('Instagram posts extracted=%s limit=%s', len(posts), limit)
-    return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
+    return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.', reference | {'posts': posts[:max(1, int(limit))]})
 
 
 __all__ = ['IntegrationResult', 'extract_public_instagram_country', 'fetch_posts_instaloader', 'fetch_profile_instaloader', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_metric', 'normalize_instagram_reference']

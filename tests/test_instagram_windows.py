@@ -86,6 +86,7 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
              patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
             result = instagram_public.fetch_public_instagram_profile("@conta")
         self.assertFalse(result.ok)
+        self.assertEqual(result.message, "Não foi possível obter os dados do Instagram. Verifique sua conexão ou tente novamente mais tarde.")
 
     def test_windows_profile_uses_instaloader_when_playwright_is_empty(self):
         expected = {"username": "conta", "biography": "Bio fallback", "follower_count": 12, "following_count": 3, "_instagram_source": "instaloader"}
