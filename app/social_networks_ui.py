@@ -8,6 +8,7 @@ import streamlit as st
 from hermes_ui.domain import create_channel, update_channel
 from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INFLUENCER_ID, get_repository
 from hermes_ui.storage import read_json, write_json
+from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
 from integrations.instagram_public import fetch_public_instagram_profile
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
@@ -23,6 +24,11 @@ def _metric(value: Any) -> str:
         return f"{int(value):,}".replace(",", ".")
     except (TypeError, ValueError):
         return _clean(value) or "—"
+
+
+def _language_index(value: Any) -> int:
+    code = language_code(value)
+    return list(LANGUAGE_CODES).index(code) if code in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt")
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:
@@ -240,14 +246,14 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                     name = st.text_input("Nome", value=_clean(profile.get("name")), key=f"instagram_edit_name_{profile_id}")
                     handle = st.text_input("handler", value=_clean(profile.get("handle")), key=f"instagram_edit_handle_{profile_id}")
                     country = st.text_input("País", value=_clean(profile.get("country")), key=f"instagram_edit_country_{profile_id}")
-                    language = st.text_input("Idioma", value=_clean(profile.get("language")), key=f"instagram_edit_language_{profile_id}")
+                    language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(profile.get("language")), format_func=language_label, key=f"instagram_edit_language_{profile_id}")
                 with edit_cols[1]:
                     posts = st.number_input("posts", min_value=0, value=int(profile.get("post_count") or 0), key=f"instagram_edit_posts_{profile_id}")
                     followers = st.number_input("Seguidores", min_value=0, value=int(profile.get("subscriber_count") or 0), key=f"instagram_edit_followers_{profile_id}")
                     following = st.number_input("seguindo", min_value=0, value=int(profile.get("following_count") or 0), key=f"instagram_edit_following_{profile_id}")
                 save_edit = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
             if save_edit:
-                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "country": country.strip(), "language": language.strip(), "post_count": int(posts), "subscriber_count": int(followers), "following_count": int(following)})
+                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "country": country.strip(), "language": language, "post_count": int(posts), "subscriber_count": int(followers), "following_count": int(following)})
                 st.session_state.pop(edit_key, None)
                 st.success("Conta Instagram actualizada.")
                 st.rerun()
@@ -317,7 +323,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     with form_cols[0]:
                         name = st.text_input("Nome", value=_clean(data.get("name")), key="social_instagram_result_name")
                         country = st.text_input("País", value=_clean(data.get("country")), key="social_instagram_result_country")
-                        language = st.text_input("Idioma", value=_clean(data.get("language")), key="social_instagram_result_language")
+                        language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key="social_instagram_result_language")
                     with form_cols[1]:
                         posts = st.number_input("posts", min_value=0, value=int(data.get("post_count") or 0), key="social_instagram_result_posts")
                         followers = st.number_input("Seguidores", min_value=0, value=int(data.get("subscriber_count") or 0), key="social_instagram_result_followers")

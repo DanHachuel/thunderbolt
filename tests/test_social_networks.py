@@ -54,6 +54,25 @@ def test_public_instagram_parser_reads_structured_following_counter():
     assert result.data["post_count"] == 78
 
 
+def test_public_instagram_parser_reads_following_alias_with_nested_payload():
+    response = Mock(
+        status_code=200,
+        text='<meta property="og:title" content="Creator (@creator)"><script>"following":{"reel":true,"count":987}</script>',
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.ok is True
+    assert result.data["following_count"] == 987
+
+
+def test_instagram_ui_uses_canonical_language_selector():
+    from app import social_networks_ui
+
+    source = open(social_networks_ui.__file__, encoding="utf-8").read()
+    assert 'st.selectbox("Idioma", list(LANGUAGE_CODES)' in source
+    assert 'st.text_input("Idioma"' not in source
+
+
 def test_create_channel_keeps_social_metadata_for_instagram_accounts():
     saved = []
 
