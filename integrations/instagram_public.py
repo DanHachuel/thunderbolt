@@ -152,20 +152,28 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     merged[key] = value
         return merged
 
+    request_headers = [
+        headers,
+        {**headers, 'User-Agent': 'Instagram 390.0.0.0.50 Android', 'Accept': 'application/json, text/plain, */*'},
+        {**headers, 'Referer': f'https://www.instagram.com/{username}/', 'Origin': 'https://www.instagram.com', 'X-Requested-With': 'XMLHttpRequest'},
+    ]
     best_user: dict[str, Any] | None = None
-    for endpoint in endpoints:
-        try:
-            response = requests.get(endpoint, headers=headers, timeout=15)
-            if response.status_code >= 400:
+    for request_header in request_headers:
+        for endpoint in endpoints:
+            try:
+                response = requests.get(endpoint, headers=request_header, timeout=15)
+                if response.status_code >= 400:
+                    continue
+                payload = response.json()
+            except (requests.RequestException, ValueError, AttributeError, StopIteration):
+                if best_user:
+                    return best_user
                 continue
-            payload = response.json()
-        except (requests.RequestException, ValueError, AttributeError):
-            continue
-        user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
-        if isinstance(user, dict):
-            best_user = merge_profile(best_user, user)
-            if profile_quality(best_user) >= 4:
-                return best_user
+            user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+            if isinstance(user, dict):
+                best_user = merge_profile(best_user, user)
+                if profile_quality(best_user) >= 4:
+                    return best_user
 
     curl = shutil.which('curl')
     if curl:
