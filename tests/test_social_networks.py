@@ -161,6 +161,7 @@ def test_instagram_refresh_preserves_existing_bio_and_following_when_response_om
 def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
     assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == ""
     assert normalize_instagram_bio("🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid") == "🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid"
+    assert normalize_instagram_bio("Treinos 5x por semana\nSigo posts de viagens") == "Treinos 5x por semana\nSigo posts de viagens"
 
 
 def test_instagram_ui_uses_canonical_language_selector():
