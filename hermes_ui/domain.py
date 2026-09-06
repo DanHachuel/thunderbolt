@@ -36,6 +36,7 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "platform": "youtube",
         "social_network": "YouTube",
         "handle": "",
+        "bio": "",
         "description": "",
         "description_source": "",
         "niche": "",

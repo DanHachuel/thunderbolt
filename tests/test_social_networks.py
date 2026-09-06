@@ -1,8 +1,8 @@
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _instagram_profiles, _normalise_api_cards
+from app.social_networks_ui import _api_card_status, _instagram_profiles, _merge_instagram_refresh, _normalise_api_cards, _save_public_profile
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 from hermes_ui.countries import COUNTRY_OPTIONS
 
@@ -89,6 +89,33 @@ def test_public_instagram_parser_reads_direct_profile_following_counter():
     assert result.data["following_count"] == 4321
 
 
+def test_instagram_metric_normalization_keeps_unknown_distinct_from_zero():
+    assert normalize_instagram_metric({"count": "12.345"}) == 12345
+    assert normalize_instagram_metric("8,765") == 8765
+    assert normalize_instagram_metric(None) is None
+
+
+def test_public_profile_save_persists_real_bio_and_following():
+    saved = []
+    with patch("app.social_networks_ui.create_channel", side_effect=lambda name, url, metadata: saved.append(metadata) or metadata):
+        _save_public_profile(
+            {"name": "Creator", "url": "https://www.instagram.com/creator/", "handle": "@creator", "bio": "Criadora de viagens", "following_count": 4321},
+            country="Brasil", language="pt", character_id="character_1",
+        )
+    assert saved[0]["bio"] == "Criadora de viagens"
+    assert saved[0]["following_count"] == 4321
+
+
+def test_instagram_refresh_preserves_existing_bio_and_following_when_response_omits_them():
+    merged = _merge_instagram_refresh(
+        {"bio": "Bio antiga", "following_count": 4321, "subscriber_count": 99},
+        {"bio": "", "following_count": None, "subscriber_count": 100},
+    )
+    assert merged["bio"] == "Bio antiga"
+    assert merged["following_count"] == 4321
+    assert merged["subscriber_count"] == 100
+
+
 def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
     assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == ""
     assert normalize_instagram_bio("🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid") == "🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid"
@@ -118,6 +145,8 @@ def test_instagram_card_renders_profile_bio_next_to_identity():
     assert 'st.selectbox("País", _country_options()' in source
     assert 'delete_channel(profile_id)' in source
     assert 'bio = normalize_instagram_bio(data.get("bio"))' in source
+    assert '"bio": normalize_instagram_bio(data.get("bio"))' in source
+    assert 'placeholder="Não encontrado"' in source
 
 
 def test_create_channel_keeps_social_metadata_for_instagram_accounts():
@@ -129,11 +158,12 @@ def test_create_channel_keeps_social_metadata_for_instagram_accounts():
         channel = create_channel(
             "Creator",
             "https://www.instagram.com/creator/",
-            {"platform": "instagram", "social_network": "Instagram", "following_count": 456},
+            {"platform": "instagram", "social_network": "Instagram", "bio": "Bio persistida", "following_count": 456},
         )
 
     assert channel["platform"] == "instagram"
     assert channel["social_network"] == "Instagram"
+    assert channel["bio"] == "Bio persistida"
     assert channel["following_count"] == 456
     assert saved[-1][0]["platform"] == "instagram"
 
@@ -195,6 +225,6 @@ def test_instagram_card_preserves_existing_metrics_when_refresh_has_no_values():
     from app import social_networks_ui
 
     source = open(social_networks_ui.__file__, encoding="utf-8").read()
-    assert 'if refreshed.get(field) in (None, "") and profile.get(field) not in (None, "")' in source
+    assert 'def _merge_instagram_refresh(existing: Mapping[str, Any], refreshed: Mapping[str, Any])' in source
     assert '_profile_metric(profile, "subscriber_count", "followers_count", "follower_count")' in source
     assert '_profile_metric(profile, "following_count", "following", "follows")' in source
