@@ -166,29 +166,63 @@ def _extract_posts_from_html(document: str, limit: int = 10) -> list[dict[str, A
     return posts
 
 
+def _metric_text_value(value: Any) -> int | None:
+    if isinstance(value, Mapping):
+        value = value.get('count') or value.get('value')
+    text = str(value or '').strip().casefold().replace(' ', '')
+    if not text:
+        return None
+    multiplier = 1
+    if text.endswith(('k', 'mil')):
+        multiplier = 1000
+        text = text[:-1] if text.endswith('k') else text[:-3]
+    elif text.endswith(('m', 'mi', 'milhões')):
+        multiplier = 1_000_000
+        text = text[:-1] if text.endswith('m') else text[:-2] if text.endswith('mi') else text[:-7]
+    digits = re.sub(r'[^0-9]', '', text)
+    if not digits:
+        return None
+    return int(digits) * multiplier
+
+
+def _embedded_profile_user(document: str, username: str) -> Mapping[str, Any]:
+    wanted = username.casefold()
+    for payload in _embedded_json_documents(document):
+        for node in _walk_json(payload):
+            if not isinstance(node, Mapping):
+                continue
+            node_username = str(node.get('username') or node.get('handle') or '').lstrip('@').casefold()
+            if node_username == wanted and any(key in node for key in ('biography', 'bio', 'edge_followed_by', 'edge_follow', 'followers', 'following')):
+                return node
+    return {}
+
+
 def _extract_profile_user_from_html(document: str, username: str) -> dict[str, Any]:
-    description = _meta(document, 'og:description')
-    title = _meta(document, 'og:title') or username
-    avatar_url = _meta(document, 'og:image')
+    embedded_user = _embedded_profile_user(document, username)
+    seo_description = _meta(document, 'og:description')
+    biography = str(embedded_user.get('biography') or embedded_user.get('bio') or '').strip()
+    description = biography or seo_description
+    title = str(embedded_user.get('full_name') or embedded_user.get('name') or _meta(document, 'og:title') or username).split('(')[0].strip() or username
+    avatar_url = str(embedded_user.get('profile_pic_url_hd') or embedded_user.get('profile_pic_url') or _meta(document, 'og:image')).strip()
 
     def metric(patterns: tuple[str, ...]) -> int | None:
         for pattern in patterns:
-            found = re.search(pattern, description, flags=re.IGNORECASE)
+            found = re.search(pattern, seo_description, flags=re.IGNORECASE)
             if found:
-                try:
-                    return int(re.sub(r'[^0-9]', '', found.group(1)))
-                except ValueError:
-                    pass
+                parsed = _metric_text_value(found.group(1) + (found.group(2) or ''))
+                if parsed is not None:
+                    return parsed
         return None
 
-    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(document, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(document, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
-    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
-    post_count = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',)) or _structured_metric(document, 'edge_owner_to_timeline_media', 'posts', 'post_count')
-    country = ''
-    for payload in _embedded_json_documents(document):
-        country = extract_public_instagram_country(payload)
-        if country:
-            break
+    followers = _metric_text_value(embedded_user.get('edge_followed_by')) or _metric_text_value(embedded_user.get('followers')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:followers|seguidores)',)) or _structured_metric(document, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(document, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = _metric_text_value(embedded_user.get('edge_follow')) or _metric_text_value(embedded_user.get('following')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:following|seguindo)',)) or _structured_metric(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    post_count = _metric_text_value(embedded_user.get('edge_owner_to_timeline_media')) or _metric_text_value(embedded_user.get('posts')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:posts|publicações|publications)',)) or _structured_metric(document, 'edge_owner_to_timeline_media', 'posts', 'post_count')
+    country = _country_value(embedded_user.get('country') or embedded_user.get('country_code')) or extract_public_instagram_country(embedded_user)
+    if not country:
+        for payload in _embedded_json_documents(document):
+            country = extract_public_instagram_country(payload)
+            if country:
+                break
     posts = _extract_posts_from_html(document, 10)
     user: dict[str, Any] = {
         'username': username,

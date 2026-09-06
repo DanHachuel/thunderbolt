@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
 
+from app.social_networks_ui import _metric
 from integrations import instagram_public
 
 
@@ -11,6 +12,26 @@ HTML = '''
 {"edge_followed_by":{"count":123},"edge_follow":{"count":456},"edge_owner_to_timeline_media":{"count":2,"edges":[{"node":{"id":"post-1","shortcode":"ABC","display_url":"https://img.example/post.jpg","edge_media_to_caption":{"edges":[{"node":{"text":"Legenda"}}]}}}]}}
 </script>
 '''
+
+BRUNO_HTML = '''
+<meta property="og:title" content="Bruno Francisco - IA | Marketing (@brun0gpt)">
+<meta property="og:description" content="227K seguidores, seguindo 241, 2,277 posts — Veja as fotos e vídeos de Bruno Francisco - IA | Marketing (@brun0gpt)">
+<script type="application/json">
+{"username":"brun0gpt","full_name":"Bruno Francisco - IA | Marketing","biography":"🤖 Marketing e Vendas com Inteligência Artificial\\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?\\n👉🏻 Acabou de chegar no lugar pra mudar isso\\n👇🏻 Segue aí\\nbrunogpt.com.br/simbiose-criativa","edge_followed_by":{"count":227000},"edge_follow":{"count":241},"edge_owner_to_timeline_media":{"count":2277}}
+</script>
+'''
+
+
+def test_bruno_profile_prefers_real_bio_and_normalizes_top_metrics():
+    user = instagram_public._extract_profile_user_from_html(BRUNO_HTML, "brun0gpt")
+    data = instagram_public._profile_data_from_api(user, instagram_public.normalize_instagram_reference("https://www.instagram.com/brun0gpt"))
+
+    assert data["bio"] == "🤖 Marketing e Vendas com Inteligência Artificial\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?\n👉🏻 Acabou de chegar no lugar pra mudar isso\n👇🏻 Segue aí\nbrunogpt.com.br/simbiose-criativa"
+    assert data["subscriber_count"] == 227000
+    assert data["following_count"] == 241
+    assert data["post_count"] == 2277
+    assert _metric(data["subscriber_count"]) == "227.000"
+    assert _metric(data["following_count"]) == "241"
 
 
 def test_windows_profile_tries_requests_then_uses_playwright_html_parser():
