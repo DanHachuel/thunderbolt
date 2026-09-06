@@ -64,6 +64,28 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
         self.assertEqual(result.data["posts"], expected)
         playwright.assert_called_once()
 
+    def test_shared_data_profile_preserves_bio_metrics_and_posts(self):
+        document = '''<script>window._sharedData = {"entry_data":{"ProfilePage":[{"graphql":{"user":{
+            "username":"conta","biography":"Bio real com seguidores e seguindo",
+            "edge_followed_by":{"count":1200},"edge_follow":{"count":340},
+            "edge_owner_to_timeline_media":{"count":2,"edges":[
+                {"node":{"id":"1","shortcode":"ABC","display_url":"https://img/1.jpg","edge_media_to_caption":{"edges":[{"node":{"text":"Legenda"}}]}}}
+            ]}}}]}};</script>'''
+        users = instagram_public._profile_users_from_document(document)
+        self.assertEqual(len(users), 1)
+        data = instagram_public._profile_data_from_api(users[0], {"username": "conta", "handle": "@conta", "url": "https://www.instagram.com/conta/"})
+        self.assertEqual(data["bio"], "Bio real com seguidores e seguindo")
+        self.assertEqual(data["subscriber_count"], 1200)
+        self.assertEqual(data["following_count"], 340)
+        self.assertEqual(data["post_count"], 2)
+
+    def test_windows_profile_failure_does_not_fallback_to_requests(self):
+        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+             patch.object(instagram_public, "_fetch_profile_with_playwright", return_value=None), \
+             patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
+            result = instagram_public.fetch_public_instagram_profile("@conta")
+        self.assertFalse(result.ok)
+
 
 if __name__ == "__main__":
     unittest.main()

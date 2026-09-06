@@ -238,12 +238,55 @@ def _extract_profile_user(payload: Any) -> Mapping[str, Any] | None:
     return next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
 
 
-def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str], cookies: Mapping[str, str]) -> dict[str, Any] | None:
-    # CORREÇÃO WINDOWS: este helper é o único caminho de rede usado pelo perfil no Windows.
-    endpoints = (
-        f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
-        f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
+def _shared_data_documents(document: str) -> list[Any]:
+    """Extract JSON assigned to window._sharedData from the rendered profile HTML."""
+    decoder = json.JSONDecoder()
+    documents: list[Any] = []
+    patterns = (
+        r'window\s*\.\s*_sharedData\s*=\s*',
+        r'window\s*\[\s*["\']_sharedData["\']\s*\]\s*=\s*',
     )
+    for pattern in patterns:
+        for match in re.finditer(pattern, document, flags=re.IGNORECASE):
+            start = document.find('{', match.end())
+            if start < 0:
+                continue
+            try:
+                parsed, _ = decoder.raw_decode(document[start:])
+            except json.JSONDecodeError:
+                continue
+            documents.append(parsed)
+    return documents
+
+
+def _profile_users_from_document(document: str) -> list[Mapping[str, Any]]:
+    """Return users found in legacy _sharedData and current embedded profile payloads."""
+    users: list[Mapping[str, Any]] = []
+    documents = _shared_data_documents(document) + _embedded_json_documents(document)
+    for payload in documents:
+        direct = _extract_profile_user(payload)
+        if isinstance(direct, Mapping):
+            users.append(direct)
+        for node in _walk_json(payload):
+            if not isinstance(node, Mapping):
+                continue
+            candidate = node.get('user')
+            if isinstance(candidate, Mapping) and any(key in candidate for key in ('biography', 'edge_follow', 'edge_followed_by', 'username')):
+                users.append(candidate)
+    unique: list[Mapping[str, Any]] = []
+    seen: set[int] = set()
+    for user in users:
+        marker = id(user)
+        if marker not in seen:
+            seen.add(marker)
+            unique.append(user)
+    return unique
+
+
+def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | None = None, cookies: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """Fetch the public profile page and read its embedded structured profile data."""
+    headers = headers or _instagram_headers()
+    cookies = cookies or _instagram_cookies()
     best_user: dict[str, Any] | None = None
     try:
         from playwright.sync_api import sync_playwright
@@ -256,20 +299,15 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str], co
                 )
                 if cookies:
                     page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
-                for endpoint in endpoints:
-                    try:
-                        response = page.goto(endpoint, wait_until='domcontentloaded', timeout=30000)
-                        LOGGER.debug('Instagram Playwright profile URL=%s status=%s', endpoint, response.status if response else None)
-                        if response is None or response.status >= 400:
-                            continue
-                        payload = json.loads(page.locator('body').inner_text(timeout=5000))
-                        user = _extract_profile_user(payload)
-                        if isinstance(user, dict):
-                            best_user = _merge_profile(best_user, user)
-                            if _profile_quality(best_user) >= 4:
-                                return best_user
-                    except (ValueError, TimeoutError) as exc:
-                        LOGGER.warning('Falha ao interpretar resposta Playwright do perfil URL=%s: %s', endpoint, exc)
+                url = f'https://www.instagram.com/{username}/'
+                response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                LOGGER.debug('Instagram Playwright profile URL=%s status=%s', url, response.status if response else None)
+                if response is None or response.status >= 400:
+                    return None
+                document = page.content()
+                for user in _profile_users_from_document(document):
+                    best_user = _merge_profile(best_user, user)
+                LOGGER.debug('Instagram Playwright _sharedData profile user=%s quality=%s', bool(best_user), _profile_quality(best_user or {}))
             finally:
                 browser.close()
     except Exception as exc:
@@ -283,13 +321,14 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     cookies = _instagram_cookies()
     headers = _instagram_headers()
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
+    if platform.system() == 'Windows':
+        LOGGER.debug('Windows detectado: perfil Instagram exclusivamente via Playwright.')
+        return _fetch_profile_with_playwright(username, headers, cookies)
+
     endpoints = (
         f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
         f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
     )
-    if platform.system() == 'Windows':
-        LOGGER.debug('Windows detectado: perfil Instagram exclusivamente via Playwright.')
-        return _fetch_profile_with_playwright(username, headers, cookies)
 
     request_headers = [
         headers,
@@ -516,6 +555,8 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
+    if platform.system() == 'Windows':
+        return IntegrationResult(False, 'Não foi possível extrair os dados públicos do Instagram com o Playwright.', reference)
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=12)
     except requests.RequestException as exc:
@@ -609,10 +650,11 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cookies: Mapping[str, str]) -> list[dict[str, Any]]:
+def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cookies: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     # CORREÇÃO WINDOWS: posts são extraídos exclusivamente do JSON/HTML obtido pelo Playwright.
     posts: list[dict[str, Any]] = []
     seen: set[str] = set()
+    cookies = cookies or _instagram_cookies()
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as playwright:
@@ -630,7 +672,8 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                     return []
                 browser_document = page.content()
                 LOGGER.debug('Instagram Playwright posts document_bytes=%s', len(browser_document))
-                for document in _embedded_json_documents(browser_document):
+                documents = _shared_data_documents(browser_document) + _embedded_json_documents(browser_document)
+                for document in documents:
                     for node in _walk_json(document):
                         post = _post_from_node(node)
                         if not post or post['id'] in seen:
