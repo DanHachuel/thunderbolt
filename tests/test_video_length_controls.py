@@ -28,6 +28,9 @@ def test_zero_channel_time_falls_back_to_prompt_master():
 
 def test_channel_cards_have_average_time_and_refresh_controls():
     assert 'Tempo Medio de Video (HH:MM)' in MAIN_SOURCE
+    assert MAIN_SOURCE.count('Guardar tempo') >= 2
+    assert 'youtube_channel_average_video_time_' in MAIN_SOURCE
+    assert 'tiktok_channel_average_video_time_' in MAIN_SOURCE
     assert 'refresh_youtube_metrics_' in MAIN_SOURCE
     assert 'refresh_tiktok_metrics_' in MAIN_SOURCE
     assert 'length_generation_settings' in MAIN_SOURCE
