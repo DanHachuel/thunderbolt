@@ -1,7 +1,7 @@
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _refresh_instagram_profile, _save_public_profile
+from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _normalise_instagram_posts, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
 from integrations.instagram_public import _country_from_bloks, _fetch_web_profile_user, extract_public_instagram_country, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
@@ -35,6 +35,50 @@ def test_public_instagram_parser_keeps_posts_following_and_followers():
     assert result.data["subscriber_count"] == 123
     assert result.data["following_count"] == 456
     assert result.data["post_count"] == 78
+
+
+def test_public_instagram_profile_reads_current_payload_country_and_following():
+    response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {
+            "username": "creator",
+            "full_name": "Creator",
+            "biography": "Bio real",
+            "country": "Brazil",
+            "followers": 123,
+            "following_count": 456,
+            "media": {"items": []},
+        }}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.ok is True
+    assert result.data["bio"] == "Bio real"
+    assert result.data["subscriber_count"] == 123
+    assert result.data["following_count"] == 456
+    assert result.data["country"] == "Brazil"
+
+
+def test_public_instagram_posts_reads_current_items_payload():
+    response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {
+            "username": "creator",
+            "media": {"items": [
+                {"id": "p1", "code": "ABC", "display_url": "https://img.example/1.jpg", "caption": {"text": "Primeiro"}},
+            ]},
+        }}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_posts("@creator", limit=10)
+    assert result.ok is True
+    assert result.data["posts"][0]["id"] == "p1"
+    assert result.data["posts"][0]["caption"] == "Primeiro"
+
+
+def test_instagram_posts_normalizer_accepts_edges_and_deduplicates():
+    posts = _normalise_instagram_posts({"edges": [{"node": {"id": "p1"}}, {"node": {"id": "p1"}}, {"id": "p2"}]})
+    assert [post["id"] for post in posts] == ["p1", "p2"]
 
 
 def test_public_instagram_parser_reads_structured_following_counter():

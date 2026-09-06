@@ -17,7 +17,13 @@ from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INF
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
+from integrations.instagram_public import (
+    extract_public_instagram_country,
+    fetch_public_instagram_posts,
+    fetch_public_instagram_profile,
+    normalize_instagram_bio,
+    normalize_instagram_metric,
+)
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
 
@@ -72,11 +78,35 @@ def _country_key(value: Any) -> str:
 COUNTRY_ALIASES = {
     "brazil": "Brasil",
     "brasil": "Brasil",
+    "br": "Brasil",
     "usa": "Estados Unidos",
     "us": "Estados Unidos",
     "united states": "Estados Unidos",
     "united states of america": "Estados Unidos",
+    "pt": "Portugal",
     "portugal": "Portugal",
+    "uk": "Reino Unido",
+    "gb": "Reino Unido",
+    "united kingdom": "Reino Unido",
+    "england": "Reino Unido",
+    "germany": "Alemanha",
+    "de": "Alemanha",
+    "france": "França",
+    "fr": "França",
+    "italy": "Itália",
+    "it": "Itália",
+    "spain": "Espanha",
+    "es": "Espanha",
+    "canada": "Canadá",
+    "ca": "Canadá",
+    "australia": "Austrália",
+    "au": "Austrália",
+    "japan": "Japão",
+    "jp": "Japão",
+    "mexico": "México",
+    "mx": "México",
+    "argentina": "Argentina",
+    "ar": "Argentina",
 }
 
 
@@ -94,11 +124,17 @@ def _normalise_country(value: Any) -> str:
 
 
 def _profile_country(profile: Mapping[str, Any]) -> str:
-    for key in ("country", "country_name", "country_of_registration", "account_country", "account_based_in"):
-        country = _normalise_country(profile.get(key))
-        if country:
-            return country
-    return ""
+    for key in ("country", "country_name", "country_of_registration", "account_country", "account_based_in", "country_code"):
+        raw_value = profile.get(key)
+        candidates = [raw_value]
+        if isinstance(raw_value, Mapping):
+            candidates.extend(raw_value.get(child) for child in ("name", "label", "display_name", "country", "country_name", "code"))
+        for candidate in candidates:
+            country = _normalise_country(candidate)
+            if country:
+                return country
+    extracted = _normalise_country(extract_public_instagram_country(profile))
+    return extracted
 
 
 def _language_index(value: Any) -> int:
@@ -130,9 +166,13 @@ def _instagram_profile_storage_id(profile: Mapping[str, Any]) -> str:
 
 
 def _clear_instagram_result_widget_state(profile: Mapping[str, Any]) -> None:
+    """Clear every previous widget key for this profile before rebuilding the form."""
     widget_id = _instagram_profile_storage_id(profile)
     for field in ("name", "bio", "country", "language", "posts", "followers", "following", "character"):
-        st.session_state.pop(f"social_instagram_result_{field}_{widget_id}", None)
+        prefix = f"social_instagram_result_{field}_{widget_id}"
+        for key in list(st.session_state.keys()):
+            if str(key).startswith(prefix):
+                st.session_state.pop(key, None)
 
 
 def _instagram_result_widget_id(profile: Mapping[str, Any]) -> str:
@@ -143,9 +183,23 @@ def _instagram_result_widget_id(profile: Mapping[str, Any]) -> str:
 
 
 def _normalise_instagram_posts(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, Mapping):
+        value = value.get("posts") or value.get("items") or value.get("edges") or []
     if not isinstance(value, list):
         return []
-    return [dict(post) for post in value if isinstance(post, Mapping) and _clean(post.get("id") or post.get("url"))]
+    normalised: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in value:
+        post = item.get("node") if isinstance(item, Mapping) and isinstance(item.get("node"), Mapping) else item
+        if not isinstance(post, Mapping):
+            continue
+        data = dict(post)
+        identifier = _clean(data.get("id") or data.get("shortcode") or data.get("url"))
+        if not identifier or identifier in seen:
+            continue
+        seen.add(identifier)
+        normalised.append(data)
+    return normalised
 
 
 def _stored_instagram_posts(profile: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -219,10 +273,9 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
             # DEBUG WINDOWS INSTAGRAM: manter até a validação final do carregamento público.
             st.write({"instagram_posts_ok": posts_ok, "instagram_posts_message": posts_message, "instagram_posts_count": len(loaded_posts)})
             if posts_ok:
-                posts = loaded_posts
+                posts = _normalise_instagram_posts(loaded_posts)
                 _persist_instagram_posts(profile, posts)
                 st.success(f"{len(posts)} posts carregados.")
-                st.rerun()
             else:
                 st.warning(posts_message)
         posts = st.session_state.get(state_key, posts)
@@ -243,9 +296,10 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", use_container_width=True):
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=len(posts) + 10)
             if posts_ok:
-                _persist_instagram_posts(profile, loaded_posts)
-                st.rerun()
-            st.warning(posts_message)
+                posts = _normalise_instagram_posts(loaded_posts)
+                _persist_instagram_posts(profile, posts)
+            else:
+                st.warning(posts_message)
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:

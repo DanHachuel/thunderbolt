@@ -191,6 +191,14 @@ def _fetch_profile_instaloader(username: str) -> dict[str, Any] | None:
         )
         profile = instaloader.Profile.from_username(loader.context, username)
         LOGGER.info('Fallback instaloader activado para o perfil @%s', username)
+        country = next(
+            (
+                str(getattr(profile, attribute, '') or '').strip()
+                for attribute in ('country', 'country_name', 'country_of_registration', 'account_country', 'account_based_in')
+                if str(getattr(profile, attribute, '') or '').strip()
+            ),
+            '',
+        )
         return {
             'id': str(getattr(profile, 'userid', '') or ''),
             'username': str(getattr(profile, 'username', '') or username),
@@ -199,6 +207,7 @@ def _fetch_profile_instaloader(username: str) -> dict[str, Any] | None:
             'follower_count': getattr(profile, 'follower_count', getattr(profile, 'followers', None)),
             'following_count': getattr(profile, 'following_count', getattr(profile, 'followees', None)),
             'edge_owner_to_timeline_media': {'count': getattr(profile, 'mediacount', None)},
+            'country': country,
             'is_private': bool(getattr(profile, 'is_private', False)),
             '_instagram_source': 'instaloader',
         }
@@ -230,6 +239,10 @@ def _fetch_posts_instaloader(username: str, limit: int = 10) -> list[dict[str, A
                 continue
             image_url = str(getattr(post, 'url', '') or '')
             timestamp = getattr(post, 'date_utc', '') or ''
+            if hasattr(timestamp, 'isoformat'):
+                timestamp = timestamp.isoformat()
+            else:
+                timestamp = str(timestamp)
             posts.append({
                 'id': str(getattr(post, 'mediaid', '') or shortcode),
                 'shortcode': shortcode,
@@ -367,8 +380,17 @@ def _extract_profile_user(payload: Any) -> Mapping[str, Any] | None:
         (payload.get('data') or {}).get('user') if isinstance(payload.get('data'), Mapping) else None,
         (payload.get('graphql') or {}).get('user') if isinstance(payload.get('graphql'), Mapping) else None,
         (payload.get('data') or {}).get('profile') if isinstance(payload.get('data'), Mapping) else None,
+        (payload.get('xdt_api__v1__users__web_profile_info') or {}).get('user') if isinstance(payload.get('xdt_api__v1__users__web_profile_info'), Mapping) else None,
     ]
-    return next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
+    direct = next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
+    if direct is not None:
+        return direct
+    for node in _walk_json(payload):
+        if not isinstance(node, Mapping) or not node.get('username'):
+            continue
+        if any(key in node for key in ('biography', 'edge_follow', 'edge_followed_by', 'follower_count', 'following_count', 'full_name')):
+            return node
+    return None
 
 
 def _shared_data_documents(document: str) -> list[Any]:
@@ -417,7 +439,7 @@ def _profile_users_from_document(document: str) -> list[Mapping[str, Any]]:
 
 
 def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | None = None, cookies: Mapping[str, str] | None = None) -> dict[str, Any] | None:
-    """Fetch the structured profile JSON requested by the public Instagram page."""
+    """Fetch a public profile using browser state, API responses and embedded HTML data."""
     headers = headers or _instagram_headers()
     cookies = cookies or _instagram_cookies()
     captured_user: dict[str, Any] | None = None
@@ -438,16 +460,20 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | N
 
                 def capture_profile_response(response: Any) -> None:
                     nonlocal captured_user
-                    if '/api/v1/users/web_profile_info/' not in response.url:
+                    response_url = str(getattr(response, 'url', '') or '')
+                    if not any(marker in response_url for marker in ('/api/v1/users/web_profile_info/', '/graphql/query')):
                         return
+                    status = getattr(response, 'status', None)
+                    LOGGER.info('Instagram Playwright API response URL=%s status=%s', response_url, status)
                     try:
                         payload = response.json()
-                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, Mapping) else None)
+                        user = _extract_profile_user(payload)
                         if isinstance(user, Mapping):
                             captured_user = _merge_profile(captured_user, user)
-                            LOGGER.debug('Instagram Playwright API profile captured user=%s', username)
+                            LOGGER.info('Instagram Playwright perfil capturado URL=%s status=%s quality=%s', response_url, status, _profile_quality(captured_user))
                     except (ValueError, TypeError, AttributeError) as exc:
-                        LOGGER.debug('Não foi possível interpretar resposta web_profile_info: %s', exc)
+                        LOGGER.warning('Não foi possível interpretar resposta Instagram URL=%s status=%s: %s', response_url, status, exc)
+
 
                 page.on('response', capture_profile_response)
                 try:
@@ -458,21 +484,36 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | N
                 except Exception as exc:
                     LOGGER.debug('Instagram Playwright não carregou a página inicial: %s', exc)
                 url = f'https://www.instagram.com/{username}/'
-                response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
-                LOGGER.debug('Instagram Playwright profile URL=%s status=%s', url, response.status if response else None)
-                if response is None or response.status >= 400:
-                    LOGGER.warning('Instagram Playwright perfil HTTP status=%s URL=%s', response.status if response else None, url)
-                    return captured_user
+                response = None
+                status = None
                 try:
-                    _save_instagram_debug_html(username, page.content())
+                    response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                    status = response.status if response else None
                 except Exception as exc:
-                    LOGGER.debug('Não foi possível guardar HTML de diagnóstico: %s', exc)
-                page.wait_for_timeout(5000)
+                    LOGGER.warning('Instagram Playwright navegação falhou URL=%s: %s', url, exc)
+                LOGGER.info('Instagram Playwright profile URL=%s status=%s', url, status)
+                try:
+                    page.wait_for_timeout(5000)
+                except Exception:
+                    pass
                 try:
                     page.wait_for_load_state('networkidle', timeout=10000)
                 except (PlaywrightTimeoutError, TimeoutError):
-                    LOGGER.debug('Instagram Playwright networkidle excedido; usando resposta API já capturada.')
-                LOGGER.info('Instagram Playwright API profile captured=%s quality=%s URL=%s', bool(captured_user), _profile_quality(captured_user or {}), url)
+                    LOGGER.debug('Instagram Playwright networkidle excedido; usando dados já capturados.')
+                try:
+                    document = page.content()
+                    _save_instagram_debug_html(username, document)
+                    for user in _profile_users_from_document(document):
+                        if isinstance(user, Mapping):
+                            candidate = _merge_profile(captured_user, user)
+                            if _profile_quality(candidate) >= _profile_quality(captured_user or {}):
+                                captured_user = candidate
+                except Exception as exc:
+                    LOGGER.warning('Não foi possível guardar/analisar HTML de diagnóstico URL=%s: %s', url, exc)
+                if response is None or status is None or status >= 400:
+                    LOGGER.warning('Instagram Playwright perfil HTTP status=%s URL=%s', status, url)
+                    return captured_user
+                LOGGER.info('Instagram Playwright perfil final captured=%s quality=%s URL=%s', bool(captured_user), _profile_quality(captured_user or {}), url)
             finally:
                 browser.close()
     except Exception as exc:
@@ -631,6 +672,30 @@ def _country_from_bio_fallback(bio: str) -> str:
     return ''
 
 
+def _profile_post_nodes(user: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Return post nodes from both legacy GraphQL edges and current items payloads."""
+    containers: list[Any] = [
+        user.get('edge_owner_to_timeline_media'),
+        user.get('timeline_media'),
+        user.get('media'),
+        user,
+    ]
+    nodes: list[Mapping[str, Any]] = []
+    for container in containers:
+        if not isinstance(container, Mapping):
+            continue
+        raw_items = container.get('edges') or container.get('items') or container.get('data') or []
+        if isinstance(raw_items, Mapping):
+            raw_items = raw_items.get('items') or raw_items.get('edges') or []
+        if not isinstance(raw_items, list):
+            continue
+        for item in raw_items:
+            node = item.get('node') if isinstance(item, Mapping) and isinstance(item.get('node'), Mapping) else item
+            if isinstance(node, Mapping):
+                nodes.append(node)
+    return nodes
+
+
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
     followers = _profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following_node = user.get('edge_follow')
@@ -638,10 +703,12 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     following = following if following is not None else _profile_metric(user, 'follows', 'following', 'following_count', 'followingCount')
     followers = followers if followers is not None else _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
-    media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
+    media_node = user.get('edge_owner_to_timeline_media') or user.get('media')
+    media = (media_node.get('count') if isinstance(media_node, Mapping) else None)
     media = media if media is not None else _profile_metric(user, 'posts', 'post_count', 'media_count')
     biography = str(user.get('biography') or user.get('bio') or user.get('description') or '').strip()
-    country = extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
+    direct_country = _country_value(user.get('country') or user.get('country_code'))
+    country = direct_country or extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
     country = country or _country_from_bio_fallback(biography)
     LOGGER.debug('Instagram profile extracted keys=%s edge_follow=%r bio=%s followers=%s following=%s posts=%s country=%s', sorted(str(key) for key in user.keys()), following_node, bool(biography), followers, following, media, country or '—')
     return {
@@ -659,7 +726,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'public_lookup': True,
         'metrics_source': 'instagram_web_profile_info',
         'last_public_lookup_at': datetime.now(timezone.utc).isoformat(),
-        '_api_posts': (((user.get('edge_owner_to_timeline_media') or {}).get('edges') or []) if isinstance(user.get('edge_owner_to_timeline_media'), dict) else (user.get('posts') if isinstance(user.get('posts'), list) else [])),
+        '_api_posts': [dict(node) for node in _profile_post_nodes(user)],
     }
 
 
@@ -674,10 +741,14 @@ def normalize_instagram_metric(value: Any) -> int | None:
 
 
 PUBLIC_COUNTRY_KEYS = {
-    'about_this_account_country', 'account_based_in', 'account_country', 'country_name',
-    'country_of_origin', 'country_of_registration', 'location_country', 'transparency_country',
+    'about_this_account_country', 'account_based_in', 'account_country',
+    'country_name', 'country_of_origin', 'country_of_registration', 'location_country',
+    'transparency_country',
 }
-PUBLIC_TRANSPARENCY_KEYS = {'about', 'about_account', 'account_transparency', 'transparency', 'account_info'}
+PUBLIC_TRANSPARENCY_KEYS = {
+    'about', 'about_account', 'about_this_account', 'about_this_account_data',
+    'account_transparency', 'transparency', 'account_info', 'profile_context',
+}
 
 
 def _country_value(value: Any) -> str:
@@ -848,18 +919,15 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                 page = context.new_page()
 
                 def capture_profile_posts(response: Any) -> None:
-                    if '/api/v1/users/web_profile_info/' not in response.url:
+                    response_url = str(getattr(response, 'url', '') or '')
+                    if not any(marker in response_url for marker in ('/api/v1/users/web_profile_info/', '/graphql/query')):
                         return
+                    LOGGER.info('Instagram Playwright posts response URL=%s status=%s', response_url, getattr(response, 'status', None))
                     try:
                         payload = response.json()
-                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, Mapping) else None)
-                        media = user.get('edge_owner_to_timeline_media') if isinstance(user, Mapping) else None
-                        edges = media.get('edges') if isinstance(media, Mapping) else []
-                        for edge in edges or []:
-                            node = edge.get('node') if isinstance(edge, Mapping) else None
-                            if not isinstance(node, dict):
-                                continue
-                            post = _post_from_node(node)
+                        user = _extract_profile_user(payload)
+                        for node in _profile_post_nodes(user) if isinstance(user, Mapping) else []:
+                            post = _post_from_node(dict(node))
                             if post and post['id'] not in seen:
                                 seen.add(post['id'])
                                 posts.append(post)
@@ -913,12 +981,10 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         api_posts: list[dict[str, Any]] = []
-        for edge in ((api_user.get('edge_owner_to_timeline_media') or {}).get('edges') or []):
-            node = edge.get('node') if isinstance(edge, dict) else None
-            if isinstance(node, dict):
-                post = _post_from_node(node)
-                if post:
-                    api_posts.append(post)
+        for node in _profile_post_nodes(api_user):
+            post = _post_from_node(dict(node))
+            if post:
+                api_posts.append(post)
         if api_posts:
             LOGGER.debug('Instagram API posts extracted=%s response=JSON', len(api_posts))
             return IntegrationResult(True, 'Posts públicos encontrados.', reference | {'posts': api_posts[:max(1, int(limit))]})
