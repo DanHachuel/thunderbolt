@@ -1,7 +1,7 @@
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _instagram_profiles, _merge_instagram_refresh, _normalise_api_cards, _save_public_profile
+from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
 from integrations.instagram_public import _fetch_web_profile_user, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
@@ -146,6 +146,7 @@ def test_public_profile_save_persists_real_bio_and_following():
         )
     assert saved[0]["bio"] == "Criadora de viagens"
     assert saved[0]["following_count"] == 4321
+    assert saved[0]["country"] == "Brasil"
 
 
 def test_instagram_refresh_preserves_existing_bio_and_following_when_response_omits_them():
@@ -156,6 +157,27 @@ def test_instagram_refresh_preserves_existing_bio_and_following_when_response_om
     assert merged["bio"] == "Bio antiga"
     assert merged["following_count"] == 4321
     assert merged["subscriber_count"] == 100
+
+
+def test_refresh_button_function_returns_canonical_updated_profile():
+    result = Mock(ok=True, message="ok", data={"bio": "Bio nova", "following_count": 765, "subscriber_count": 1234})
+    with patch("app.social_networks_ui.fetch_public_instagram_profile", return_value=result) as fetch:
+        ok, message, refreshed = _refresh_instagram_profile({"url": "https://www.instagram.com/creator/", "bio": "Bio antiga", "following_count": 4})
+    assert ok is True
+    assert message == "ok"
+    assert refreshed["bio"] == "Bio nova"
+    assert refreshed["following_count"] == 765
+    fetch.assert_called_once_with("https://www.instagram.com/creator/")
+
+
+def test_load_posts_button_function_uses_saved_profile_url_and_returns_posts():
+    result = Mock(ok=True, message="Posts públicos encontrados.", data={"posts": [{"id": "p1"}]})
+    with patch("app.social_networks_ui.fetch_public_instagram_posts", return_value=result) as fetch:
+        ok, message, posts = _load_instagram_posts({"url": "https://www.instagram.com/creator/"}, limit=10)
+    assert ok is True
+    assert message == "Posts públicos encontrados."
+    assert posts == [{"id": "p1"}]
+    fetch.assert_called_once_with("https://www.instagram.com/creator/", limit=10)
 
 
 def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
@@ -185,7 +207,7 @@ def test_instagram_card_renders_profile_bio_next_to_identity():
     source = open(social_networks_ui.__file__, encoding="utf-8").read()
     assert 'def _render_instagram_bio(value: Any) -> None:' in source
     assert 'st.caption(f"Bio: {bio}")' not in source
-    assert 'bio.replace("\\n", "  \\n")' in source
+    assert 'st.text(bio)' in source
     assert 'st.selectbox("País", _country_options()' in source
     assert 'delete_channel(profile_id)' in source
     assert '_render_instagram_bio(data.get("bio"))' in source
