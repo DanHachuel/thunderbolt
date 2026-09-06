@@ -112,6 +112,7 @@ from hermes_ui.growth_youtube import list_analyses, run_audit
 from hermes_ui.growth_tiktok import render_growth_tiktok
 from hermes_ui.growth_instagram import render_growth_instagram
 from hermes_ui.growth_facebook_pages import render_growth_facebook_pages
+from hermes_ui.growth_bilibili import render_growth_bilibili
 from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -9076,7 +9077,7 @@ def main():
         "Analista Growth Tiktok": render_growth_tiktok,
         "Analista Growth Instagram": render_growth_instagram,
         "Analista Facebook Pages": render_growth_facebook_pages,
-        "Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", ""),
+        "Analista Bilibili": render_growth_bilibili,
         "Documentação": lambda: render_edit_placeholder("Documentação", "Seleccione um tutorial no menu expansível."),
         "Tutorial Meta": render_models_ai_tutorial,
         "Tutorial Supabase": render_supabase_tutorial,
