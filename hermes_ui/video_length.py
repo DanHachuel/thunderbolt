@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 WORDS_PER_MINUTE = 150
+DEFAULT_AVERAGE_VIDEO_TIME = "00:12"
 AVERAGE_VIDEO_TIME_KEY = "average_video_time"
 AVERAGE_VIDEO_WORD_COUNT_KEY = "average_video_word_count"
 
@@ -100,7 +101,8 @@ def channel_video_length(channel: dict[str, Any], blueprint: Any = None, prompt_
     words = explicit_word_count(blueprint, prompt_master)
     if words:
         return words, hhmm_from_minutes(round(words / WORDS_PER_MINUTE)), "Blueprint/Prompt Master"
-    return 0, "00:00", "sem referência"
+    default_minutes = minutes_from_hhmm(DEFAULT_AVERAGE_VIDEO_TIME)
+    return default_minutes * WORDS_PER_MINUTE, DEFAULT_AVERAGE_VIDEO_TIME, "padrão do canal"
 
 
 def words_from_channel_time(value: Any) -> int:
@@ -121,6 +123,7 @@ def length_generation_settings(channel: dict[str, Any], blueprint: Any = None, p
 __all__ = [
     "AVERAGE_VIDEO_TIME_KEY",
     "AVERAGE_VIDEO_WORD_COUNT_KEY",
+    "DEFAULT_AVERAGE_VIDEO_TIME",
     "WORDS_PER_MINUTE",
     "channel_video_length",
     "explicit_word_count",
