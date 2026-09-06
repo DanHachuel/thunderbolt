@@ -116,6 +116,7 @@ def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint()
     with patch("integrations.instagram_public.requests.get", return_value=api_response), patch("integrations.instagram_public.shutil.which", return_value=None):
         result = fetch_public_instagram_profile("@private_creator")
     assert result.data["bio"] == "Linha um\nLinha dois"
+    assert result.data["bio_raw"] == "Linha um\nLinha dois"
     assert result.data["following_count"] == 2468
     assert result.data["is_private"] is True
 
@@ -210,8 +211,8 @@ def test_instagram_card_renders_profile_bio_next_to_identity():
     assert 'st.text(bio)' in source
     assert 'st.selectbox("País", _country_options()' in source
     assert 'delete_channel(profile_id)' in source
-    assert '_render_instagram_bio(data.get("bio"))' in source
-    assert '"bio": normalize_instagram_bio(data.get("bio"))' in source
+    assert '_profile_bio(data)' in source
+    assert '"bio_raw": _clean(data.get("bio_raw"))' in source
     assert 'placeholder="Não encontrado"' in source
 
 
@@ -231,6 +232,7 @@ def test_create_channel_keeps_social_metadata_for_instagram_accounts():
     assert channel["social_network"] == "Instagram"
     assert channel["bio"] == "Bio persistida"
     assert channel["following_count"] == 456
+    assert channel["bio_raw"] == ""
     assert saved[-1][0]["platform"] == "instagram"
 
 
