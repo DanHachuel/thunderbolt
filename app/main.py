@@ -1721,7 +1721,7 @@ def render_growth_youtube():
 
 def render_dashboard():
     ui_language = current_ui_language()
-    st.title("Thunderbolt")
+    st.title("Thunderbolt Dashboard")
     st.caption(ui_text("Interface local para operação e automação de conteúdo faceless", ui_language))
     summary = pipeline_summary()
     active_note = f'{summary["active_channels"]} {ui_text("activos", ui_language)}'
