@@ -132,18 +132,8 @@ class IntegrationResult:
 
 
 def normalize_instagram_bio(value: Any) -> str:
-    """Keep the profile biography, never Instagram's metrics summary."""
+    """Keep the complete public biography exactly as returned by Instagram."""
     bio = str(value or '').strip()
-    if not bio:
-        return ''
-    metric_words = r'followers|following|seguidores|seguindo|posts|publicações|publications'
-    metric_hits = re.findall(
-        rf'(?:\d[\d.,]*\s*(?:{metric_words})\b|\b(?:{metric_words})\s*\d[\d.,]*)',
-        bio,
-        flags=re.IGNORECASE,
-    )
-    if len(metric_hits) >= 2:
-        return ''
     return bio
 
 
@@ -249,6 +239,7 @@ def _extract_profile_user(payload: Any) -> Mapping[str, Any] | None:
 
 
 def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str], cookies: Mapping[str, str]) -> dict[str, Any] | None:
+    # CORREÇÃO WINDOWS: este helper é o único caminho de rede usado pelo perfil no Windows.
     endpoints = (
         f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
         f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
@@ -429,7 +420,9 @@ def _country_from_bio_fallback(bio: str) -> str:
 
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
     followers = _profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
-    following = _profile_metric(user, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    following_node = user.get('edge_follow')
+    following = normalize_instagram_metric(following_node) if isinstance(following_node, Mapping) else None
+    following = following if following is not None else _profile_metric(user, 'follows', 'following', 'following_count', 'followingCount')
     followers = followers if followers is not None else _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
@@ -437,7 +430,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     biography = str(user.get('biography') or user.get('bio') or user.get('description') or '').strip()
     country = extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
     country = country or _country_from_bio_fallback(biography)
-    LOGGER.debug('Instagram profile extracted bio=%s followers=%s following=%s posts=%s country=%s', bool(biography), followers, following, media, country or '—')
+    LOGGER.debug('Instagram profile extracted keys=%s edge_follow=%r bio=%s followers=%s following=%s posts=%s country=%s', sorted(str(key) for key in user.keys()), following_node, bool(biography), followers, following, media, country or '—')
     return {
         'id': f"instagram_{reference['username']}",
         **reference,
@@ -617,6 +610,7 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cookies: Mapping[str, str]) -> list[dict[str, Any]]:
+    # CORREÇÃO WINDOWS: posts são extraídos exclusivamente do JSON/HTML obtido pelo Playwright.
     posts: list[dict[str, Any]] = []
     seen: set[str] = set()
     try:
@@ -635,6 +629,7 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                 if response is None or response.status >= 400:
                     return []
                 browser_document = page.content()
+                LOGGER.debug('Instagram Playwright posts document_bytes=%s', len(browser_document))
                 for document in _embedded_json_documents(browser_document):
                     for node in _walk_json(document):
                         post = _post_from_node(node)
@@ -642,6 +637,7 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                             continue
                         seen.add(post['id'])
                         posts.append(post)
+                        LOGGER.debug('Instagram Playwright post extracted id=%s', post['id'])
                         if len(posts) >= max(1, int(limit)):
                             return posts
             finally:

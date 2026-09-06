@@ -268,8 +268,8 @@ def test_load_posts_button_function_uses_saved_profile_url_and_returns_posts():
     fetch.assert_called_once_with("https://www.instagram.com/creator/", limit=10)
 
 
-def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
-    assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == ""
+def test_instagram_bio_keeps_metrics_text_and_real_bio_integrally():
+    assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == "606 seguidores, seguindo 3,432, 278 posts — Veja as fotos"
     assert normalize_instagram_bio("🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid") == "🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid"
     assert normalize_instagram_bio("Treinos 5x por semana\nSigo posts de viagens") == "Treinos 5x por semana\nSigo posts de viagens"
 
