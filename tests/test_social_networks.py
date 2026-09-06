@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 from app.social_networks_ui import _api_card_status, _instagram_profiles, _normalise_api_cards
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 
 
@@ -76,6 +76,11 @@ def test_public_instagram_parser_reads_json_metric_aliases():
     assert result.data["following_count"] == 654
 
 
+def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
+    assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == ""
+    assert normalize_instagram_bio("🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid") == "🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid"
+
+
 def test_instagram_ui_uses_canonical_language_selector():
     from app import social_networks_ui
 
@@ -88,7 +93,7 @@ def test_instagram_card_renders_profile_bio_next_to_identity():
     from app import social_networks_ui
 
     source = open(social_networks_ui.__file__, encoding="utf-8").read()
-    assert 'bio = _clean(profile.get("bio"))' in source
+    assert 'bio = normalize_instagram_bio(profile.get("bio"))' in source
     assert 'st.caption(f"Bio: {bio}")' in source
 
 
