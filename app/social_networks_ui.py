@@ -13,7 +13,7 @@ from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INF
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
 
@@ -36,6 +36,10 @@ def _profile_metric(profile: Mapping[str, Any], *keys: str) -> Any:
         if value not in (None, ""):
             return value
     return None
+
+
+def _metric_input(value: Any) -> int | None:
+    return normalize_instagram_metric(value)
 
 
 def _language_index(value: Any) -> int:
@@ -288,6 +292,7 @@ def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str
         "name": name,
         "url": url,
         "handle": _clean(data.get("handle")),
+        "bio": normalize_instagram_bio(data.get("bio")),
         "country": country.strip(),
         "language": language.strip(),
         "post_count": data.get("post_count"),
@@ -298,6 +303,14 @@ def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str
         "metrics_source": "instagram_public_page",
     }
     return create_channel(name, url, metadata)
+
+
+def _merge_instagram_refresh(existing: Mapping[str, Any], refreshed: Mapping[str, Any]) -> dict[str, Any]:
+    merged = dict(refreshed)
+    for field in ("subscriber_count", "following_count", "post_count", "bio", "avatar_url"):
+        if merged.get(field) in (None, "") and existing.get(field) not in (None, ""):
+            merged[field] = existing[field]
+    return merged
 
 
 def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, Any]], settings: Mapping[str, Any]) -> None:
@@ -329,10 +342,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                 if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
                     result = fetch_public_instagram_profile(_clean(profile.get("url")) or _clean(profile.get("handle")))
                     if result.ok:
-                        refreshed = dict(result.data)
-                        for field in ("subscriber_count", "following_count", "post_count", "bio", "avatar_url"):
-                            if refreshed.get(field) in (None, "") and profile.get(field) not in (None, ""):
-                                refreshed[field] = profile[field]
+                        refreshed = _merge_instagram_refresh(profile, result.data)
                         update_channel(profile_id, {**refreshed, "platform": "instagram", "country": profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
@@ -368,15 +378,16 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                 with edit_cols[0]:
                     name = st.text_input("Nome", value=_clean(profile.get("name")), key=f"instagram_edit_name_{profile_id}")
                     handle = st.text_input("handler", value=_clean(profile.get("handle")), key=f"instagram_edit_handle_{profile_id}")
+                    bio = st.text_area("Bio", value=normalize_instagram_bio(profile.get("bio")), key=f"instagram_edit_bio_{profile_id}")
                     country = st.selectbox("País", _country_options(), index=_country_index(profile.get("country")), format_func=_country_label, key=f"instagram_edit_country_{profile_id}")
                     language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(profile.get("language")), format_func=language_label, key=f"instagram_edit_language_{profile_id}")
                 with edit_cols[1]:
-                    posts = st.number_input("posts", min_value=0, value=int(profile.get("post_count") or 0), key=f"instagram_edit_posts_{profile_id}")
-                    followers = st.number_input("Seguidores", min_value=0, value=int(profile.get("subscriber_count") or 0), key=f"instagram_edit_followers_{profile_id}")
-                    following = st.number_input("seguindo", min_value=0, value=int(profile.get("following_count") or 0), key=f"instagram_edit_following_{profile_id}")
+                    posts = st.number_input("posts", min_value=0, value=_metric_input(profile.get("post_count")), placeholder="Não encontrado", key=f"instagram_edit_posts_{profile_id}")
+                    followers = st.number_input("Seguidores", min_value=0, value=_metric_input(profile.get("subscriber_count")), placeholder="Não encontrado", key=f"instagram_edit_followers_{profile_id}")
+                    following = st.number_input("seguindo", min_value=0, value=_metric_input(profile.get("following_count")), placeholder="Não encontrado", key=f"instagram_edit_following_{profile_id}")
                 save_edit = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
             if save_edit:
-                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "country": country.strip(), "language": language, "post_count": int(posts), "subscriber_count": int(followers), "following_count": int(following)})
+                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "bio": normalize_instagram_bio(bio), "country": country.strip(), "language": language, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                 st.session_state.pop(edit_key, None)
                 st.success("Conta Instagram actualizada.")
                 st.rerun()
@@ -449,19 +460,20 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     form_cols = st.columns(2)
                     with form_cols[0]:
                         name = st.text_input("Nome", value=_clean(data.get("name")), key="social_instagram_result_name")
+                        bio = st.text_area("Bio", value=normalize_instagram_bio(data.get("bio")), key="social_instagram_result_bio")
                         country = st.selectbox("País", _country_options(), index=_country_index(data.get("country")), format_func=_country_label, key="social_instagram_result_country")
                         language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key="social_instagram_result_language")
                     with form_cols[1]:
-                        posts = st.number_input("posts", min_value=0, value=int(data.get("post_count") or 0), key="social_instagram_result_posts")
-                        followers = st.number_input("Seguidores", min_value=0, value=int(data.get("subscriber_count") or 0), key="social_instagram_result_followers")
-                        following = st.number_input("seguindo", min_value=0, value=int(data.get("following_count") or 0), key="social_instagram_result_following")
+                        posts = st.number_input("posts", min_value=0, value=_metric_input(data.get("post_count")), placeholder="Não encontrado", key="social_instagram_result_posts")
+                        followers = st.number_input("Seguidores", min_value=0, value=_metric_input(data.get("subscriber_count")), placeholder="Não encontrado", key="social_instagram_result_followers")
+                        following = st.number_input("seguindo", min_value=0, value=_metric_input(data.get("following_count")), placeholder="Não encontrado", key="social_instagram_result_following")
                     character_options = [""] + [_clean(item.get("id")) for item in characters if _clean(item.get("id"))]
                     character_labels = {"": "Sem personagem associado"} | {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters}
                     selected_character = st.selectbox("Personagem", character_options, format_func=lambda value: character_labels.get(value, value), key="social_instagram_result_character")
                     save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", use_container_width=True)
                 if save_profile:
                     profile_data = dict(data)
-                    profile_data.update({"name": name, "post_count": int(posts), "subscriber_count": int(followers), "following_count": int(following)})
+                    profile_data.update({"name": name, "bio": normalize_instagram_bio(bio), "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                     _save_public_profile(profile_data, country=country, language=language, character_id=selected_character)
                     st.success("Conta Instagram cadastrada em Redes Sociais.")
                     for key in ("social_instagram_result", "social_instagram_ok", "social_instagram_message"):

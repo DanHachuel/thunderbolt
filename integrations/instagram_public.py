@@ -117,8 +117,8 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
 
 
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
-    followers = _direct_profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
-    following = _direct_profile_metric(user, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    followers = _profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = _profile_metric(user, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     followers = followers if followers is not None else _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
@@ -138,18 +138,21 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     }
 
 
-def _direct_profile_metric(user: Mapping[str, Any], *keys: str) -> int | None:
-    """Read common profile counters before falling back to recursive JSON parsing."""
+def normalize_instagram_metric(value: Any) -> int | None:
+    """Normalize an Instagram counter without turning an unknown value into zero."""
+    if isinstance(value, Mapping):
+        value = value.get('count') or value.get('value')
+    if value in (None, ''):
+        return None
+    digits = re.sub(r'[^0-9]', '', str(value))
+    return int(digits) if digits else None
+
+
+def _profile_metric(user: Mapping[str, Any], *keys: str) -> int | None:
     for key in keys:
-        value = user.get(key)
-        if isinstance(value, Mapping):
-            value = value.get('count') or value.get('value')
-        if value in (None, ''):
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            continue
+        value = normalize_instagram_metric(user.get(key))
+        if value is not None:
+            return value
     return None
 
 
@@ -283,4 +286,4 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
 
-__all__ = ['IntegrationResult', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_reference']
+__all__ = ['IntegrationResult', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_metric', 'normalize_instagram_reference']
