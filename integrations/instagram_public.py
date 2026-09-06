@@ -62,14 +62,21 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     title = _meta(response.text, 'og:title') or reference['username']
     description = _meta(response.text, 'og:description')
     avatar_url = _meta(response.text, 'og:image')
-    followers = None
-    match = re.search(r'([\d,.]+)\s*(?:followers|seguidores)', description, flags=re.IGNORECASE)
-    if match:
-        try:
-            followers = int(re.sub(r'[^0-9]', '', match.group(1)))
-        except ValueError:
-            followers = None
-    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
+    def metric(patterns: tuple[str, ...]) -> int | None:
+        for pattern in patterns:
+            found = re.search(pattern, description, flags=re.IGNORECASE)
+            if not found:
+                continue
+            try:
+                return int(re.sub(r'[^0-9]', '', found.group(1)))
+            except ValueError:
+                continue
+        return None
+
+    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',))
+    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',))
+    posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',))
+    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
 
