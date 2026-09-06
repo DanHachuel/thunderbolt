@@ -116,7 +116,7 @@ from hermes_ui.update_manager import check_version, restart_current_process, upd
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
-from hermes_ui.video_length import channel_video_length, length_generation_settings, words_from_channel_time
+from hermes_ui.video_length import DEFAULT_AVERAGE_VIDEO_TIME, channel_video_length, length_generation_settings, words_from_channel_time
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, cached_personal_voices, fetch_personal_voices, personal_voice_options
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
@@ -2374,12 +2374,12 @@ def render_tiktok_channels():
                         prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
                         prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
                         calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
-                        average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"tiktok_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}. Use 00:00 para usar o Prompt Master.")
+                        average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or DEFAULT_AVERAGE_VIDEO_TIME), key=f"tiktok_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
                         if st.button("Guardar tempo", key=f"save_tiktok_channel_average_video_time_{channel_id}", use_container_width=True):
                             if not valid_hhmm(average_video_time):
                                 st.error("Use o formato HH:MM, por exemplo 00:02.")
                             else:
-                                update_channel(channel_id, {"average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time)})
+                                update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
                                 st.success("Tempo médio do canal TikTok guardado.")
                                 st.rerun()
                     with card_cols[6]:
@@ -3073,12 +3073,12 @@ def render_channels():
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
             with header_cols[5]:
                 calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
-                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}. Use 00:00 para usar o Blueprint.")
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or DEFAULT_AVERAGE_VIDEO_TIME), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
                 if st.button("Guardar tempo", key=f"save_youtube_channel_average_video_time_{channel_id}", use_container_width=True):
                     if not valid_hhmm(average_video_time):
                         st.error("Use o formato HH:MM, por exemplo 00:02.")
                     else:
-                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time)})
+                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
                         st.success("Tempo médio do canal YouTube guardado.")
                         st.rerun()
             with header_cols[6]:
@@ -5465,7 +5465,7 @@ def render_tiktok_automation():
                 prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
                 prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
                 calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
-                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"tiktok_average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}. Use 00:00 para voltar ao Prompt Master.")
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or DEFAULT_AVERAGE_VIDEO_TIME), key=f"tiktok_average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
             default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
             with default_cols[0]:
                 st.markdown("**Idioma do roteiro**")
@@ -5492,7 +5492,7 @@ def render_tiktok_automation():
                         st.error("O Tempo Medio de Video deve estar no formato HH:MM, por exemplo 00:02.")
                     else:
                         avatar_url = _tiktok_avatar_url(channel)
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
+                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                         st.success("Automação TikTok guardada.")
                         st.rerun()
     _render_tiktok_automation_cards()
@@ -5653,7 +5653,7 @@ def render_automation():
                 schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
             with header_cols[7]:
                 calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
-                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}. Use 00:00 para voltar ao Blueprint.")
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or DEFAULT_AVERAGE_VIDEO_TIME), key=f"average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
 
             control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")
             with control_cols[0]:
@@ -5685,7 +5685,7 @@ def render_automation():
                         update_channel(channel_id, {
                             "automation_on": bool(enabled),
                             "automation_time": schedule_time.strip(),
-                            "average_video_time": average_video_time.strip() or "00:00",
+                            "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME,
                             "average_video_word_count": words_from_channel_time(average_video_time),
                             "format": automation_format,
                         })
