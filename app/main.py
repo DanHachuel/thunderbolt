@@ -109,6 +109,7 @@ from hermes_ui.draft_video import DRAFT_SETTING_SECTIONS, missing_content_fields
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_thumbnail_prompt, generate_title_and_keywords, generate_topic_for_channel, generate_video_description, generate_video_keywords, generate_video_update_metadata
 from hermes_ui.media_generation import MediaGenerationError, format_media_generation_error, generate_image_for_card, generate_video_for_card
 from hermes_ui.growth_youtube import list_analyses, run_audit
+from hermes_ui.growth_tiktok import render_growth_tiktok
 from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -9068,7 +9069,7 @@ def main():
         "UGC Products": lambda: render_ugc_products(read_json("settings.json", {})),
         "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
         "Analista Growth Youtube": render_growth_youtube,
-        "Analista Growth Tiktok": lambda: render_edit_placeholder("Analista Growth Tiktok", ""),
+        "Analista Growth Tiktok": render_growth_tiktok,
         "Analista Growth Instagram": lambda: render_edit_placeholder("Analista Growth Instagram", ""),
         "Analista Facebook Pages": lambda: render_edit_placeholder("Analista Facebook Pages", ""),
         "Analista Bilibili": lambda: render_edit_placeholder("Analista Bilibili", ""),
