@@ -1,4 +1,10 @@
 # Changelog
+## 0.6.33 — 2026-09-06
+- Corrigido o cadastro e refresh de Contas Instagram para preservar o ID interno do canal e normalizar bio, seguidores, seguindo e posts entre versões antigas dos dados.
+- O botão **Carregar últimos 10** passa a guardar os posts por conta no storage local, mantendo-os disponíveis após o rerun da interface.
+- O botão **Actualizar posts, seguidores e seguindo** actualiza o perfil e os posts sem substituir a identidade interna da conta.
+- O campo **País** usa exclusivamente o país explícito publicado em **Sobre esta conta**; a bio nunca é usada para inferir o país.
+
 ## 0.6.10 — 2026-09-05
 - Adicionado suporte à selecção explícita de uma connected account YouTube no Composio por ID ou alias.
 - O executor resolve o alias contra as contas activas da mesma entidade antes de chamar a ferramenta, evitando depender da conta predefinida errada.
