@@ -5447,7 +5447,7 @@ def render_tiktok_automation():
     for channel in channels:
         channel_id = str(channel["id"])
         with st.container(border=True):
-            header_cols = st.columns([0.55, 2.15, 1.25, 1.35, 1.55, 1.2])
+            header_cols = st.columns([0.55, 2.35, 1.25, 0.82, 0.92, 1.2])
             with header_cols[0]:
                 profile_image = _tiktok_avatar_url(channel)
                 if profile_image:
@@ -5626,7 +5626,7 @@ def render_automation():
             automation_voice = current_voice
             paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
             automation_format = str(channel.get("format") or "wide")
-            header_cols = st.columns([0.58, 1.95, 1.4, 1.15, 1.15, 1.25, 1.25, 1.45], gap="small")
+            header_cols = st.columns([0.58, 2.15, 1.4, 1.15, 1.15, 1.25, 0.82, 0.92], gap="small")
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=48)
