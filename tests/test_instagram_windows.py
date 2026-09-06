@@ -82,6 +82,7 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
     def test_windows_profile_failure_does_not_fallback_to_requests(self):
         with patch.object(instagram_public.platform, "system", return_value="Windows"), \
              patch.object(instagram_public, "_fetch_profile_with_playwright", return_value=None), \
+             patch.object(instagram_public, "fetch_profile_instaloader", return_value=None), \
              patch.object(instagram_public.requests, "get", side_effect=AssertionError("HTTP não permitido no Windows")):
             result = instagram_public.fetch_public_instagram_profile("@conta")
         self.assertFalse(result.ok)
