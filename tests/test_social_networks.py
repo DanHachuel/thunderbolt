@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 from app.social_networks_ui import _api_card_status, _instagram_profiles, _normalise_api_cards
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import fetch_public_instagram_profile
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 
 
@@ -109,3 +109,30 @@ def test_instagram_profiles_include_legacy_records_by_public_url():
     ):
         profiles = _instagram_profiles()
     assert [profile["id"] for profile in profiles] == ["legacy"]
+
+
+def test_public_instagram_posts_extracts_media_and_caption_from_embedded_json():
+    response = Mock(
+        status_code=200,
+        text=(
+            '<script type="application/json">{"items":['
+            '{"id":"p1","code":"ABC","display_url":"https://img.example/1.jpg","caption":{"text":"Primeiro"}},'
+            '{"id":"p2","code":"DEF","display_url":"https://img.example/2.jpg","caption":{"text":"Segundo"}}]}'
+            '</script>'
+        ),
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_posts("@creator", limit=10)
+    assert result.ok is True
+    assert [post["id"] for post in result.data["posts"]] == ["p1", "p2"]
+    assert result.data["posts"][0]["caption"] == "Primeiro"
+
+
+def test_instagram_card_contains_posts_expander_controls():
+    from app import social_networks_ui
+
+    source = open(social_networks_ui.__file__, encoding="utf-8").read()
+    assert 'with st.expander("Últimos posts do Instagram", expanded=False):' in source
+    assert 'st.button("Actualizar tudo"' in source
+    assert 'st.download_button("Baixar todos"' in source
+    assert 'st.button("Mostrar + 10"' in source
