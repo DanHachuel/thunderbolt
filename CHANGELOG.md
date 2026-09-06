@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.41 — 2026-09-06
+- Corrigido o estado dos widgets do formulário de pesquisa Instagram: uma nova pesquisa limpa os valores antigos de Bio, posts, seguidores, seguindo, país, idioma e personagem antes de renderizar o novo perfil.
+- Mantidas integralmente as correcções de parsing Windows, fallback Chromium e payload Instagram das versões anteriores.
+- Nenhuma alteração de layout.
+
 ## 0.6.40 — 2026-09-06
 - Corrigido o parser Instagram para aceitar também respostas Windows no formato directo `{"user": {...}}`, além de `data.user`, `graphql.user` e `data.profile`.
 - Evitado o fallback indevido para HTML parcial quando o endpoint já devolveu o perfil completo.
