@@ -2352,7 +2352,7 @@ def render_tiktok_channels():
             for channel in channels:
                 channel_id = str(channel.get("id") or "")
                 with st.container(border=True):
-                    card_cols = st.columns([0.7, 3.45, 1.15, 1.15, 1.45, 1.55], gap="small")
+                    card_cols = st.columns([0.7, 3.05, 1.05, 1.05, 1.25, 1.7, 1.35], gap="small")
                     with card_cols[0]:
                         avatar_url = _tiktok_avatar_url(channel)
                         if avatar_url:
@@ -2371,6 +2371,18 @@ def render_tiktok_channels():
                     with card_cols[4]:
                         st.metric("Vídeos", format_metric_number(channel.get("video_count")))
                     with card_cols[5]:
+                        prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
+                        prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
+                        calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
+                        average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"tiktok_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}. Use 00:00 para usar o Prompt Master.")
+                        if st.button("Guardar tempo", key=f"save_tiktok_channel_average_video_time_{channel_id}", use_container_width=True):
+                            if not valid_hhmm(average_video_time):
+                                st.error("Use o formato HH:MM, por exemplo 00:02.")
+                            else:
+                                update_channel(channel_id, {"average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time)})
+                                st.success("Tempo médio do canal TikTok guardado.")
+                                st.rerun()
+                    with card_cols[6]:
                         if st.button("↻", key=f"refresh_tiktok_metrics_{channel_id}", help="Actualizar Seguidores, Vídeos e Curtidas", use_container_width=True):
                             with st.spinner("A actualizar métricas TikTok…"):
                                 refreshed, message = _refresh_tiktok_channel_metrics(channel)
@@ -3043,7 +3055,7 @@ def render_channels():
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
-            header_cols = st.columns([0.7, 3.1, 1.25, 1.15, 1.55, 1.5])
+            header_cols = st.columns([0.7, 2.75, 1.1, 1.0, 1.35, 1.75, 1.35])
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=64)
@@ -3060,6 +3072,16 @@ def render_channels():
             with header_cols[4]:
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
             with header_cols[5]:
+                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
+                average_video_time = st.text_input("Tempo Medio de Video (HH:MM)", value=str(channel.get("average_video_time") or calculated_time), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}. Use 00:00 para usar o Blueprint.")
+                if st.button("Guardar tempo", key=f"save_youtube_channel_average_video_time_{channel_id}", use_container_width=True):
+                    if not valid_hhmm(average_video_time):
+                        st.error("Use o formato HH:MM, por exemplo 00:02.")
+                    else:
+                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or "00:00", "average_video_word_count": words_from_channel_time(average_video_time)})
+                        st.success("Tempo médio do canal YouTube guardado.")
+                        st.rerun()
+            with header_cols[6]:
                 if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", use_container_width=True):
                     with st.spinner("A actualizar métricas YouTube…"):
                         refreshed, message = _refresh_youtube_channel_metrics(channel, youtube)
