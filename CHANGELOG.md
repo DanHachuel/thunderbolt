@@ -1,4 +1,10 @@
 # Changelog
+## 0.6.43 — 2026-09-06
+- Corrigido o arranque Windows para carregar `.env` em UTF-8 antes dos imports da UI e do cliente Instagram, permitindo a sessão usada pelo país de “Sobre esta conta”.
+- Corrigida a raiz do entrypoint legado, que apontava um nível acima do pacote.
+- Corrigida a indentação inválida no entrypoint legado, garantindo compilação Python antes do arranque.
+- Mantidas as correcções de payload, estado dos widgets e fallback Chromium para os posts, sem alteração de layout.
+
 ## 0.6.42 — 2026-09-06
 - Tornadas únicas por payload as chaves dos widgets da pesquisa Instagram, impedindo que Bio, seguindo, posts e país vazios sejam reutilizados pela mesma conta.
 - Adicionado fallback Chromium específico ao botão **Carregar últimos 10** quando o HTML HTTP não contém os posts.

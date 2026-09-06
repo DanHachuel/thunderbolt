@@ -39,6 +39,28 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+def _load_local_env() -> None:
+    for env_path in (ROOT / ".env", Path.cwd() / ".env"):
+        try:
+            if not env_path.is_file():
+                continue
+            for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("'\"")
+                if key:
+                    os.environ.setdefault(key, value)
+        except OSError as exc:
+            print(f"DEBUG: não foi possível ler {env_path}: {exc}")
+
+
+_load_local_env()
+
 try:
     APP_VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8")).get("version", "")
 except (OSError, json.JSONDecodeError):
