@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import uuid
 import zipfile
 from typing import Any, Callable, Mapping
@@ -50,6 +51,20 @@ def _render_instagram_bio(value: Any) -> None:
 
 def _profile_bio(profile: Mapping[str, Any]) -> str:
     return normalize_instagram_bio(profile.get("bio")) or normalize_instagram_bio(profile.get("bio_raw"))
+
+
+def _infer_country_from_bio(value: Any) -> str:
+    bio = _clean(value).casefold()
+    if not bio:
+        return ""
+    for country in sorted(COUNTRY_OPTIONS, key=len, reverse=True):
+        if re.search(rf"(?<!\w){re.escape(country.casefold())}(?!\w)", bio):
+            return country
+    return ""
+
+
+def _profile_country(profile: Mapping[str, Any]) -> str:
+    return _clean(profile.get("country")) or _infer_country_from_bio(_profile_bio(profile))
 
 
 def _language_index(value: Any) -> int:
@@ -295,7 +310,7 @@ def _characters(settings: Mapping[str, Any]) -> tuple[list[dict[str, Any]], Any 
 def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str, character_id: str = "") -> dict[str, Any]:
     name = _clean(data.get("name")) or _clean(data.get("username")) or "Conta Instagram"
     url = _clean(data.get("url"))
-    selected_country = _clean(country) if _clean(country) in COUNTRY_OPTIONS else ""
+    selected_country = _clean(country) if _clean(country) in COUNTRY_OPTIONS else _infer_country_from_bio(_profile_bio(data))
     metadata = {
         **dict(data),
         "platform": "instagram",
@@ -322,6 +337,8 @@ def _merge_instagram_refresh(existing: Mapping[str, Any], refreshed: Mapping[str
     for field in ("subscriber_count", "following_count", "post_count", "bio", "bio_raw", "avatar_url"):
         if merged.get(field) in (None, "") and existing.get(field) not in (None, ""):
             merged[field] = existing[field]
+    if not _clean(merged.get("country")):
+        merged["country"] = _infer_country_from_bio(_profile_bio(merged))
     return merged
 
 
@@ -354,7 +371,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             st.write(f"**{_clean(profile.get('name')) or 'Sem nome'}**")
             st.caption(f"{_clean(profile.get('handle')) or _clean(profile.get('url')) or 'sem handler'}")
             _render_instagram_bio(_profile_bio(profile))
-            st.caption(f"{_clean(profile.get('country')) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
+            st.caption(f"{_profile_country(profile) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
         with header_cols[2]:
             st.metric("posts", _metric(profile.get("post_count")))
         with header_cols[3]:
@@ -372,7 +389,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                         posts_ok, _, refreshed_posts = _load_instagram_posts(refreshed, limit=max(10, len(current_posts)))
                         if posts_ok:
                             st.session_state[posts_key] = refreshed_posts
-                        update_channel(profile_id, {**refreshed, "platform": "instagram", "country": profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
+                        update_channel(profile_id, {**refreshed, "platform": "instagram", "country": refreshed.get("country") or profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
                     st.warning(refreshed_message)
@@ -408,7 +425,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                     name = st.text_input("Nome", value=_clean(profile.get("name")), key=f"instagram_edit_name_{profile_id}")
                     handle = st.text_input("handler", value=_clean(profile.get("handle")), key=f"instagram_edit_handle_{profile_id}")
                     bio = st.text_area("Bio", value=_profile_bio(profile), key=f"instagram_edit_bio_{profile_id}")
-                    country = st.selectbox("País", _country_options(), index=_country_index(profile.get("country")), format_func=_country_label, key=f"instagram_edit_country_{profile_id}")
+                    country = st.selectbox("País", _country_options(), index=_country_index(_profile_country(profile)), format_func=_country_label, key=f"instagram_edit_country_{profile_id}")
                     language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(profile.get("language")), format_func=language_label, key=f"instagram_edit_language_{profile_id}")
                 with edit_cols[1]:
                     posts = st.number_input("posts", min_value=0, value=_metric_input(profile.get("post_count")), placeholder="Não encontrado", key=f"instagram_edit_posts_{profile_id}")
@@ -427,7 +444,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             with block_cols[1]:
                 st.markdown(f"**handler**\n\n{_clean(profile.get('handle')) or '—'}")
             with block_cols[2]:
-                st.markdown(f"**País**\n\n{_clean(profile.get('country')) or '—'}")
+                st.markdown(f"**País**\n\n{_profile_country(profile) or '—'}")
             with block_cols[3]:
                 st.markdown(f"**Idioma**\n\n{_clean(profile.get('language')) or '—'}")
 
@@ -459,7 +476,10 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                 st.rerun()
         if search_clicked:
             result = fetch_public_instagram_profile(source)
-            st.session_state["social_instagram_result"] = result.data if isinstance(result.data, dict) else {}
+            result_data = dict(result.data) if isinstance(result.data, dict) else {}
+            if result_data and not _clean(result_data.get("country")):
+                result_data["country"] = _infer_country_from_bio(_profile_bio(result_data))
+            st.session_state["social_instagram_result"] = result_data
             st.session_state["social_instagram_ok"] = result.ok
             st.session_state["social_instagram_message"] = result.message
         if st.session_state.get("social_instagram_message"):
@@ -488,7 +508,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     with form_cols[0]:
                         name = st.text_input("Nome", value=_clean(data.get("name")), key="social_instagram_result_name")
                         bio = st.text_area("Bio", value=_profile_bio(data), key="social_instagram_result_bio")
-                        country = st.selectbox("País", _country_options(), index=_country_index(data.get("country")), format_func=_country_label, key="social_instagram_result_country")
+                        country = st.selectbox("País", _country_options(), index=_country_index(_profile_country(data)), format_func=_country_label, key="social_instagram_result_country")
                         language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key="social_instagram_result_language")
                     with form_cols[1]:
                         posts = st.number_input("posts", min_value=0, value=_metric_input(data.get("post_count")), placeholder="Não encontrado", key="social_instagram_result_posts")
