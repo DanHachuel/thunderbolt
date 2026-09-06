@@ -1,4 +1,8 @@
 # Changelog
+## 0.6.39 — 2026-09-06
+- Renumeração da correcção de compatibilidade Windows/Chromium que estava identificada como 0.6.38; inclui integralmente o fallback Chromium, as variantes de headers e a protecção contra payload Instagram parcial.
+- Mantidas todas as funcionalidades e correcções da 0.6.38, sem alteração de layout.
+
 ## 0.6.38 — 2026-09-06
 - Adicionado fallback Chromium para o endpoint público Instagram quando o Windows devolve HTML parcial a `requests` e `curl`.
 - A pesquisa só usa os dados obtidos pelo navegador quando o payload contém bio, following, followers, posts e username.
