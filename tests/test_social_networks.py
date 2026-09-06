@@ -65,6 +65,17 @@ def test_public_instagram_parser_reads_following_alias_with_nested_payload():
     assert result.data["following_count"] == 987
 
 
+def test_public_instagram_parser_reads_json_metric_aliases():
+    response = Mock(
+        status_code=200,
+        text='<script type="application/json">{"followers":{"value":321},"followingCount":654}</script>',
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=response):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.data["subscriber_count"] == 321
+    assert result.data["following_count"] == 654
+
+
 def test_instagram_ui_uses_canonical_language_selector():
     from app import social_networks_ui
 
@@ -136,3 +147,12 @@ def test_instagram_card_contains_posts_expander_controls():
     assert 'st.button("Actualizar tudo"' in source
     assert 'st.download_button("Baixar todos"' in source
     assert 'st.button("Mostrar + 10"' in source
+
+
+def test_instagram_card_preserves_existing_metrics_when_refresh_has_no_values():
+    from app import social_networks_ui
+
+    source = open(social_networks_ui.__file__, encoding="utf-8").read()
+    assert 'if refreshed.get(field) in (None, "") and profile.get(field) not in (None, "")' in source
+    assert '_profile_metric(profile, "subscriber_count", "followers_count", "follower_count")' in source
+    assert '_profile_metric(profile, "following_count", "following", "follows")' in source

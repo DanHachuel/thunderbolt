@@ -29,6 +29,14 @@ def _metric(value: Any) -> str:
         return _clean(value) or "—"
 
 
+def _profile_metric(profile: Mapping[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = profile.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
 def _language_index(value: Any) -> int:
     code = language_code(value)
     return list(LANGUAGE_CODES).index(code) if code in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt")
@@ -297,16 +305,20 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         with header_cols[2]:
             st.metric("posts", _metric(profile.get("post_count")))
         with header_cols[3]:
-            st.metric("Seguidores", _metric(profile.get("subscriber_count")))
+            st.metric("Seguidores", _metric(_profile_metric(profile, "subscriber_count", "followers_count", "follower_count")))
         with header_cols[4]:
-            st.metric("seguindo", _metric(profile.get("following_count")))
+            st.metric("seguindo", _metric(_profile_metric(profile, "following_count", "following", "follows")))
         with header_cols[5]:
             refresh_col, edit_col = st.columns(2)
             with refresh_col:
                 if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
                     result = fetch_public_instagram_profile(_clean(profile.get("url")) or _clean(profile.get("handle")))
                     if result.ok:
-                        update_channel(profile_id, {**result.data, "platform": "instagram", "country": profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
+                        refreshed = dict(result.data)
+                        for field in ("subscriber_count", "following_count", "post_count", "bio", "avatar_url"):
+                            if refreshed.get(field) in (None, "") and profile.get(field) not in (None, ""):
+                                refreshed[field] = profile[field]
+                        update_channel(profile_id, {**refreshed, "platform": "instagram", "country": profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
                     st.warning(result.message)
