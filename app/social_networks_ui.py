@@ -12,7 +12,7 @@ from hermes_ui.domain import create_channel, update_channel
 from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INFLUENCER_ID, get_repository
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
 
@@ -298,7 +298,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         with header_cols[1]:
             st.write(f"**{_clean(profile.get('name')) or 'Sem nome'}**")
             st.caption(f"{_clean(profile.get('handle')) or _clean(profile.get('url')) or 'sem handler'}")
-            bio = _clean(profile.get("bio"))
+            bio = normalize_instagram_bio(profile.get("bio"))
             if bio:
                 st.caption(f"Bio: {bio}")
             st.caption(f"{_clean(profile.get('country')) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")

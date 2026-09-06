@@ -18,6 +18,16 @@ class IntegrationResult:
     data: dict[str, Any]
 
 
+def normalize_instagram_bio(value: Any) -> str:
+    """Keep the profile biography, never Instagram's metrics summary."""
+    bio = str(value or '').strip()
+    if not bio:
+        return ''
+    if re.search(r'\b(?:followers|following|seguidores|seguindo|posts|publicações)\b', bio, flags=re.IGNORECASE) and re.search(r'\d', bio):
+        return ''
+    return bio
+
+
 def normalize_instagram_reference(source: str) -> dict[str, str]:
     value = str(source or '').strip()
     if not value:
@@ -114,7 +124,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'id': f"instagram_{reference['username']}",
         **reference,
         'name': str(user.get('full_name') or user.get('username') or reference['username']).strip(),
-        'bio': str(user.get('biography') or '').strip(),
+        'bio': normalize_instagram_bio(user.get('biography')),
         'avatar_url': str(user.get('profile_pic_url_hd') or user.get('profile_pic_url') or '').strip(),
         'subscriber_count': followers,
         'following_count': following,
@@ -137,6 +147,9 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
         return IntegrationResult(False, f'Não foi possível consultar o perfil público do Instagram: {exc}', reference)
     if response.status_code >= 400:
         return IntegrationResult(False, f'O Instagram devolveu HTTP {response.status_code}. Confirme o @handle ou use o cadastro manual.', reference | {'status_code': response.status_code})
+    api_user = _fetch_web_profile_user(reference['username'])
+    if api_user:
+        return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
     title = _meta(response.text, 'og:title') or reference['username']
     description = _meta(response.text, 'og:description')
     avatar_url = _meta(response.text, 'og:image')
@@ -154,11 +167,7 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(response.text, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(response.text, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',)) or _structured_metric(response.text, 'edge_owner_to_timeline_media', 'posts', 'post_count')
-    if followers is None or following is None or not avatar_url:
-        api_user = _fetch_web_profile_user(reference['username'])
-        if api_user:
-            return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
-    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
+    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': normalize_instagram_bio(description), 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
 
@@ -257,4 +266,4 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
 
-__all__ = ['IntegrationResult', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_reference']
+__all__ = ['IntegrationResult', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_reference']
