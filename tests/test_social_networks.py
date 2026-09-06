@@ -73,6 +73,14 @@ def test_instagram_ui_uses_canonical_language_selector():
     assert 'st.text_input("Idioma"' not in source
 
 
+def test_instagram_card_renders_profile_bio_next_to_identity():
+    from app import social_networks_ui
+
+    source = open(social_networks_ui.__file__, encoding="utf-8").read()
+    assert 'bio = _clean(profile.get("bio"))' in source
+    assert 'st.caption(f"Bio: {bio}")' in source
+
+
 def test_create_channel_keeps_social_metadata_for_instagram_accounts():
     saved = []
 

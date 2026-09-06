@@ -214,6 +214,9 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         with header_cols[1]:
             st.write(f"**{_clean(profile.get('name')) or 'Sem nome'}**")
             st.caption(f"{_clean(profile.get('handle')) or _clean(profile.get('url')) or 'sem handler'}")
+            bio = _clean(profile.get("bio"))
+            if bio:
+                st.caption(f"Bio: {bio}")
             st.caption(f"{_clean(profile.get('country')) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
         with header_cols[2]:
             st.metric("posts", _metric(profile.get("post_count")))
