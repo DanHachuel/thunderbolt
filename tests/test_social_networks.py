@@ -104,6 +104,33 @@ def test_public_instagram_endpoint_uses_curl_fallback_after_http_429():
     assert run.called
 
 
+def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint():
+    api_response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {
+            "username": "private_creator", "full_name": "Private Creator", "is_private": True,
+            "biography": "Linha um\nLinha dois", "edge_follow": {"count": 2468},
+            "edge_followed_by": {"count": 1357}, "edge_owner_to_timeline_media": {"count": 42, "edges": []},
+        }}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=api_response):
+        result = fetch_public_instagram_profile("@private_creator")
+    assert result.data["bio"] == "Linha um\nLinha dois"
+    assert result.data["following_count"] == 2468
+    assert result.data["is_private"] is True
+
+
+def test_private_profile_posts_return_authentication_message():
+    api_response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {"username": "private_creator", "is_private": True, "edge_owner_to_timeline_media": {"edges": []}}}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=api_response):
+        result = fetch_public_instagram_posts("@private_creator")
+    assert result.ok is False
+    assert "conta é privada" in result.message
+
+
 def test_instagram_metric_normalization_keeps_unknown_distinct_from_zero():
     assert normalize_instagram_metric({"count": "12.345"}) == 12345
     assert normalize_instagram_metric("8,765") == 8765
@@ -155,11 +182,12 @@ def test_instagram_card_renders_profile_bio_next_to_identity():
     from app import social_networks_ui
 
     source = open(social_networks_ui.__file__, encoding="utf-8").read()
-    assert 'bio = normalize_instagram_bio(profile.get("bio"))' in source
-    assert 'st.caption(f"Bio: {bio}")' in source
+    assert 'def _render_instagram_bio(value: Any) -> None:' in source
+    assert 'st.caption(f"Bio: {bio}")' not in source
+    assert 'bio.replace("\\n", "  \\n")' in source
     assert 'st.selectbox("País", _country_options()' in source
     assert 'delete_channel(profile_id)' in source
-    assert 'bio = normalize_instagram_bio(data.get("bio"))' in source
+    assert '_render_instagram_bio(data.get("bio"))' in source
     assert '"bio": normalize_instagram_bio(data.get("bio"))' in source
     assert 'placeholder="Não encontrado"' in source
 
