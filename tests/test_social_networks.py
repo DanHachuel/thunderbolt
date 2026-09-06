@@ -1,9 +1,9 @@
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _infer_country_from_bio, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _refresh_instagram_profile, _save_public_profile
+from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import _fetch_web_profile_user, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
+from integrations.instagram_public import _fetch_web_profile_user, extract_public_instagram_country, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 from hermes_ui.countries import COUNTRY_OPTIONS
 
@@ -123,6 +123,25 @@ def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint()
     assert result.data["is_private"] is True
 
 
+def test_public_profile_keeps_account_country_from_transparency_payload():
+    api_response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {
+            "username": "creator", "biography": "Brasil na bio não é a origem",
+            "country_of_registration": "Portugal", "edge_follow": {"count": 12},
+        }}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=api_response), patch("integrations.instagram_public.shutil.which", return_value=None):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.data["country"] == "Portugal"
+
+
+def test_country_extractor_ignores_bio_and_uses_only_explicit_account_country():
+    assert extract_public_instagram_country({"biography": "Brasil", "account_country": "Portugal"}) == "Portugal"
+    assert extract_public_instagram_country({"business_address_json": {"country": "Brasil"}, "account_transparency": {"country_name": "Portugal"}}) == "Portugal"
+    assert extract_public_instagram_country({"biography": "Brasil"}) == ""
+
+
 def test_private_profile_posts_return_authentication_message():
     api_response = Mock(
         status_code=200,
@@ -162,6 +181,15 @@ def test_instagram_refresh_preserves_existing_bio_and_following_when_response_om
     assert merged["subscriber_count"] == 100
 
 
+def test_instagram_refresh_preserves_internal_channel_id_and_country():
+    merged = _merge_instagram_refresh(
+        {"id": "channel_internal", "country": "Brasil", "bio": "Bio antiga"},
+        {"id": "instagram_creator", "country": "", "bio": "Bio nova"},
+    )
+    assert merged["id"] == "channel_internal"
+    assert merged["country"] == "Brasil"
+
+
 def test_refresh_button_function_returns_canonical_updated_profile():
     result = Mock(ok=True, message="ok", data={"bio": "Bio nova", "following_count": 765, "subscriber_count": 1234})
     with patch("app.social_networks_ui.fetch_public_instagram_profile", return_value=result) as fetch:
@@ -173,9 +201,10 @@ def test_refresh_button_function_returns_canonical_updated_profile():
     fetch.assert_called_once_with("https://www.instagram.com/creator/")
 
 
-def test_country_is_inferred_from_a_clear_country_name_in_bio():
-    assert _infer_country_from_bio("Brasil/ SP 🇧🇷\nGeminiana") == "Brasil"
-    assert _infer_country_from_bio("Criadora de conteúdo") == ""
+def test_country_normalization_only_normalizes_explicit_form_values():
+    assert _normalise_country("Brazil") == "Brasil"
+    assert _normalise_country("Brasil") == "Brasil"
+    assert _normalise_country("Brasil/ SP") == ""
 
 
 def test_load_posts_button_function_uses_saved_profile_url_and_returns_posts():

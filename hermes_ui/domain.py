@@ -87,7 +87,7 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "updated_at": now(),
     }
     if metadata:
-        channel.update({k: v for k, v in metadata.items() if k in channel})
+        channel.update({k: v for k, v in metadata.items() if k in channel and k != "id"})
     channels = read_json("channels.json", [])
     channels.append(channel)
     write_json("channels.json", channels)
