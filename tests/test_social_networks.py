@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import _fetch_web_profile_user, extract_public_instagram_country, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
+from integrations.instagram_public import _country_from_bloks, _fetch_web_profile_user, extract_public_instagram_country, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 from hermes_ui.countries import COUNTRY_OPTIONS
 
@@ -140,6 +140,23 @@ def test_country_extractor_ignores_bio_and_uses_only_explicit_account_country():
     assert extract_public_instagram_country({"biography": "Brasil", "account_country": "Portugal"}) == "Portugal"
     assert extract_public_instagram_country({"business_address_json": {"country": "Brasil"}, "account_transparency": {"country_name": "Portugal"}}) == "Portugal"
     assert extract_public_instagram_country({"biography": "Brasil"}) == ""
+
+
+def test_bloks_about_parser_reads_account_country_without_using_bio_or_business_address():
+    payload = {"layout": {"bloks_payload": {"data": [{"data": {"key": "about_this_account_country", "initial_lispy": '(bk.action.array.Make, "Portugal")'}}]}}}
+    assert _country_from_bloks(payload) == "Portugal"
+    assert _country_from_bloks({"biography": "Brasil", "business_address_json": {"country": "Brasil"}}) == ""
+
+
+def test_authenticated_about_country_is_merged_into_real_profile_result(monkeypatch):
+    profile_response = Mock(status_code=200, json=lambda: {"data": {"user": {"id": "123", "username": "creator", "biography": "Bio real", "edge_follow": {"count": 456}}}})
+    about_response = Mock(status_code=200, json=lambda: {"data": {"about_this_account_country": "Portugal"}})
+    monkeypatch.setenv("INSTAGRAM_SESSIONID", "session-value")
+    with patch("integrations.instagram_public.requests.get", return_value=profile_response), patch("integrations.instagram_public.requests.post", return_value=about_response), patch("integrations.instagram_public.shutil.which", return_value=None):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.data["bio"] == "Bio real"
+    assert result.data["following_count"] == 456
+    assert result.data["country"] == "Portugal"
 
 
 def test_private_profile_posts_return_authentication_message():

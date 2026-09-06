@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import json
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -11,6 +12,31 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 import requests
+
+
+ABOUT_ACCOUNT_URL = 'https://i.instagram.com/api/v1/bloks/apps/com.instagram.interactions.about_this_account/'
+ABOUT_ACCOUNT_BLOKS_VERSION = '8ca96ca267e30c02cf90888d91eeff09627f0e3fd2bd9df472278c9a6c022cbb'
+
+
+def _instagram_cookies() -> dict[str, str]:
+    cookies = {}
+    sessionid = os.getenv('INSTAGRAM_SESSIONID') or os.getenv('IG_SESSIONID')
+    if sessionid:
+        cookies['sessionid'] = sessionid.strip()
+    for name in ('csrftoken', 'ds_user_id', 'mid', 'ig_did'):
+        value = os.getenv(f'INSTAGRAM_{name.upper()}') or os.getenv(f'IG_{name.upper()}')
+        if value:
+            cookies[name] = value.strip()
+    return cookies
+
+
+def _instagram_headers() -> dict[str, str]:
+    return {
+        'x-ig-app-id': '936619743392459',
+        'User-Agent': 'Instagram 390.0.0.0.50 Android',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
 
 
 @dataclass
@@ -104,12 +130,8 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
-    headers = {
-        'x-ig-app-id': '936619743392459',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
+    headers = _instagram_headers()
+    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
     # The www host is the current public web endpoint. The legacy i host is
     # retained as a fallback because Instagram rate-limits the two hosts
     # independently and their availability can vary by region.
@@ -150,6 +172,60 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     return None
 
 
+def _country_from_bloks(value: Any) -> str:
+    if isinstance(value, Mapping):
+        data_key = str(value.get('key') or '').casefold()
+        if data_key in PUBLIC_COUNTRY_KEYS:
+            serialized = value.get('initial_lispy') or value.get('value')
+            if isinstance(serialized, str) and 'bk.action.array.Make' in serialized:
+                country = _country_value(serialized.rsplit('bk.action.array.Make,', 1)[-1].split(')', 1)[0].replace('\\"', '"').replace('"', '').strip())
+            else:
+                country = _country_value(serialized)
+            if country:
+                return country
+        for key, candidate in value.items():
+            if str(key).casefold() in PUBLIC_COUNTRY_KEYS:
+                if isinstance(candidate, str) and 'bk.action.array.Make' in candidate:
+                    country = _country_value(candidate.rsplit('bk.action.array.Make,', 1)[-1].split(')', 1)[0].replace('\\"', '"').replace('"', '').strip())
+                else:
+                    country = _country_value(candidate)
+                if country:
+                    return country
+            country = _country_from_bloks(candidate)
+            if country:
+                return country
+    elif isinstance(value, list):
+        for candidate in value:
+            country = _country_from_bloks(candidate)
+            if country:
+                return country
+    elif isinstance(value, str) and 'about_this_account_country' in value:
+        marker = 'bk.action.array.Make,'
+        if marker in value:
+            country = value.rsplit(marker, 1)[-1].split(')', 1)[0].replace('\\"', '"').replace('"', '').strip()
+            return _country_value(country)
+    return ''
+
+
+def _fetch_instagram_about_country(user_id: Any) -> str:
+    cookies = _instagram_cookies()
+    if not cookies or not str(user_id or '').strip():
+        return ''
+    payload = {
+        'referer_type': 'ProfileUsername',
+        'target_user_id': str(user_id),
+        'bk_client_context': json.dumps({'bloks_version': ABOUT_ACCOUNT_BLOKS_VERSION, 'style_id': 'instagram'}, separators=(',', ':')),
+        'bloks_versioning_id': ABOUT_ACCOUNT_BLOKS_VERSION,
+    }
+    try:
+        response = requests.post(ABOUT_ACCOUNT_URL, data=payload, headers=_instagram_headers(), cookies=cookies, timeout=20)
+        if response.status_code >= 400:
+            return ''
+        return _country_from_bloks(response.json())
+    except (requests.RequestException, ValueError, TypeError):
+        return ''
+
+
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
     followers = _profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = _profile_metric(user, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
@@ -157,7 +233,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
     biography = str(user.get('biography') or '').strip()
-    country = extract_public_instagram_country(user)
+    country = extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
     return {
         'id': f"instagram_{reference['username']}",
         **reference,
@@ -188,7 +264,7 @@ def normalize_instagram_metric(value: Any) -> int | None:
 
 
 PUBLIC_COUNTRY_KEYS = {
-    'account_based_in', 'account_country', 'country_name',
+    'about_this_account_country', 'account_based_in', 'account_country', 'country_name',
     'country_of_origin', 'country_of_registration', 'location_country', 'transparency_country',
 }
 PUBLIC_TRANSPARENCY_KEYS = {'about', 'about_account', 'account_transparency', 'transparency', 'account_info'}
