@@ -25,7 +25,13 @@ def normalize_instagram_bio(value: Any) -> str:
     bio = str(value or '').strip()
     if not bio:
         return ''
-    if re.search(r'\b(?:followers|following|seguidores|seguindo|posts|publicações)\b', bio, flags=re.IGNORECASE) and re.search(r'\d', bio):
+    metric_words = r'followers|following|seguidores|seguindo|posts|publicações|publications'
+    metric_hits = re.findall(
+        rf'(?:\d[\d.,]*\s*(?:{metric_words})\b|\b(?:{metric_words})\s*\d[\d.,]*)',
+        bio,
+        flags=re.IGNORECASE,
+    )
+    if len(metric_hits) >= 2:
         return ''
     return bio
 
