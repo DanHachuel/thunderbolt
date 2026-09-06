@@ -196,6 +196,36 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                         return best_user
             except (OSError, subprocess.SubprocessError, ValueError):
                 continue
+
+    # Em algumas instalações Windows o Instagram devolve a página HTML aos
+    # clientes HTTP, embora entregue o JSON completo a um navegador Chromium.
+    # O fallback é opcional: a aplicação continua funcional sem Playwright.
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(
+                    user_agent=headers['User-Agent'],
+                    extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9'},
+                )
+                for endpoint in endpoints:
+                    try:
+                        response = page.goto(endpoint, wait_until='domcontentloaded', timeout=30000)
+                        if response is None or response.status >= 400:
+                            continue
+                        payload = json.loads(page.locator('body').inner_text(timeout=5000))
+                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+                        if isinstance(user, dict):
+                            best_user = merge_profile(best_user, user)
+                            if profile_quality(best_user) >= 4:
+                                return best_user
+                    except (ValueError, TimeoutError):
+                        continue
+            finally:
+                browser.close()
+    except (ImportError, OSError, RuntimeError):
+        pass
     return best_user
 
 
