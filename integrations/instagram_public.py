@@ -124,6 +124,98 @@ def _instagram_headers() -> dict[str, str]:
     }
 
 
+def _instagram_playwright_headless() -> bool:
+    """Use headed mode for Windows diagnostics unless explicitly overridden."""
+    value = os.getenv('INSTAGRAM_PLAYWRIGHT_HEADLESS', 'false').strip().casefold()
+    return value not in {'0', 'false', 'no', 'off'}
+
+
+def _save_instagram_debug_html(username: str, document: str) -> None:
+    path = Path(os.getenv('INSTAGRAM_DEBUG_PROFILE_HTML', str(Path(__file__).resolve().parents[1] / 'debug_profile.html')))
+    try:
+        path.write_text(document, encoding='utf-8')
+        LOGGER.info('HTML salvo em %s', path)
+    except OSError as exc:
+        LOGGER.warning('Não foi possível salvar o HTML de diagnóstico Instagram: %s', exc)
+
+
+def _instagram_instaloader():
+    """Load the optional anonymous fallback without mutating the user's environment."""
+    try:
+        import instaloader
+    except ImportError:
+        LOGGER.warning('Fallback instaloader indisponível; instale com: python -m pip install instaloader')
+        return None
+    return instaloader
+
+
+def fetch_profile_instaloader(username: str) -> dict[str, Any] | None:
+    """Fetch a public profile anonymously through Instaloader when Playwright fails."""
+    instaloader = _instagram_instaloader()
+    if instaloader is None:
+        return None
+    try:
+        loader = instaloader.Instaloader(
+            quiet=True,
+            download_pictures=False,
+            download_videos=False,
+            download_video_thumbnails=False,
+            save_metadata=False,
+        )
+        profile = instaloader.Profile.from_username(loader.context, username)
+        LOGGER.info('Fallback instaloader activado para o perfil @%s', username)
+        return {
+            'id': str(getattr(profile, 'userid', '') or ''),
+            'username': str(getattr(profile, 'username', '') or username),
+            'full_name': str(getattr(profile, 'full_name', '') or ''),
+            'biography': str(getattr(profile, 'biography', '') or ''),
+            'follower_count': getattr(profile, 'followers', None),
+            'following_count': getattr(profile, 'followees', None),
+            'edge_owner_to_timeline_media': {'count': getattr(profile, 'mediacount', None)},
+            'is_private': bool(getattr(profile, 'is_private', False)),
+            '_instagram_source': 'instaloader',
+        }
+    except Exception as exc:
+        LOGGER.warning('Fallback instaloader falhou para @%s: %s', username, exc, exc_info=True)
+        return None
+
+
+def fetch_posts_instaloader(username: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Fetch public posts anonymously through Instaloader when Playwright fails."""
+    instaloader = _instagram_instaloader()
+    if instaloader is None:
+        return []
+    posts: list[dict[str, Any]] = []
+    try:
+        loader = instaloader.Instaloader(
+            quiet=True,
+            download_pictures=False,
+            download_videos=False,
+            download_video_thumbnails=False,
+            save_metadata=False,
+        )
+        profile = instaloader.Profile.from_username(loader.context, username)
+        for post in profile.get_posts():
+            shortcode = str(getattr(post, 'shortcode', '') or '')
+            if not shortcode:
+                continue
+            posts.append({
+                'id': str(getattr(post, 'mediaid', '') or shortcode),
+                'shortcode': shortcode,
+                'url': f'https://www.instagram.com/p/{shortcode}/',
+                'image_url': str(getattr(post, 'url', '') or ''),
+                'caption': str(getattr(post, 'caption', '') or '').strip(),
+                'published_at': getattr(post, 'date_utc', '') or '',
+                'is_video': bool(getattr(post, 'is_video', False)),
+            })
+            if len(posts) >= max(1, int(limit)):
+                break
+        LOGGER.info('Fallback instaloader carregou %s posts para @%s', len(posts), username)
+    except Exception as exc:
+        LOGGER.warning('Fallback instaloader falhou nos posts de @%s: %s', username, exc, exc_info=True)
+    return posts
+
+
 @dataclass
 class IntegrationResult:
     ok: bool
@@ -291,11 +383,11 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | N
     try:
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(headless=_instagram_playwright_headless())
             try:
                 page = browser.new_page(
                     user_agent=headers['User-Agent'],
-                    extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9'},
+                    extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9', 'Accept': 'application/json, text/plain, */*', 'Origin': 'https://www.instagram.com', 'Referer': 'https://www.instagram.com/'},
                 )
                 if cookies:
                     page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
@@ -314,16 +406,26 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | N
                         LOGGER.debug('Não foi possível interpretar resposta web_profile_info: %s', exc)
 
                 page.on('response', capture_profile_response)
+                try:
+                    page.goto('https://www.instagram.com/', wait_until='domcontentloaded', timeout=10000)
+                    LOGGER.debug('Instagram Playwright página inicial carregada para cookies.')
+                except Exception as exc:
+                    LOGGER.debug('Instagram Playwright não carregou a página inicial: %s', exc)
                 url = f'https://www.instagram.com/{username}/'
-                response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                response = page.goto(url, wait_until='domcontentloaded', timeout=10000)
                 LOGGER.debug('Instagram Playwright profile URL=%s status=%s', url, response.status if response else None)
                 if response is None or response.status >= 400:
-                    return None
+                    LOGGER.warning('Instagram Playwright perfil HTTP status=%s URL=%s', response.status if response else None, url)
+                    return captured_user
+                try:
+                    _save_instagram_debug_html(username, page.content())
+                except Exception as exc:
+                    LOGGER.debug('Não foi possível guardar HTML de diagnóstico: %s', exc)
                 try:
                     page.wait_for_load_state('networkidle', timeout=10000)
                 except (PlaywrightTimeoutError, TimeoutError):
                     LOGGER.debug('Instagram Playwright networkidle excedido; usando resposta API já capturada.')
-                LOGGER.debug('Instagram Playwright API profile user=%s quality=%s', bool(captured_user), _profile_quality(captured_user or {}))
+                LOGGER.info('Instagram Playwright API profile captured=%s quality=%s URL=%s', bool(captured_user), _profile_quality(captured_user or {}), url)
             finally:
                 browser.close()
     except Exception as exc:
@@ -339,7 +441,11 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
     if platform.system() == 'Windows':
         LOGGER.debug('Windows detectado: perfil Instagram exclusivamente via Playwright.')
-        return _fetch_profile_with_playwright(username, headers, cookies)
+        playwright_user = _fetch_profile_with_playwright(username, headers, cookies)
+        if playwright_user:
+            return playwright_user
+        LOGGER.warning('Fallback para instaloader activado no perfil @%s.', username)
+        return fetch_profile_instaloader(username)
 
     endpoints = (
         f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
@@ -570,7 +676,10 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
         return IntegrationResult(False, str(exc), {})
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
-        return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
+        data = _profile_data_from_api(api_user, reference)
+        if api_user.get('_instagram_source') == 'instaloader':
+            return IntegrationResult(True, 'Perfil encontrado via fallback instaloader. O país pode não estar disponível.', data)
+        return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
     if platform.system() == 'Windows':
         return IntegrationResult(False, 'Não foi possível extrair os dados públicos do Instagram com o Playwright.', reference)
     try:
@@ -674,11 +783,11 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
     try:
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(headless=_instagram_playwright_headless())
             try:
                 page = browser.new_page(
                     user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
-                    extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9'},
+                    extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9', 'Accept': 'application/json, text/plain, */*', 'Origin': 'https://www.instagram.com', 'Referer': 'https://www.instagram.com/'},
                 )
                 if cookies:
                     page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
@@ -703,7 +812,11 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                         LOGGER.debug('Não foi possível interpretar posts web_profile_info: %s', exc)
 
                 page.on('response', capture_profile_posts)
-                response = page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
+                try:
+                    page.goto('https://www.instagram.com/', wait_until='domcontentloaded', timeout=10000)
+                except Exception as exc:
+                    LOGGER.debug('Instagram Playwright não carregou a página inicial para posts: %s', exc)
+                response = page.goto(reference['url'], wait_until='domcontentloaded', timeout=10000)
                 LOGGER.debug('Instagram Playwright posts URL=%s status=%s', reference['url'], response.status if response else None)
                 if response is None or response.status >= 400:
                     return []
@@ -731,6 +844,9 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     if platform.system() == 'Windows':
         LOGGER.debug('Windows detectado: posts Instagram exclusivamente via Playwright.')
         posts = _fetch_posts_with_playwright(reference, limit, _instagram_cookies())
+        if not posts:
+            LOGGER.warning('Fallback para instaloader activado nos posts de @%s.', reference['username'])
+            posts = fetch_posts_instaloader(reference['username'], limit)
         return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
@@ -773,4 +889,4 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
 
-__all__ = ['IntegrationResult', 'extract_public_instagram_country', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_metric', 'normalize_instagram_reference']
+__all__ = ['IntegrationResult', 'extract_public_instagram_country', 'fetch_posts_instaloader', 'fetch_profile_instaloader', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_bio', 'normalize_instagram_metric', 'normalize_instagram_reference']

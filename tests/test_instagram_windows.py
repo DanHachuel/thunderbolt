@@ -86,6 +86,25 @@ class InstagramWindowsRegressionTests(unittest.TestCase):
             result = instagram_public.fetch_public_instagram_profile("@conta")
         self.assertFalse(result.ok)
 
+    def test_windows_profile_uses_instaloader_when_playwright_is_empty(self):
+        expected = {"username": "conta", "biography": "Bio fallback", "follower_count": 12, "following_count": 3, "_instagram_source": "instaloader"}
+        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+             patch.object(instagram_public, "_fetch_profile_with_playwright", return_value=None), \
+             patch.object(instagram_public, "fetch_profile_instaloader", return_value=expected) as fallback:
+            result = instagram_public._fetch_web_profile_user("conta")
+        self.assertEqual(result, expected)
+        fallback.assert_called_once_with("conta")
+
+    def test_windows_posts_use_instaloader_when_playwright_is_empty(self):
+        expected = [{"id": "post-1", "shortcode": "ABC", "image_url": "https://img/1.jpg"}]
+        with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+             patch.object(instagram_public, "_fetch_posts_with_playwright", return_value=[]), \
+             patch.object(instagram_public, "fetch_posts_instaloader", return_value=expected) as fallback:
+            result = instagram_public.fetch_public_instagram_posts("@conta", limit=10)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["posts"], expected)
+        fallback.assert_called_once_with("conta", 10)
+
 
 if __name__ == "__main__":
     unittest.main()
