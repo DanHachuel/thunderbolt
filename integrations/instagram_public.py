@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
@@ -98,4 +99,88 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
 
-__all__ = ['IntegrationResult', 'fetch_public_instagram_profile', 'normalize_instagram_reference']
+def _walk_json(value: Any):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_json(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_json(child)
+
+
+def _embedded_json_documents(document: str) -> list[Any]:
+    decoder = json.JSONDecoder()
+    documents: list[Any] = []
+    for script in re.findall(r'<script[^>]*>(.*?)</script>', document, flags=re.IGNORECASE | re.DOTALL):
+        candidate = script.strip()
+        if not candidate:
+            continue
+        for start in [0] + [match.start() for match in re.finditer(r'[\[{]', candidate)][:20]:
+            try:
+                parsed, _ = decoder.raw_decode(candidate[start:])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            documents.append(parsed)
+            break
+    return documents
+
+
+def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
+    shortcode = str(node.get('shortcode') or node.get('code') or '').strip()
+    media_id = str(node.get('id') or '').strip()
+    image_url = str(node.get('display_url') or node.get('thumbnail_src') or node.get('image') or '').strip()
+    if not shortcode and not media_id:
+        return None
+    if not image_url and not node.get('is_video'):
+        return None
+    caption_value = node.get('caption') or node.get('title') or ''
+    if isinstance(caption_value, dict):
+        caption_value = caption_value.get('text') or ''
+    edges = node.get('edge_media_to_caption')
+    if isinstance(edges, dict):
+        edge_list = edges.get('edges') or []
+        if edge_list and isinstance(edge_list[0], dict):
+            caption_value = ((edge_list[0].get('node') or {}).get('text') or caption_value)
+    url = str(node.get('permalink') or node.get('url') or '').strip()
+    if not url and shortcode:
+        url = f'https://www.instagram.com/p/{shortcode}/'
+    return {
+        'id': media_id or shortcode,
+        'shortcode': shortcode,
+        'url': url,
+        'image_url': image_url,
+        'caption': str(caption_value or '').strip(),
+        'published_at': node.get('taken_at_timestamp') or node.get('taken_at') or '',
+        'is_video': bool(node.get('is_video') or node.get('video_url')),
+    }
+
+
+def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationResult:
+    try:
+        reference = normalize_instagram_reference(source)
+    except ValueError as exc:
+        return IntegrationResult(False, str(exc), {})
+    try:
+        response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
+    except requests.RequestException as exc:
+        return IntegrationResult(False, f'Não foi possível consultar os posts públicos do Instagram: {exc}', reference)
+    if response.status_code >= 400:
+        return IntegrationResult(False, f'O Instagram devolveu HTTP {response.status_code} ao consultar os posts.', reference | {'status_code': response.status_code})
+    posts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for document in _embedded_json_documents(response.text):
+        for node in _walk_json(document):
+            post = _post_from_node(node)
+            if not post or post['id'] in seen:
+                continue
+            seen.add(post['id'])
+            posts.append(post)
+            if len(posts) >= max(1, int(limit)):
+                break
+        if len(posts) >= max(1, int(limit)):
+            break
+    return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
+
+
+__all__ = ['IntegrationResult', 'fetch_public_instagram_posts', 'fetch_public_instagram_profile', 'normalize_instagram_reference']

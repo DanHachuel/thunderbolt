@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import io
 import uuid
+import zipfile
 from typing import Any, Callable, Mapping
 
+import requests
 import streamlit as st
 
 from hermes_ui.domain import create_channel, update_channel
 from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INFLUENCER_ID, get_repository
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import fetch_public_instagram_profile
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
 
@@ -29,6 +32,79 @@ def _metric(value: Any) -> str:
 def _language_index(value: Any) -> int:
     code = language_code(value)
     return list(LANGUAGE_CODES).index(code) if code in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt")
+
+
+def _instagram_posts_key(profile_id: str) -> str:
+    return f"instagram_posts_{profile_id}"
+
+
+def _instagram_posts_archive(posts: list[dict[str, Any]]) -> bytes:
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        manifest: list[str] = []
+        for index, post in enumerate(posts, start=1):
+            url = _clean(post.get("image_url"))
+            if url:
+                try:
+                    response = requests.get(url, timeout=15)
+                    response.raise_for_status()
+                    extension = ".jpg"
+                    content_type = response.headers.get("content-type", "")
+                    if "png" in content_type:
+                        extension = ".png"
+                    elif "webp" in content_type:
+                        extension = ".webp"
+                    bundle.writestr(f"post-{index:02d}{extension}", response.content)
+                except requests.RequestException:
+                    pass
+            manifest.append(f"{index}. {_clean(post.get('url'))}\n{_clean(post.get('caption'))}\n")
+        bundle.writestr("posts.txt", "\n".join(manifest))
+    return archive.getvalue()
+
+
+def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
+    profile_id = _clean(profile.get("id"))
+    state_key = _instagram_posts_key(profile_id)
+    posts = st.session_state.get(state_key, [])
+    source = _clean(profile.get("url")) or _clean(profile.get("handle"))
+    with st.expander("Últimos posts do Instagram", expanded=False):
+        action_cols = st.columns(3)
+        with action_cols[0]:
+            load_clicked = st.button("Carregar últimos 10", key=f"load_instagram_posts_{profile_id}", use_container_width=True)
+        with action_cols[1]:
+            refresh_clicked = st.button("Actualizar tudo", key=f"refresh_instagram_posts_{profile_id}", use_container_width=True)
+        with action_cols[2]:
+            download_clicked = bool(posts) and st.download_button("Baixar todos", data=_instagram_posts_archive(posts), file_name=f"instagram-{profile_id}-posts.zip", mime="application/zip", key=f"download_instagram_posts_{profile_id}", use_container_width=True)
+        if load_clicked or refresh_clicked:
+            target = max(10, len(posts)) if refresh_clicked else 10
+            result = fetch_public_instagram_posts(source, limit=target)
+            if result.ok:
+                posts = result.data.get("posts", [])
+                st.session_state[state_key] = posts
+                st.success(f"{len(posts)} posts carregados.")
+            else:
+                st.warning(result.message)
+        posts = st.session_state.get(state_key, posts)
+        if not posts:
+            st.info("Clique em Carregar últimos 10 para consultar os posts públicos desta conta.")
+            return
+        for post in posts:
+            with st.container(border=True):
+                post_cols = st.columns([1, 3])
+                with post_cols[0]:
+                    if _clean(post.get("image_url")):
+                        st.image(post["image_url"], use_container_width=True)
+                with post_cols[1]:
+                    if _clean(post.get("url")):
+                        st.link_button("Abrir post", post["url"])
+                    if _clean(post.get("caption")):
+                        st.caption(post["caption"])
+        if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", use_container_width=True):
+            result = fetch_public_instagram_posts(source, limit=len(posts) + 10)
+            if result.ok:
+                st.session_state[state_key] = result.data.get("posts", posts)
+                st.rerun()
+            st.warning(result.message)
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:
@@ -279,6 +355,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             update_channel(profile_id, {"character_id": selected_character})
             st.success("Personagem associado à conta Instagram.")
             st.rerun()
+        _render_instagram_posts(profile)
 
 
 def render_social_networks(settings: dict[str, Any]) -> None:
