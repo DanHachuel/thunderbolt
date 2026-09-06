@@ -591,6 +591,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         data = st.session_state.get("social_instagram_result", {}) if st.session_state.get("social_instagram_ok") else {}
         if data:
             characters, _ = _characters(settings)
+            result_widget_id = _instagram_profile_storage_id(data)
             with st.container(border=True):
                 st.subheader("Conta Instagram encontrada")
                 preview_cols = st.columns([0.8, 2.2, 1.2, 1.2, 1.2])
@@ -607,20 +608,20 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     st.metric("Seguidores", _metric(_profile_metric(data, "subscriber_count", "followers_count", "follower_count", "followers", "edge_followed_by")))
                 with preview_cols[4]:
                     st.metric("seguindo", _metric(_profile_metric(data, "following_count", "following", "follows", "followingCount", "edge_follow")))
-                with st.form("social_instagram_save_public_profile"):
+                with st.form(f"social_instagram_save_public_profile_{result_widget_id}"):
                     form_cols = st.columns(2)
                     with form_cols[0]:
-                        name = st.text_input("Nome", value=_clean(data.get("name")), key="social_instagram_result_name")
-                        bio = st.text_area("Bio", value=_profile_bio(data), key="social_instagram_result_bio")
-                        country = st.selectbox("País", _country_options(), index=_country_index(_profile_country(data)), format_func=_country_label, key="social_instagram_result_country")
-                        language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key="social_instagram_result_language")
+                        name = st.text_input("Nome", value=_clean(data.get("name")), key=f"social_instagram_result_name_{result_widget_id}")
+                        bio = st.text_area("Bio", value=_profile_bio(data), key=f"social_instagram_result_bio_{result_widget_id}")
+                        country = st.selectbox("País", _country_options(), index=_country_index(_profile_country(data)), format_func=_country_label, key=f"social_instagram_result_country_{result_widget_id}")
+                        language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key=f"social_instagram_result_language_{result_widget_id}")
                     with form_cols[1]:
-                        posts = st.number_input("posts", min_value=0, value=_metric_input(_profile_metric(data, "post_count", "posts", "media_count")), placeholder="Não encontrado", key="social_instagram_result_posts")
-                        followers = st.number_input("Seguidores", min_value=0, value=_metric_input(_profile_metric(data, "subscriber_count", "followers_count", "follower_count", "followers", "edge_followed_by")), placeholder="Não encontrado", key="social_instagram_result_followers")
-                        following = st.number_input("seguindo", min_value=0, value=_metric_input(_profile_metric(data, "following_count", "following", "follows", "followingCount", "edge_follow")), placeholder="Não encontrado", key="social_instagram_result_following")
+                        posts = st.number_input("posts", min_value=0, value=_metric_input(_profile_metric(data, "post_count", "posts", "media_count")), placeholder="Não encontrado", key=f"social_instagram_result_posts_{result_widget_id}")
+                        followers = st.number_input("Seguidores", min_value=0, value=_metric_input(_profile_metric(data, "subscriber_count", "followers_count", "follower_count", "followers", "edge_followed_by")), placeholder="Não encontrado", key=f"social_instagram_result_followers_{result_widget_id}")
+                        following = st.number_input("seguindo", min_value=0, value=_metric_input(_profile_metric(data, "following_count", "following", "follows", "followingCount", "edge_follow")), placeholder="Não encontrado", key=f"social_instagram_result_following_{result_widget_id}")
                     character_options = [""] + [_clean(item.get("id")) for item in characters if _clean(item.get("id"))]
                     character_labels = {"": "Sem personagem associado"} | {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters}
-                    selected_character = st.selectbox("Personagem", character_options, format_func=lambda value: character_labels.get(value, value), key="social_instagram_result_character")
+                    selected_character = st.selectbox("Personagem", character_options, format_func=lambda value: character_labels.get(value, value), key=f"social_instagram_result_character_{result_widget_id}")
                     save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", use_container_width=True)
                 if save_profile:
                     profile_data = dict(data)

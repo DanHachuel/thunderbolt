@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.35 — 2026-09-06
+- Corrigido o estado dos widgets do formulário de pesquisa Instagram: cada conta pesquisada passa a ter chaves próprias, impedindo que bio, posts, seguidores ou seguindo fiquem presos aos valores de uma pesquisa anterior.
+- Integrada a leitura do país pelo endpoint Bloks de **Sobre esta conta** quando existe sessão Instagram autenticada, sem inferência pela bio ou morada comercial.
+- Mantido integralmente o layout existente, incluindo o botão compacto **↻**.
+
 ## 0.6.34 — 2026-09-06
 - Restaurado o formato visual anterior do botão de actualização Instagram: ícone **↻** com tooltip, sem alterar a lógica corrigida de actualização de posts, seguidores e seguindo.
 
