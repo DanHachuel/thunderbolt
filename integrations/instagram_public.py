@@ -2,20 +2,113 @@ from __future__ import annotations
 
 import re
 import json
+import logging
 import os
+import sys
 import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
+from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
 import requests
 
+try:
+    import streamlit as st
+except ImportError:  # pragma: no cover - Streamlit is a runtime dependency
+    st = None
+
+
+LOGGER = logging.getLogger(__name__)
+_WINDOWS_PLAYWRIGHT_CHECKED = False
+_WINDOWS_COOKIE_WARNING_SHOWN = False
+
 
 ABOUT_ACCOUNT_URL = 'https://i.instagram.com/api/v1/bloks/apps/com.instagram.interactions.about_this_account/'
 ABOUT_ACCOUNT_BLOKS_VERSION = '8ca96ca267e30c02cf90888d91eeff09627f0e3fd2bd9df472278c9a6c022cbb'
+
+
+def _load_dotenv_compat() -> None:
+    """Load .env when python-dotenv exists, otherwise parse simple KEY=VALUE lines."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        return
+    except ImportError:
+        LOGGER.debug('python-dotenv não está instalado; será usado o parser .env compatível.')
+    env_path = Path(__file__).resolve().parents[1] / '.env'
+    if not env_path.is_file():
+        return
+    try:
+        for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key.strip(), value)
+    except OSError as exc:
+        LOGGER.warning('Não foi possível ler %s: %s', env_path, exc)
+
+
+def _streamlit_message(level: str, message: str, key: str) -> None:
+    """Show a runtime diagnostic once when Streamlit is available."""
+    if st is None:
+        return
+    try:
+        shown_key = f'_instagram_debug_{key}'
+        if st.session_state.get(shown_key):
+            return
+        st.session_state[shown_key] = True
+        getattr(st, level)(message)
+    except Exception as exc:  # Streamlit may be imported outside an active app context.
+        LOGGER.debug('Não foi possível mostrar diagnóstico Streamlit: %s', exc)
+
+
+def _ensure_windows_playwright() -> None:
+    """Ensure Chromium exists on Windows before using the Playwright fallback."""
+    global _WINDOWS_PLAYWRIGHT_CHECKED, _WINDOWS_COOKIE_WARNING_SHOWN
+    if os.name != 'nt' or _WINDOWS_PLAYWRIGHT_CHECKED:
+        return
+    _WINDOWS_PLAYWRIGHT_CHECKED = True
+    _load_dotenv_compat()
+    cookie_names = ('INSTAGRAM_SESSIONID', 'IG_SESSIONID')
+    if not any(os.getenv(name, '').strip() for name in cookie_names) and not _WINDOWS_COOKIE_WARNING_SHOWN:
+        _WINDOWS_COOKIE_WARNING_SHOWN = True
+        message = ('Windows: cookies Instagram não configurados. O país da conta pode ficar indisponível; '
+                   'configure INSTAGRAM_SESSIONID (e, se necessário, INSTAGRAM_CSRFTOKEN, '
+                   'INSTAGRAM_DS_USER_ID, INSTAGRAM_MID e INSTAGRAM_IG_DID) no ficheiro .env.')
+        LOGGER.warning(message)
+        _streamlit_message('warning', message, 'windows_cookie_warning')
+    try:
+        completed = subprocess.run(
+            [sys.executable, '-m', 'playwright', 'install', 'chromium'],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=180,
+            check=False,
+        )
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or 'sem detalhes').strip()[-1000:]
+            message = f'Não foi possível instalar o Chromium do Playwright no Windows: {detail}'
+            LOGGER.warning(message)
+            _streamlit_message('error', message + ' Execute: python -m playwright install chromium', 'playwright_install_error')
+        else:
+            LOGGER.info('Chromium do Playwright verificado/instalado no Windows.')
+    except (OSError, subprocess.SubprocessError) as exc:
+        message = f'Falha ao executar a instalação do Chromium no Windows: {exc}'
+        LOGGER.warning(message)
+        _streamlit_message('error', message + ' Execute: python -m playwright install chromium', 'playwright_install_exception')
+
+
+_load_dotenv_compat()
+if os.name == 'nt':
+    _ensure_windows_playwright()
 
 
 def _instagram_cookies() -> dict[str, str]:
@@ -130,6 +223,7 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
+    _ensure_windows_playwright()
     headers = _instagram_headers()
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
     # The www host is the current public web endpoint. The legacy i host is
@@ -180,10 +274,13 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
         for endpoint in endpoints:
             try:
                 response = requests.get(endpoint, headers=request_header, timeout=15)
+                LOGGER.debug('Instagram profile URL=%s status=%s content_type=%s', endpoint, response.status_code, response.headers.get('content-type', ''))
                 if response.status_code >= 400:
                     continue
                 payload = response.json()
+                LOGGER.debug('Instagram profile URL=%s response=JSON', endpoint)
             except (requests.RequestException, ValueError, AttributeError, StopIteration):
+                LOGGER.warning('Falha na requisição JSON do perfil Instagram URL=%s', endpoint, exc_info=True)
                 if best_user:
                     return best_user
                 continue
@@ -195,6 +292,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
 
     curl = shutil.which('curl')
     if curl:
+        LOGGER.debug('Fallback curl disponível em %s', curl)
         for endpoint in endpoints:
             try:
                 completed = subprocess.run(
@@ -207,13 +305,18 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     check=False,
                 )
                 payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
+                LOGGER.debug('Instagram curl URL=%s returncode=%s stdout_bytes=%s stderr=%s', endpoint, completed.returncode, len(completed.stdout or ''), (completed.stderr or '').strip()[-500:])
                 user = extract_user(payload)
                 if isinstance(user, dict):
                     best_user = merge_profile(best_user, user)
                     if profile_quality(best_user) >= 4:
                         return best_user
             except (OSError, subprocess.SubprocessError, ValueError):
+                LOGGER.warning('Falha no fallback curl do perfil Instagram URL=%s', endpoint, exc_info=True)
                 continue
+    else:
+        LOGGER.warning('curl não está disponível no PATH; a tentar Playwright.')
+        _streamlit_message('warning', 'curl não foi encontrado no PATH do Windows; será tentado o fallback Playwright.', 'curl_missing')
 
     # Em algumas instalações Windows o Instagram devolve a página HTML aos
     # clientes HTTP, embora entregue o JSON completo a um navegador Chromium.
@@ -242,8 +345,9 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                         continue
             finally:
                 browser.close()
-    except (ImportError, OSError, RuntimeError):
-        pass
+    except Exception as exc:
+        LOGGER.warning('Falha no fallback Playwright do perfil Instagram: %s', exc, exc_info=True)
+        _streamlit_message('error', f'Fallback Playwright do perfil Instagram falhou: {exc}. Execute: python -m playwright install chromium', 'profile_playwright_error')
     return best_user
 
 
@@ -294,11 +398,27 @@ def _fetch_instagram_about_country(user_id: Any) -> str:
     }
     try:
         response = requests.post(ABOUT_ACCOUNT_URL, data=payload, headers=_instagram_headers(), cookies=cookies, timeout=20)
+        LOGGER.debug('Instagram about-account URL=%s status=%s content_type=%s', ABOUT_ACCOUNT_URL, response.status_code, response.headers.get('content-type', ''))
         if response.status_code >= 400:
             return ''
-        return _country_from_bloks(response.json())
-    except (requests.RequestException, ValueError, TypeError):
+        country = _country_from_bloks(response.json())
+        LOGGER.debug('Instagram about-account country_found=%s', bool(country))
+        return country
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        LOGGER.warning('Falha ao consultar país público do Instagram: %s', exc, exc_info=True)
         return ''
+
+
+def _country_from_bio_fallback(bio: str) -> str:
+    patterns = (
+        r'\b(?:from|based in|located in|living in)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .-]{1,60})',
+        r'\b(?:de|baseado em|morando em|localizado em)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .-]{1,60})',
+    )
+    for pattern in patterns:
+        match = re.search(pattern, bio or '', flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip(' .,!;:')
+    return ''
 
 
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
@@ -310,6 +430,8 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
     media = media if media is not None else _profile_metric(user, 'posts', 'post_count', 'media_count')
     biography = str(user.get('biography') or user.get('bio') or user.get('description') or '').strip()
     country = extract_public_instagram_country(user) or _fetch_instagram_about_country(user.get('id') or user.get('pk'))
+    country = country or _country_from_bio_fallback(biography)
+    LOGGER.debug('Instagram profile extracted bio=%s followers=%s following=%s posts=%s country=%s', bool(biography), followers, following, media, country or '—')
     return {
         'id': f"instagram_{reference['username']}",
         **reference,
@@ -387,6 +509,7 @@ def _profile_metric(user: Mapping[str, Any], *keys: str) -> int | None:
 
 
 def fetch_public_instagram_profile(source: str) -> IntegrationResult:
+    LOGGER.debug('fetch_public_instagram_profile source=%s', source)
     try:
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
@@ -397,7 +520,9 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=12)
     except requests.RequestException as exc:
+        LOGGER.warning('Falha HTTP no perfil Instagram URL=%s: %s', reference['url'], exc, exc_info=True)
         return IntegrationResult(False, f'Não foi possível consultar o perfil público do Instagram: {exc}', reference)
+    LOGGER.debug('Instagram HTML profile URL=%s status=%s content_type=%s response=HTML', reference['url'], response.status_code, response.headers.get('content-type', ''))
     if response.status_code >= 400:
         return IntegrationResult(False, f'O Instagram devolveu HTTP {response.status_code}. Confirme o @handle ou use o cadastro manual.', reference | {'status_code': response.status_code})
     title = _meta(response.text, 'og:title') or reference['username']
@@ -422,6 +547,8 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
         embedded_country = extract_public_instagram_country(document)
         if embedded_country:
             break
+    embedded_country = embedded_country or _country_from_bio_fallback(description)
+    LOGGER.debug('Instagram HTML profile extracted bio=%s followers=%s following=%s posts=%s country=%s', bool(description), followers, following, posts, embedded_country or '—')
     data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': normalize_instagram_bio(description), 'bio_raw': description, 'country': embedded_country, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
@@ -484,6 +611,8 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationResult:
+    LOGGER.debug('fetch_public_instagram_posts source=%s limit=%s', source, limit)
+    _ensure_windows_playwright()
     try:
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
@@ -498,13 +627,16 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                 if post:
                     api_posts.append(post)
         if api_posts:
+            LOGGER.debug('Instagram API posts extracted=%s response=JSON', len(api_posts))
             return IntegrationResult(True, 'Posts públicos encontrados.', reference | {'posts': api_posts[:max(1, int(limit))]})
         if api_user.get('is_private'):
             return IntegrationResult(False, 'Esta conta é privada. O Instagram não disponibiliza posts sem uma sessão autenticada.', reference | {'posts': [], 'is_private': True})
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
     except requests.RequestException as exc:
+        LOGGER.warning('Falha HTTP nos posts Instagram URL=%s: %s', reference['url'], exc, exc_info=True)
         return IntegrationResult(False, f'Não foi possível consultar os posts públicos do Instagram: {exc}', reference)
+    LOGGER.debug('Instagram HTML posts URL=%s status=%s content_type=%s response=HTML', reference['url'], response.status_code, response.headers.get('content-type', ''))
     if response.status_code >= 400:
         return IntegrationResult(False, f'O Instagram devolveu HTTP {response.status_code} ao consultar os posts.', reference | {'status_code': response.status_code})
     posts: list[dict[str, Any]] = []
@@ -545,8 +677,10 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                             break
                 finally:
                     browser.close()
-        except (ImportError, OSError, RuntimeError, TimeoutError):
-            pass
+        except Exception as exc:
+            LOGGER.warning('Falha no fallback Playwright dos posts Instagram: %s', exc, exc_info=True)
+            _streamlit_message('error', f'Fallback Playwright dos posts Instagram falhou: {exc}. Execute: python -m playwright install chromium', 'posts_playwright_error')
+    LOGGER.debug('Instagram posts extracted=%s limit=%s', len(posts), limit)
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
 

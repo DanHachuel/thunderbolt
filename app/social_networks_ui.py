@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 import uuid
 import zipfile
@@ -18,6 +19,9 @@ from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
 from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _clean(value: Any) -> str:
@@ -190,8 +194,8 @@ def _instagram_posts_archive(posts: list[dict[str, Any]]) -> bytes:
                     elif "webp" in content_type:
                         extension = ".webp"
                     bundle.writestr(f"post-{index:02d}{extension}", response.content)
-                except requests.RequestException:
-                    pass
+                except requests.RequestException as exc:
+                    LOGGER.warning("Não foi possível descarregar a imagem do post Instagram %s: %s", url, exc)
             manifest.append(f"{index}. {_clean(post.get('url'))}\n{_clean(post.get('caption'))}\n")
         bundle.writestr("posts.txt", "\n".join(manifest))
     return archive.getvalue()
@@ -212,6 +216,8 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
+            # Debug temporário removido após validação; manter para reactivar se necessário:
+            # st.write({"posts_ok": posts_ok, "posts_message": posts_message, "posts_count": len(loaded_posts)})
             if posts_ok:
                 posts = loaded_posts
                 _persist_instagram_posts(profile, posts)
@@ -386,7 +392,8 @@ def _characters(settings: Mapping[str, Any]) -> tuple[list[dict[str, Any]], Any 
         repository = get_repository(settings)
         items = [item for item in repository.list_influencers() if _clean(item.get("id")) != STANDALONE_CONTENT_INFLUENCER_ID]
         return items, repository
-    except (InfluencerBackendError, Exception):
+    except Exception as exc:
+        LOGGER.warning("Não foi possível carregar as personagens: %s", exc, exc_info=True)
         return [], None
 
 
@@ -498,19 +505,39 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             refresh_col, edit_col = st.columns(2)
             with refresh_col:
                 if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
-                    refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
+                    try:
+                        refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
+                    except Exception as exc:
+                        st.error(f"Falha ao actualizar o perfil Instagram: {exc}")
+                        refreshed_ok, refreshed_message, refreshed = False, str(exc), {}
                     if refreshed_ok:
                         current_posts = _stored_instagram_posts(profile)
-                        posts_ok, _, refreshed_posts = _load_instagram_posts(refreshed, limit=max(10, len(current_posts)))
+                        try:
+                            posts_ok, posts_message, refreshed_posts = _load_instagram_posts(refreshed, limit=max(10, len(current_posts)))
+                        except Exception as exc:
+                            posts_ok, posts_message, refreshed_posts = False, str(exc), []
                         if posts_ok:
                             _persist_instagram_posts(profile, refreshed_posts)
-                        updated = update_channel(profile_id, {**refreshed, "id": profile_id, "country": _profile_country(refreshed) or _profile_country(profile), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
+                        else:
+                            st.warning(f"Perfil actualizado, mas os posts não foram actualizados: {posts_message}")
+                        # Debug temporário removido após validação; manter para reactivar se necessário:
+                        # st.write({"profile_ok": refreshed_ok, "profile_message": refreshed_message, "profile_data": refreshed})
+                        # st.write({"posts_ok": posts_ok, "posts_message": posts_message, "posts_count": len(refreshed_posts)})
+                        try:
+                            updated = update_channel(profile_id, {**refreshed, "id": profile_id, "country": _profile_country(refreshed) or _profile_country(profile), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
+                        except (OSError, PermissionError) as exc:
+                            st.error(f"Não foi possível guardar os dados no Windows: {exc}")
+                            return
+                        except Exception as exc:
+                            st.error(f"Falha ao guardar os dados da conta Instagram: {exc}")
+                            return
                         if updated is None:
-                            st.error("A conta Instagram já não existe no armazenamento local.")
+                            st.error("A conta Instagram já não existe no armazenamento local ou não foi possível escrever o ficheiro.")
                             return
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
-                    st.warning(refreshed_message)
+                    else:
+                        st.error(f"Não foi possível actualizar o perfil Instagram: {refreshed_message}")
             with edit_col:
                 if st.button("Editar", key=f"edit_instagram_button_{profile_id}", use_container_width=True):
                     for field in ("name", "handle", "bio", "country", "language", "posts", "followers", "following"):
