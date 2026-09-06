@@ -48,6 +48,23 @@ def _meta(document: str, name: str) -> str:
     return ''
 
 
+def _structured_metric(document: str, *keys: str) -> int | None:
+    """Read numeric Instagram counters embedded in the public HTML payload."""
+    for key in keys:
+        patterns = (
+            rf'"{re.escape(key)}"\s*:\s*\{{\s*"count"\s*:\s*(\d+)',
+            rf'"{re.escape(key)}"\s*:\s*(\d+)',
+        )
+        for pattern in patterns:
+            found = re.search(pattern, document, flags=re.IGNORECASE)
+            if found:
+                try:
+                    return int(found.group(1))
+                except ValueError:
+                    continue
+    return None
+
+
 def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     try:
         reference = normalize_instagram_reference(source)
@@ -73,9 +90,9 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
                 continue
         return None
 
-    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',))
-    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',))
-    posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',))
+    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(response.text, 'edge_followed_by', 'followers', 'follower_count')
+    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(response.text, 'edge_follow', 'following', 'following_count')
+    posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',)) or _structured_metric(response.text, 'edge_owner_to_timeline_media', 'posts', 'post_count')
     data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
