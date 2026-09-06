@@ -113,7 +113,7 @@ def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint()
             "edge_followed_by": {"count": 1357}, "edge_owner_to_timeline_media": {"count": 42, "edges": []},
         }}},
     )
-    with patch("integrations.instagram_public.requests.get", return_value=api_response):
+    with patch("integrations.instagram_public.requests.get", return_value=api_response), patch("integrations.instagram_public.shutil.which", return_value=None):
         result = fetch_public_instagram_profile("@private_creator")
     assert result.data["bio"] == "Linha um\nLinha dois"
     assert result.data["following_count"] == 2468
