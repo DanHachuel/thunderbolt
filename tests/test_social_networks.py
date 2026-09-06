@@ -1,8 +1,9 @@
+from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
 from app.social_networks_ui import _api_card_status, _instagram_profiles, _merge_instagram_refresh, _normalise_api_cards, _save_public_profile
 from hermes_ui.domain import create_channel
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
+from integrations.instagram_public import _fetch_web_profile_user, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
 from hermes_ui.countries import COUNTRY_OPTIONS
 
@@ -87,6 +88,20 @@ def test_public_instagram_parser_reads_direct_profile_following_counter():
         result = fetch_public_instagram_profile("@creator")
     assert result.ok is True
     assert result.data["following_count"] == 4321
+
+
+def test_public_instagram_endpoint_uses_curl_fallback_after_http_429():
+    payload = '{"data":{"user":{"username":"creator","edge_follow":{"count":4321}}}}'
+    blocked = Mock(status_code=429)
+    with patch("integrations.instagram_public.requests.get", return_value=blocked), patch(
+        "integrations.instagram_public.shutil.which", return_value="/usr/bin/curl"
+    ), patch(
+        "integrations.instagram_public.subprocess.run",
+        return_value=CompletedProcess([], 0, stdout=payload, stderr=""),
+    ) as run:
+        user = _fetch_web_profile_user("creator")
+    assert user["edge_follow"]["count"] == 4321
+    assert run.called
 
 
 def test_instagram_metric_normalization_keeps_unknown_distinct_from_zero():
