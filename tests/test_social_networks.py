@@ -1,7 +1,7 @@
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _refresh_instagram_profile, _save_public_profile
+from app.social_networks_ui import _api_card_status, _infer_country_from_bio, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
 from integrations.instagram_public import _fetch_web_profile_user, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
@@ -171,6 +171,11 @@ def test_refresh_button_function_returns_canonical_updated_profile():
     assert refreshed["bio"] == "Bio nova"
     assert refreshed["following_count"] == 765
     fetch.assert_called_once_with("https://www.instagram.com/creator/")
+
+
+def test_country_is_inferred_from_a_clear_country_name_in_bio():
+    assert _infer_country_from_bio("Brasil/ SP 🇧🇷\nGeminiana") == "Brasil"
+    assert _infer_country_from_bio("Criadora de conteúdo") == ""
 
 
 def test_load_posts_button_function_uses_saved_profile_url_and_returns_posts():
