@@ -156,6 +156,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'subscriber_count': followers,
         'following_count': following,
         'post_count': media,
+        'is_private': bool(user.get('is_private')),
         'public_lookup': True,
         'metrics_source': 'instagram_web_profile_info',
         'last_public_lookup_at': datetime.now(timezone.utc).isoformat(),
@@ -289,6 +290,8 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                     api_posts.append(post)
         if api_posts:
             return IntegrationResult(True, 'Posts públicos encontrados.', reference | {'posts': api_posts[:max(1, int(limit))]})
+        if api_user.get('is_private'):
+            return IntegrationResult(False, 'Esta conta é privada. O Instagram não disponibiliza posts sem uma sessão autenticada.', reference | {'posts': [], 'is_private': True})
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
     except requests.RequestException as exc:

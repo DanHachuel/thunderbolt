@@ -42,6 +42,12 @@ def _metric_input(value: Any) -> int | None:
     return normalize_instagram_metric(value)
 
 
+def _render_instagram_bio(value: Any) -> None:
+    bio = normalize_instagram_bio(value)
+    if bio:
+        st.markdown(bio.replace("\n", "  \n"))
+
+
 def _language_index(value: Any) -> int:
     code = language_code(value)
     return list(LANGUAGE_CODES).index(code) if code in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt")
@@ -326,9 +332,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         with header_cols[1]:
             st.write(f"**{_clean(profile.get('name')) or 'Sem nome'}**")
             st.caption(f"{_clean(profile.get('handle')) or _clean(profile.get('url')) or 'sem handler'}")
-            bio = normalize_instagram_bio(profile.get("bio"))
-            if bio:
-                st.caption(f"Bio: {bio}")
+            _render_instagram_bio(profile.get("bio"))
             st.caption(f"{_clean(profile.get('country')) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
         with header_cols[2]:
             st.metric("posts", _metric(profile.get("post_count")))
@@ -447,9 +451,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                 with preview_cols[1]:
                     st.write(f"**{_clean(data.get('name')) or _clean(data.get('username'))}**")
                     st.caption(_clean(data.get("handle")))
-                    bio = normalize_instagram_bio(data.get("bio"))
-                    if bio:
-                        st.caption(f"Bio: {bio}")
+                    _render_instagram_bio(data.get("bio"))
                 with preview_cols[2]:
                     st.metric("posts", _metric(data.get("post_count")))
                 with preview_cols[3]:
