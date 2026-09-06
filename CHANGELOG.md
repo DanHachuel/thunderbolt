@@ -1,4 +1,7 @@
 # Changelog
+## 0.6.34 — 2026-09-06
+- Restaurado o formato visual anterior do botão de actualização Instagram: ícone **↻** com tooltip, sem alterar a lógica corrigida de actualização de posts, seguidores e seguindo.
+
 ## 0.6.33 — 2026-09-06
 - Corrigido o cadastro e refresh de Contas Instagram para preservar o ID interno do canal e normalizar bio, seguidores, seguindo e posts entre versões antigas dos dados.
 - O botão **Carregar últimos 10** passa a guardar os posts por conta no storage local, mantendo-os disponíveis após o rerun da interface.

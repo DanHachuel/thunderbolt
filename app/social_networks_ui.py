@@ -483,7 +483,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         with header_cols[5]:
             refresh_col, edit_col = st.columns(2)
             with refresh_col:
-                if st.button("Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}", use_container_width=True):
+                if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
                     refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
                     if refreshed_ok:
                         current_posts = _stored_instagram_posts(profile)
