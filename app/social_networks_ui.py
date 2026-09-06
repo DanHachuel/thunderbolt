@@ -216,8 +216,8 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
-            # Debug temporário removido após validação; manter para reactivar se necessário:
-            # st.write({"posts_ok": posts_ok, "posts_message": posts_message, "posts_count": len(loaded_posts)})
+            # DEBUG WINDOWS INSTAGRAM: manter até a validação final do carregamento público.
+            st.write({"instagram_posts_ok": posts_ok, "instagram_posts_message": posts_message, "instagram_posts_count": len(loaded_posts)})
             if posts_ok:
                 posts = loaded_posts
                 _persist_instagram_posts(profile, posts)
