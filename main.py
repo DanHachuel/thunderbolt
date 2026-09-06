@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import os
 from datetime import date, datetime
 import sys
 import uuid
@@ -12,9 +13,31 @@ from typing import Any
 import requests
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+def _load_local_env() -> None:
+    for env_path in (ROOT / ".env", Path.cwd() / ".env"):
+        try:
+            if not env_path.is_file():
+                continue
+            for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("'\"")
+                if key:
+                    os.environ.setdefault(key, value)
+        except OSError as exc:
+            print(f"DEBUG: não foi possível ler {env_path}: {exc}")
+
+
+_load_local_env()
+
 try:
     APP_VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8")).get("version", "")
 except (OSError, json.JSONDecodeError):
@@ -1564,7 +1587,7 @@ def render_channels():
             automation_time = st.text_input("Horário diário (HH:MM)", value="00:00", key="manual_channel_automation_time")
             thumbnail_url = st.text_input("URL da imagem do canal", key="manual_channel_thumbnail")
             metrics = st.columns(3)
-                with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=0, key="manual_channel_subscribers")
+            with metrics[0]: subscriber_count = st.number_input("Inscritos", min_value=0, value=0, key="manual_channel_subscribers")
             with metrics[1]: video_count = st.number_input("Vídeos", min_value=0, value=0, key="manual_channel_videos")
             with metrics[2]: view_count = st.number_input("Visualizações", min_value=0, value=0, key="manual_channel_views")
             submitted = st.form_submit_button("Guardar canal manual", type="primary")
