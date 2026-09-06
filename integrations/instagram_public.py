@@ -284,12 +284,12 @@ def _profile_users_from_document(document: str) -> list[Mapping[str, Any]]:
 
 
 def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | None = None, cookies: Mapping[str, str] | None = None) -> dict[str, Any] | None:
-    """Fetch the public profile page and read its embedded structured profile data."""
+    """Fetch the structured profile JSON requested by the public Instagram page."""
     headers = headers or _instagram_headers()
     cookies = cookies or _instagram_cookies()
-    best_user: dict[str, Any] | None = None
+    captured_user: dict[str, Any] | None = None
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)
             try:
@@ -299,21 +299,37 @@ def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str] | N
                 )
                 if cookies:
                     page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
+
+                def capture_profile_response(response: Any) -> None:
+                    nonlocal captured_user
+                    if '/api/v1/users/web_profile_info/' not in response.url:
+                        return
+                    try:
+                        payload = response.json()
+                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, Mapping) else None)
+                        if isinstance(user, Mapping):
+                            captured_user = _merge_profile(captured_user, user)
+                            LOGGER.debug('Instagram Playwright API profile captured user=%s', username)
+                    except (ValueError, TypeError, AttributeError) as exc:
+                        LOGGER.debug('Não foi possível interpretar resposta web_profile_info: %s', exc)
+
+                page.on('response', capture_profile_response)
                 url = f'https://www.instagram.com/{username}/'
                 response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 LOGGER.debug('Instagram Playwright profile URL=%s status=%s', url, response.status if response else None)
                 if response is None or response.status >= 400:
                     return None
-                document = page.content()
-                for user in _profile_users_from_document(document):
-                    best_user = _merge_profile(best_user, user)
-                LOGGER.debug('Instagram Playwright _sharedData profile user=%s quality=%s', bool(best_user), _profile_quality(best_user or {}))
+                try:
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                except (PlaywrightTimeoutError, TimeoutError):
+                    LOGGER.debug('Instagram Playwright networkidle excedido; usando resposta API já capturada.')
+                LOGGER.debug('Instagram Playwright API profile user=%s quality=%s', bool(captured_user), _profile_quality(captured_user or {}))
             finally:
                 browser.close()
     except Exception as exc:
         LOGGER.warning('Falha no Playwright do perfil Instagram: %s', exc, exc_info=True)
         _streamlit_message('error', f'Playwright não conseguiu consultar o perfil Instagram: {exc}', 'profile_playwright_error')
-    return best_user
+    return captured_user
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
@@ -651,12 +667,12 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cookies: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
-    # CORREÇÃO WINDOWS: posts são extraídos exclusivamente do JSON/HTML obtido pelo Playwright.
+    # CORREÇÃO WINDOWS: posts são extraídos exclusivamente da resposta API capturada pelo Playwright.
     posts: list[dict[str, Any]] = []
     seen: set[str] = set()
     cookies = cookies or _instagram_cookies()
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)
             try:
@@ -666,23 +682,37 @@ def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cooki
                 )
                 if cookies:
                     page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
+
+                def capture_profile_posts(response: Any) -> None:
+                    if '/api/v1/users/web_profile_info/' not in response.url:
+                        return
+                    try:
+                        payload = response.json()
+                        user = ((payload.get('data') or {}).get('user') if isinstance(payload, Mapping) else None)
+                        media = user.get('edge_owner_to_timeline_media') if isinstance(user, Mapping) else None
+                        edges = media.get('edges') if isinstance(media, Mapping) else []
+                        for edge in edges or []:
+                            node = edge.get('node') if isinstance(edge, Mapping) else None
+                            if not isinstance(node, dict):
+                                continue
+                            post = _post_from_node(node)
+                            if post and post['id'] not in seen:
+                                seen.add(post['id'])
+                                posts.append(post)
+                    except (ValueError, TypeError, AttributeError) as exc:
+                        LOGGER.debug('Não foi possível interpretar posts web_profile_info: %s', exc)
+
+                page.on('response', capture_profile_posts)
                 response = page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
                 LOGGER.debug('Instagram Playwright posts URL=%s status=%s', reference['url'], response.status if response else None)
                 if response is None or response.status >= 400:
                     return []
-                browser_document = page.content()
-                LOGGER.debug('Instagram Playwright posts document_bytes=%s', len(browser_document))
-                documents = _shared_data_documents(browser_document) + _embedded_json_documents(browser_document)
-                for document in documents:
-                    for node in _walk_json(document):
-                        post = _post_from_node(node)
-                        if not post or post['id'] in seen:
-                            continue
-                        seen.add(post['id'])
-                        posts.append(post)
-                        LOGGER.debug('Instagram Playwright post extracted id=%s', post['id'])
-                        if len(posts) >= max(1, int(limit)):
-                            return posts
+                try:
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                except (PlaywrightTimeoutError, TimeoutError):
+                    LOGGER.debug('Instagram Playwright networkidle excedido; usando posts API já capturados.')
+                LOGGER.debug('Instagram Playwright API posts extracted=%s limit=%s', len(posts), limit)
+                return posts[:max(1, int(limit))]
             finally:
                 browser.close()
     except Exception as exc:
