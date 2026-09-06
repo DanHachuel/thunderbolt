@@ -4,6 +4,7 @@ from app.social_networks_ui import _api_card_status, _instagram_profiles, _norma
 from hermes_ui.domain import create_channel
 from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
+from hermes_ui.countries import COUNTRY_OPTIONS
 
 
 def test_meta_cards_report_missing_key_and_missing_configuration_separately():
@@ -76,6 +77,18 @@ def test_public_instagram_parser_reads_json_metric_aliases():
     assert result.data["following_count"] == 654
 
 
+def test_public_instagram_parser_reads_direct_profile_following_counter():
+    api_response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {"username": "creator", "edge_follow": {"count": 4321}}}},
+    )
+    page_response = Mock(status_code=200, text='<meta property="og:title" content="Creator (@creator)">')
+    with patch("integrations.instagram_public.requests.get", side_effect=[page_response, api_response]):
+        result = fetch_public_instagram_profile("@creator")
+    assert result.ok is True
+    assert result.data["following_count"] == 4321
+
+
 def test_instagram_bio_removes_metrics_summary_but_keeps_real_bio():
     assert normalize_instagram_bio("606 seguidores, seguindo 3,432, 278 posts — Veja as fotos") == ""
     assert normalize_instagram_bio("🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid") == "🇧🇷🇪🇸\n♊ Gemini\n📍 LA / Madrid"
@@ -89,12 +102,22 @@ def test_instagram_ui_uses_canonical_language_selector():
     assert 'st.text_input("Idioma"' not in source
 
 
+def test_instagram_country_catalog_contains_attachment_values():
+    assert "Brasil" in COUNTRY_OPTIONS
+    assert "Estados Unidos" in COUNTRY_OPTIONS
+    assert "Zimbábue" in COUNTRY_OPTIONS
+    assert len(COUNTRY_OPTIONS) == 203
+
+
 def test_instagram_card_renders_profile_bio_next_to_identity():
     from app import social_networks_ui
 
     source = open(social_networks_ui.__file__, encoding="utf-8").read()
     assert 'bio = normalize_instagram_bio(profile.get("bio"))' in source
     assert 'st.caption(f"Bio: {bio}")' in source
+    assert 'st.selectbox("País", _country_options()' in source
+    assert 'delete_channel(profile_id)' in source
+    assert 'bio = normalize_instagram_bio(data.get("bio"))' in source
 
 
 def test_create_channel_keeps_social_metadata_for_instagram_accounts():
