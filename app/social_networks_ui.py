@@ -5,6 +5,7 @@ import re
 import uuid
 import zipfile
 import unicodedata
+import hashlib
 from typing import Any, Callable, Mapping
 
 import requests
@@ -128,6 +129,13 @@ def _clear_instagram_result_widget_state(profile: Mapping[str, Any]) -> None:
     widget_id = _instagram_profile_storage_id(profile)
     for field in ("name", "bio", "country", "language", "posts", "followers", "following", "character"):
         st.session_state.pop(f"social_instagram_result_{field}_{widget_id}", None)
+
+
+def _instagram_result_widget_id(profile: Mapping[str, Any]) -> str:
+    base_id = _instagram_profile_storage_id(profile)
+    signature = "|".join(_clean(profile.get(key)) for key in ("bio", "bio_raw", "following_count", "subscriber_count", "post_count", "country"))
+    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:10]
+    return f"{base_id}_{digest}"
 
 
 def _normalise_instagram_posts(value: Any) -> list[dict[str, Any]]:
@@ -599,7 +607,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         data = st.session_state.get("social_instagram_result", {}) if st.session_state.get("social_instagram_ok") else {}
         if data:
             characters, _ = _characters(settings)
-            result_widget_id = _instagram_profile_storage_id(data)
+            result_widget_id = _instagram_result_widget_id(data)
             with st.container(border=True):
                 st.subheader("Conta Instagram encontrada")
                 preview_cols = st.columns([0.8, 2.2, 1.2, 1.2, 1.2])
