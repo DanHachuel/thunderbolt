@@ -4,6 +4,7 @@ import re
 import json
 import logging
 import os
+import platform
 import sys
 import shutil
 import subprocess
@@ -213,48 +214,91 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
     return None
 
 
+def _profile_quality(user: Mapping[str, Any]) -> int:
+    groups = (
+        ('biography', 'bio', 'description'),
+        ('edge_follow', 'following', 'following_count', 'followingCount', 'follows'),
+        ('edge_followed_by', 'followers', 'follower_count', 'followers_count', 'followerCount'),
+        ('edge_owner_to_timeline_media', 'posts', 'post_count', 'media_count'),
+        ('username', 'user_name', 'handle'),
+    )
+    return sum(any(user.get(key) not in (None, '', {}, []) for key in group) for group in groups)
+
+
+def _merge_profile(base: dict[str, Any] | None, candidate: Mapping[str, Any]) -> dict[str, Any]:
+    merged = dict(base or {})
+    for key, value in candidate.items():
+        if value not in (None, '', [], {}):
+            if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
+                merged[key] = {**merged[key], **value}
+            else:
+                merged[key] = value
+    return merged
+
+
+def _extract_profile_user(payload: Any) -> Mapping[str, Any] | None:
+    if not isinstance(payload, Mapping):
+        return None
+    candidates = [
+        payload.get('user'),
+        (payload.get('data') or {}).get('user') if isinstance(payload.get('data'), Mapping) else None,
+        (payload.get('graphql') or {}).get('user') if isinstance(payload.get('graphql'), Mapping) else None,
+        (payload.get('data') or {}).get('profile') if isinstance(payload.get('data'), Mapping) else None,
+    ]
+    return next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
+
+
+def _fetch_profile_with_playwright(username: str, headers: Mapping[str, str], cookies: Mapping[str, str]) -> dict[str, Any] | None:
+    endpoints = (
+        f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+        f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
+    )
+    best_user: dict[str, Any] | None = None
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(
+                    user_agent=headers['User-Agent'],
+                    extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9'},
+                )
+                if cookies:
+                    page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
+                for endpoint in endpoints:
+                    try:
+                        response = page.goto(endpoint, wait_until='domcontentloaded', timeout=30000)
+                        LOGGER.debug('Instagram Playwright profile URL=%s status=%s', endpoint, response.status if response else None)
+                        if response is None or response.status >= 400:
+                            continue
+                        payload = json.loads(page.locator('body').inner_text(timeout=5000))
+                        user = _extract_profile_user(payload)
+                        if isinstance(user, dict):
+                            best_user = _merge_profile(best_user, user)
+                            if _profile_quality(best_user) >= 4:
+                                return best_user
+                    except (ValueError, TimeoutError) as exc:
+                        LOGGER.warning('Falha ao interpretar resposta Playwright do perfil URL=%s: %s', endpoint, exc)
+            finally:
+                browser.close()
+    except Exception as exc:
+        LOGGER.warning('Falha no Playwright do perfil Instagram: %s', exc, exc_info=True)
+        _streamlit_message('error', f'Playwright não conseguiu consultar o perfil Instagram: {exc}', 'profile_playwright_error')
+    return best_user
+
+
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     _ensure_windows_playwright()
     cookies = _instagram_cookies()
     headers = _instagram_headers()
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
-    # The www host is the current public web endpoint. The legacy i host is
-    # retained as a fallback because Instagram rate-limits the two hosts
-    # independently and their availability can vary by region.
     endpoints = (
         f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
         f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
     )
-    def profile_quality(user: Mapping[str, Any]) -> int:
-        groups = (
-            ('biography', 'bio', 'description'),
-            ('edge_follow', 'following', 'following_count', 'followingCount', 'follows'),
-            ('edge_followed_by', 'followers', 'follower_count', 'followers_count', 'followerCount'),
-            ('edge_owner_to_timeline_media', 'posts', 'post_count', 'media_count'),
-            ('username', 'user_name', 'handle'),
-        )
-        return sum(any(user.get(key) not in (None, '', {}, []) for key in group) for group in groups)
-
-    def merge_profile(base: dict[str, Any] | None, candidate: Mapping[str, Any]) -> dict[str, Any]:
-        merged = dict(base or {})
-        for key, value in candidate.items():
-            if value not in (None, '', [], {}):
-                if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
-                    merged[key] = {**merged[key], **value}
-                else:
-                    merged[key] = value
-        return merged
-
-    def extract_user(payload: Any) -> Mapping[str, Any] | None:
-        if not isinstance(payload, Mapping):
-            return None
-        candidates = [
-            payload.get('user'),
-            (payload.get('data') or {}).get('user') if isinstance(payload.get('data'), Mapping) else None,
-            (payload.get('graphql') or {}).get('user') if isinstance(payload.get('graphql'), Mapping) else None,
-            (payload.get('data') or {}).get('profile') if isinstance(payload.get('data'), Mapping) else None,
-        ]
-        return next((candidate for candidate in candidates if isinstance(candidate, Mapping)), None)
+    if platform.system() == 'Windows':
+        LOGGER.debug('Windows detectado: perfil Instagram exclusivamente via Playwright.')
+        return _fetch_profile_with_playwright(username, headers, cookies)
 
     request_headers = [
         headers,
@@ -276,10 +320,10 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                 if best_user:
                     return best_user
                 continue
-            user = extract_user(payload)
+            user = _extract_profile_user(payload)
             if isinstance(user, dict):
-                best_user = merge_profile(best_user, user)
-                if profile_quality(best_user) >= 4:
+                best_user = _merge_profile(best_user, user)
+                if _profile_quality(best_user) >= 4:
                     return best_user
 
     curl = shutil.which('curl')
@@ -298,10 +342,10 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                 )
                 payload = json.loads(completed.stdout) if completed.returncode == 0 and completed.stdout else None
                 LOGGER.debug('Instagram curl URL=%s returncode=%s stdout_bytes=%s stderr=%s', endpoint, completed.returncode, len(completed.stdout or ''), (completed.stderr or '').strip()[-500:])
-                user = extract_user(payload)
+                user = _extract_profile_user(payload)
                 if isinstance(user, dict):
-                    best_user = merge_profile(best_user, user)
-                    if profile_quality(best_user) >= 4:
+                    best_user = _merge_profile(best_user, user)
+                    if _profile_quality(best_user) >= 4:
                         return best_user
             except (OSError, subprocess.SubprocessError, ValueError):
                 LOGGER.warning('Falha no fallback curl do perfil Instagram URL=%s', endpoint, exc_info=True)
@@ -310,39 +354,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
         LOGGER.warning('curl não está disponível no PATH; a tentar Playwright.')
         _streamlit_message('warning', 'curl não foi encontrado no PATH do Windows; será tentado o fallback Playwright.', 'curl_missing')
 
-    # Em algumas instalações Windows o Instagram devolve a página HTML aos
-    # clientes HTTP, embora entregue o JSON completo a um navegador Chromium.
-    # O fallback é opcional: a aplicação continua funcional sem Playwright.
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(
-                    user_agent=headers['User-Agent'],
-                    extra_http_headers={'x-ig-app-id': headers['x-ig-app-id'], 'Accept-Language': 'en-US,en;q=0.9'},
-                )
-                if cookies:
-                    page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
-                for endpoint in endpoints:
-                    try:
-                        response = page.goto(endpoint, wait_until='domcontentloaded', timeout=30000)
-                        if response is None or response.status >= 400:
-                            continue
-                        payload = json.loads(page.locator('body').inner_text(timeout=5000))
-                        user = extract_user(payload)
-                        if isinstance(user, dict):
-                            best_user = merge_profile(best_user, user)
-                            if profile_quality(best_user) >= 4:
-                                return best_user
-                    except (ValueError, TimeoutError):
-                        continue
-            finally:
-                browser.close()
-    except Exception as exc:
-        LOGGER.warning('Falha no fallback Playwright do perfil Instagram: %s', exc, exc_info=True)
-        _streamlit_message('error', f'Fallback Playwright do perfil Instagram falhou: {exc}. Execute: python -m playwright install chromium', 'profile_playwright_error')
-    return best_user
+    return _fetch_profile_with_playwright(username, headers, cookies) or best_user
 
 
 def _country_from_bloks(value: Any) -> str:
@@ -604,6 +616,42 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _fetch_posts_with_playwright(reference: Mapping[str, str], limit: int, cookies: Mapping[str, str]) -> list[dict[str, Any]]:
+    posts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+                    extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9'},
+                )
+                if cookies:
+                    page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
+                response = page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
+                LOGGER.debug('Instagram Playwright posts URL=%s status=%s', reference['url'], response.status if response else None)
+                if response is None or response.status >= 400:
+                    return []
+                browser_document = page.content()
+                for document in _embedded_json_documents(browser_document):
+                    for node in _walk_json(document):
+                        post = _post_from_node(node)
+                        if not post or post['id'] in seen:
+                            continue
+                        seen.add(post['id'])
+                        posts.append(post)
+                        if len(posts) >= max(1, int(limit)):
+                            return posts
+            finally:
+                browser.close()
+    except Exception as exc:
+        LOGGER.warning('Falha no Playwright dos posts Instagram: %s', exc, exc_info=True)
+        _streamlit_message('error', f'Playwright não conseguiu consultar os posts Instagram: {exc}', 'posts_playwright_error')
+    return posts
+
+
 def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationResult:
     LOGGER.debug('fetch_public_instagram_posts source=%s limit=%s', source, limit)
     _ensure_windows_playwright()
@@ -611,6 +659,10 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
+    if platform.system() == 'Windows':
+        LOGGER.debug('Windows detectado: posts Instagram exclusivamente via Playwright.')
+        posts = _fetch_posts_with_playwright(reference, limit, _instagram_cookies())
+        return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         api_posts: list[dict[str, Any]] = []
@@ -647,36 +699,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
         if len(posts) >= max(1, int(limit)):
             break
     if not posts:
-        try:
-            from playwright.sync_api import sync_playwright
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(headless=True)
-                try:
-                    page = browser.new_page(
-                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
-                        extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9'},
-                    )
-                    cookies = _instagram_cookies()
-                    if cookies:
-                        page.context.add_cookies([{'name': name, 'value': value, 'domain': '.instagram.com', 'path': '/'} for name, value in cookies.items()])
-                    page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
-                    browser_document = page.content()
-                    for document in _embedded_json_documents(browser_document):
-                        for node in _walk_json(document):
-                            post = _post_from_node(node)
-                            if not post or post['id'] in seen:
-                                continue
-                            seen.add(post['id'])
-                            posts.append(post)
-                            if len(posts) >= max(1, int(limit)):
-                                break
-                        if len(posts) >= max(1, int(limit)):
-                            break
-                finally:
-                    browser.close()
-        except Exception as exc:
-            LOGGER.warning('Falha no fallback Playwright dos posts Instagram: %s', exc, exc_info=True)
-            _streamlit_message('error', f'Fallback Playwright dos posts Instagram falhou: {exc}. Execute: python -m playwright install chromium', 'posts_playwright_error')
+        posts = _fetch_posts_with_playwright(reference, limit, _instagram_cookies())
     LOGGER.debug('Instagram posts extracted=%s limit=%s', len(posts), limit)
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
