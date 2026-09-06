@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import urlparse
 
 import requests
@@ -85,6 +85,47 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
     return None
 
 
+def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
+    try:
+        response = requests.get(
+            f'https://i.instagram.com/api/v1/users/web_profile_info/?username={username}',
+            headers={
+                'x-ig-app-id': '936619743392459',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            timeout=15,
+        )
+        if response.status_code >= 400:
+            return None
+        payload = response.json()
+    except (requests.RequestException, ValueError, AttributeError):
+        return None
+    user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
+    return user if isinstance(user, dict) else None
+
+
+def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
+    followers = _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count')
+    following = _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count')
+    media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
+    return {
+        'id': f"instagram_{reference['username']}",
+        **reference,
+        'name': str(user.get('full_name') or user.get('username') or reference['username']).strip(),
+        'bio': str(user.get('biography') or '').strip(),
+        'avatar_url': str(user.get('profile_pic_url_hd') or user.get('profile_pic_url') or '').strip(),
+        'subscriber_count': followers,
+        'following_count': following,
+        'post_count': media,
+        'public_lookup': True,
+        'metrics_source': 'instagram_web_profile_info',
+        'last_public_lookup_at': datetime.now(timezone.utc).isoformat(),
+        '_api_posts': (((user.get('edge_owner_to_timeline_media') or {}).get('edges') or []) if isinstance(user.get('edge_owner_to_timeline_media'), dict) else []),
+    }
+
+
 def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     try:
         reference = normalize_instagram_reference(source)
@@ -113,6 +154,10 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(response.text, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(response.text, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
     following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',)) or _structured_metric(response.text, 'edge_owner_to_timeline_media', 'posts', 'post_count')
+    if followers is None or following is None or not avatar_url:
+        api_user = _fetch_web_profile_user(reference['username'])
+        if api_user:
+            return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
     data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
@@ -179,6 +224,17 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
+    api_user = _fetch_web_profile_user(reference['username'])
+    if api_user:
+        api_posts: list[dict[str, Any]] = []
+        for edge in ((api_user.get('edge_owner_to_timeline_media') or {}).get('edges') or []):
+            node = edge.get('node') if isinstance(edge, dict) else None
+            if isinstance(node, dict):
+                post = _post_from_node(node)
+                if post:
+                    api_posts.append(post)
+        if api_posts:
+            return IntegrationResult(True, 'Posts públicos encontrados.', reference | {'posts': api_posts[:max(1, int(limit))]})
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
     except requests.RequestException as exc:

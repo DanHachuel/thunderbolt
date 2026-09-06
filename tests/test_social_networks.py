@@ -139,6 +139,20 @@ def test_public_instagram_posts_extracts_media_and_caption_from_embedded_json():
     assert result.data["posts"][0]["caption"] == "Primeiro"
 
 
+def test_public_instagram_posts_uses_web_profile_info_json_endpoint():
+    api_response = Mock(
+        status_code=200,
+        json=lambda: {"data": {"user": {"edge_owner_to_timeline_media": {"edges": [
+            {"node": {"id": "p1", "shortcode": "ABC", "display_url": "https://img.example/1.jpg", "edge_media_to_caption": {"edges": [{"node": {"text": "Legenda"}}]}}}
+        ]}}}},
+    )
+    with patch("integrations.instagram_public.requests.get", return_value=api_response) as request:
+        result = fetch_public_instagram_posts("@creator", limit=10)
+    assert result.ok is True
+    assert result.data["posts"][0]["caption"] == "Legenda"
+    assert "web_profile_info" in request.call_args.args[0]
+
+
 def test_instagram_card_contains_posts_expander_controls():
     from app import social_networks_ui
 
