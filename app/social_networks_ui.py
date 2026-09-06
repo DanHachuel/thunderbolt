@@ -45,7 +45,7 @@ def _metric_input(value: Any) -> int | None:
 def _render_instagram_bio(value: Any) -> None:
     bio = normalize_instagram_bio(value)
     if bio:
-        st.markdown(bio.replace("\n", "  \n"))
+        st.text(bio)
 
 
 def _language_index(value: Any) -> int:
@@ -99,7 +99,6 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
     profile_id = _clean(profile.get("id"))
     state_key = _instagram_posts_key(profile_id)
     posts = st.session_state.get(state_key, [])
-    source = _clean(profile.get("url")) or _clean(profile.get("handle"))
     with st.expander("Últimos posts do Instagram", expanded=False):
         action_cols = st.columns(3)
         with action_cols[0]:
@@ -110,13 +109,14 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
             download_clicked = bool(posts) and st.download_button("Baixar todos", data=_instagram_posts_archive(posts), file_name=f"instagram-{profile_id}-posts.zip", mime="application/zip", key=f"download_instagram_posts_{profile_id}", use_container_width=True)
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
-            result = fetch_public_instagram_posts(source, limit=target)
-            if result.ok:
-                posts = result.data.get("posts", [])
+            posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
+            if posts_ok:
+                posts = loaded_posts
                 st.session_state[state_key] = posts
                 st.success(f"{len(posts)} posts carregados.")
+                st.rerun()
             else:
-                st.warning(result.message)
+                st.warning(posts_message)
         posts = st.session_state.get(state_key, posts)
         if not posts:
             st.info("Clique em Carregar últimos 10 para consultar os posts públicos desta conta.")
@@ -133,11 +133,11 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
                     if _clean(post.get("caption")):
                         st.caption(post["caption"])
         if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", use_container_width=True):
-            result = fetch_public_instagram_posts(source, limit=len(posts) + 10)
-            if result.ok:
-                st.session_state[state_key] = result.data.get("posts", posts)
+            posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=len(posts) + 10)
+            if posts_ok:
+                st.session_state[state_key] = loaded_posts
                 st.rerun()
-            st.warning(result.message)
+            st.warning(posts_message)
 
 
 def _api_card_defaults(kind: str) -> tuple[str, list[str], Callable[[Mapping[str, Any]], dict[str, Any]]]:
@@ -291,6 +291,7 @@ def _characters(settings: Mapping[str, Any]) -> tuple[list[dict[str, Any]], Any 
 def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str, character_id: str = "") -> dict[str, Any]:
     name = _clean(data.get("name")) or _clean(data.get("username")) or "Conta Instagram"
     url = _clean(data.get("url"))
+    selected_country = _clean(country) if _clean(country) in COUNTRY_OPTIONS else ""
     metadata = {
         **dict(data),
         "platform": "instagram",
@@ -299,7 +300,7 @@ def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str
         "url": url,
         "handle": _clean(data.get("handle")),
         "bio": normalize_instagram_bio(data.get("bio")),
-        "country": country.strip(),
+        "country": selected_country,
         "language": language.strip(),
         "post_count": data.get("post_count"),
         "subscriber_count": data.get("subscriber_count"),
@@ -317,6 +318,21 @@ def _merge_instagram_refresh(existing: Mapping[str, Any], refreshed: Mapping[str
         if merged.get(field) in (None, "") and existing.get(field) not in (None, ""):
             merged[field] = existing[field]
     return merged
+
+
+def _refresh_instagram_profile(profile: Mapping[str, Any]) -> tuple[bool, str, dict[str, Any]]:
+    source = _clean(profile.get("url")) or _clean(profile.get("handle"))
+    result = fetch_public_instagram_profile(source)
+    if not result.ok:
+        return False, result.message, {}
+    return True, result.message, _merge_instagram_refresh(profile, result.data)
+
+
+def _load_instagram_posts(profile: Mapping[str, Any], limit: int = 10) -> tuple[bool, str, list[dict[str, Any]]]:
+    source = _clean(profile.get("url")) or _clean(profile.get("handle"))
+    result = fetch_public_instagram_posts(source, limit=limit)
+    posts = result.data.get("posts", []) if isinstance(result.data, dict) else []
+    return result.ok, result.message, posts
 
 
 def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, Any]], settings: Mapping[str, Any]) -> None:
@@ -344,13 +360,12 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             refresh_col, edit_col = st.columns(2)
             with refresh_col:
                 if st.button("↻", help="Actualizar posts, seguidores e seguindo", key=f"refresh_instagram_{profile_id}"):
-                    result = fetch_public_instagram_profile(_clean(profile.get("url")) or _clean(profile.get("handle")))
-                    if result.ok:
-                        refreshed = _merge_instagram_refresh(profile, result.data)
+                    refreshed_ok, refreshed_message, refreshed = _refresh_instagram_profile(profile)
+                    if refreshed_ok:
                         update_channel(profile_id, {**refreshed, "platform": "instagram", "country": profile.get("country", ""), "language": profile.get("language", ""), "character_id": profile.get("character_id", "")})
                         st.success("Métricas Instagram actualizadas.")
                         st.rerun()
-                    st.warning(result.message)
+                    st.warning(refreshed_message)
             with edit_col:
                 if st.button("Editar", key=f"edit_instagram_button_{profile_id}", use_container_width=True):
                     st.session_state[edit_key] = True
