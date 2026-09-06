@@ -8,9 +8,10 @@ from typing import Any, Callable, Mapping
 import requests
 import streamlit as st
 
-from hermes_ui.domain import create_channel, update_channel
+from hermes_ui.domain import create_channel, delete_channel, update_channel
 from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INFLUENCER_ID, get_repository
 from hermes_ui.storage import read_json, write_json
+from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
 from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
@@ -40,6 +41,20 @@ def _profile_metric(profile: Mapping[str, Any], *keys: str) -> Any:
 def _language_index(value: Any) -> int:
     code = language_code(value)
     return list(LANGUAGE_CODES).index(code) if code in LANGUAGE_CODES else list(LANGUAGE_CODES).index("pt")
+
+
+def _country_options() -> tuple[str, ...]:
+    return ("",) + COUNTRY_OPTIONS
+
+
+def _country_index(value: Any) -> int:
+    options = _country_options()
+    value = _clean(value)
+    return options.index(value) if value in options else 0
+
+
+def _country_label(value: str) -> str:
+    return value or "Não definido"
 
 
 def _instagram_posts_key(profile_id: str) -> str:
@@ -326,9 +341,26 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                 if st.button("Editar", key=f"edit_instagram_button_{profile_id}", use_container_width=True):
                     st.session_state[edit_key] = True
                     st.rerun()
+            if st.button("Apagar", key=f"delete_instagram_button_{profile_id}", use_container_width=True):
+                st.session_state[f"confirm_delete_instagram_{profile_id}"] = True
+                st.rerun()
             url = _clean(profile.get("url"))
             if url:
                 st.link_button("Abrir Instagram", url, use_container_width=True)
+
+        if st.session_state.get(f"confirm_delete_instagram_{profile_id}"):
+            st.warning("Apagar este card remove o cadastro da conta Instagram, mas não os ficheiros associados.")
+            confirm_cols = st.columns(2)
+            with confirm_cols[0]:
+                if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_instagram_button_{profile_id}", use_container_width=True):
+                    delete_channel(profile_id)
+                    st.session_state.pop(f"confirm_delete_instagram_{profile_id}", None)
+                    st.success("Conta Instagram apagada.")
+                    st.rerun()
+            with confirm_cols[1]:
+                if st.button("Cancelar", key=f"cancel_delete_instagram_button_{profile_id}", use_container_width=True):
+                    st.session_state.pop(f"confirm_delete_instagram_{profile_id}", None)
+                    st.rerun()
 
         if st.session_state.get(edit_key):
             with st.form(f"edit_instagram_profile_form_{profile_id}"):
@@ -336,7 +368,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                 with edit_cols[0]:
                     name = st.text_input("Nome", value=_clean(profile.get("name")), key=f"instagram_edit_name_{profile_id}")
                     handle = st.text_input("handler", value=_clean(profile.get("handle")), key=f"instagram_edit_handle_{profile_id}")
-                    country = st.text_input("País", value=_clean(profile.get("country")), key=f"instagram_edit_country_{profile_id}")
+                    country = st.selectbox("País", _country_options(), index=_country_index(profile.get("country")), format_func=_country_label, key=f"instagram_edit_country_{profile_id}")
                     language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(profile.get("language")), format_func=language_label, key=f"instagram_edit_language_{profile_id}")
                 with edit_cols[1]:
                     posts = st.number_input("posts", min_value=0, value=int(profile.get("post_count") or 0), key=f"instagram_edit_posts_{profile_id}")
@@ -404,6 +436,9 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                 with preview_cols[1]:
                     st.write(f"**{_clean(data.get('name')) or _clean(data.get('username'))}**")
                     st.caption(_clean(data.get("handle")))
+                    bio = normalize_instagram_bio(data.get("bio"))
+                    if bio:
+                        st.caption(f"Bio: {bio}")
                 with preview_cols[2]:
                     st.metric("posts", _metric(data.get("post_count")))
                 with preview_cols[3]:
@@ -414,7 +449,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     form_cols = st.columns(2)
                     with form_cols[0]:
                         name = st.text_input("Nome", value=_clean(data.get("name")), key="social_instagram_result_name")
-                        country = st.text_input("País", value=_clean(data.get("country")), key="social_instagram_result_country")
+                        country = st.selectbox("País", _country_options(), index=_country_index(data.get("country")), format_func=_country_label, key="social_instagram_result_country")
                         language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=_language_index(data.get("language")), format_func=language_label, key="social_instagram_result_language")
                     with form_cols[1]:
                         posts = st.number_input("posts", min_value=0, value=int(data.get("post_count") or 0), key="social_instagram_result_posts")

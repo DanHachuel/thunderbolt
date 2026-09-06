@@ -117,8 +117,10 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
 
 
 def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]) -> dict[str, Any]:
-    followers = _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count')
-    following = _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count')
+    followers = _direct_profile_metric(user, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = _direct_profile_metric(user, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    followers = followers if followers is not None else _structured_metric_from_json(json.dumps(user), 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = following if following is not None else _structured_metric_from_json(json.dumps(user), 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     media = ((user.get('edge_owner_to_timeline_media') or {}).get('count') if isinstance(user.get('edge_owner_to_timeline_media'), dict) else None)
     return {
         'id': f"instagram_{reference['username']}",
@@ -134,6 +136,21 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'last_public_lookup_at': datetime.now(timezone.utc).isoformat(),
         '_api_posts': (((user.get('edge_owner_to_timeline_media') or {}).get('edges') or []) if isinstance(user.get('edge_owner_to_timeline_media'), dict) else []),
     }
+
+
+def _direct_profile_metric(user: Mapping[str, Any], *keys: str) -> int | None:
+    """Read common profile counters before falling back to recursive JSON parsing."""
+    for key in keys:
+        value = user.get(key)
+        if isinstance(value, Mapping):
+            value = value.get('count') or value.get('value')
+        if value in (None, ''):
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 def fetch_public_instagram_profile(source: str) -> IntegrationResult:
