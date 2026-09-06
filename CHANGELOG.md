@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.38 — 2026-09-06
+- Adicionado fallback Chromium para o endpoint público Instagram quando o Windows devolve HTML parcial a `requests` e `curl`.
+- A pesquisa só usa os dados obtidos pelo navegador quando o payload contém bio, following, followers, posts e username.
+- Nenhuma alteração de layout.
+
 ## 0.6.37 — 2026-09-06
 - Corrigida a consulta Instagram para Windows com variantes de headers de navegador e aplicação móvel, evitando que respostas parciais deixem bio e seguindo vazios no formulário.
 - Validado o fluxo completo da UI com **@simoes.vi**: bio, posts `65`, seguidores `868` e seguindo `933` renderizados no formulário.
