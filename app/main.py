@@ -70,6 +70,7 @@ from app.modules.token_optimizer.compressor import check_installation
 from app.modules.token_optimizer.config import DEFAULTS as TOKEN_OPTIMIZER_DEFAULTS
 from app.modules.token_optimizer.metrics import get_stats as get_token_optimizer_stats
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
+from app.social_networks_ui import render_meta_api_cards, render_social_networks
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
@@ -8035,6 +8036,10 @@ def render_settings():
                 st.rerun()
         with st.expander("API Tiktok", expanded=False):
             render_tiktok_api_cards(settings)
+        with st.expander("API Instagram", expanded=False):
+            render_meta_api_cards(settings, "instagram")
+        with st.expander("API Facebook Pages", expanded=False):
+            render_meta_api_cards(settings, "facebook_pages")
         with st.expander("API Bilibili", expanded=False):
             bilibili_cards = settings.get("bilibili_api_cards") if isinstance(settings.get("bilibili_api_cards"), list) else []
             bilibili_ready = any(bool(card.get("active", True) and card.get("sessdata") and card.get("bili_jct") and card.get("buvid3")) for card in bilibili_cards if isinstance(card, dict))
@@ -9072,7 +9077,7 @@ def main():
         "Geração de Conteúdo IA": lambda: render_ai_influencer_content(read_json("settings.json", {})),
         "Motion Control": lambda: render_motion_control(read_json("settings.json", {})),
         "UGC Products": lambda: render_ugc_products(read_json("settings.json", {})),
-        "Redes Sociais": lambda: render_edit_placeholder("Redes Sociais", "Área reservada para a futura funcionalidade de redes sociais."),
+        "Redes Sociais": lambda: render_social_networks(read_json("settings.json", {})),
         "Analista Growth Youtube": render_growth_youtube,
         "Analista Growth Tiktok": render_growth_tiktok,
         "Analista Growth Instagram": render_growth_instagram,
