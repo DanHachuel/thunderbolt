@@ -520,6 +520,33 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                 break
         if len(posts) >= max(1, int(limit)):
             break
+    if not posts:
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(
+                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+                        extra_http_headers={'x-ig-app-id': '936619743392459', 'Accept-Language': 'en-US,en;q=0.9'},
+                    )
+                    page.goto(reference['url'], wait_until='domcontentloaded', timeout=30000)
+                    browser_document = page.content()
+                    for document in _embedded_json_documents(browser_document):
+                        for node in _walk_json(document):
+                            post = _post_from_node(node)
+                            if not post or post['id'] in seen:
+                                continue
+                            seen.add(post['id'])
+                            posts.append(post)
+                            if len(posts) >= max(1, int(limit)):
+                                break
+                        if len(posts) >= max(1, int(limit)):
+                            break
+                finally:
+                    browser.close()
+        except (ImportError, OSError, RuntimeError, TimeoutError):
+            pass
     return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
 
 

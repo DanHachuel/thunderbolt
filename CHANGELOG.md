@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.42 — 2026-09-06
+- Tornadas únicas por payload as chaves dos widgets da pesquisa Instagram, impedindo que Bio, seguindo, posts e país vazios sejam reutilizados pela mesma conta.
+- Adicionado fallback Chromium específico ao botão **Carregar últimos 10** quando o HTML HTTP não contém os posts.
+- Mantidas todas as funcionalidades anteriores e nenhum ajuste de layout.
+
 ## 0.6.41 — 2026-09-06
 - Corrigido o estado dos widgets do formulário de pesquisa Instagram: uma nova pesquisa limpa os valores antigos de Bio, posts, seguidores, seguindo, país, idioma e personagem antes de renderizar o novo perfil.
 - Mantidas integralmente as correcções de parsing Windows, fallback Chromium e payload Instagram das versões anteriores.
