@@ -67,6 +67,24 @@ def _structured_metric(document: str, *keys: str) -> int | None:
     return None
 
 
+def _structured_metric_from_json(document: str, *keys: str) -> int | None:
+    wanted = {key.casefold() for key in keys}
+    for parsed in _embedded_json_documents(document):
+        for node in _walk_json(parsed):
+            if not isinstance(node, dict):
+                continue
+            for key, value in node.items():
+                if str(key).casefold() not in wanted:
+                    continue
+                if isinstance(value, dict):
+                    value = value.get('count') or value.get('value')
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    continue
+    return None
+
+
 def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     try:
         reference = normalize_instagram_reference(source)
@@ -92,8 +110,8 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
                 continue
         return None
 
-    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(response.text, 'edge_followed_by', 'followers', 'follower_count')
-    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    followers = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:followers|seguidores)',)) or _structured_metric(response.text, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(response.text, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:following|seguindo)',)) or _structured_metric(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(response.text, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
     posts = metric((r'([\d,.]+)\s*(?:mil\s+)?(?:posts|publicações|publications)',)) or _structured_metric(response.text, 'edge_owner_to_timeline_media', 'posts', 'post_count')
     data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
