@@ -102,6 +102,8 @@ def test_public_instagram_endpoint_uses_curl_fallback_after_http_429():
         user = _fetch_web_profile_user("creator")
     assert user["edge_follow"]["count"] == 4321
     assert run.called
+    assert run.call_args.kwargs["encoding"] == "utf-8"
+    assert run.call_args.kwargs["errors"] == "replace"
 
 
 def test_private_profile_keeps_bio_and_following_metrics_from_profile_endpoint():

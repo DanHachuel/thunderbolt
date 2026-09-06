@@ -125,6 +125,8 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     [curl, '-L', '--max-time', '20', '-sS', '-A', headers['User-Agent'], '-H', f"x-ig-app-id: {headers['x-ig-app-id']}", '-H', 'Accept: application/json, text/plain, */*', endpoint],
                     capture_output=True,
                     text=True,
+                    encoding='utf-8',
+                    errors='replace',
                     timeout=25,
                     check=False,
                 )
