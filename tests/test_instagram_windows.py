@@ -21,6 +21,20 @@ BRUNO_HTML = '''
 </script>
 '''
 
+SEO_ONLY_HTML = '''
+<meta property="og:title" content="Bruno Francisco - IA | Marketing (@brun0gpt)">
+<meta property="og:description" content="227K seguidores, seguindo 241, 2,277 posts — Veja as fotos e vídeos de Bruno Francisco - IA | Marketing (@brun0gpt)">
+'''
+
+
+def test_seo_summary_is_not_saved_as_bio_when_structured_bio_is_missing():
+    user = instagram_public._extract_profile_user_from_html(SEO_ONLY_HTML, "brun0gpt")
+    data = instagram_public._profile_data_from_api(user, instagram_public.normalize_instagram_reference("https://www.instagram.com/brun0gpt"))
+
+    assert data["bio"] == ""
+    assert data["subscriber_count"] == 227000
+    assert data["following_count"] == 241
+
 
 def test_bruno_profile_prefers_real_bio_and_normalizes_top_metrics():
     user = instagram_public._extract_profile_user_from_html(BRUNO_HTML, "brun0gpt")
@@ -41,7 +55,7 @@ def test_windows_profile_tries_requests_then_uses_playwright_html_parser():
          patch.object(instagram_public, "_fetch_instagram_html_with_playwright", return_value=HTML) as playwright:
         result = instagram_public._fetch_web_profile_user("creator")
 
-    assert result["biography"] == "123 followers, 456 following and 2 posts"
+    assert result["biography"] == ""
     assert result["edge_followed_by"]["count"] == 123
     assert result["edge_follow"]["count"] == 456
     assert result["edge_owner_to_timeline_media"]["edges"][0]["node"]["shortcode"] == "ABC"
