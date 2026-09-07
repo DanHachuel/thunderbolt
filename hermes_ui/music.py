@@ -13,7 +13,7 @@ import requests
 from . import storage
 from .notifications import record_notification
 
-MUSIC_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
+MUSIC_EXTENSIONS = {".mp3", ".mpeg", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 VOICEOVER_EXTENSIONS = set(MUSIC_EXTENSIONS)
 
 

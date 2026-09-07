@@ -775,7 +775,7 @@ def _mpt_percent(value: Any, fallback: float = 1.0) -> str:
 
 def _valid_audio_artifact(value: Any) -> Path | None:
     path = _valid_artifact_path(value)
-    if path is None or path.suffix.lower() not in {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}:
+    if path is None or path.suffix.lower() not in {'.mp3', '.mpeg', '.wav', '.m4a', '.aac', '.flac', '.ogg'}:
         return None
     return path
 
