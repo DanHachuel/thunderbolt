@@ -34,7 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "uploads.json": [],
     "notifications.json": [],
     "media_downloads.json": [],
-    "display_names.json": {"blueprints": {}, "prompt_masters": {}},
+    "display_names.json": {"blueprints": {}, "prompt_masters": {}, "music": {}, "music_lyrics": {}},
     "niche_apify_runs.json": [],
     "metadata_edits.json": [],
         "python_editor_edits.json": [],
@@ -615,6 +615,13 @@ def _display_name_key(kind: str, path: Path) -> str:
             return resolved.relative_to(root).as_posix()
         except ValueError as exc:
             raise ValueError("O ficheiro não pertence ao storage de Prompt Masters.") from exc
+    if kind in {"music", "music_lyrics"}:
+        root = (STORAGE / ("music" if kind == "music" else "scripts")).resolve()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError as exc:
+            label = "música" if kind == "music" else "lyrics"
+            raise ValueError(f"O ficheiro não pertence ao storage de {label}.") from exc
     raise ValueError(f"Tipo de biblioteca inválido: {kind}")
 
 
