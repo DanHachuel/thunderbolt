@@ -109,6 +109,8 @@ def test_ugc_products_uses_generic_video_provider_and_model():
 
 def test_ugc_products_has_character_product_generation_and_ready_media_controls():
     block = UI.split("def render_ugc_products", 1)[1].split("def render_ai_influencer_content", 1)[0]
+    assert "Cadastre pelo menos um personagem na aba Personagens antes de criar UGC." not in block
+    assert '"Personagem (opcional)"' in block
     for label in ("Personagem", "Nome do produto", "Informação do Produto ou link do produto", "Gerar roteiro com IA", "Gerar Foto", "Gerar Video", "Duração de cada clip (segundos)", "Midias Prontas"):
         assert label in block
     assert '"aspect_ratio": "9:16"' in block
