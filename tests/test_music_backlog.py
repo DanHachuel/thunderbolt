@@ -23,33 +23,38 @@ def test_custom_music_voices_is_an_empty_reserved_blueprint_area():
     assert "st.file_uploader(" not in voices
 
 
-def test_music_backlog_uses_its_own_audio_task_pool():
-    backlog = MAIN_SOURCE.split("def render_music_backlog()", 1)[1].split("def _thumbnail_editor_context", 1)[0]
+def test_music_backlog_combines_created_and_imported_audio_files():
+    backlog = MAIN_SOURCE.split("def _music_backlog_records()", 1)[1].split("def _thumbnail_editor_context", 1)[0]
 
     assert "tasks = list_music_tasks()" in backlog
+    assert "for music_file in list_music_files()" in backlog
+    assert 'record["source_type"] = "created"' in backlog
+    assert '"source_type": "imported"' in backlog
     assert "_render_pipeline_progress_panel()" not in backlog
     assert "load_video_tasks_for_catalog()" not in backlog
     assert "Worker de vídeo" not in backlog
 
 
-def test_music_backlog_has_the_same_state_controls_as_video_backlog():
-    backlog = MAIN_SOURCE.split("def render_music_backlog()", 1)[1].split("def _thumbnail_editor_context", 1)[0]
+def test_music_backlog_has_upload_download_rename_and_lyrics_controls():
+    backlog = MAIN_SOURCE.split("def _render_music_file_card", 1)[1].split("def _thumbnail_editor_context", 1)[0]
 
+    assert 'st.tabs(["Músicas", "Lyrics"])' in backlog
+    assert 'st.file_uploader("Adicionar músicas à pasta acima"' in backlog
+    assert 'st.file_uploader("Adicionar lyrics"' in backlog
     assert 'st.selectbox("Filtrar por estado"' in backlog
-    assert 'key=f"music_backlog_start_{task[\'id\']}"' in backlog
-    assert 'key=f"music_backlog_stop_{task[\'id\']}"' in backlog
-    assert 'run_music_task(str(task["id"]), read_json("settings.json", {}))' in backlog
-    assert 'transition_music_task(str(task["id"]), "blocked")' in backlog
+    assert 'run_music_task(record_id' in backlog
+    assert 'transition_music_task(record_id, "blocked")' in backlog
     assert '"Descarregar música"' in backlog
-    assert 'key=f"music_backlog_download_{task[\'id\']}"' in backlog
-    assert '"Tipo")' in backlog
-    assert '"Áudio")' in backlog
+    assert '"Descarregar lyrics"' in backlog
+    assert '_render_card_pencil(edit_key)' in backlog
+    assert '"Música criada"' in backlog
+    assert '"Música importada"' in backlog
 
 
 def test_music_creation_is_audio_only_and_supports_suno_and_lyria():
-    creation = MAIN_SOURCE.split("def render_music_creation()", 1)[1].split("def render_scripts", 1)[0]
+    creation = MAIN_SOURCE.split("def render_music_creation()", 1)[1].split("def render_custom_music_voices", 1)[0]
 
-    assert 'st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria"]' in creation
+    assert 'st.selectbox("Provider de geração musical", ["Suno AI", "Google Lyria", "Eleven Music"]' in creation
     assert '"Idioma da letra/música"' in creation
     assert 'st.selectbox("Género musical", list(MUSIC_GENRES)' in creation
     assert 'st.selectbox("Vocal", list(MUSIC_VOCAL_OPTIONS)' in creation
@@ -73,6 +78,12 @@ def test_google_lyria_configuration_has_a_safe_api_test_control():
     assert 'st.form_submit_button("Guardar Google Lyria"' in settings
     assert 'test_voice_provider("google_lyria", {"lyria_api_key": lyria_api_key, "lyria_model": lyria_model})' in settings
     assert 'widget_key="api_test_voice_google_lyria"' in settings
+
+
+def test_music_lyrics_records_use_existing_markdown_document_storage():
+    assert 'document_type") or "").strip() != "music_lyrics"' in MAIN_SOURCE
+    assert 'save_script_document({"title": Path(uploaded_lyrics.name).stem, "document_type": "music_lyrics"' in MAIN_SOURCE
+    assert 'mime="text/markdown"' in MAIN_SOURCE
 
 
 def test_thumbnail_cards_offer_download_for_generated_images():
