@@ -26,6 +26,12 @@ SEO_ONLY_HTML = '''
 <meta property="og:description" content="227K seguidores, seguindo 241, 2,277 posts — Veja as fotos e vídeos de Bruno Francisco - IA | Marketing (@brun0gpt)">
 '''
 
+REGEX_BIO_HTML = '''<script>var data = {"biography":"🤖 Marketing e Vendas com Inteligência Artificial\\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"};</script>'''
+
+
+def test_regex_bio_is_used_when_profile_node_is_not_found():
+    assert instagram_public._extract_bio_from_html(REGEX_BIO_HTML) == "🤖 Marketing e Vendas com Inteligência Artificial\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"
+
 
 def test_seo_summary_is_not_saved_as_bio_when_structured_bio_is_missing():
     user = instagram_public._extract_profile_user_from_html(SEO_ONLY_HTML, "brun0gpt")
