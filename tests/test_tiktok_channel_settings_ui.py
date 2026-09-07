@@ -23,6 +23,24 @@ def test_tiktok_cards_show_requested_channel_settings():
     assert '"Horário diário (HH:MM)": "automation_time"' in block
 
 
+def test_tiktok_cards_include_all_requested_actions_and_download_names():
+    card_block = SOURCE.split("def _render_tiktok_automation_cards():", 1)[1].split("def render_tiktok_automation():", 1)[0]
+    for label in ("Apagar", "Baixar Thumbnail 9:16", "Baixar Thumbnail Prompt", "Baixar Roteiro", "Baixar Vídeo9:16"):
+        assert label in card_block
+    assert '_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png")' in card_block
+    assert '_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt")' in card_block
+    assert '_automation_download_name("Script", task, script_path, ".md")' in card_block
+    assert '_automation_download_name("Vídeo9:16", task, video_path, ".mp4")' in card_block
+
+
+def test_youtube_downloads_use_the_same_requested_name_patterns():
+    card_block = SOURCE.split("def _render_youtube_automation_cards():", 1)[1].split("def render_automation():", 1)[0]
+    assert '_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png")' in card_block
+    assert '_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt")' in card_block
+    assert '_automation_download_name("Script", task, script_path, ".md")' in card_block
+    assert '_automation_download_name("Vídeo9:16", task, video_path, ".mp4")' in card_block
+
+
 def test_tiktok_automation_start_uses_shared_pipeline_start_helper():
     assert '@st.fragment(run_every=5.0)\ndef _render_tiktok_automation_cards()' in SOURCE
     assert 'key=f"tiktok_automation_start_{task_id}"' in SOURCE
