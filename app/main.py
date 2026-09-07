@@ -4970,10 +4970,11 @@ def _task_artifact_path(task: dict[str, Any], *names: str) -> Path | None:
 
 
 def _download_title(task: dict[str, Any]) -> str:
-    """Return a filesystem-safe title for automation downloads."""
-    raw_title = str(task.get("title") or task.get("topic") or task.get("name") or "Vídeo").strip()
-    cleaned = re.sub(r'[<>:"/\\|?*\\x00-\\x1f]+', "_", raw_title)
-    cleaned = " ".join(cleaned.split()).strip(" ._")
+    """Return the original video name, safely normalised for downloaded files."""
+    raw_title = str(task.get("topic") or task.get("title") or task.get("name") or "Vídeo").strip()
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", raw_title)
+    cleaned = re.sub(r"\s+", "_", cleaned)
+    cleaned = re.sub(r"_+", "_", cleaned).strip(" ._")
     return cleaned or "Vídeo"
 
 
@@ -5713,7 +5714,7 @@ def _render_youtube_automation_cards():
                         st.download_button(
                             "Baixar Thumbnail",
                             data=thumbnail_path.read_bytes() if thumbnail_path else b"",
-                            file_name=_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png"),
+                            file_name=_automation_download_name("Thumbnail", task, thumbnail_path, ".png"),
                             mime="image/png",
                             key=f"automation_download_thumbnail_{task['id']}",
                             use_container_width=True,
@@ -5761,7 +5762,7 @@ def _render_youtube_automation_cards():
                         st.download_button(
                             "Baixar Vídeo",
                             data=video_path.read_bytes() if video_path else b"",
-                            file_name=_automation_download_name("Vídeo9:16", task, video_path, ".mp4"),
+                            file_name=_automation_download_name("Vídeo", task, video_path, ".mp4"),
                             mime="video/mp4",
                             key=f"automation_download_video_{task['id']}",
                             use_container_width=True,
