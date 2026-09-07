@@ -95,11 +95,13 @@ class InfluencerWorkflowTests(unittest.TestCase):
         card = {"provider": "kie_ai", "api_key": "secret", "model": "veo3_fast"}
         with tempfile.TemporaryDirectory() as temp_dir:
             output = Path(temp_dir) / "final.mp4"
-            with patch.object(media_generation, "generate_ugc_segment", side_effect=[(Path("one.mp4"), "task-1"), (Path("two.mp4"), "task-2")]) as segment, patch.object(media_generation, "concatenate_video_files", return_value=output) as concat:
-                result, task_ids = media_generation.generate_ugc_product_video({}, card, image_url="https://files.kie.ai/product.jpg", prompts=["primeiro", "segundo"], output_path=output)
+            with patch.object(media_generation, "generate_video_for_card", side_effect=[Path("one.mp4"), Path("two.mp4")]) as segment, patch.object(media_generation, "concatenate_video_files", return_value=output) as concat:
+                result, task_ids = media_generation.generate_ugc_product_video({}, card, image_url="https://files.kie.ai/product.jpg", prompts=["primeiro", "segundo"], duration=12, output_path=output)
         self.assertEqual(result, output)
-        self.assertEqual(task_ids, ["task-1", "task-2"])
+        self.assertEqual(len(task_ids), 2)
         self.assertEqual(segment.call_count, 2)
+        self.assertEqual(segment.call_args_list[0].kwargs["duration"], 12)
+        self.assertEqual(segment.call_args_list[0].kwargs["aspect_ratio"], "9:16")
         self.assertEqual(concat.call_args.args[1], output)
 
     def test_explicit_two_part_script_avoids_llm_call(self):

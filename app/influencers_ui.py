@@ -115,6 +115,25 @@ def _provider_label(card: Mapping[str, Any]) -> str:
     return f"{definition.label} · {model}"
 
 
+def _content_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
+    raw = item.get("metadata") if isinstance(item.get("metadata"), Mapping) else item.get("metadata_json")
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    try:
+        parsed = json.loads(str(raw or "{}"))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return dict(parsed) if isinstance(parsed, Mapping) else {}
+
+
+def _ugc_media_records(repository: Any) -> list[dict[str, Any]]:
+    try:
+        records = repository.list_content("", limit=200)
+    except Exception:
+        return []
+    return [item for item in records if _content_metadata(item).get("workflow") == "ugc_products"]
+
+
 def render_ai_influencers_api_status(settings: dict[str, Any]) -> None:
     """Show the effective backend status after selector and credentials are loaded."""
     status = backend_status(settings)
@@ -424,76 +443,156 @@ def render_motion_control(settings: dict[str, Any]) -> None:
 
 
 def render_ugc_products(settings: dict[str, Any]) -> None:
-    """Render the local product-image to video workflow without Telegram or social publishing."""
+    """Create portrait UGC photos or videos from a product and a saved character."""
     st.title("UGC Products")
-    st.caption("Crie um anúncio UGC a partir de uma imagem de produto e de um roteiro local. O workflow gera dois clips de vídeo com o provider e modelo seleccionados e junta-os com FFmpeg no storage local.")
+    st.caption("Crie fotos ou vídeos UGC em formato vertical 9:16 para TikTok e Instagram usando um produto e um personagem cadastrados.")
     repository = _repository(settings)
     if repository is None:
         return
-    video_cards = _workflow_provider_cards(settings, provider=None)
-    if not video_cards:
-        st.warning("Active e configure pelo menos um provider de vídeo no pool de vídeo em Configuração API > API Keys > Imagem e Video IA.")
-        return
-    image_cards, _ = _provider_options(settings, "image")
-    with st.form("influencer_ugc_products_form"):
-        product_upload = st.file_uploader("Imagem do produto", type=["jpg", "jpeg", "png", "webp"], key="ugc_products_image")
-        script = st.text_area("Roteiro de vídeo", height=180, placeholder="Escreva a demonstração, falas e acções. Para controlar os dois clips manualmente, separe-os com uma linha contendo ---.", key="ugc_products_script")
-        improve_image = st.checkbox("Melhorar a imagem com o provider de imagem activo (opcional)", value=False, key="ugc_products_improve_image")
-        image_provider_id = ""
-        if improve_image and image_cards:
-            image_provider_options = [str(card.get("id") or "") for card in image_cards]
-            image_provider_id = st.selectbox("Provider de melhoria da imagem", image_provider_options, format_func=lambda value: _provider_label(next(card for card in image_cards if str(card.get("id")) == value)), key="ugc_products_image_provider")
-        elif improve_image:
-            st.info("Não existe um provider activo no pool de imagem; será usada a imagem original.")
-        card_options = [str(card.get("id") or "") for card in video_cards]
-        provider_id = st.selectbox("Provider / modelo de vídeo", card_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider")
-        generate = st.form_submit_button("Gerar UGC Product", type="primary", use_container_width=True)
-    if generate:
-        if product_upload is None:
-            st.error("Seleccione a imagem do produto.")
-            return
-        card = next(card for card in video_cards if str(card.get("id")) == provider_id)
-        try:
-            product_path = _store_uploaded_file(product_upload, "ugc-products-inputs")
-            image_path = product_path
-            if improve_image and image_provider_id:
-                image_card = next(card for card in image_cards if str(card.get("id")) == image_provider_id)
-                with st.spinner("A melhorar a imagem do produto…"):
-                    image_path = generate_image_for_card(settings, image_card, "Melhorar a apresentação fotográfica do mesmo produto sem alterar a embalagem, logótipo, cores, forma ou objectos visíveis. Fundo comercial limpo e luz natural.", topic="UGC Product", reference_image=product_path)
-            prompts = generate_ugc_segment_prompts(settings, script)
-            owner_id = _workflow_owner(repository)
-            record = repository.create_content(
-                {
-                    "influencer_id": owner_id,
-                    "content_type": "video",
-                    "prompt": script,
-                    "caption": "",
-                    "provider": card.get("provider"),
-                    "model": str(card.get("model") or ""),
-                    "platform": "",
-                    "state": "running",
-                    "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "telegram": False, "social_publish": False},
-                }
-            )
-            image_url = _image_input({"stored_path": str(image_path), "mime_type": mimetypes.guess_type(image_path.name)[0] or "image/jpeg"})
-            with st.spinner("A gerar os dois clips com o provider seleccionado e a juntá-los localmente…"):
-                try:
-                    output, task_ids = generate_ugc_product_video(settings, card, image_url=image_url, prompts=prompts)
-                    repository.update_content(record["id"], {"state": "completed", "artifact_path": str(output), "provider_request_id": ",".join(task_ids), "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "task_ids": task_ids, "telegram": False, "social_publish": False}})
-                    record_notification("influencer_content_completed", "UGC Products concluído", "O vídeo UGC Product foi gerado, unido e guardado localmente.", metadata={"content_id": record["id"], "workflow": "ugc_products", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:completed")
-                    st.success("UGC Product concluído. O vídeo final está disponível no histórico local abaixo.")
-                    with st.expander("Prompts dos dois segmentos", expanded=False):
-                        for index, prompt_item in enumerate(prompts, start=1):
-                            st.markdown(f"**Segmento {index}**")
-                            st.code(prompt_item)
-                except Exception as exc:
-                    repository.update_content(record["id"], {"state": "failed", "error": str(exc)[:1000]})
-                    record_notification("influencer_content_failed", "UGC Products falhou", f"A criação UGC Products falhou: {str(exc)[:240]}", metadata={"content_id": record["id"], "workflow": "ugc_products", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:failed")
-                    st.error(f"Não foi possível gerar o UGC Product: {exc}")
-        except (MediaGenerationError, ValueError, OSError) as exc:
-            st.error(str(exc))
-    _render_content_history(repository, STANDALONE_CONTENT_INFLUENCER_ID)
+    media_tab, ready_tab = st.tabs(["Criar UGC", "Midias Prontas"])
+    try:
+        influencers = [item for item in repository.list_influencers() if str(item.get("id") or "") != STANDALONE_CONTENT_INFLUENCER_ID]
+    except Exception:
+        influencers = []
 
+    with media_tab:
+        if not influencers:
+            st.info("Cadastre pelo menos um personagem na aba Personagens antes de criar UGC.")
+        else:
+            influencer_options = _influencer_options(influencers)
+            selected_influencer = st.selectbox(
+                "Personagem",
+                influencer_options,
+                format_func=lambda value: _influencer_label(influencers, value),
+                key="ugc_products_character",
+            )
+            selected_character = next(item for item in influencers if str(item.get("id")) == selected_influencer)
+            try:
+                character_assets = repository.list_assets(selected_influencer)
+            except Exception:
+                character_assets = []
+            character_images = [item for item in character_assets if str(item.get("asset_type") or "") == "image"]
+            product_name = st.text_input("Nome do produto", key="ugc_products_name", placeholder="Ex.: Sérum facial hidratante")
+            product_info = st.text_area("Informação do Produto ou link do produto", key="ugc_products_info", height=110, placeholder="Descreva benefícios, características, oferta ou cole o link do produto…")
+            product_uploads = st.file_uploader(
+                "Imagem do produto (fotos/vídeos)",
+                type=["jpg", "jpeg", "png", "webp", "mp4", "mov", "webm"],
+                accept_multiple_files=True,
+                key="ugc_products_inputs",
+                help="Anexe uma ou mais referências do produto. Para geração, a primeira imagem será usada como referência visual principal.",
+            )
+            generation_mode = st.radio("Geração", ["Gerar Foto", "Gerar Video"], horizontal=True, key="ugc_products_generation_mode")
+            duration = st.number_input("Duração de cada clip (segundos)", min_value=2, max_value=30, value=8, step=1, key="ugc_products_duration", disabled=generation_mode != "Gerar Video")
+            image_cards, image_options = _provider_options(settings, "image")
+            video_cards = _workflow_provider_cards(settings, provider=None)
+            video_options = [str(card.get("id") or "") for card in video_cards]
+            image_provider_id = st.selectbox("Provider / modelo de imagem", image_options, format_func=lambda value: _provider_label(next(card for card in image_cards if str(card.get("id")) == value)), key="ugc_products_image_provider") if image_cards else ""
+            video_provider_id = st.selectbox("Provider / modelo de vídeo", video_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider") if video_cards else ""
+            script = st.text_area("Roteiro de vídeo (UGC)", height=150, key="ugc_products_script", placeholder="O roteiro gerado pela IA aparecerá aqui; também pode editá-lo antes de gerar.")
+            generate_script = st.button("Gerar roteiro com IA", use_container_width=True, key="ugc_products_generate_script")
+            generate = st.button("Gerar Foto" if generation_mode == "Gerar Foto" else "Gerar Video", type="primary", use_container_width=True, key="ugc_products_generate")
+            if generate_script:
+                context = "\n".join(
+                    item for item in [
+                        f"Produto: {product_name.strip()}" if product_name.strip() else "",
+                        f"Informação/link: {product_info.strip()}" if product_info.strip() else "",
+                        f"Personagem: {selected_character.get('name') or selected_influencer}",
+                        f"Biografia do personagem: {selected_character.get('bio') or ''}",
+                    ] if item
+                )
+                prompts = generate_ugc_segment_prompts(settings, context or "Criar uma demonstração UGC natural do produto.")
+                st.session_state["ugc_products_script"] = "\n---\n".join(prompts)
+                st.rerun()
+            if generate:
+                if not product_name.strip():
+                    st.error("Informe o nome do produto.")
+                elif not product_info.strip() and not product_uploads:
+                    st.error("Informe os dados/link do produto ou anexe pelo menos uma mídia.")
+                elif not script.strip():
+                    st.error("Escreva o roteiro ou use o botão Gerar roteiro com IA.")
+                elif generation_mode == "Gerar Foto" and not image_provider_id:
+                    st.error("Active um provider de imagem antes de gerar a foto.")
+                elif generation_mode == "Gerar Video" and not video_provider_id:
+                    st.error("Active um provider de vídeo antes de gerar o vídeo.")
+                else:
+                    image_upload = next((item for item in product_uploads or [] if Path(str(getattr(item, "name", ""))).suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}), None)
+                    if image_upload is None:
+                        st.error("Anexe pelo menos uma imagem do produto para usar como referência visual.")
+                    else:
+                        try:
+                            product_path = _store_uploaded_file(image_upload, "ugc-products-inputs")
+                            character_path = _local_asset_path(character_images[0]) if character_images else None
+                            prompts = [part.strip() for part in script.split("\n---\n") if part.strip()]
+                            if len(prompts) != 2:
+                                prompts = generate_ugc_segment_prompts(settings, script)
+                            card = next((item for item in (image_cards if generation_mode == "Gerar Foto" else video_cards) if str(item.get("id")) == (image_provider_id if generation_mode == "Gerar Foto" else video_provider_id)), None)
+                            character_name = str(selected_character.get("name") or selected_influencer)
+                            enriched_prompts = [f"Personagem: {character_name}. Produto: {product_name.strip()}. Informação: {product_info.strip()}. {item} Formato vertical 9:16, enquadramento para telemóvel, TikTok e Instagram." for item in prompts]
+                            owner_id = selected_influencer
+                            record = repository.create_content({
+                                "influencer_id": owner_id,
+                                "content_type": "image" if generation_mode == "Gerar Foto" else "video",
+                                "prompt": script,
+                                "caption": f"{product_name.strip()} + {character_name}",
+                                "provider": card.get("provider") if card else "",
+                                "model": str(card.get("model") or "") if card else "",
+                                "platform": "TikTok, Instagram",
+                                "state": "running",
+                                "metadata": {"workflow": "ugc_products", "product_name": product_name.strip(), "product_info": product_info.strip(), "character_name": character_name, "character_asset_path": str(character_path or ""), "product_image_path": str(product_path), "generation_mode": generation_mode, "duration_seconds": int(duration), "aspect_ratio": "9:16", "segment_prompts": enriched_prompts, "telegram": False, "social_publish": False},
+                            })
+                            with st.spinner("A gerar a mídia UGC em formato vertical 9:16…"):
+                                if generation_mode == "Gerar Foto":
+                                    image_card = {**card, "aspect_ratio": "9:16"}
+                                    output = generate_image_for_card(settings, image_card, enriched_prompts[0], topic=product_name.strip(), reference_image=product_path)
+                                    task_ids = []
+                                else:
+                                    output = generate_ugc_product_video(settings, card, image_url=_image_input({"stored_path": str(product_path), "mime_type": mimetypes.guess_type(product_path.name)[0] or "image/jpeg"}), prompts=enriched_prompts, duration=int(duration))[0]
+                                    task_ids = []
+                            repository.update_content(record["id"], {"state": "completed", "artifact_path": str(output), "provider_request_id": ",".join(task_ids)})
+                            st.success("Mídia UGC criada e guardada em Midias Prontas.")
+                        except Exception as exc:
+                            repository.update_content(record["id"], {"state": "failed", "error": str(exc)[:1000]})
+                            st.error(f"Não foi possível gerar a mídia UGC: {exc}")
+            if not image_cards and not video_cards:
+                st.warning("Configure pelo menos um provider de imagem ou vídeo em Configuração API > API Keys > Imagem e Video IA.")
+
+    with ready_tab:
+        st.subheader("Midias Prontas")
+        records = _ugc_media_records(repository)
+        if not records:
+            st.info("Ainda não existem mídias UGC prontas.")
+        for item in records:
+            metadata = _content_metadata(item)
+            artifact = Path(str(item.get("artifact_path") or ""))
+            content_id = str(item.get("id") or "content")
+            title = str(item.get("caption") or f"{metadata.get('product_name') or 'Produto'} + {metadata.get('character_name') or 'Personagem'}")
+            with st.container(border=True):
+                preview_col, detail_col, edit_col, download_col = st.columns([1.2, 2.7, 0.35, 0.9])
+                with preview_col:
+                    if artifact.is_file() and str(item.get("content_type") or "") == "image":
+                        st.image(str(artifact), use_container_width=True)
+                    elif artifact.is_file():
+                        st.video(str(artifact))
+                    else:
+                        st.caption("Artefacto indisponível")
+                with detail_col:
+                    st.write(f"**{title}**")
+                    st.caption(f"{metadata.get('product_name') or 'Produto'} · {metadata.get('character_name') or 'Personagem'} · {metadata.get('generation_mode') or 'UGC'} · 9:16")
+                    st.caption(f"Criado: {item.get('created_at') or '—'}")
+                with edit_col:
+                    if st.button("", icon=":material/edit:", help="Renomear mídia", key=f"ugc_ready_rename_{content_id}"):
+                        st.session_state[f"ugc_ready_editing_{content_id}"] = True
+                with download_col:
+                    if artifact.is_file() and str(item.get("state") or "") == "completed":
+                        mime = mimetypes.guess_type(artifact.name)[0] or ("image/png" if str(item.get("content_type") or "") == "image" else "video/mp4")
+                        st.download_button("Download", data=artifact.read_bytes(), file_name=artifact.name, mime=mime, key=f"ugc_ready_download_{content_id}", use_container_width=True)
+                if st.session_state.get(f"ugc_ready_editing_{content_id}"):
+                    with st.form(f"ugc_ready_rename_form_{content_id}"):
+                        renamed = st.text_input("Nome da mídia", value=title, key=f"ugc_ready_name_{content_id}")
+                        if st.form_submit_button("Guardar nome"):
+                            repository.update_content(content_id, {"caption": renamed.strip() or title})
+                            st.session_state.pop(f"ugc_ready_editing_{content_id}", None)
+                            st.rerun()
 
 def render_ai_influencer_content(settings: dict[str, Any]) -> None:
     st.title("Geração de Conteúdo IA")
