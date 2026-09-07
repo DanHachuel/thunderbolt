@@ -185,23 +185,45 @@ def _metric_text_value(value: Any) -> int | None:
     return int(digits) * multiplier
 
 
+def _extract_bio_from_html(document: str) -> str:
+    """Extract only the JSON biography value; never use an SEO description as Bio."""
+    patterns = (
+        r'"biography"\s*:\s*"((?:\\.|[^"\\])*)"',
+        r"'biography'\s*:\s*'((?:\\.|[^'\\])*)'",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, document, flags=re.IGNORECASE | re.DOTALL):
+            raw_value = match.group(1)
+            try:
+                decoded = json.loads(f'"{raw_value}"')
+            except (TypeError, ValueError, json.JSONDecodeError):
+                decoded = bytes(raw_value, 'utf-8').decode('unicode_escape')
+            if str(decoded or '').strip():
+                return str(decoded).strip()
+    return ''
+
+
 def _embedded_profile_user(document: str, username: str) -> Mapping[str, Any]:
-    wanted = username.casefold()
+    wanted = str(username or '').strip().lstrip('@').casefold()
     for payload in _embedded_json_documents(document):
         for node in _walk_json(payload):
             if not isinstance(node, Mapping):
                 continue
-            node_username = str(node.get('username') or node.get('handle') or '').lstrip('@').casefold()
-            if node_username == wanted and any(key in node for key in ('biography', 'bio', 'edge_followed_by', 'edge_follow', 'followers', 'following')):
+            node_username = str(node.get('username') or node.get('handle') or '').strip().lstrip('@').casefold()
+            has_profile_fields = any(key in node for key in ('biography', 'bio', 'edge_followed_by', 'edge_follow', 'followers', 'following'))
+            if node_username == wanted and has_profile_fields:
                 return node
     return {}
 
 
 def _extract_profile_user_from_html(document: str, username: str) -> dict[str, Any]:
     embedded_user = _embedded_profile_user(document, username)
+    regex_biography = _extract_bio_from_html(document)
     seo_description = _meta(document, 'og:description')
-    biography = str(embedded_user.get('biography') or embedded_user.get('bio') or '').strip()
-    description = biography or seo_description
+    biography = str(embedded_user.get('biography') or embedded_user.get('bio') or regex_biography or '').strip()
+    print(f'embedded_user for @{username}: {embedded_user}')
+    print(f'biography extracted for @{username}: {biography!r}')
+    description = biography
     title = str(embedded_user.get('full_name') or embedded_user.get('name') or _meta(document, 'og:title') or username).split('(')[0].strip() or username
     avatar_url = str(embedded_user.get('profile_pic_url_hd') or embedded_user.get('profile_pic_url') or _meta(document, 'og:image')).strip()
 
@@ -235,7 +257,7 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
         'profile_pic_url': avatar_url,
         '_html_posts': posts,
     }
-    return user if any((description, followers, following, post_count, country, posts)) else {}
+    return user if any((biography, followers, following, post_count, country, posts)) else {}
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
