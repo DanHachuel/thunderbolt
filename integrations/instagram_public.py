@@ -605,10 +605,25 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
             return IntegrationResult(False, 'Esta conta é privada. O Instagram não disponibiliza posts sem uma sessão autenticada.', reference | {'posts': [], 'is_private': True})
         if platform.system() == 'Windows':
             html_posts = api_user.get('_html_posts') or []
-            return IntegrationResult(bool(html_posts), 'Posts públicos encontrados.' if html_posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': html_posts[:max(1, int(limit))]})
+            print(f'Posts no user inicial para @{reference["username"]}: {len(html_posts)}')
+            if html_posts:
+                return IntegrationResult(True, 'Posts públicos encontrados.', reference | {'posts': html_posts[:max(1, int(limit))]})
     if platform.system() == 'Windows':
         html_content = _fetch_instagram_html_with_playwright(reference['url'], reference['username'])
-        posts = _extract_posts_from_html(html_content, limit) if html_content else []
+        html_user = _extract_profile_user_from_html(html_content, reference['username']) if html_content else {}
+        media = html_user.get('edge_owner_to_timeline_media') if isinstance(html_user, Mapping) else {}
+        edges = media.get('edges') if isinstance(media, Mapping) else []
+        print(f'JSON do perfil extraído no Windows para @{reference["username"]}: {bool(html_user)}; edges encontrados: {len(edges or [])}')
+        posts: list[dict[str, Any]] = []
+        for edge in edges or []:
+            node = edge.get('node') if isinstance(edge, Mapping) else edge
+            if isinstance(node, dict):
+                post = _post_from_node(node)
+                if post:
+                    posts.append(post)
+        if not posts:
+            posts = _extract_posts_from_html(html_content, limit) if html_content else []
+        posts = posts[:max(1, int(limit))]
         print(f'Posts extraídos no Windows para @{reference["username"]}: {len(posts)}')
         if not posts and html_content:
             try:
@@ -618,7 +633,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
                 print(f'HTML de debug dos posts guardado em storage/debug_posts.html para @{reference["username"]}')
             except OSError as exc:
                 print(f'Não foi possível guardar storage/debug_posts.html: {exc}')
-        return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
+        return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts})
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
     except requests.RequestException as exc:
