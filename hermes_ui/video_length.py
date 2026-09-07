@@ -6,32 +6,43 @@ from pathlib import Path
 from typing import Any
 
 WORDS_PER_MINUTE = 150
-DEFAULT_AVERAGE_VIDEO_TIME = "00:12"
+DEFAULT_AVERAGE_VIDEO_TIME = "12:00"
 AVERAGE_VIDEO_TIME_KEY = "average_video_time"
 AVERAGE_VIDEO_WORD_COUNT_KEY = "average_video_word_count"
 
 
+def channel_video_time_value(channel: dict[str, Any]) -> str:
+    """Return the card value, migrating only the historical twelve-minute default."""
+    value = str(channel.get(AVERAGE_VIDEO_TIME_KEY) or "").strip()
+    configured_words = str(channel.get(AVERAGE_VIDEO_WORD_COUNT_KEY) or "").strip()
+    if value == "00:12" and configured_words in {"", "0", "1800"}:
+        return DEFAULT_AVERAGE_VIDEO_TIME
+    return value or DEFAULT_AVERAGE_VIDEO_TIME
+
+
 def valid_hhmm(value: Any) -> bool:
+    """Keep the historical helper name while validating a MM:SS duration."""
     match = re.fullmatch(r"\s*(\d{1,3}):(\d{2})\s*", str(value or ""))
     if not match:
         return False
-    hours, minutes = int(match.group(1)), int(match.group(2))
-    return hours >= 0 and 0 <= minutes <= 59
+    minutes, seconds = int(match.group(1)), int(match.group(2))
+    return minutes >= 0 and 0 <= seconds <= 59
 
 
-def minutes_from_hhmm(value: Any) -> int:
+def minutes_from_hhmm(value: Any) -> float:
+    """Convert a stored MM:SS duration to fractional minutes."""
     if not valid_hhmm(value):
         return 0
-    hours, minutes = (int(part) for part in str(value).strip().split(":"))
-    return hours * 60 + minutes
+    minutes, seconds = (int(part) for part in str(value).strip().split(":"))
+    return minutes + seconds / 60
 
 
 def hhmm_from_minutes(value: Any) -> str:
     try:
-        total = max(0, int(value))
+        total_seconds = max(0, round(float(value) * 60))
     except (TypeError, ValueError):
-        total = 0
-    return f"{total // 60:02d}:{total % 60:02d}"
+        total_seconds = 0
+    return f"{total_seconds // 60:02d}:{total_seconds % 60:02d}"
 
 
 def _numbers(value: Any) -> list[int]:
@@ -91,23 +102,26 @@ def explicit_word_count(blueprint: Any = None, prompt_master: str = "") -> int:
 
 
 def channel_video_length(channel: dict[str, Any], blueprint: Any = None, prompt_master: str = "") -> tuple[int, str, str]:
-    """Return (word_count, hh:mm, source), preferring channel override over defaults."""
-    configured_time = minutes_from_hhmm(channel.get(AVERAGE_VIDEO_TIME_KEY))
+    """Return (word_count, mm:ss, source), preferring channel override over defaults."""
+    raw_configured_time = str(channel.get(AVERAGE_VIDEO_TIME_KEY) or "").strip()
     configured_words = int(channel.get(AVERAGE_VIDEO_WORD_COUNT_KEY) or 0) if str(channel.get(AVERAGE_VIDEO_WORD_COUNT_KEY) or "0").isdigit() else 0
+    if raw_configured_time == "00:12" and configured_words in {0, 1800}:
+        raw_configured_time = DEFAULT_AVERAGE_VIDEO_TIME
+    configured_time = minutes_from_hhmm(raw_configured_time)
     if configured_time:
-        return configured_time * WORDS_PER_MINUTE, hhmm_from_minutes(configured_time), "canal"
+        return round(configured_time * WORDS_PER_MINUTE), hhmm_from_minutes(configured_time), "canal"
     if configured_words:
         return configured_words, hhmm_from_minutes(round(configured_words / WORDS_PER_MINUTE)), "canal"
     words = explicit_word_count(blueprint, prompt_master)
     if words:
         return words, hhmm_from_minutes(round(words / WORDS_PER_MINUTE)), "Blueprint/Prompt Master"
     default_minutes = minutes_from_hhmm(DEFAULT_AVERAGE_VIDEO_TIME)
-    return default_minutes * WORDS_PER_MINUTE, DEFAULT_AVERAGE_VIDEO_TIME, "padrão do canal"
+    return round(default_minutes * WORDS_PER_MINUTE), DEFAULT_AVERAGE_VIDEO_TIME, "padrão do canal"
 
 
 def words_from_channel_time(value: Any) -> int:
     minutes = minutes_from_hhmm(value)
-    return minutes * WORDS_PER_MINUTE if minutes else 0
+    return round(minutes * WORDS_PER_MINUTE) if minutes else 0
 
 
 def length_generation_settings(channel: dict[str, Any], blueprint: Any = None, prompt_master: str = "") -> dict[str, Any]:
@@ -124,6 +138,7 @@ __all__ = [
     "AVERAGE_VIDEO_TIME_KEY",
     "AVERAGE_VIDEO_WORD_COUNT_KEY",
     "DEFAULT_AVERAGE_VIDEO_TIME",
+    "channel_video_time_value",
     "WORDS_PER_MINUTE",
     "channel_video_length",
     "explicit_word_count",
