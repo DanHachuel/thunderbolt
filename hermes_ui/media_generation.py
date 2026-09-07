@@ -584,7 +584,7 @@ def _video_endpoint(card: Mapping[str, Any]) -> str:
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de vídeo configurado.")
 
 
-def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> Any:
+def _video_request(card: dict[str, Any], prompt: str, image_url: str = "", duration: int | None = None, aspect_ratio: str | None = None) -> Any:
     style = str(card.get("api_style") or media_provider_definition(card.get("provider")).api_style)
     endpoint = _video_endpoint(card)
     body: dict[str, Any] = {
@@ -596,20 +596,26 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
             size=str(card.get("video_size") or ""),
         ),
     }
+    if aspect_ratio:
+        body["aspect_ratio"] = str(aspect_ratio)
     if image_url:
         body["image_url"] = image_url
+    if duration is not None:
+        body["duration"] = max(1, int(duration))
     if style == "openrouter":
-        body["aspect_ratio"] = str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO)
+        body["aspect_ratio"] = str(aspect_ratio or card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO)
         body["resolution"] = str(card.get("video_size") or INTERNAL_VIDEO_SIZE)
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if style == "kie":
         input_payload: dict[str, Any] = {
             "prompt": body["prompt"],
-            "aspect_ratio": str(card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO),
+            "aspect_ratio": str(aspect_ratio or card.get("aspect_ratio") or INTERNAL_VIDEO_ASPECT_RATIO),
             "resolution": str(card.get("video_size") or INTERNAL_VIDEO_SIZE),
         }
         if image_url:
             input_payload["imageUrls"] = [image_url]
+        if duration is not None:
+            input_payload["duration"] = max(1, int(duration))
         return requests.post(endpoint, headers=_headers(card), json={"model": _model(card), "input": input_payload}, timeout=180)
     if style == "heygen":
         avatar_id = str(card.get("avatar_id") or "").strip()
@@ -632,6 +638,8 @@ def _video_request(card: dict[str, Any], prompt: str, image_url: str = "") -> An
     if style == "replicate":
         image_input_key = str(card.get("image_input_key") or "image").strip() or "image"
         input_payload = {"prompt": body["prompt"]}
+        if duration is not None:
+            input_payload["duration"] = max(1, int(duration))
         if image_url:
             input_payload[image_input_key] = image_url
         return requests.post(endpoint, headers=_headers(card), json={"version": _model(card), "input": input_payload}, timeout=180)
@@ -725,6 +733,8 @@ def generate_video_for_card(
     prompt: str,
     *,
     image_url: str = "",
+    duration: int | None = None,
+    aspect_ratio: str | None = None,
     output_path: Path | None = None,
 ) -> Path:
     """Submit and resolve one video generation request."""
@@ -732,7 +742,7 @@ def generate_video_for_card(
     provider = str(card.get("provider") or "").strip().lower()
 
     def request(current: dict[str, Any]) -> Any:
-        return _video_request(current, prompt, image_url=image_url)
+        return _video_request(current, prompt, image_url=image_url, duration=duration, aspect_ratio=aspect_ratio)
 
     try:
         routed = route_json_request(settings, pool=POOL_VIDEO, cards=[card], request=request)
@@ -1100,6 +1110,7 @@ def generate_ugc_product_video(
     *,
     image_url: str,
     prompts: list[str],
+    duration: int = 8,
     output_path: Path | None = None,
 ) -> tuple[Path, list[str]]:
     """Generate two 8-second clips with the selected video card and concatenate them locally."""
@@ -1111,6 +1122,6 @@ def generate_ugc_product_video(
     segment_paths = [destination.with_name(f"{destination.stem}-segment-{index + 1}.mp4") for index in range(2)]
     task_ids: list[str] = []
     for prompt, segment_path in zip(clean_prompts, segment_paths):
-        generate_video_for_card(settings, card, prompt, image_url=image_url, output_path=segment_path)
+        generate_video_for_card(settings, card, prompt, image_url=image_url, duration=duration, aspect_ratio="9:16", output_path=segment_path)
         task_ids.append(segment_path.stem)
     return concatenate_video_files(segment_paths, destination), task_ids

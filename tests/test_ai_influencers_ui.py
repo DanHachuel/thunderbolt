@@ -107,6 +107,15 @@ def test_ugc_products_uses_generic_video_provider_and_model():
     assert "clips VEO3" not in block
 
 
+def test_ugc_products_has_character_product_generation_and_ready_media_controls():
+    block = UI.split("def render_ugc_products", 1)[1].split("def render_ai_influencer_content", 1)[0]
+    for label in ("Personagem", "Nome do produto", "Informação do Produto ou link do produto", "Gerar roteiro com IA", "Gerar Foto", "Gerar Video", "Duração de cada clip (segundos)", "Midias Prontas"):
+        assert label in block
+    assert '"aspect_ratio": "9:16"' in block
+    assert 'icon=":material/edit:"' in block
+    assert "st.download_button(\"Download\"" in block
+
+
 def test_ai_content_history_renders_downloadable_cards_for_images_and_videos():
     history = UI.split("def _render_content_history", 1)[1].split("def _store_uploaded_file", 1)[0]
 
