@@ -5759,7 +5759,7 @@ def _render_youtube_automation_cards():
                         )
                     with video_download_col:
                         st.download_button(
-                            "Baixar Vídeo9:16",
+                            "Baixar Vídeo",
                             data=video_path.read_bytes() if video_path else b"",
                             file_name=_automation_download_name("Vídeo9:16", task, video_path, ".mp4"),
                             mime="video/mp4",
