@@ -64,9 +64,55 @@ def test_fetch_posts_with_ytdlp_maps_metadata():
     assert run.call_args.args[0][:5] == ["yt-dlp", "--dump-json", "--no-download", "--flat-playlist", "--playlist-end"]
 
 
-def test_windows_prefers_ytdlp_before_profile_fallback():
+def test_fetch_posts_with_instaloader_maps_metadata():
+    from datetime import datetime
+
+    class FakePost:
+        mediaid = 12345
+        shortcode = "ABC123"
+        url = "https://cdn.example/abc.jpg"
+        caption = "Legenda Instaloader"
+        date_utc = datetime(2025, 1, 2, 3, 4, 5)
+        is_video = False
+
+    class FakeProfile:
+        @staticmethod
+        def from_username(context, username):
+            assert username == "simoes.vi"
+            return type("Profile", (), {"get_posts": lambda self: iter([FakePost()])})()
+
+    fake_module = type("InstaloaderModule", (), {
+        "Instaloader": lambda: type("Loader", (), {"context": object()})(),
+        "Profile": FakeProfile,
+    })
+    with patch.dict("sys.modules", {"instaloader": fake_module}):
+        posts = instagram_public._fetch_posts_with_instaloader("simoes.vi", limit=10)
+    assert posts[0]["id"] == 12345
+    assert posts[0]["shortcode"] == "ABC123"
+    assert posts[0]["display_url"] == "https://cdn.example/abc.jpg"
+    assert posts[0]["caption"] == "Legenda Instaloader"
+    assert posts[0]["timestamp"] > 0
+
+
+def test_windows_prefers_instaloader_before_other_post_fallbacks():
+    instaloader_posts = [{"id": 12345, "shortcode": "ABC123", "image_url": "https://img.example/abc.jpg"}]
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_posts_with_instaloader", return_value=instaloader_posts) as instaloader, \
+         patch.object(instagram_public, "_fetch_posts_with_ytdlp") as ytdlp, \
+         patch.object(instagram_public, "_fetch_web_profile_user") as profile:
+        result = instagram_public.fetch_public_instagram_posts("https://www.instagram.com/simoes.vi/", limit=10)
+    assert result.ok is True
+    assert result.message == "1 posts obtidos via Instaloader"
+    assert result.data["posts"] == instaloader_posts
+    instaloader.assert_called_once_with("simoes.vi", 10)
+    ytdlp.assert_not_called()
+    profile.assert_not_called()
+
+
+def test_windows_falls_back_to_ytdlp_when_instaloader_fails():
     ytdlp_posts = [{"id": "ABC123", "shortcode": "ABC123", "image_url": "https://img.example/abc.jpg"}]
     with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_posts_with_instaloader", return_value=[]), \
          patch.object(instagram_public, "_fetch_posts_with_ytdlp", return_value=ytdlp_posts) as ytdlp, \
          patch.object(instagram_public, "_fetch_web_profile_user") as profile:
         result = instagram_public.fetch_public_instagram_posts("https://www.instagram.com/simoes.vi/", limit=10)
