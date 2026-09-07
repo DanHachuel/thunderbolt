@@ -77,7 +77,7 @@ def display_version(version: str) -> str:
 
 APP_VERSION_LABEL = display_version(APP_VERSION)
 
-from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, retry_task_with_current_settings, set_channel_defaults, stop_task_by_user, transition_task, update_channel, update_channel_video
+from hermes_ui.domain import STAGES, create_batch, create_channel, create_tasks_for_batch, delete_channel, delete_task, pipeline_summary, remake_video_task, retry_task_with_current_settings, set_channel_defaults, stop_task_by_user, transition_task, update_channel, update_channel_video
 from hermes_ui.channel_import import build_channel_template_xlsx, channel_is_duplicate, find_duplicate_channel, parse_channel_workbook, resolve_blueprint, resolve_google_account, resolve_voice
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
@@ -5057,6 +5057,21 @@ def _start_pipeline_task(task_id: str, state: str) -> bool:
     return True
 
 
+def _remake_video_from_card(task: dict[str, Any]) -> bool:
+    """Queue a new render while keeping the script and all creative artefacts."""
+    task_id = str(task.get("id") or "")
+    try:
+        updated = remake_video_task(task_id)
+    except ValueError as exc:
+        st.error(str(exc))
+        return False
+    if not updated:
+        st.error("Não foi possível refazer este vídeo: a tarefa já não existe na fila.")
+        return False
+    st.success("Vídeo colocado na fila para remontagem. Roteiro, tags, voz, thumbnail e artefactos existentes foram preservados.")
+    return True
+
+
 def render_videos():
     st.subheader("Backlog Videos")
     st.caption("Acompanhamento dos vídeos criados, estados da pipeline e controlos de execução.")
@@ -5597,6 +5612,17 @@ def _render_tiktok_automation_cards():
                             use_container_width=True,
                             disabled=video_path is None,
                         )
+                    if st.button(
+                        "Refazer Vídeo",
+                        key=f"tiktok_automation_remake_video_{task_id}",
+                        icon=":material/refresh:",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=state == "doing",
+                        help="Remonta apenas o vídeo, mantendo o mesmo roteiro, Blueprint/Prompt Master, tags, thumbnail, voz e artefactos já baixados.",
+                    ):
+                        if _remake_video_from_card(task):
+                            st.rerun()
                     with delete_col:
                         confirm_delete_key = f"tiktok_automation_confirm_delete_{task_id}"
                         if st.button("Apagar", key=f"tiktok_automation_delete_{task_id}", use_container_width=True, disabled=state == "doing"):
@@ -5769,6 +5795,17 @@ def _render_youtube_automation_cards():
                             use_container_width=True,
                             disabled=video_path is None,
                         )
+                    if st.button(
+                        "Refazer Vídeo",
+                        key=f"automation_remake_video_{task['id']}",
+                        icon=":material/refresh:",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=state == "doing",
+                        help="Remonta apenas o vídeo, mantendo o mesmo roteiro, Blueprint/Prompt Master, tags, thumbnail, voz e artefactos já baixados.",
+                    ):
+                        if _remake_video_from_card(task):
+                            st.rerun()
                     with delete_col:
                         confirm_delete_key = f"automation_confirm_delete_{task['id']}"
                         if st.button("Apagar", key=f"automation_delete_{task['id']}", use_container_width=True, disabled=state == "doing"):

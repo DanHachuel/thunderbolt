@@ -1,4 +1,8 @@
 # Changelog
+## 0.6.86 — 2026-09-07
+- Adicionado o botão **Refazer Vídeo** às abas de Automação Youtube e Automação Tiktok.
+- A remontagem preserva roteiro, Blueprint/Prompt Master, tags, voz, thumbnail e artefactos de media existentes, invalidando apenas o vídeo e o resultado de publicação.
+
 ## 0.6.43 — 2026-09-06
 - Corrigido o arranque Windows para carregar `.env` em UTF-8 antes dos imports da UI e do cliente Instagram, permitindo a sessão usada pelo país de “Sobre esta conta”.
 - Corrigida a raiz do entrypoint legado, que apontava um nível acima do pacote.
