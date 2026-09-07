@@ -566,7 +566,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
 
 
 def render_social_networks(settings: dict[str, Any]) -> None:
-    st.title("Redes Sociais")
+    st.title("Contas Instagram")
     st.caption("Cadastre contas Instagram através de pesquisa pública e associe cada conta a um Personagem de AI Influencers.")
     search_tab, accounts_tab = st.tabs(["Pesquisa pública Instagram", "Contas Instagram"])
     with search_tab:
@@ -628,7 +628,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     profile_data.update({"name": name, "bio": bio, "bio_raw": bio, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                     profile_data["country"] = _normalise_country(country)
                     _save_public_profile(profile_data, country=profile_data["country"], language=language, character_id=selected_character)
-                    st.success("Conta Instagram cadastrada em Redes Sociais.")
+                    st.success("Conta Instagram cadastrada em Contas Instagram.")
                     for key in ("social_instagram_result", "social_instagram_ok", "social_instagram_message"):
                         st.session_state.pop(key, None)
                     st.rerun()

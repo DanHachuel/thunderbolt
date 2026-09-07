@@ -195,14 +195,14 @@ def test_ai_influencers_navigation_has_characters_and_social_pages():
 
     assert 'models_ai_items = [' in source
     assert '("Personagens", ":material/person:", "Personagens")' in source
-    assert '("Redes Sociais", ":material/share:", "Redes Sociais")' in source
-    assert source.index('("Personagens", ":material/person:') < source.index('("Redes Sociais", ":material/share:')
+    assert '("Contas Instagram", ":material/share:", "Contas Instagram")' in source
+    assert source.index('("Personagens", ":material/person:') < source.index('("Contas Instagram", ":material/share:')
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in source
     assert '"Models AI": "AI Influencers"' in source
     assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in source
     assert '"Personagens": lambda: render_ai_influencer_characters' in source
     assert '"Geração de Conteúdo IA": lambda: render_ai_influencer_content' in source
-    assert '"Redes Sociais": lambda: render_edit_placeholder("Redes Sociais"' in source
+    assert '"Contas Instagram": lambda: render_social_networks' in source
 
 
 def test_niche_finder_menu_precedes_pipeline_in_top_navigation():
