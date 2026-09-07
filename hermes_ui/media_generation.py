@@ -1102,7 +1102,7 @@ def generate_ugc_product_video(
     prompts: list[str],
     output_path: Path | None = None,
 ) -> tuple[Path, list[str]]:
-    """Generate two 8-second KIE VEO3 clips and concatenate them locally."""
+    """Generate two 8-second clips with the selected video card and concatenate them locally."""
     clean_prompts = [str(item or "").strip() for item in prompts if str(item or "").strip()]
     if len(clean_prompts) != 2:
         raise MediaGenerationError("UGC Products requer exactamente dois prompts de segmento.")
@@ -1111,6 +1111,6 @@ def generate_ugc_product_video(
     segment_paths = [destination.with_name(f"{destination.stem}-segment-{index + 1}.mp4") for index in range(2)]
     task_ids: list[str] = []
     for prompt, segment_path in zip(clean_prompts, segment_paths):
-        _, task_id = generate_ugc_segment(settings, card, image_url=image_url, prompt=prompt, output_path=segment_path, duration=8)
-        task_ids.append(task_id)
+        generate_video_for_card(settings, card, prompt, image_url=image_url, output_path=segment_path)
+        task_ids.append(segment_path.stem)
     return concatenate_video_files(segment_paths, destination), task_ids

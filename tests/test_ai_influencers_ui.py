@@ -98,6 +98,15 @@ def test_video_ui_uses_active_video_pool_instead_of_hardcoded_veo():
     assert 'Veo 3.1' not in UI
 
 
+def test_ugc_products_uses_generic_video_provider_and_model():
+    block = UI.split("def render_ugc_products", 1)[1].split("def render_ai_influencer_content", 1)[0]
+    assert "video_cards = _workflow_provider_cards(settings, provider=None)" in block
+    assert "Provider / modelo de vídeo" in block
+    assert "upload_kie_file" not in block
+    assert "KIE AI com modelo VEO3" not in block
+    assert "clips VEO3" not in block
+
+
 def test_ai_content_history_renders_downloadable_cards_for_images_and_videos():
     history = UI.split("def _render_content_history", 1)[1].split("def _store_uploaded_file", 1)[0]
 
