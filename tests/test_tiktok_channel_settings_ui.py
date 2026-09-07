@@ -35,10 +35,17 @@ def test_tiktok_cards_include_all_requested_actions_and_download_names():
 
 def test_youtube_downloads_use_the_same_requested_name_patterns():
     card_block = SOURCE.split("def _render_youtube_automation_cards():", 1)[1].split("def render_automation():", 1)[0]
-    assert '_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png")' in card_block
+    assert '_automation_download_name("Thumbnail", task, thumbnail_path, ".png")' in card_block
     assert '_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt")' in card_block
     assert '_automation_download_name("Script", task, script_path, ".md")' in card_block
-    assert '_automation_download_name("Vídeo9:16", task, video_path, ".mp4")' in card_block
+    assert '_automation_download_name("Vídeo", task, video_path, ".mp4")' in card_block
+
+
+def test_automation_download_title_uses_original_topic_without_losing_letters():
+    name_block = SOURCE.split("def _download_title", 1)[1].split("def _automation_download_name", 1)[0]
+    assert 'task.get("topic") or task.get("title")' in name_block
+    assert 're.sub(r"\\s+", "_", cleaned)' in name_block
+    assert 're.sub(r"_+", "_", cleaned)' in name_block
 
 
 def test_tiktok_automation_start_uses_shared_pipeline_start_helper():
