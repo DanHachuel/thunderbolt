@@ -9006,7 +9006,7 @@ def main():
         ("Geração de Conteúdo IA", ":material/auto_awesome:", "Geração de Conteúdo IA"),
         ("Motion Control", ":material/motion_photos_on:", "Motion Control"),
         ("UGC Products", ":material/shopping_bag:", "UGC Products"),
-        ("Redes Sociais", ":material/share:", "Redes Sociais"),
+        ("Contas Instagram", ":material/share:", "Contas Instagram"),
     ]
     growth_items = [
         ("Analista Growth Youtube", ":material/analytics:", "Analista Growth Youtube"),
@@ -9075,7 +9075,7 @@ def main():
         "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload", "Update Youtube Vídeos": "/pipeline-videos/update-youtube",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
         "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
-        "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Redes Sociais": "/ai-influencers/redes-sociais",
+        "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Contas Instagram": "/ai-influencers/redes-sociais",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
         "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend", "Tutorial OAuth do Google": "/documentacao/oauth-google", "Tutorial YouTube Data API Key (Public Data)": "/documentacao/youtube-data-api-key",
@@ -9189,7 +9189,7 @@ def main():
         "Geração de Conteúdo IA": lambda: render_ai_influencer_content(read_json("settings.json", {})),
         "Motion Control": lambda: render_motion_control(read_json("settings.json", {})),
         "UGC Products": lambda: render_ugc_products(read_json("settings.json", {})),
-        "Redes Sociais": lambda: render_social_networks(read_json("settings.json", {})),
+        "Contas Instagram": lambda: render_social_networks(read_json("settings.json", {})),
         "Analista Growth Youtube": render_growth_youtube,
         "Analista Growth Tiktok": render_growth_tiktok,
         "Analista Growth Instagram": render_growth_instagram,

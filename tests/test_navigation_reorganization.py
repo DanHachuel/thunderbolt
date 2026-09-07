@@ -50,7 +50,7 @@ class NavigationReorganizationTests(unittest.TestCase):
         required = (
             "Canais/Perfis (Vídeos)", "Canais YouTube", "Blueprints Youtube", "Thumbnail Blueprints", "Brandings Youtube", "Contas TikTok", "Prompt Masters", "Facebook Pages",
             "Pipeline Vídeos", "Criação de Vídeos", "Backlog Vídeos", "Roteiros", "Thumbnails", "Upload",
-            "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Redes Sociais",
+            "AI Influencers", "Personagens", "Geração de Conteúdo IA", "UGC Products", "Contas Instagram",
             "Pipeline Música", "Criação de Músicas", "Upload Música",
             "Growth", "Analista Growth Youtube", "Analista Growth Tiktok", "Analista Growth Instagram", "Analista Facebook Pages", "Analista Bilibili",
             "Documentação", "Tutorial Meta", "Tutorial Supabase", "Tutorial Kaggle", "Tutorial Apify",
