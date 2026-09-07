@@ -28,7 +28,6 @@ from hermes_ui.media_generation import (
     generate_motion_control_video,
     generate_ugc_product_video,
     generate_video_for_card,
-    upload_kie_file,
     validate_motion_control_file,
 )
 from hermes_ui.creative_generation import generate_ugc_segment_prompts
@@ -349,8 +348,12 @@ def _workflow_owner(repository: Any) -> str:
     return ensure_standalone_content_owner(repository)
 
 
-def _workflow_provider_cards(settings: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return [card for card in media_cards_for_pool(settings, "video") if str(card.get("provider") or "").strip().lower() == "kie_ai"]
+def _workflow_provider_cards(settings: Mapping[str, Any], *, provider: str | None = "kie_ai") -> list[dict[str, Any]]:
+    cards = media_cards_for_pool(settings, "video")
+    if provider is None:
+        return cards
+    normalized_provider = str(provider).strip().lower()
+    return [card for card in cards if str(card.get("provider") or "").strip().lower() == normalized_provider]
 
 
 def render_motion_control(settings: dict[str, Any]) -> None:
@@ -421,18 +424,17 @@ def render_motion_control(settings: dict[str, Any]) -> None:
 
 
 def render_ugc_products(settings: dict[str, Any]) -> None:
-    """Render the local product-image to VEO3 workflow without Telegram or social publishing."""
+    """Render the local product-image to video workflow without Telegram or social publishing."""
     st.title("UGC Products")
-    st.caption("Crie um anúncio UGC a partir de uma imagem de produto e de um roteiro local. O workflow gera dois clips VEO3 de 8 segundos e junta-os com FFmpeg no storage local.")
+    st.caption("Crie um anúncio UGC a partir de uma imagem de produto e de um roteiro local. O workflow gera dois clips de vídeo com o provider e modelo seleccionados e junta-os com FFmpeg no storage local.")
     repository = _repository(settings)
     if repository is None:
         return
-    video_cards = [card for card in _workflow_provider_cards(settings) if str(card.get("model") or "").strip().lower() in {"", "veo3", "veo3_fast", "veo3_lite"}]
+    video_cards = _workflow_provider_cards(settings, provider=None)
     if not video_cards:
-        st.warning("Active e configure um cartão KIE AI com modelo VEO3 compatível no pool de vídeo em Configuração API > API Keys > Imagem e Video IA.")
+        st.warning("Active e configure pelo menos um provider de vídeo no pool de vídeo em Configuração API > API Keys > Imagem e Video IA.")
         return
     image_cards, _ = _provider_options(settings, "image")
-    image_cards = [card for card in image_cards if str(card.get("provider") or "").strip().lower() == "nano_banana"]
     with st.form("influencer_ugc_products_form"):
         product_upload = st.file_uploader("Imagem do produto", type=["jpg", "jpeg", "png", "webp"], key="ugc_products_image")
         script = st.text_area("Roteiro de vídeo", height=180, placeholder="Escreva a demonstração, falas e acções. Para controlar os dois clips manualmente, separe-os com uma linha contendo ---.", key="ugc_products_script")
@@ -444,7 +446,7 @@ def render_ugc_products(settings: dict[str, Any]) -> None:
         elif improve_image:
             st.info("Não existe um provider activo no pool de imagem; será usada a imagem original.")
         card_options = [str(card.get("id") or "") for card in video_cards]
-        provider_id = st.selectbox("Provider VEO3", card_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider")
+        provider_id = st.selectbox("Provider / modelo de vídeo", card_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider")
         generate = st.form_submit_button("Gerar UGC Product", type="primary", use_container_width=True)
     if generate:
         if product_upload is None:
@@ -467,15 +469,15 @@ def render_ugc_products(settings: dict[str, Any]) -> None:
                     "prompt": script,
                     "caption": "",
                     "provider": card.get("provider"),
-                    "model": str(card.get("model") or "veo3_fast"),
+                    "model": str(card.get("model") or ""),
                     "platform": "",
                     "state": "running",
                     "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "telegram": False, "social_publish": False},
                 }
             )
-            with st.spinner("A enviar a imagem para KIE, a gerar os dois clips VEO3 e a juntá-los localmente…"):
+            image_url = _image_input({"stored_path": str(image_path), "mime_type": mimetypes.guess_type(image_path.name)[0] or "image/jpeg"})
+            with st.spinner("A gerar os dois clips com o provider seleccionado e a juntá-los localmente…"):
                 try:
-                    image_url = upload_kie_file(image_path, card, upload_path="thunderbolt/ugc-products")
                     output, task_ids = generate_ugc_product_video(settings, card, image_url=image_url, prompts=prompts)
                     repository.update_content(record["id"], {"state": "completed", "artifact_path": str(output), "provider_request_id": ",".join(task_ids), "metadata": {"workflow": "ugc_products", "product_image_path": str(product_path), "effective_image_path": str(image_path), "segment_prompts": prompts, "task_ids": task_ids, "telegram": False, "social_publish": False}})
                     record_notification("influencer_content_completed", "UGC Products concluído", "O vídeo UGC Product foi gerado, unido e guardado localmente.", metadata={"content_id": record["id"], "workflow": "ugc_products", "provider": card.get("provider")}, dedupe_key=f"influencer-workflow:{record['id']}:completed")
