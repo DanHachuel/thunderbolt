@@ -1,3 +1,4 @@
+import json
 from unittest.mock import Mock, patch
 
 from app.social_networks_ui import _metric, _persist_instagram_posts, _profile_bio
@@ -43,6 +44,37 @@ def test_persist_posts_writes_instagram_posts_json():
     write_json.assert_called_once()
     assert write_json.call_args.args[0] == "instagram_posts.json"
     assert write_json.call_args.args[1]["instagram_brun0gpt"][0]["shortcode"] == "CODE1"
+
+
+def test_fetch_posts_with_ytdlp_maps_metadata():
+    stdout = "\n".join(json.dumps({
+        "id": "ABC123",
+        "webpage_url": "https://www.instagram.com/p/ABC123/",
+        "thumbnail": "https://img.example/abc.jpg",
+        "description": "Legenda yt-dlp",
+        "timestamp": 1700000000,
+    }) for _ in range(2))
+    completed = Mock(returncode=0, stdout=stdout, stderr="")
+    with patch("subprocess.run", return_value=completed) as run:
+        posts = instagram_public._fetch_posts_with_ytdlp("simoes.vi", limit=10)
+    assert len(posts) == 2
+    assert posts[0]["id"] == "ABC123"
+    assert posts[0]["image_url"] == "https://img.example/abc.jpg"
+    assert posts[0]["caption"] == "Legenda yt-dlp"
+    assert run.call_args.args[0][:5] == ["yt-dlp", "--dump-json", "--no-download", "--flat-playlist", "--playlist-end"]
+
+
+def test_windows_prefers_ytdlp_before_profile_fallback():
+    ytdlp_posts = [{"id": "ABC123", "shortcode": "ABC123", "image_url": "https://img.example/abc.jpg"}]
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_posts_with_ytdlp", return_value=ytdlp_posts) as ytdlp, \
+         patch.object(instagram_public, "_fetch_web_profile_user") as profile:
+        result = instagram_public.fetch_public_instagram_posts("https://www.instagram.com/simoes.vi/", limit=10)
+    assert result.ok is True
+    assert result.message == "1 posts obtidos via yt-dlp"
+    assert result.data["posts"] == ytdlp_posts
+    ytdlp.assert_called_once_with("simoes.vi", 10)
+    profile.assert_not_called()
 
 
 def test_windows_fetches_ten_posts_for_brun0gpt_and_simoes_vi():
