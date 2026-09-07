@@ -5711,7 +5711,7 @@ def _render_youtube_automation_cards():
                     thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
                     with thumbnail_download_col:
                         st.download_button(
-                            "Baixar Thumbnail 9:16",
+                            "Baixar Thumbnail",
                             data=thumbnail_path.read_bytes() if thumbnail_path else b"",
                             file_name=_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png"),
                             mime="image/png",
