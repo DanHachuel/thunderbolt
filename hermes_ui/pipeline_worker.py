@@ -41,6 +41,7 @@ PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
 LONG_STOCK_VIDEO_TIMEOUT_SECONDS = 90 * 60
 VIDEO_IDLE_TIMEOUT_SECONDS = 10 * 60
+STOCK_VIDEO_IDLE_TIMEOUT_SECONDS = 30 * 60
 STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
 WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
 CASCADE_STAGE_ORDER = ("topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload")
@@ -726,6 +727,18 @@ def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None
     return VIDEO_TIMEOUT_SECONDS
 
 
+def _video_idle_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
+    """Allow slow stock downloads to stay quiet without treating them as hung."""
+    configured = VIDEO_IDLE_TIMEOUT_SECONDS
+    if configured <= 0:
+        return configured
+    effective_settings = settings if isinstance(settings, dict) else _settings()
+    route = _normalise_video_route(task, effective_settings)
+    if route in {"pexels", "pixabay"}:
+        return max(configured, STOCK_VIDEO_IDLE_TIMEOUT_SECONDS)
+    return configured
+
+
 def _task_stale_timeout_seconds(task: dict[str, Any]) -> int:
     """Keep stale-task recovery aligned with the actual execution budget."""
     if str(task.get("stage") or "").strip().casefold() == "video":
@@ -1032,6 +1045,7 @@ def _run_video_helper_once(
     line_queue: queue.Queue[str | None] = queue.Queue()
     started_at = time.monotonic()
     timeout_seconds = _video_timeout_seconds(task, settings)
+    idle_timeout_seconds = _video_idle_timeout_seconds(task, settings)
     process: subprocess.Popen[str] | None = None
 
     def _read_output() -> None:
@@ -1125,11 +1139,11 @@ def _run_video_helper_once(
                     failure_metadata=metadata,
                     fallback_eligible=True,
                 )
-            if time.monotonic() - last_activity_at >= VIDEO_IDLE_TIMEOUT_SECONDS:
+            if time.monotonic() - last_activity_at >= idle_timeout_seconds:
                 _stop_process(process)
                 message = (
                     "A etapa Vídeo não apresentou actividade comprovada do motor durante "
-                    f"{VIDEO_IDLE_TIMEOUT_SECONDS // 60} minutos e foi encerrada."
+                    f"{idle_timeout_seconds // 60} minutos e foi encerrada."
                 )
                 metadata = _failure_attribution(task, settings, "video", error=message)
                 raise PipelineError(

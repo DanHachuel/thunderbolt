@@ -870,6 +870,14 @@ def test_short_or_non_stock_video_keeps_default_timeout(tmp_path, monkeypatch):
     assert pipeline_worker._video_timeout_seconds({"style_wide": "full_ia", "video_script": "word " * 300}, {}) == pipeline_worker.VIDEO_TIMEOUT_SECONDS
 
 
+def test_stock_video_allows_slow_provider_activity_without_false_idle_failure(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+
+    assert pipeline_worker._video_idle_timeout_seconds({"style_wide": "pexels"}, {}) == pipeline_worker.STOCK_VIDEO_IDLE_TIMEOUT_SECONDS
+    assert pipeline_worker._video_idle_timeout_seconds({"style_wide": "pixabay"}, {}) == pipeline_worker.STOCK_VIDEO_IDLE_TIMEOUT_SECONDS
+    assert pipeline_worker._video_idle_timeout_seconds({"style_wide": "full_ia"}, {}) == pipeline_worker.VIDEO_IDLE_TIMEOUT_SECONDS
+
+
 def test_run_once_preserves_blocked_state_when_pipeline_is_stopped(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     storage.write_json("tasks.json", [{"id": "video_stopped", "state": "to_do", "stage": "video", "progress": 68, "topic": "Tema"}])
