@@ -15,7 +15,7 @@ from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INF
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
-from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
+from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card, test_instagram_api_card
 
 
@@ -46,17 +46,13 @@ def _metric_input(value: Any) -> int | None:
 
 
 def _render_instagram_bio(value: Any) -> None:
-    bio = normalize_instagram_bio(value)
+    bio = str(value or "")
     if bio:
         st.text(bio)
 
 
 def _profile_bio(profile: Mapping[str, Any]) -> str:
-    for key in ("bio", "bio_raw", "biography", "description"):
-        bio = normalize_instagram_bio(profile.get(key))
-        if bio:
-            return bio
-    return ""
+    return str(profile.get("bio") or profile.get("biography", ""))
 
 
 def _country_key(value: Any) -> str:
@@ -539,7 +535,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                     following = st.number_input("seguindo", min_value=0, value=_metric_input(_profile_metric(profile, "following_count", "following", "follows", "followingCount", "edge_follow")), placeholder="Não encontrado", key=f"instagram_edit_following_{profile_id}")
                 save_edit = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
             if save_edit:
-                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "bio": normalize_instagram_bio(bio), "bio_raw": bio, "country": _normalise_country(country), "language": language, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
+                update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "bio": bio, "bio_raw": bio, "country": _normalise_country(country), "language": language, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                 st.session_state.pop(edit_key, None)
                 st.success("Conta Instagram actualizada.")
                 st.rerun()
@@ -625,7 +621,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", use_container_width=True)
                 if save_profile:
                     profile_data = dict(data)
-                    profile_data.update({"name": name, "bio": normalize_instagram_bio(bio), "bio_raw": bio, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
+                    profile_data.update({"name": name, "bio": bio, "bio_raw": bio, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                     profile_data["country"] = _normalise_country(country)
                     _save_public_profile(profile_data, country=profile_data["country"], language=language, character_id=selected_character)
                     st.success("Conta Instagram cadastrada em Redes Sociais.")
