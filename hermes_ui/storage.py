@@ -457,7 +457,7 @@ class StorageIntegrityError(RuntimeError):
 
 
 @contextmanager
-def _state_lock(path: Path) -> Iterator[None]:
+def _state_lock(path: Path, *, read_only: bool = False) -> Iterator[None]:
     """Serialise state mutations across the UI and both local workers.
 
     A lock file is used instead of an in-memory mutex because the launcher
@@ -472,6 +472,15 @@ def _state_lock(path: Path) -> Iterator[None]:
         try:
             descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+        except PermissionError:
+            if not read_only:
+                raise
+            # Windows pode manter um lock residual aberto por outro processo
+            # (ou por antivírus). Leituras de JSON continuam seguras porque as
+            # escritas usam replace atómico; não bloquear a leitura evita que
+            # uma página inteira falhe por causa de um lock de metadados.
+            yield
+            return
         except FileExistsError:
             try:
                 if time.time() - lock_path.stat().st_mtime > _LOCK_STALE_SECONDS:
@@ -557,7 +566,7 @@ def _recover_json_unlocked(name: str, path: Path, default: Any | None) -> Any:
 def read_json(name: str, default: Any | None = None) -> Any:
     ensure_storage()
     path = STATE / name
-    with _state_lock(path):
+    with _state_lock(path, read_only=True):
         try:
             data = _load_json_unlocked(path)
         except (json.JSONDecodeError, OSError):
