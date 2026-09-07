@@ -585,11 +585,64 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _fetch_posts_with_ytdlp(username: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Fetch public Instagram post metadata with the installed yt-dlp CLI."""
+    import subprocess
+
+    url = f'https://www.instagram.com/{username}/'
+    cmd = [
+        'yt-dlp', '--dump-json', '--no-download', '--flat-playlist',
+        '--playlist-end', str(max(1, int(limit))), url,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
+        if result.returncode != 0:
+            print(f'yt-dlp erro para @{username}: {result.stderr.strip()}')
+            return []
+        posts: list[dict[str, Any]] = []
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            post_id = str(data.get('id') or '').strip()
+            post_url = str(data.get('webpage_url') or data.get('url') or '').strip()
+            shortcode = post_id or (post_url.rstrip('/').split('/')[-1] if post_url else '')
+            if not shortcode and not post_id:
+                continue
+            timestamp = data.get('timestamp') or data.get('release_timestamp') or ''
+            thumbnail = str(data.get('thumbnail') or '').strip()
+            posts.append({
+                'id': post_id or shortcode,
+                'shortcode': shortcode,
+                'url': post_url or f'https://www.instagram.com/p/{shortcode}/',
+                'image_url': thumbnail,
+                'display_url': thumbnail,
+                'caption': str(data.get('description') or data.get('title') or '').strip(),
+                'published_at': timestamp,
+                'timestamp': timestamp,
+                'is_video': bool(data.get('vcodec') not in (None, 'none')),
+            })
+        posts = posts[:max(1, int(limit))]
+        print(f'yt-dlp sucesso para @{username}: {len(posts)} posts')
+        return posts
+    except Exception as exc:
+        print(f'yt-dlp exceção para @{username}: {exc}')
+        return []
+
+
 def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationResult:
     try:
         reference = normalize_instagram_reference(source)
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
+    if platform.system() == 'Windows':
+        ytdlp_posts = _fetch_posts_with_ytdlp(reference['username'], limit)
+        print(f'yt-dlp posts retornados para @{reference["username"]}: {len(ytdlp_posts)}')
+        if ytdlp_posts:
+            return IntegrationResult(True, f'{len(ytdlp_posts)} posts obtidos via yt-dlp', reference | {'posts': ytdlp_posts})
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         api_posts: list[dict[str, Any]] = []
