@@ -4969,6 +4969,21 @@ def _task_artifact_path(task: dict[str, Any], *names: str) -> Path | None:
     return None
 
 
+def _download_title(task: dict[str, Any]) -> str:
+    """Return a filesystem-safe title for automation downloads."""
+    raw_title = str(task.get("title") or task.get("topic") or task.get("name") or "Vídeo").strip()
+    cleaned = re.sub(r'[<>:"/\\|?*\\x00-\\x1f]+', "_", raw_title)
+    cleaned = " ".join(cleaned.split()).strip(" ._")
+    return cleaned or "Vídeo"
+
+
+def _automation_download_name(prefix: str, task: dict[str, Any], path: Path | None, fallback_suffix: str) -> str:
+    suffix = path.suffix if path and path.suffix else fallback_suffix
+    if not suffix.startswith("."):
+        suffix = f".{suffix}"
+    return f"{prefix}_{_download_title(task)}{suffix}"
+
+
 def _is_music_task(task: dict[str, Any]) -> bool:
     """Identify music pipeline tasks without conflating them with ordinary video tasks."""
     return bool(task.get("music_mode")) or str(task.get("style_wide") or task.get("style") or "").strip().casefold() in {"music", "música"}
@@ -5508,27 +5523,99 @@ def _render_tiktok_automation_cards():
         for task in tiktok_tasks:
             task_id = str(task["id"])
             with st.container(border=True):
-                cols = st.columns([2.4, 1.4, 1.1, 1.6])
-                with cols[0]:
-                    thumbnail_path = _task_thumbnail_path(task)
+                task_cols = st.columns([2.25, 1.55, 1.05, 2.15], gap="small")
+                thumbnail_path = _task_thumbnail_path(task)
+                script_path = _task_artifact_path(task, "script")
+                video_path = _task_artifact_path(task, "video")
+                thumbnail_prompt_path = _task_artifact_path(task, "thumbnail_prompt_json")
+                thumbnail_prompt = str(task.get("thumbnail_prompt") or "").strip()
+                with task_cols[0]:
                     if thumbnail_path:
-                        st.image(str(thumbnail_path), width=150, caption="Thumbnail")
+                        st.image(str(thumbnail_path), width=180, caption="Thumbnail")
+                    else:
+                        st.caption("Thumbnail ainda não pronta")
                     st.write(f"**{task.get('title') or task.get('topic') or 'Vídeo TikTok'}**")
                     st.caption(f"{task.get('channel_name') or 'Canal TikTok'} · {task_id}")
-                with cols[1]:
+                    thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
+                    with thumbnail_download_col:
+                        st.download_button(
+                            "Baixar Thumbnail 9:16",
+                            data=thumbnail_path.read_bytes() if thumbnail_path else b"",
+                            file_name=_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png"),
+                            mime="image/png",
+                            key=f"tiktok_automation_download_thumbnail_{task_id}",
+                            use_container_width=True,
+                            disabled=thumbnail_path is None,
+                        )
+                    with prompt_download_col:
+                        prompt_data = thumbnail_prompt_path.read_bytes() if thumbnail_prompt_path else thumbnail_prompt.encode("utf-8")
+                        st.download_button(
+                            "Baixar Thumbnail Prompt",
+                            data=prompt_data,
+                            file_name=_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt"),
+                            mime="application/json" if thumbnail_prompt_path else "text/plain",
+                            key=f"tiktok_automation_download_thumbnail_prompt_{task_id}",
+                            use_container_width=True,
+                            disabled=thumbnail_prompt_path is None and not thumbnail_prompt,
+                        )
+                with task_cols[1]:
                     _render_video_task_state(task)
-                with cols[2]:
+                with task_cols[2]:
                     st.caption("Plataforma")
                     st.write("TikTok")
                     st.caption("Portrait 9:16")
-                with cols[3]:
+                with task_cols[3]:
                     state = str(task.get("state") or "")
-                    if st.button("Start", key=f"tiktok_automation_start_{task_id}", disabled=state not in {"to_do", "blocked", "failed"}, use_container_width=True):
-                        _start_pipeline_task(task_id, state)
-                        st.rerun()
-                    if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", disabled=state != "doing", use_container_width=True):
-                        stop_task_by_user(task_id)
-                        st.rerun()
+                    start_col, stop_col, delete_col = st.columns(3)
+                    with start_col:
+                        if st.button("Start", key=f"tiktok_automation_start_{task_id}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                            if _start_pipeline_task(task_id, state):
+                                st.rerun()
+                    with stop_col:
+                        if st.button("Stop", key=f"tiktok_automation_stop_{task_id}", use_container_width=True, disabled=state != "doing"):
+                            stop_task_by_user(task_id)
+                            st.rerun()
+                    script_download_col, video_download_col = st.columns(2, gap="small")
+                    with script_download_col:
+                        st.download_button(
+                            "Baixar Roteiro",
+                            data=script_path.read_bytes() if script_path else b"",
+                            file_name=_automation_download_name("Script", task, script_path, ".md"),
+                            mime="text/markdown",
+                            key=f"tiktok_automation_download_script_{task_id}",
+                            use_container_width=True,
+                            disabled=script_path is None,
+                        )
+                    with video_download_col:
+                        st.download_button(
+                            "Baixar Vídeo9:16",
+                            data=video_path.read_bytes() if video_path else b"",
+                            file_name=_automation_download_name("Vídeo9:16", task, video_path, ".mp4"),
+                            mime="video/mp4",
+                            key=f"tiktok_automation_download_video_{task_id}",
+                            use_container_width=True,
+                            disabled=video_path is None,
+                        )
+                    with delete_col:
+                        confirm_delete_key = f"tiktok_automation_confirm_delete_{task_id}"
+                        if st.button("Apagar", key=f"tiktok_automation_delete_{task_id}", use_container_width=True, disabled=state == "doing"):
+                            st.session_state[confirm_delete_key] = True
+                            st.rerun()
+                        if st.session_state.get(confirm_delete_key):
+                            st.warning("Remover este vídeo da fila? Os ficheiros de artefactos serão preservados.")
+                            confirm_col, cancel_col = st.columns(2)
+                            with confirm_col:
+                                if st.button("Confirmar", key=f"tiktok_automation_confirm_delete_button_{task_id}", use_container_width=True, type="primary"):
+                                    try:
+                                        delete_task(task["id"])
+                                        st.session_state.pop(confirm_delete_key, None)
+                                        st.rerun()
+                                    except ValueError as exc:
+                                        st.error(str(exc))
+                            with cancel_col:
+                                if st.button("Cancelar", key=f"tiktok_automation_cancel_delete_{task_id}", use_container_width=True):
+                                    st.session_state.pop(confirm_delete_key, None)
+                                    st.rerun()
 
 
 def render_tiktok_automation():
@@ -5624,9 +5711,9 @@ def _render_youtube_automation_cards():
                     thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
                     with thumbnail_download_col:
                         st.download_button(
-                            "Baixar Thumbnail",
+                            "Baixar Thumbnail 9:16",
                             data=thumbnail_path.read_bytes() if thumbnail_path else b"",
-                            file_name=thumbnail_path.name if thumbnail_path else "thumbnail.png",
+                            file_name=_automation_download_name("Thumbnail9:16", task, thumbnail_path, ".png"),
                             mime="image/png",
                             key=f"automation_download_thumbnail_{task['id']}",
                             use_container_width=True,
@@ -5637,7 +5724,7 @@ def _render_youtube_automation_cards():
                         st.download_button(
                             "Baixar Thumbnail Prompt",
                             data=prompt_data,
-                            file_name=thumbnail_prompt_path.name if thumbnail_prompt_path else "thumbnail-prompt.txt",
+                            file_name=_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt"),
                             mime="application/json" if thumbnail_prompt_path else "text/plain",
                             key=f"automation_download_thumbnail_prompt_{task['id']}",
                             use_container_width=True,
@@ -5664,7 +5751,7 @@ def _render_youtube_automation_cards():
                         st.download_button(
                             "Baixar Roteiro",
                             data=script_path.read_bytes() if script_path else b"",
-                            file_name=script_path.name if script_path else "roteiro.md",
+                            file_name=_automation_download_name("Script", task, script_path, ".md"),
                             mime="text/markdown",
                             key=f"automation_download_script_{task['id']}",
                             use_container_width=True,
@@ -5672,9 +5759,9 @@ def _render_youtube_automation_cards():
                         )
                     with video_download_col:
                         st.download_button(
-                            "Baixar Vídeo",
+                            "Baixar Vídeo9:16",
                             data=video_path.read_bytes() if video_path else b"",
-                            file_name=video_path.name if video_path else "video.mp4",
+                            file_name=_automation_download_name("Vídeo9:16", task, video_path, ".mp4"),
                             mime="video/mp4",
                             key=f"automation_download_video_{task['id']}",
                             use_container_width=True,
