@@ -214,9 +214,9 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
                     return parsed
         return None
 
-    followers = _metric_text_value(embedded_user.get('edge_followed_by')) or _metric_text_value(embedded_user.get('followers')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:followers|seguidores)',)) or _structured_metric(document, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(document, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
-    following = _metric_text_value(embedded_user.get('edge_follow')) or _metric_text_value(embedded_user.get('following')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:following|seguindo)',)) or _structured_metric(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
-    post_count = _metric_text_value(embedded_user.get('edge_owner_to_timeline_media')) or _metric_text_value(embedded_user.get('posts')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:posts|publicações|publications)',)) or _structured_metric(document, 'edge_owner_to_timeline_media', 'posts', 'post_count')
+    followers = _metric_text_value(embedded_user.get('edge_followed_by')) or _metric_text_value(embedded_user.get('followers')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:followers|seguidores)', r'(?:followers|seguidores)\s*([\d.,]+)\s*(k|mil)?')) or _structured_metric(document, 'edge_followed_by', 'followers', 'follower_count') or _structured_metric_from_json(document, 'edge_followed_by', 'followers', 'follower_count', 'followerCount')
+    following = _metric_text_value(embedded_user.get('edge_follow')) or _metric_text_value(embedded_user.get('following')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:following|seguindo)', r'(?:following|seguindo)\s*([\d.,]+)\s*(k|mil)?')) or _structured_metric(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount') or _structured_metric_from_json(document, 'edge_follow', 'follows', 'following', 'following_count', 'followingCount')
+    post_count = _metric_text_value(embedded_user.get('edge_owner_to_timeline_media')) or _metric_text_value(embedded_user.get('posts')) or metric((r'([\d.,]+)\s*(k|mil)?\s*(?:posts|publicações|publications)', r'(?:posts|publicações|publications)\s*([\d.,]+)\s*(k|mil)?')) or _structured_metric(document, 'edge_owner_to_timeline_media', 'posts', 'post_count')
     country = _country_value(embedded_user.get('country') or embedded_user.get('country_code')) or extract_public_instagram_country(embedded_user)
     if not country:
         for payload in _embedded_json_documents(document):
@@ -227,7 +227,7 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
     user: dict[str, Any] = {
         'username': username,
         'full_name': title.split('(')[0].strip() or username,
-        'biography': description,
+        'biography': biography,
         'edge_followed_by': {'count': followers} if followers is not None else {},
         'edge_follow': {'count': following} if following is not None else {},
         'edge_owner_to_timeline_media': {'count': post_count, 'edges': [{'node': post} for post in posts]},
@@ -261,6 +261,15 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
                     merged[key] = value
         return merged
 
+    def profile_is_complete(user: Mapping[str, Any]) -> bool:
+        if profile_quality(user) < 4:
+            return False
+        if platform.system() != 'Windows':
+            return True
+        has_bio = bool(str(user.get('biography') or user.get('bio') or '').strip())
+        has_following = any(user.get(key) not in (None, '', {}, []) for key in ('edge_follow', 'follows', 'following', 'following_count', 'followingCount'))
+        return has_bio and has_following
+
     best_user: dict[str, Any] | None = None
     for endpoint in endpoints:
         try:
@@ -273,7 +282,7 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
         user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
         if isinstance(user, dict):
             best_user = merge_profile(best_user, user)
-            if profile_quality(best_user) >= 4:
+            if profile_is_complete(best_user):
                 return best_user
 
     curl = shutil.which('curl')
@@ -453,6 +462,8 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', _profile_data_from_api(api_user, reference))
+    if platform.system() == 'Windows':
+        return IntegrationResult(False, 'Não foi possível encontrar o perfil público estruturado do Instagram.', reference)
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=12)
     except requests.RequestException as exc:
