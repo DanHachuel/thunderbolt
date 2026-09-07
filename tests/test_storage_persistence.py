@@ -52,6 +52,21 @@ def test_corrupt_protected_task_file_is_not_replaced_by_empty_list(tmp_path, mon
     assert list(storage.STATE.glob("tasks.json.corrupt-*"))
 
 
+def test_read_json_survives_windows_lock_permission_error(tmp_path, monkeypatch):
+    storage = _isolated_storage(tmp_path, monkeypatch)
+    storage.write_json("display_names.json", {"blueprints": {}, "prompt_masters": {"prompt.md": "Prompt"}})
+    original_open = storage.os.open
+
+    def permission_denied_for_lock(path, flags, *args):
+        if str(path).endswith(".display_names.json.lock"):
+            raise PermissionError(13, "Permission denied")
+        return original_open(path, flags, *args)
+
+    monkeypatch.setattr(storage.os, "open", permission_denied_for_lock)
+
+    assert storage.read_json("display_names.json")["prompt_masters"]["prompt.md"] == "Prompt"
+
+
 def test_install_merges_legacy_tasks_when_new_storage_already_exists(tmp_path):
     legacy_state = tmp_path / "Hermes-UI" / "storage" / "state"
     current_state = tmp_path / ".thunderbolt" / "storage" / "state"
