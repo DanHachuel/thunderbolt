@@ -14,6 +14,13 @@ def test_both_automation_cards_show_channel_video_settings():
         assert '**Formato**' in block
 
 
+def test_both_automation_pages_group_registered_channels_in_closed_expanders():
+    youtube = SOURCE.split("def render_automation():", 1)[1].split("def render_upload_direct", 1)[0]
+    tiktok = SOURCE.split("def render_tiktok_automation():", 1)[1].split("def render_automation():", 1)[0]
+    for block in (youtube, tiktok):
+        assert 'with st.expander("Canais cadastrados", expanded=False):' in block
+
+
 def test_channel_source_legacy_values_are_normalized():
     from app.main import channel_video_source_value
 
