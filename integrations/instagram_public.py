@@ -223,7 +223,7 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
     biography = str(embedded_user.get('biography') or embedded_user.get('bio') or regex_biography or '').strip()
     print(f'embedded_user for @{username}: {embedded_user}')
     print(f'biography extracted for @{username}: {biography!r}')
-    description = biography
+    description = biography or seo_description
     title = str(embedded_user.get('full_name') or embedded_user.get('name') or _meta(document, 'og:title') or username).split('(')[0].strip() or username
     avatar_url = str(embedded_user.get('profile_pic_url_hd') or embedded_user.get('profile_pic_url') or _meta(document, 'og:image')).strip()
 
@@ -249,7 +249,7 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
     user: dict[str, Any] = {
         'username': username,
         'full_name': title.split('(')[0].strip() or username,
-        'biography': biography,
+        'biography': description,
         'edge_followed_by': {'count': followers} if followers is not None else {},
         'edge_follow': {'count': following} if following is not None else {},
         'edge_owner_to_timeline_media': {'count': post_count, 'edges': [{'node': post} for post in posts]},
@@ -257,7 +257,7 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
         'profile_pic_url': avatar_url,
         '_html_posts': posts,
     }
-    return user if any((biography, followers, following, post_count, country, posts)) else {}
+    return user if any((description, followers, following, post_count, country, posts)) else {}
 
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
