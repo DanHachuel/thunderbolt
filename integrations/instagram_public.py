@@ -272,7 +272,12 @@ def _extract_profile_user_from_html(document: str, username: str) -> dict[str, A
 
 def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     headers = _instagram_headers()
-    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36'
+    if platform.system() == 'Windows':
+        headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        })
     # The www host is the current public web endpoint. The legacy i host is
     # retained as a fallback because Instagram rate-limits the two hosts
     # independently and their availability can vary by region.
@@ -305,11 +310,20 @@ def _fetch_web_profile_user(username: str) -> dict[str, Any] | None:
     best_user: dict[str, Any] | None = None
     for endpoint in endpoints:
         try:
+            if platform.system() == 'Windows':
+                print(f'Instagram API Windows: URL chamada: {endpoint}')
             response = requests.get(endpoint, headers=headers, timeout=15)
+            if platform.system() == 'Windows':
+                response_text = str(getattr(response, 'text', '') or '')
+                print(f'Instagram API Windows: status={response.status_code}; tamanho={len(response_text)}; início={response_text[:500]!r}')
             if response.status_code >= 400:
+                if platform.system() == 'Windows':
+                    print(f'Instagram API Windows: HTTP {response.status_code}; a tentar o próximo endpoint/fallback.')
                 continue
             payload = response.json()
-        except (requests.RequestException, ValueError, AttributeError):
+        except (requests.RequestException, ValueError, AttributeError) as exc:
+            if platform.system() == 'Windows':
+                print(f'Instagram API Windows: erro ao consultar/parsing {endpoint}: {exc}')
             continue
         user = ((payload.get('data') or {}).get('user') if isinstance(payload, dict) else None)
         if isinstance(user, dict):
@@ -585,38 +599,6 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _fetch_posts_with_instaloader(username: str, limit: int = 10) -> list[dict[str, Any]]:
-    """Obtém os posts mais recentes de um perfil público usando Instaloader."""
-    print(f'Instaloader: tentando obter posts de @{username}')
-    try:
-        import instaloader
-
-        loader = instaloader.Instaloader()
-        profile = instaloader.Profile.from_username(loader.context, username)
-        posts: list[dict[str, Any]] = []
-        for post in profile.get_posts():
-            if len(posts) >= max(1, int(limit)):
-                break
-            timestamp = post.date_utc.timestamp() if post.date_utc else ''
-            post_url = str(post.url or '').strip()
-            shortcode = str(post.shortcode or '').strip()
-            posts.append({
-                'id': post.mediaid,
-                'shortcode': shortcode,
-                'url': f'https://www.instagram.com/p/{shortcode}/' if shortcode else post_url,
-                'image_url': post_url,
-                'display_url': post_url,
-                'caption': str(post.caption or '').strip(),
-                'published_at': timestamp,
-                'timestamp': timestamp,
-                'is_video': bool(getattr(post, 'is_video', False)),
-            })
-        print(f'Instaloader: {len(posts)} posts encontrados para @{username}')
-        return posts
-    except Exception as exc:
-        print(f'Instaloader falhou para @{username}: {exc}')
-        return []
-
 
 def _fetch_posts_with_ytdlp(username: str, limit: int = 10) -> list[dict[str, Any]]:
     """Fetch public Instagram post metadata with the installed yt-dlp CLI."""
@@ -672,13 +654,7 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
     if platform.system() == 'Windows':
-        instaloader_posts = _fetch_posts_with_instaloader(reference['username'], limit)
-        if instaloader_posts:
-            return IntegrationResult(True, f'{len(instaloader_posts)} posts obtidos via Instaloader', reference | {'posts': instaloader_posts})
-        ytdlp_posts = _fetch_posts_with_ytdlp(reference['username'], limit)
-        print(f'yt-dlp posts retornados para @{reference["username"]}: {len(ytdlp_posts)}')
-        if ytdlp_posts:
-            return IntegrationResult(True, f'{len(ytdlp_posts)} posts obtidos via yt-dlp', reference | {'posts': ytdlp_posts})
+        print(f'Posts Windows: a iniciar consulta pública API/HTML para @{reference["username"]}')
     api_user = _fetch_web_profile_user(reference['username'])
     if api_user:
         api_posts: list[dict[str, Any]] = []
