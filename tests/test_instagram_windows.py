@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _metric, _profile_bio
+from app.social_networks_ui import _metric, _persist_instagram_posts, _profile_bio
 from integrations import instagram_public
 
 
@@ -27,6 +27,34 @@ SEO_ONLY_HTML = '''
 '''
 
 REGEX_BIO_HTML = '''<script>var data = {"biography":"🤖 Marketing e Vendas com Inteligência Artificial\\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"};</script>'''
+
+POST_NODES = ','.join(
+    '{"node":{"id":"post-{0}","shortcode":"CODE{0}","display_url":"https://img.example/post-{0}.jpg","edge_media_to_caption":{"edges":[{"node":{"text":"Legenda {0}"}}]}}}'.replace('{0}', str(index))
+    for index in range(1, 11)
+)
+POSTS_HTML = f'<script type="application/json">{{"edge_owner_to_timeline_media":{{"edges":[{POST_NODES}]}}}}</script>'
+
+
+def test_persist_posts_writes_instagram_posts_json():
+    posts = [{"id": "post-1", "shortcode": "CODE1", "image_url": "https://img.example/post-1.jpg", "url": "https://www.instagram.com/p/CODE1/"}]
+    with patch("app.social_networks_ui.read_json", return_value={}) as read_json, patch("app.social_networks_ui.write_json") as write_json:
+        _persist_instagram_posts({"id": "instagram_brun0gpt", "username": "brun0gpt"}, posts)
+    read_json.assert_called_once_with("instagram_posts.json", {})
+    write_json.assert_called_once()
+    assert write_json.call_args.args[0] == "instagram_posts.json"
+    assert write_json.call_args.args[1]["instagram_brun0gpt"][0]["shortcode"] == "CODE1"
+
+
+def test_windows_fetches_ten_posts_for_brun0gpt_and_simoes_vi():
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_web_profile_user", return_value=None), \
+         patch.object(instagram_public, "_fetch_instagram_html_with_playwright", return_value=POSTS_HTML) as playwright:
+        for username in ("brun0gpt", "simoes.vi"):
+            result = instagram_public.fetch_public_instagram_posts(f"https://www.instagram.com/{username}/", limit=10)
+            assert result.ok is True
+            assert result.message == "Posts públicos encontrados."
+            assert len(result.data["posts"]) == 10
+        assert playwright.call_count == 2
 
 
 def test_frontend_uses_bio_directly_and_ignores_stale_seo_bio_raw():

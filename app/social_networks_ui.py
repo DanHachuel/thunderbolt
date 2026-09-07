@@ -194,6 +194,8 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
+            st.write(f"Resultado do posts: {posts_ok}, mensagem: {posts_message}")
+            st.write(f"Posts retornados: {len(loaded_posts)}")
             if posts_ok:
                 posts = loaded_posts
                 _persist_instagram_posts(profile, posts)
@@ -221,6 +223,8 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
             if posts_ok:
                 _persist_instagram_posts(profile, loaded_posts)
                 st.rerun()
+            st.write(f"Resultado do posts: {posts_ok}, mensagem: {posts_message}")
+            st.write(f"Posts retornados: {len(loaded_posts)}")
             st.warning(posts_message)
 
 

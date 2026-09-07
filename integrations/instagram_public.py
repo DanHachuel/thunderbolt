@@ -52,14 +52,10 @@ def _fetch_instagram_html_with_playwright(url: str, username: str) -> str:
                     extra_http_headers={'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'},
                 )
                 page = context.new_page()
-                response = page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                response = page.goto(url, wait_until='networkidle', timeout=30000)
                 status = response.status if response else None
                 print(f'Playwright usado no Windows para @{username}; status HTML={status}')
-                page.wait_for_timeout(5000)
-                try:
-                    page.wait_for_load_state('networkidle', timeout=10000)
-                except (PlaywrightTimeoutError, TimeoutError):
-                    pass
+                page.wait_for_timeout(3000)
                 html_content = page.content()
                 print(f'HTML Instagram recebido no Windows para @{username}: {len(html_content)} bytes')
                 return html_content
@@ -152,16 +148,30 @@ def _structured_metric_from_json(document: str, *keys: str) -> int | None:
 def _extract_posts_from_html(document: str, limit: int = 10) -> list[dict[str, Any]]:
     posts: list[dict[str, Any]] = []
     seen: set[str] = set()
+    wanted_limit = max(1, int(limit))
+
+    def add_node(node: Any) -> bool:
+        if not isinstance(node, dict):
+            return False
+        post = _post_from_node(node)
+        if not post or post['id'] in seen:
+            return False
+        seen.add(post['id'])
+        posts.append(post)
+        return len(posts) >= wanted_limit
+
     for payload in _embedded_json_documents(document):
         for node in _walk_json(payload):
             if not isinstance(node, dict):
                 continue
-            post = _post_from_node(node)
-            if not post or post['id'] in seen:
-                continue
-            seen.add(post['id'])
-            posts.append(post)
-            if len(posts) >= max(1, int(limit)):
+            media = node.get('edge_owner_to_timeline_media')
+            if isinstance(media, Mapping):
+                edges = media.get('edges') or media.get('items') or []
+                for edge in edges:
+                    candidate = edge.get('node') if isinstance(edge, dict) else edge
+                    if add_node(candidate):
+                        return posts
+            if add_node(node):
                 return posts
     return posts
 
@@ -599,6 +609,15 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     if platform.system() == 'Windows':
         html_content = _fetch_instagram_html_with_playwright(reference['url'], reference['username'])
         posts = _extract_posts_from_html(html_content, limit) if html_content else []
+        print(f'Posts extraídos no Windows para @{reference["username"]}: {len(posts)}')
+        if not posts and html_content:
+            try:
+                os.makedirs('storage', exist_ok=True)
+                with open('storage/debug_posts.html', 'w', encoding='utf-8', errors='replace') as debug_file:
+                    debug_file.write(html_content)
+                print(f'HTML de debug dos posts guardado em storage/debug_posts.html para @{reference["username"]}')
+            except OSError as exc:
+                print(f'Não foi possível guardar storage/debug_posts.html: {exc}')
         return IntegrationResult(bool(posts), 'Posts públicos encontrados.' if posts else 'Não foi possível encontrar posts públicos nesta página do Instagram.', reference | {'posts': posts[:max(1, int(limit))]})
     try:
         response = requests.get(reference['url'], headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'}, timeout=15)
