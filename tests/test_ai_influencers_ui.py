@@ -114,8 +114,14 @@ def test_ugc_products_has_character_product_generation_and_ready_media_controls(
     assert '"name": ""' in block
     assert 'influencer_options = [""]' in block
     assert "influencers[0]" in block
-    for label in ("Personagem", "Nome do produto", "Informação do Produto ou link do produto", "Gerar roteiro com IA", "Gerar Foto", "Gerar Video", "Duração de cada clip (segundos)", "Midias Prontas"):
+    for label in ("Personagem", "Nome do produto", "Informação do Produto ou link do produto", "Gerar roteiro com IA", "Gerar Foto", "Gerar Video", "Duração de cada clip (MM:SS)", "Midias Prontas"):
         assert label in block
+    assert 'st.button("Gerar Mídia (Foto/Vídeo)"' in block
+    assert 'st.radio("Geração"' not in block
+    assert 'value="1:20"' in block
+    assert 'key="ugc_products_duration_text"' in block
+    assert 'if generation_mode == "Gerar Foto":' in block
+    assert 'else:\n            video_provider_id = st.selectbox("Provider / modelo de vídeo"' in block
     assert '"aspect_ratio": "9:16"' in block
     assert 'icon=":material/edit:"' in block
     assert "st.download_button(\"Download\"" in block
