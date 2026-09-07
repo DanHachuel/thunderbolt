@@ -38,11 +38,11 @@ def test_regex_bio_is_used_when_profile_node_is_not_found():
     assert instagram_public._extract_bio_from_html(REGEX_BIO_HTML) == "🤖 Marketing e Vendas com Inteligência Artificial\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"
 
 
-def test_seo_summary_is_not_saved_as_bio_when_structured_bio_is_missing():
+def test_seo_summary_is_used_as_bio_fallback_when_structured_bio_is_missing():
     user = instagram_public._extract_profile_user_from_html(SEO_ONLY_HTML, "brun0gpt")
     data = instagram_public._profile_data_from_api(user, instagram_public.normalize_instagram_reference("https://www.instagram.com/brun0gpt"))
 
-    assert data["bio"] == ""
+    assert data["bio"] == "227K seguidores, seguindo 241, 2,277 posts — Veja as fotos e vídeos de Bruno Francisco - IA | Marketing (@brun0gpt)"
     assert data["subscriber_count"] == 227000
     assert data["following_count"] == 241
 
@@ -66,7 +66,7 @@ def test_windows_profile_tries_requests_then_uses_playwright_html_parser():
          patch.object(instagram_public, "_fetch_instagram_html_with_playwright", return_value=HTML) as playwright:
         result = instagram_public._fetch_web_profile_user("creator")
 
-    assert result["biography"] == ""
+    assert result["biography"] == "123 followers, 456 following and 2 posts"
     assert result["edge_followed_by"]["count"] == 123
     assert result["edge_follow"]["count"] == 456
     assert result["edge_owner_to_timeline_media"]["edges"][0]["node"]["shortcode"] == "ABC"
