@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _metric
+from app.social_networks_ui import _metric, _profile_bio
 from integrations import instagram_public
 
 
@@ -27,6 +27,11 @@ SEO_ONLY_HTML = '''
 '''
 
 REGEX_BIO_HTML = '''<script>var data = {"biography":"🤖 Marketing e Vendas com Inteligência Artificial\\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"};</script>'''
+
+
+def test_frontend_uses_bio_directly_and_ignores_stale_seo_bio_raw():
+    real_bio = "🤖 Marketing e Vendas com Inteligência Artificial\n🧑🏻‍💻 Tá cansado de usar IA no modo amador?"
+    assert _profile_bio({"bio": real_bio, "biography": "", "bio_raw": "227K seguidores, seguindo 241"}) == real_bio
 
 
 def test_regex_bio_is_used_when_profile_node_is_not_found():

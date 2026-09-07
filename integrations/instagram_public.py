@@ -78,8 +78,8 @@ class IntegrationResult:
 
 
 def normalize_instagram_bio(value: Any) -> str:
-    """Preserve the complete biography returned by Instagram."""
-    return str(value or '').strip()
+    """Deprecated compatibility helper; Bio values are now passed through unchanged."""
+    return str(value or '')
 
 
 def normalize_instagram_reference(source: str) -> dict[str, str]:
@@ -404,7 +404,7 @@ def _profile_data_from_api(user: Mapping[str, Any], reference: Mapping[str, str]
         'id': f"instagram_{reference['username']}",
         **reference,
         'name': str(user.get('full_name') or user.get('username') or reference['username']).strip(),
-        'bio': normalize_instagram_bio(biography),
+        'bio': biography,
         'bio_raw': biography,
         'country': country,
         'avatar_url': str(user.get('profile_pic_url_hd') or user.get('profile_pic_url') or '').strip(),
@@ -514,7 +514,7 @@ def fetch_public_instagram_profile(source: str) -> IntegrationResult:
         embedded_country = extract_public_instagram_country(document)
         if embedded_country:
             break
-    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': normalize_instagram_bio(description), 'bio_raw': description, 'country': embedded_country, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
+    data = {'id': f"instagram_{reference['username']}", **reference, 'name': title.split('(')[0].strip() or reference['username'], 'bio': description, 'bio_raw': description, 'country': embedded_country, 'avatar_url': avatar_url, 'subscriber_count': followers, 'following_count': following, 'post_count': posts, 'public_lookup': True, 'metrics_source': 'instagram_public_page', 'last_public_lookup_at': datetime.now(timezone.utc).isoformat()}
     return IntegrationResult(True, 'Perfil Instagram encontrado publicamente.', data)
 
 
