@@ -585,6 +585,39 @@ def _post_from_node(node: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _fetch_posts_with_instaloader(username: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Obtém os posts mais recentes de um perfil público usando Instaloader."""
+    print(f'Instaloader: tentando obter posts de @{username}')
+    try:
+        import instaloader
+
+        loader = instaloader.Instaloader()
+        profile = instaloader.Profile.from_username(loader.context, username)
+        posts: list[dict[str, Any]] = []
+        for post in profile.get_posts():
+            if len(posts) >= max(1, int(limit)):
+                break
+            timestamp = post.date_utc.timestamp() if post.date_utc else ''
+            post_url = str(post.url or '').strip()
+            shortcode = str(post.shortcode or '').strip()
+            posts.append({
+                'id': post.mediaid,
+                'shortcode': shortcode,
+                'url': f'https://www.instagram.com/p/{shortcode}/' if shortcode else post_url,
+                'image_url': post_url,
+                'display_url': post_url,
+                'caption': str(post.caption or '').strip(),
+                'published_at': timestamp,
+                'timestamp': timestamp,
+                'is_video': bool(getattr(post, 'is_video', False)),
+            })
+        print(f'Instaloader: {len(posts)} posts encontrados para @{username}')
+        return posts
+    except Exception as exc:
+        print(f'Instaloader falhou para @{username}: {exc}')
+        return []
+
+
 def _fetch_posts_with_ytdlp(username: str, limit: int = 10) -> list[dict[str, Any]]:
     """Fetch public Instagram post metadata with the installed yt-dlp CLI."""
     import subprocess
@@ -639,6 +672,9 @@ def fetch_public_instagram_posts(source: str, limit: int = 10) -> IntegrationRes
     except ValueError as exc:
         return IntegrationResult(False, str(exc), {})
     if platform.system() == 'Windows':
+        instaloader_posts = _fetch_posts_with_instaloader(reference['username'], limit)
+        if instaloader_posts:
+            return IntegrationResult(True, f'{len(instaloader_posts)} posts obtidos via Instaloader', reference | {'posts': instaloader_posts})
         ytdlp_posts = _fetch_posts_with_ytdlp(reference['username'], limit)
         print(f'yt-dlp posts retornados para @{reference["username"]}: {len(ytdlp_posts)}')
         if ytdlp_posts:
