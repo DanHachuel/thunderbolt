@@ -445,7 +445,7 @@ def render_motion_control(settings: dict[str, Any]) -> None:
 def render_ugc_products(settings: dict[str, Any]) -> None:
     """Create portrait UGC photos or videos from a product and a saved character."""
     st.title("UGC Products")
-    st.caption("Crie fotos ou vídeos UGC em formato vertical 9:16 para TikTok e Instagram usando um produto e um personagem cadastrados.")
+    st.caption("Crie fotos ou vídeos UGC em formato vertical 9:16 para TikTok e Instagram usando um produto e um personagem cadastrado.")
     repository = _repository(settings)
     if repository is None:
         return
@@ -457,15 +457,21 @@ def render_ugc_products(settings: dict[str, Any]) -> None:
 
     with media_tab:
         if not influencers:
-            influencers = [{"id": "", "name": "Sem personagem", "bio": ""}]
+            influencers = [{"id": "", "name": "", "bio": ""}]
         influencer_options = _influencer_options(influencers)
+        if not influencer_options:
+            influencer_options = [""]
         selected_influencer = st.selectbox(
-            "Personagem (opcional)",
+            "Personagem",
             influencer_options,
             format_func=lambda value: _influencer_label(influencers, value),
             key="ugc_products_character",
         )
-        selected_character = next(item for item in influencers if str(item.get("id")) == selected_influencer)
+        selected_character = next(
+            (item for item in influencers if str(item.get("id") or "") == str(selected_influencer or "")),
+            influencers[0],
+        )
+        selected_influencer = str(selected_character.get("id") or "")
         try:
             character_assets = repository.list_assets(selected_influencer)
         except Exception:
