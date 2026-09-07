@@ -115,6 +115,19 @@ def _provider_label(card: Mapping[str, Any]) -> str:
     return f"{definition.label} · {model}"
 
 
+def _ugc_duration_seconds(value: str) -> int:
+    """Parse the UGC duration field as minutes:seconds with a safe default."""
+    try:
+        minutes_text, seconds_text = str(value or "1:20").strip().split(":", 1)
+        minutes = max(0, int(minutes_text))
+        seconds = int(seconds_text)
+        if 0 <= seconds < 60:
+            return max(1, min(3600, minutes * 60 + seconds))
+    except (TypeError, ValueError):
+        pass
+    return 80
+
+
 def _content_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
     raw = item.get("metadata") if isinstance(item.get("metadata"), Mapping) else item.get("metadata_json")
     if isinstance(raw, Mapping):
@@ -486,16 +499,26 @@ def render_ugc_products(settings: dict[str, Any]) -> None:
             key="ugc_products_inputs",
             help="Anexe uma ou mais referências do produto. Para geração, a primeira imagem será usada como referência visual principal.",
         )
-        generation_mode = st.radio("Geração", ["Gerar Foto", "Gerar Video"], horizontal=True, key="ugc_products_generation_mode")
-        duration = st.number_input("Duração de cada clip (segundos)", min_value=2, max_value=30, value=8, step=1, key="ugc_products_duration", disabled=generation_mode != "Gerar Video")
+        generation_col, duration_col = st.columns([2, 1])
+        with generation_col:
+            generation_mode = st.selectbox("Tipo de geração", ["Gerar Foto", "Gerar Video"], key="ugc_products_generation_mode")
+        duration_text = "1:20"
+        if generation_mode == "Gerar Video":
+            with duration_col:
+                duration_text = st.text_input("Duração de cada clip (MM:SS)", value="1:20", max_chars=5, key="ugc_products_duration_text", width=120)
+        duration = _ugc_duration_seconds(duration_text)
         image_cards, image_options = _provider_options(settings, "image")
         video_cards = _workflow_provider_cards(settings, provider=None)
         video_options = [str(card.get("id") or "") for card in video_cards]
-        image_provider_id = st.selectbox("Provider / modelo de imagem", image_options, format_func=lambda value: _provider_label(next(card for card in image_cards if str(card.get("id")) == value)), key="ugc_products_image_provider") if image_cards else ""
-        video_provider_id = st.selectbox("Provider / modelo de vídeo", video_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider") if video_cards else ""
+        image_provider_id = ""
+        video_provider_id = ""
+        if generation_mode == "Gerar Foto":
+            image_provider_id = st.selectbox("Provider / modelo de imagem", image_options, format_func=lambda value: _provider_label(next(card for card in image_cards if str(card.get("id")) == value)), key="ugc_products_image_provider") if image_cards else ""
+        else:
+            video_provider_id = st.selectbox("Provider / modelo de vídeo", video_options, format_func=lambda value: _provider_label(next(card for card in video_cards if str(card.get("id")) == value)), key="ugc_products_video_provider") if video_cards else ""
         script = st.text_area("Roteiro de vídeo (UGC)", height=150, key="ugc_products_script", placeholder="O roteiro gerado pela IA aparecerá aqui; também pode editá-lo antes de gerar.")
         generate_script = st.button("Gerar roteiro com IA", use_container_width=True, key="ugc_products_generate_script")
-        generate = st.button("Gerar Foto" if generation_mode == "Gerar Foto" else "Gerar Video", type="primary", use_container_width=True, key="ugc_products_generate")
+        generate = st.button("Gerar Mídia (Foto/Vídeo)", type="primary", use_container_width=True, key="ugc_products_generate")
         if generate_script:
             context = "\n".join(
                 item for item in [
