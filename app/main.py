@@ -5105,71 +5105,172 @@ def render_videos():
                         st.rerun()
 
 
-def render_music_backlog() -> None:
-    """Render the independent audio-only queue; it never reads the video pipeline."""
-    st.subheader("Music Backlog")
-    st.caption("Fila independente de geração de áudio por Suno AI ou Google Lyria. Não inclui tarefas, worker ou progresso de vídeo.")
-    st.caption(f"As músicas são guardadas em `{STORAGE / 'music'}`.")
+def _music_backlog_records() -> list[dict[str, Any]]:
+    """Combine generated music tasks with audio files imported into storage/music."""
     tasks = list_music_tasks()
-    active = [task for task in tasks if str(task.get("state") or "") == "doing"]
-    if active:
-        st.info(f"Geração musical em execução · {len(active)} tarefa(s) de áudio.")
-    if not tasks:
-        st.info("Nenhuma música criada.")
-        return
-    known_states = ["to_do", "doing", "blocked", "done", "failed", "cancelled"]
-    extra_states = sorted({str(task.get("state") or "unknown") for task in tasks if str(task.get("state") or "unknown") not in known_states})
-    state_filter = st.selectbox("Filtrar por estado", ["Todos", *known_states, *extra_states], key="music_backlog_state_filter")
+    records: list[dict[str, Any]] = []
+    registered_paths: set[str] = set()
     for task in tasks:
-        if state_filter != "Todos" and task.get("state") != state_filter:
+        record = dict(task)
+        record["source_type"] = "created"
+        audio_path = Path(str(record.get("audio_path") or "")) if record.get("audio_path") else None
+        if audio_path:
+            registered_paths.add(str(audio_path.resolve()))
+        records.append(record)
+    for music_file in list_music_files():
+        if str(music_file.resolve()) in registered_paths:
             continue
-        with st.container(border=True):
-            cols = st.columns([2.2, 1, 1, 1.2, 1.8])
-            with cols[0]:
-                st.write(f"**{task.get('title') or 'Música sem título'}**")
-                st.caption(f"Provider: {'Google Lyria' if str(task.get('provider') or '').casefold() == 'lyria' else 'Suno AI'}")
-                st.caption(str(task.get('id') or ''))
-                music_path = str(task.get("audio_path") or "").strip()
-                if music_path and Path(music_path).is_file():
-                    music_file = Path(music_path)
-                    st.success("Música pronta; pode continuar para o destino configurado.")
-                    st.download_button(
-                        "Descarregar música",
-                        data=music_file.read_bytes(),
-                        file_name=music_file.name,
-                        mime="audio/mpeg",
-                        key=f"music_backlog_download_{task['id']}",
-                        use_container_width=True,
-                    )
-                elif music_path:
-                    st.caption(f"Música registada: {music_path}")
-                else:
-                    st.caption("A música será disponibilizada quando a etapa de geração terminar.")
-            with cols[1]:
-                st.caption("Tipo")
-                st.write("Áudio")
-            with cols[2]:
-                st.write({"music_generation": "Geração musical", "completed": "Concluída", "failed": "Falha"}.get(str(task.get("stage") or ""), "Na fila"))
-            with cols[3]:
-                state = str(task.get("state") or "unknown").strip().lower()
-                progress = _video_task_progress(task)
-                st.caption("Estado")
-                st.write(state or "—")
-                st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
-                st.progress(progress, text=f"{progress}%")
-                if task.get("error"):
-                    st.error(str(task.get("error") or "")[:500])
-            with cols[4]:
-                state = str(task.get("state") or "")
+        records.append({
+            "id": f"imported_{hashlib.sha1(str(music_file.resolve()).encode('utf-8')).hexdigest()[:12]}",
+            "title": get_display_name("music", music_file, music_file.stem),
+            "provider": "imported",
+            "stage": "imported",
+            "state": "done",
+            "progress": 100,
+            "audio_path": str(music_file),
+            "source_type": "imported",
+            "created_at": datetime.fromtimestamp(music_file.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
+        })
+    return records
+
+
+def _music_lyrics_records() -> list[dict[str, Any]]:
+    """Return persisted music-lyrics documents that still exist on disk."""
+    records: list[dict[str, Any]] = []
+    for document in list_script_documents():
+        if str(document.get("document_type") or "").strip() != "music_lyrics":
+            continue
+        path = Path(str(document.get("path") or ""))
+        if path.is_file():
+            records.append({**document, "path": str(path), "title": get_display_name("music_lyrics", path, str(document.get("title") or path.stem))})
+    return records
+
+
+def _render_music_file_card(record: dict[str, Any]) -> None:
+    music_path = Path(str(record.get("audio_path") or ""))
+    record_id = str(record.get("id") or music_path.name)
+    title = get_display_name("music", music_path, str(record.get("title") or music_path.stem)) if music_path else str(record.get("title") or "Música sem título")
+    with st.container(border=True):
+        cols = st.columns([2.2, 1, 1, 1.2, 1.8])
+        with cols[0]:
+            st.write(f"**{title}**")
+            source_type = "Música criada" if str(record.get("source_type") or "") == "created" else "Música importada"
+            st.caption(source_type)
+            if str(record.get("provider") or "").casefold() not in {"", "imported"}:
+                provider = "Google Lyria" if str(record.get("provider") or "").casefold() == "lyria" else "Suno AI"
+                st.caption(f"Provider: {provider}")
+            st.caption(record_id)
+            if music_path.is_file():
+                st.download_button(
+                    "Descarregar música",
+                    data=music_path.read_bytes(),
+                    file_name=music_path.name,
+                    mime=mimetypes.guess_type(music_path.name)[0] or "audio/mpeg",
+                    key=f"music_backlog_download_{record_id}",
+                    use_container_width=True,
+                )
+                edit_key = _render_library_name_editor("music", music_path, title)
+                with st.columns([0.2, 0.8])[0]:
+                    _render_card_pencil(edit_key)
+            else:
+                st.caption(f"Música registada: {music_path}")
+        with cols[1]:
+            st.caption("Tipo")
+            st.write("Áudio")
+        with cols[2]:
+            stage = str(record.get("stage") or "")
+            st.write({"music_generation": "Geração musical", "completed": "Concluída", "failed": "Falha", "imported": "Importada"}.get(stage, "Na fila"))
+        with cols[3]:
+            state = str(record.get("state") or "unknown").strip().lower()
+            progress = _video_task_progress(record)
+            st.caption("Estado")
+            st.write(state or "—")
+            st.caption(VIDEO_TASK_STATE_LABELS.get(state, state.replace("_", " ").capitalize() or "Desconhecido"))
+            st.progress(progress, text=f"{progress}%")
+            if record.get("error"):
+                st.error(str(record.get("error") or "")[:500])
+        with cols[4]:
+            if str(record.get("source_type") or "") == "created":
+                state = str(record.get("state") or "")
                 start_col, stop_col = st.columns(2)
                 with start_col:
-                    if st.button("Start", key=f"music_backlog_start_{task['id']}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
-                        run_music_task(str(task["id"]), read_json("settings.json", {}))
+                    if st.button("Start", key=f"music_backlog_start_{record_id}", use_container_width=True, disabled=state not in {"to_do", "blocked", "failed"}):
+                        run_music_task(record_id, read_json("settings.json", {}))
                         st.rerun()
                 with stop_col:
-                    if st.button("Stop", key=f"music_backlog_stop_{task['id']}", use_container_width=True, disabled=state != "doing"):
-                        transition_music_task(str(task["id"]), "blocked")
+                    if st.button("Stop", key=f"music_backlog_stop_{record_id}", use_container_width=True, disabled=state != "doing"):
+                        transition_music_task(record_id, "blocked")
                         st.rerun()
+
+
+def _render_lyrics_card(record: dict[str, Any]) -> None:
+    path = Path(str(record.get("path") or ""))
+    if not path.is_file():
+        return
+    record_id = str(record.get("id") or hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()[:12])
+    title = str(record.get("title") or path.stem)
+    content = read_script_document(record)
+    with st.container(border=True):
+        title_col, download_col, edit_col = st.columns([3.2, 1.3, 0.6])
+        with title_col:
+            st.write(f"**{title}**")
+            st.caption("Lyrics")
+        with download_col:
+            st.download_button("Descarregar lyrics", data=path.read_bytes(), file_name=path.name, mime="text/markdown", key=f"music_lyrics_download_{record_id}", use_container_width=True)
+        with edit_col:
+            edit_key = _render_library_name_editor("music_lyrics", path, title)
+            _render_card_pencil(edit_key)
+        with st.expander("Ver lyrics", expanded=False):
+            st.code(content or path.read_text(encoding="utf-8"), language="markdown")
+
+
+def render_music_backlog() -> None:
+    """List generated and imported music, plus locally stored lyrics."""
+    st.subheader("Music Backlog")
+    st.caption("Fila independente de geração e importação de áudio por Suno AI ou Google Lyria. Não inclui tarefas, worker ou progresso de vídeo.")
+    st.caption(f"As músicas são guardadas em `{STORAGE / 'music'}`.")
+    music_tab, lyrics_tab = st.tabs(["Músicas", "Lyrics"])
+    with music_tab:
+        with st.form("music_backlog_upload_form", clear_on_submit=True):
+            uploaded_music = st.file_uploader("Adicionar músicas à pasta acima", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], accept_multiple_files=True, key="music_backlog_upload")
+            upload_music = st.form_submit_button("Guardar músicas", type="primary", use_container_width=True)
+        if upload_music and uploaded_music:
+            for uploaded in uploaded_music:
+                store_music_file(uploaded.name, uploaded.getvalue())
+            st.success(f"{len(uploaded_music)} música(s) guardada(s) em `{STORAGE / 'music'}`.")
+            st.rerun()
+        records = _music_backlog_records()
+        active = [record for record in records if str(record.get("state") or "") == "doing"]
+        if active:
+            st.info(f"Geração musical em execução · {len(active)} tarefa(s) de áudio.")
+        if not records:
+            st.info("Nenhuma música criada ou importada.")
+        else:
+            known_states = ["to_do", "doing", "blocked", "done", "failed", "cancelled"]
+            extra_states = sorted({str(record.get("state") or "unknown") for record in records if str(record.get("state") or "unknown") not in known_states})
+            state_filter = st.selectbox("Filtrar por estado", ["Todos", *known_states, *extra_states], key="music_backlog_state_filter")
+            for record in records:
+                if state_filter != "Todos" and record.get("state") != state_filter:
+                    continue
+                _render_music_file_card(record)
+    with lyrics_tab:
+        st.caption(f"As lyrics são guardadas em `{script_storage_path()}` no formato Markdown local do Thunderbolt.")
+        with st.form("music_backlog_lyrics_upload_form", clear_on_submit=True):
+            uploaded_lyrics = st.file_uploader("Adicionar lyrics", type=["md", "txt"], key="music_backlog_lyrics_upload")
+            upload_lyrics = st.form_submit_button("Guardar lyrics", use_container_width=True)
+        if upload_lyrics and uploaded_lyrics:
+            content = uploaded_lyrics.getvalue().decode("utf-8", errors="replace").strip()
+            if content:
+                save_script_document({"title": Path(uploaded_lyrics.name).stem, "document_type": "music_lyrics", "content": content})
+                st.success("Lyrics guardadas.")
+                st.rerun()
+            else:
+                st.warning("O ficheiro de lyrics está vazio.")
+        lyrics = _music_lyrics_records()
+        if not lyrics:
+            st.info("Nenhuma lyrics guardada.")
+        for record in lyrics:
+            _render_lyrics_card(record)
 
 
 def _thumbnail_editor_context(record: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
