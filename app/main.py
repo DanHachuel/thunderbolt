@@ -5633,57 +5633,58 @@ def render_tiktok_automation():
     if not channels:
         st.info("Cadastre primeiro um canal TikTok.")
         return
-    for channel in channels:
-        channel_id = str(channel["id"])
-        with st.container(border=True):
-            header_cols = st.columns([0.55, 2.35, 1.25, 0.82, 0.92, 1.2])
-            with header_cols[0]:
-                profile_image = _tiktok_avatar_url(channel)
-                if profile_image:
-                    st.image(profile_image, width=48)
-                else:
-                    st.markdown("### TT")
-            with header_cols[1]:
-                st.write(f"**{channel.get('name', 'Sem nome')}**")
-                st.caption(channel.get("handle") or channel.get("url") or "sem URL")
-            with header_cols[2]:
-                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
-            with header_cols[3]:
-                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
-            with header_cols[4]:
-                prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
-                prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
-                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
-                average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"tiktok_average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
-            default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
-            with default_cols[0]:
-                st.markdown("**Idioma do roteiro**")
-                st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
-            with default_cols[1]:
-                st.markdown("**Nicho Padrão**")
-                st.caption(channel_niche_label(channel))
-            with default_cols[2]:
-                st.markdown("**Fonte do vídeo**")
-                st.caption(channel_video_source_value(channel.get("style_wide")))
-                st.markdown("**Proporção do vídeo**")
-                st.caption(str(channel.get("video_aspect_ratio") or "Portrait 9:16"))
-                st.markdown("**Formato**")
-                st.caption(str(channel.get("format") or "Shorts"))
-            with default_cols[3]:
-                prompt = st.selectbox("Prompt Master Padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
-            with default_cols[4]:
-                automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1, key=f"tiktok_automation_format_{channel_id}")
-            with default_cols[5]:
-                if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
-                    if not valid_hhmm(schedule_time):
-                        st.error("Use o formato HH:MM, por exemplo 08:30.")
-                    elif not valid_hhmm(average_video_time):
-                        st.error("O Tempo Medio de Video deve estar no formato MM:SS, por exemplo 12:00.")
+    with st.expander("Canais cadastrados", expanded=False):
+        for channel in channels:
+            channel_id = str(channel["id"])
+            with st.container(border=True):
+                header_cols = st.columns([0.55, 2.35, 1.25, 0.82, 0.92, 1.2])
+                with header_cols[0]:
+                    profile_image = _tiktok_avatar_url(channel)
+                    if profile_image:
+                        st.image(profile_image, width=48)
                     else:
-                        avatar_url = _tiktok_avatar_url(channel)
-                        update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
-                        st.success("Automação TikTok guardada.")
-                        st.rerun()
+                        st.markdown("### TT")
+                with header_cols[1]:
+                    st.write(f"**{channel.get('name', 'Sem nome')}**")
+                    st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+                with header_cols[2]:
+                    enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"tiktok_automation_on_{channel_id}")
+                with header_cols[3]:
+                    schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"tiktok_automation_time_{channel_id}")
+                with header_cols[4]:
+                    prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
+                    prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
+                    calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
+                    average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"tiktok_average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
+                default_cols = st.columns([1.0, 1.0, 1.35, 1.45, 1.55, 1.0], gap="small")
+                with default_cols[0]:
+                    st.markdown("**Idioma do roteiro**")
+                    st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
+                with default_cols[1]:
+                    st.markdown("**Nicho Padrão**")
+                    st.caption(channel_niche_label(channel))
+                with default_cols[2]:
+                    st.markdown("**Fonte do vídeo**")
+                    st.caption(channel_video_source_value(channel.get("style_wide")))
+                    st.markdown("**Proporção do vídeo**")
+                    st.caption(str(channel.get("video_aspect_ratio") or "Portrait 9:16"))
+                    st.markdown("**Formato**")
+                    st.caption(str(channel.get("format") or "Shorts"))
+                with default_cols[3]:
+                    prompt = st.selectbox("Prompt Master Padrão", prompt_ids, index=prompt_ids.index(channel.get("default_prompt_master", "")) if channel.get("default_prompt_master", "") in prompt_ids else 0, format_func=lambda item: prompt_labels.get(item, item), key=f"tiktok_automation_prompt_{channel_id}")
+                with default_cols[4]:
+                    automation_format = st.selectbox("Formato", CHANNEL_FORMAT_OPTIONS, index=CHANNEL_FORMAT_OPTIONS.index(str(channel.get("format") or "Shorts")) if str(channel.get("format") or "Shorts") in CHANNEL_FORMAT_OPTIONS else 1, key=f"tiktok_automation_format_{channel_id}")
+                with default_cols[5]:
+                    if st.button("Guardar", key=f"tiktok_automation_save_{channel_id}", use_container_width=True, type="primary"):
+                        if not valid_hhmm(schedule_time):
+                            st.error("Use o formato HH:MM, por exemplo 08:30.")
+                        elif not valid_hhmm(average_video_time):
+                            st.error("O Tempo Medio de Video deve estar no formato MM:SS, por exemplo 12:00.")
+                        else:
+                            avatar_url = _tiktok_avatar_url(channel)
+                            update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
+                            st.success("Automação TikTok guardada.")
+                            st.rerun()
     _render_tiktok_automation_cards()
 
 @st.fragment(run_every=5.0)
@@ -5807,82 +5808,83 @@ def render_automation():
     channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
     if not channels:
         st.info("Nenhum canal cadastrado para configurar.")
-    for channel in channels:
-        channel_id = channel["id"]
-        with st.container(border=True):
-            blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
-            automation_blueprint = current_blueprint
-            automation_voice = current_voice
-            paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
-            automation_format = str(channel.get("format") or "wide")
-            header_cols = st.columns([0.58, 2.15, 1.4, 1.15, 1.15, 1.25, 0.82, 0.92], gap="small")
-            with header_cols[0]:
-                if channel.get("thumbnail_url"):
-                    st.image(channel["thumbnail_url"], width=48)
-                else:
-                    st.markdown("### YT")
-            with header_cols[1]:
-                st.write(f"**{channel.get('name', 'Sem nome')}**")
-                st.caption(channel.get("handle") or channel.get("url") or "sem URL")
-            with header_cols[2]:
-                st.markdown("**Thumbnail Blueprint**")
-                st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
-            with header_cols[3]:
-                st.markdown("**Idioma do roteiro**")
-                st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
-            with header_cols[4]:
-                st.markdown("**Nicho Padrão**")
-                st.caption(channel_niche_label(channel))
-            with header_cols[5]:
-                st.markdown("**Fonte do vídeo**")
-                st.caption(channel_video_source_value(channel.get("style_wide")))
-                st.markdown("**Proporção do vídeo**")
-                st.caption(str(channel.get("video_aspect_ratio") or "Landscape 16:9"))
-            with header_cols[6]:
-                schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
-            with header_cols[7]:
-                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
-                average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
-
-            control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")
-            with control_cols[0]:
-                automation_blueprint = st.selectbox(
-                    "Blueprint Padrão",
-                    blueprint_ids,
-                    index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
-                    format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
-                    key=f"automation_blueprint_{channel_id}",
-                )
-            paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
-            with control_cols[1]:
-                automation_voice = st.selectbox(
-                    "Narrador/Voz Padrão",
-                    voice_options,
-                    index=voice_options.index(current_voice) if current_voice in voice_options else 0,
-                    format_func=lambda item: item or "Sem voz padrão",
-                    key=f"automation_voice_{channel_id}",
-                )
-            with control_cols[2]:
-                enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
-            with control_cols[3]:
-                if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True, type="primary"):
-                    if not valid_hhmm(schedule_time):
-                        st.error("Use o formato HH:MM, por exemplo 08:30.")
-                    elif not valid_hhmm(average_video_time):
-                        st.error("O Tempo Medio de Video deve estar no formato MM:SS, por exemplo 12:00.")
+    with st.expander("Canais cadastrados", expanded=False):
+        for channel in channels:
+            channel_id = channel["id"]
+            with st.container(border=True):
+                blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
+                automation_blueprint = current_blueprint
+                automation_voice = current_voice
+                paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
+                automation_format = str(channel.get("format") or "wide")
+                header_cols = st.columns([0.58, 2.15, 1.4, 1.15, 1.15, 1.25, 0.82, 0.92], gap="small")
+                with header_cols[0]:
+                    if channel.get("thumbnail_url"):
+                        st.image(channel["thumbnail_url"], width=48)
                     else:
-                        update_channel(channel_id, {
-                            "automation_on": bool(enabled),
-                            "automation_time": schedule_time.strip(),
-                            "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME,
-                            "average_video_word_count": words_from_channel_time(average_video_time),
-                            "format": automation_format,
-                        })
-                        set_channel_defaults(channel_id, automation_blueprint, automation_voice)
-                        paired_id = str(paired_thumbnail.get("id") or "Generic_Thumbnail_Blueprint")
-                        update_channel(channel_id, {"thumbnail_blueprint_id": paired_id, "default_thumbnail_blueprint_id": paired_id})
-                        st.success("Agendamento guardado.")
-                        st.rerun()
+                        st.markdown("### YT")
+                with header_cols[1]:
+                    st.write(f"**{channel.get('name', 'Sem nome')}**")
+                    st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+                with header_cols[2]:
+                    st.markdown("**Thumbnail Blueprint**")
+                    st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
+                with header_cols[3]:
+                    st.markdown("**Idioma do roteiro**")
+                    st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
+                with header_cols[4]:
+                    st.markdown("**Nicho Padrão**")
+                    st.caption(channel_niche_label(channel))
+                with header_cols[5]:
+                    st.markdown("**Fonte do vídeo**")
+                    st.caption(channel_video_source_value(channel.get("style_wide")))
+                    st.markdown("**Proporção do vídeo**")
+                    st.caption(str(channel.get("video_aspect_ratio") or "Landscape 16:9"))
+                with header_cols[6]:
+                    schedule_time = st.text_input("Horário (HH:MM)", value=channel.get("automation_time", "00:00"), key=f"automation_time_{channel_id}")
+                with header_cols[7]:
+                    calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
+                    average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"average_video_time_{channel_id}", help=f"Referência média: {calculated_words or 0} palavras · fonte: {calculated_source}.")
+
+                control_cols = st.columns([1.8, 1.8, 1.35, 1.2], gap="small")
+                with control_cols[0]:
+                    automation_blueprint = st.selectbox(
+                        "Blueprint Padrão",
+                        blueprint_ids,
+                        index=blueprint_ids.index(current_blueprint) if current_blueprint in blueprint_ids else 0,
+                        format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"),
+                        key=f"automation_blueprint_{channel_id}",
+                    )
+                paired_thumbnail = thumbnail_blueprint_for_blueprint(automation_blueprint)
+                with control_cols[1]:
+                    automation_voice = st.selectbox(
+                        "Narrador/Voz Padrão",
+                        voice_options,
+                        index=voice_options.index(current_voice) if current_voice in voice_options else 0,
+                        format_func=lambda item: item or "Sem voz padrão",
+                        key=f"automation_voice_{channel_id}",
+                    )
+                with control_cols[2]:
+                    enabled = st.toggle("Automação ligada", value=bool(channel.get("automation_on", False)), key=f"automation_on_{channel_id}")
+                with control_cols[3]:
+                    if st.button("Guardar", key=f"automation_save_{channel_id}", use_container_width=True, type="primary"):
+                        if not valid_hhmm(schedule_time):
+                            st.error("Use o formato HH:MM, por exemplo 08:30.")
+                        elif not valid_hhmm(average_video_time):
+                            st.error("O Tempo Medio de Video deve estar no formato MM:SS, por exemplo 12:00.")
+                        else:
+                            update_channel(channel_id, {
+                                "automation_on": bool(enabled),
+                                "automation_time": schedule_time.strip(),
+                                "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME,
+                                "average_video_word_count": words_from_channel_time(average_video_time),
+                                "format": automation_format,
+                            })
+                            set_channel_defaults(channel_id, automation_blueprint, automation_voice)
+                            paired_id = str(paired_thumbnail.get("id") or "Generic_Thumbnail_Blueprint")
+                            update_channel(channel_id, {"thumbnail_blueprint_id": paired_id, "default_thumbnail_blueprint_id": paired_id})
+                            st.success("Agendamento guardado.")
+                            st.rerun()
 
     _render_youtube_automation_cards()
 
