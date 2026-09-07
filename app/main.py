@@ -1168,7 +1168,7 @@ def render_video_generation_settings(
                     st.caption("Carregue uma narração pronta; o ficheiro será usado directamente pelo MoneyPrinterTurbo.")
                     uploaded_voiceover = st.file_uploader(
                         "Ficheiro de narração",
-                        type=["mp3", "wav", "m4a", "aac", "flac", "ogg"],
+                        type=["mp3", "mpeg", "wav", "m4a", "aac", "flac", "ogg"],
                         key=f"{prefix}_voiceover_upload",
                     )
                     if uploaded_voiceover is not None and st.button("Guardar áudio de narração", key=f"{prefix}_voiceover_store", use_container_width=True):
@@ -3522,7 +3522,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                     else:
                         st.warning("Ainda não existem músicas em storage/music. Escolha Carregar ficheiro ou Criar via Suno API.")
                 elif music_source == "Carregar ficheiro":
-                    uploaded_music = st.file_uploader("Carregar música", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], key=f"{prefix}_music_upload")
+                    uploaded_music = st.file_uploader("Carregar música", type=["mp3", "mpeg", "wav", "m4a", "aac", "flac", "ogg"], key=f"{prefix}_music_upload")
                     if uploaded_music and st.button("Guardar música local", key=f"{prefix}_music_store", use_container_width=True):
                         try:
                             stored_music = store_music_file(uploaded_music.name, uploaded_music.getvalue())
@@ -5232,7 +5232,7 @@ def render_music_backlog() -> None:
     music_tab, lyrics_tab = st.tabs(["Músicas", "Lyrics"])
     with music_tab:
         with st.form("music_backlog_upload_form", clear_on_submit=True):
-            uploaded_music = st.file_uploader("Adicionar músicas à pasta acima", type=["mp3", "wav", "m4a", "aac", "flac", "ogg"], accept_multiple_files=True, key="music_backlog_upload")
+            uploaded_music = st.file_uploader("Adicionar músicas à pasta acima", type=["mp3", "mpeg", "wav", "m4a", "aac", "flac", "ogg"], accept_multiple_files=True, key="music_backlog_upload")
             upload_music = st.form_submit_button("Guardar músicas", type="primary", use_container_width=True)
         if upload_music and uploaded_music:
             for uploaded in uploaded_music:

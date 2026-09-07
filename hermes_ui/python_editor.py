@@ -16,7 +16,7 @@ from .metadata_cleaner import VIDEO_EXTENSIONS as METADATA_VIDEO_EXTENSIONS
 from .metadata_cleaner import _resolve_ffmpeg
 
 VIDEO_EXTENSIONS = {f".{extension.lower().lstrip('.')}" for extension in METADATA_VIDEO_EXTENSIONS}
-AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
+AUDIO_EXTENSIONS = {".mp3", ".mpeg", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 
 
 class PythonEditorError(RuntimeError):

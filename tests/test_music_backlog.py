@@ -23,6 +23,12 @@ def test_custom_music_voices_is_an_empty_reserved_blueprint_area():
     assert "st.file_uploader(" not in voices
 
 
+def test_music_backlog_accepts_mpeg_audio_from_suno():
+    assert '"mpeg"' in MAIN_SOURCE
+    music_source = (Path(__file__).resolve().parents[1] / "hermes_ui" / "music.py").read_text(encoding="utf-8")
+    assert '".mpeg"' in music_source
+
+
 def test_music_backlog_combines_created_and_imported_audio_files():
     backlog = MAIN_SOURCE.split("def _music_backlog_records()", 1)[1].split("def _thumbnail_editor_context", 1)[0]
 
