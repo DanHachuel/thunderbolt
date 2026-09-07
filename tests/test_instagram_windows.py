@@ -64,63 +64,40 @@ def test_fetch_posts_with_ytdlp_maps_metadata():
     assert run.call_args.args[0][:5] == ["yt-dlp", "--dump-json", "--no-download", "--flat-playlist", "--playlist-end"]
 
 
-def test_fetch_posts_with_instaloader_maps_metadata():
-    from datetime import datetime
-
-    class FakePost:
-        mediaid = 12345
-        shortcode = "ABC123"
-        url = "https://cdn.example/abc.jpg"
-        caption = "Legenda Instaloader"
-        date_utc = datetime(2025, 1, 2, 3, 4, 5)
-        is_video = False
-
-    class FakeProfile:
-        @staticmethod
-        def from_username(context, username):
-            assert username == "simoes.vi"
-            return type("Profile", (), {"get_posts": lambda self: iter([FakePost()])})()
-
-    fake_module = type("InstaloaderModule", (), {
-        "Instaloader": lambda: type("Loader", (), {"context": object()})(),
-        "Profile": FakeProfile,
-    })
-    with patch.dict("sys.modules", {"instaloader": fake_module}):
-        posts = instagram_public._fetch_posts_with_instaloader("simoes.vi", limit=10)
-    assert posts[0]["id"] == 12345
-    assert posts[0]["shortcode"] == "ABC123"
-    assert posts[0]["display_url"] == "https://cdn.example/abc.jpg"
-    assert posts[0]["caption"] == "Legenda Instaloader"
-    assert posts[0]["timestamp"] > 0
-
-
-def test_windows_prefers_instaloader_before_other_post_fallbacks():
-    instaloader_posts = [{"id": 12345, "shortcode": "ABC123", "image_url": "https://img.example/abc.jpg"}]
+def test_windows_profile_api_uses_chrome_headers_and_logs_response():
+    response = Mock(status_code=200, text='{"data":{"user":{"username":"simoes.vi","biography":"Bio","edge_follow":{"count":2},"edge_followed_by":{"count":3},"edge_owner_to_timeline_media":{"count":1,"edges":[]}}}}')
+    response.json.return_value = json.loads(response.text)
     with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-         patch.object(instagram_public, "_fetch_posts_with_instaloader", return_value=instaloader_posts) as instaloader, \
-         patch.object(instagram_public, "_fetch_posts_with_ytdlp") as ytdlp, \
-         patch.object(instagram_public, "_fetch_web_profile_user") as profile:
+         patch.object(instagram_public.requests, "get", return_value=response) as request, \
+         patch.object(instagram_public, "print") as output:
+        user = instagram_public._fetch_web_profile_user("simoes.vi")
+    assert user["username"] == "simoes.vi"
+    headers = request.call_args.kwargs["headers"]
+    assert "Chrome/131.0" in headers["User-Agent"]
+    assert headers["Accept-Encoding"] == "gzip, deflate, br"
+    assert headers["Accept-Language"] == "pt-BR,pt;q=0.9,en;q=0.8"
+    logged = "\n".join(str(call.args[0]) for call in output.call_args_list)
+    assert "URL chamada" in logged
+    assert "status=200" in logged
+    assert "tamanho=" in logged
+    assert "simoes.vi" in logged
+
+
+def test_windows_public_posts_do_not_use_instaloader_and_use_profile_api():
+    api_user = {
+        "username": "simoes.vi",
+        "biography": "Bio",
+        "edge_follow": {"count": 2},
+        "edge_followed_by": {"count": 3},
+        "edge_owner_to_timeline_media": {"count": 1, "edges": [{"node": {"id": "1", "shortcode": "ABC123", "display_url": "https://img.example/abc.jpg"}}]},
+    }
+    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
+         patch.object(instagram_public, "_fetch_web_profile_user", return_value=api_user) as profile:
         result = instagram_public.fetch_public_instagram_posts("https://www.instagram.com/simoes.vi/", limit=10)
     assert result.ok is True
-    assert result.message == "1 posts obtidos via Instaloader"
-    assert result.data["posts"] == instaloader_posts
-    instaloader.assert_called_once_with("simoes.vi", 10)
-    ytdlp.assert_not_called()
-    profile.assert_not_called()
-
-
-def test_windows_falls_back_to_ytdlp_when_instaloader_fails():
-    ytdlp_posts = [{"id": "ABC123", "shortcode": "ABC123", "image_url": "https://img.example/abc.jpg"}]
-    with patch.object(instagram_public.platform, "system", return_value="Windows"), \
-         patch.object(instagram_public, "_fetch_posts_with_instaloader", return_value=[]), \
-         patch.object(instagram_public, "_fetch_posts_with_ytdlp", return_value=ytdlp_posts) as ytdlp, \
-         patch.object(instagram_public, "_fetch_web_profile_user") as profile:
-        result = instagram_public.fetch_public_instagram_posts("https://www.instagram.com/simoes.vi/", limit=10)
-    assert result.ok is True
-    assert result.message == "1 posts obtidos via yt-dlp"
-    assert result.data["posts"] == ytdlp_posts
-    ytdlp.assert_called_once_with("simoes.vi", 10)
-    profile.assert_not_called()
+    assert result.data["posts"][0]["shortcode"] == "ABC123"
+    profile.assert_called_once_with("simoes.vi")
+    assert not hasattr(instagram_public, "_fetch_posts_with_instaloader")
 
 
 def test_windows_fetches_ten_posts_for_brun0gpt_and_simoes_vi():
