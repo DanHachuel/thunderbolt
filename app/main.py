@@ -270,12 +270,26 @@ if st.get_option("theme.base") == "light":
     st.markdown(
         """
 <style>
-.stApp {
+html,
+body,
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main {
     background: linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%);
     background-size: 400% 400%;
+    background-attachment: fixed;
     animation: thunderbolt-prismatic-gradient 15s ease infinite;
+}
+
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main {
     min-height: 100vh;
     margin: 0;
+    background-color: transparent !important;
+    background-image: linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%) !important;
+    background-size: 400% 400% !important;
+    background-attachment: fixed;
 }
 
 @keyframes thunderbolt-prismatic-gradient {
