@@ -116,7 +116,7 @@ from hermes_ui.update_manager import check_version, restart_current_process, upd
 
 from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
 from hermes_ui.script_generation import generate_script_document
-from hermes_ui.video_length import DEFAULT_AVERAGE_VIDEO_TIME, channel_video_length, channel_video_time_value, length_generation_settings, words_from_channel_time
+from hermes_ui.video_length import DEFAULT_AVERAGE_VIDEO_TIME, channel_video_length, channel_video_time_value, default_average_video_time, length_generation_settings, words_from_channel_time
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.elevenlabs_voices import ElevenLabsVoicesError, cached_personal_voices, fetch_personal_voices, personal_voice_options
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
@@ -5733,7 +5733,7 @@ def render_tiktok_automation():
                             st.error("O Tempo Medio de Video deve estar no formato MM:SS, por exemplo 12:00.")
                         else:
                             avatar_url = _tiktok_avatar_url(channel)
-                            update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
+                            update_channel(channel_id, {"automation_on": bool(enabled), "automation_time": schedule_time.strip(), "average_video_time": average_video_time.strip() or default_average_video_time(channel), "average_video_word_count": words_from_channel_time(average_video_time), "default_prompt_master": prompt, "prompt_master": prompt, "platform": "tiktok", "format": automation_format, "video_aspect_ratio": "Portrait 9:16", "style_wide": "portrait", "avatar_url": avatar_url, "thumbnail_url": avatar_url})
                             st.success("Automação TikTok guardada.")
                             st.rerun()
     _render_tiktok_automation_cards()
