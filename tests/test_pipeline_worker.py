@@ -335,6 +335,22 @@ def test_worker_progress_is_monotonic_when_resuming_old_checkpoints():
     assert "Nunca deixar a percentagem persistida recuar" in source
 
 
+def test_stock_video_uses_total_timeout_instead_of_false_idle_watchdog(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    settings = {"video_source": "pixabay"}
+    task = {"style_wide": "pixabay", "video_script": "roteiro curto"}
+
+    assert pipeline_worker._video_timeout_seconds(task, settings) == pipeline_worker.LONG_STOCK_VIDEO_TIMEOUT_SECONDS
+    assert pipeline_worker._video_idle_timeout_seconds(task, settings) == pipeline_worker.STOCK_VIDEO_IDLE_TIMEOUT_SECONDS
+
+
+def test_non_stock_video_keeps_idle_watchdog(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    task = {"style_wide": "full_ia", "video_script": "roteiro curto"}
+
+    assert pipeline_worker._video_idle_timeout_seconds(task, {}) == pipeline_worker.VIDEO_IDLE_TIMEOUT_SECONDS
+
+
 class _FakeStdout:
     def __init__(self, lines):
         self._lines = iter(lines)
