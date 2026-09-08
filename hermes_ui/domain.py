@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from typing import Any
 
@@ -21,6 +22,13 @@ def slugify(value: str) -> str:
     return value or "item"
 
 
+def composio_connected_account_id_from_channel_name(name: str) -> str:
+    """Create the editable Composio account alias used by a YouTube channel."""
+    normalized = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
+    words = re.findall(r"[A-Za-z0-9]+", normalized)
+    return "-".join(word[:1].upper() + word[1:] for word in words)
+
+
 def make_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
@@ -31,6 +39,7 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
         "youtube_channel_id": "",
         "google_account_id": "",
         "google_account_email": "",
+        "composio_connected_account_id": composio_connected_account_id_from_channel_name(name),
         "name": name.strip(),
         "url": url.strip(),
         "platform": "youtube",

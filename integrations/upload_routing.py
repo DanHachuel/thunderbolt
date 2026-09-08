@@ -20,6 +20,7 @@ from integrations.youtube_direct_credentials import document_status
 from integrations.youtube_direct_upload import YouTubeDirectUploader
 from integrations.youtube_session_manager import renew_account_session
 from integrations.composio_upload import ComposioUploadError, execute_upload, resolve_tool_slug
+from hermes_ui.domain import composio_connected_account_id_from_channel_name
 from hermes_ui.storage import read_json, write_json
 from hermes_ui.languages import language_locale
 
@@ -338,7 +339,7 @@ def _composio_upload(settings: dict[str, Any], *, channel: dict[str, Any], **kwa
             str(kwargs.get("video_path") or ""),
             file_field,
             json.dumps(parsed_arguments, ensure_ascii=False),
-            str(settings.get("composio_connected_account_id") or channel.get("composio_connected_account_id") or "").strip(),
+            str(channel.get("composio_connected_account_id") or composio_connected_account_id_from_channel_name(channel.get("name") or "") or settings.get("composio_connected_account_id") or "").strip(),
         )
     except ComposioUploadError as exc:
         return IntegrationResult(False, str(exc), {})
