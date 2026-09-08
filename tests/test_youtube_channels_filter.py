@@ -1,4 +1,5 @@
 from app.main import classify_channel_platform, is_youtube_channel_record
+from hermes_ui.domain import composio_connected_account_id_from_channel_name
 
 
 def test_youtube_and_tiktok_filters_are_complementary_with_legacy_records():
@@ -36,3 +37,15 @@ def test_youtube_channels_ui_filters_both_table_and_card_loops():
     block = source[start:end]
     assert block.count('is_youtube_channel_record(channel)') >= 2
     assert '\n    channels = read_json("channels.json", [])' not in block
+
+
+def test_channel_composio_account_id_uses_hyphenated_title_words():
+    assert composio_connected_account_id_from_channel_name("The Financial Mechanics") == "The-Financial-Mechanics"
+    assert composio_connected_account_id_from_channel_name("Canal de Finanças") == "Canal-De-Financas"
+
+
+def test_channel_edit_form_exposes_editable_composio_account_id():
+    from pathlib import Path
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    assert '"Connected account ID do Composio"' in source
+    assert '"composio_connected_account_id": edited_composio_account_id.strip()' in source

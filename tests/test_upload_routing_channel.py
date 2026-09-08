@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from integrations import upload_routing
-from integrations.platforms import IntegrationResult
 
 
 def _settings(arguments="{}"):
@@ -23,14 +22,14 @@ def test_default_composio_route_injects_task_youtube_channel_id(monkeypatch, tmp
     captured = {}
 
     def fake_execute(api_key, user_id, slug, video_path, file_field, arguments_json, connected_account_id=""):
-        captured.update(api_key=api_key, user_id=user_id, slug=slug, video_path=video_path, file_field=file_field, arguments=json.loads(arguments_json))
+        captured.update(api_key=api_key, user_id=user_id, slug=slug, video_path=video_path, file_field=file_field, arguments=json.loads(arguments_json), connected_account_id=connected_account_id)
         return {"successful": True, "data": {"remote_id": "abc"}, "error": "", "log_id": "log-1"}
 
     monkeypatch.setattr(upload_routing, "execute_upload", fake_execute)
     result = upload_routing.upload_with_default_route(
         _settings('{"title":"Demo"}'),
         storage_root=tmp_path,
-        channel={"id": "local-1", "youtube_channel_id": "UC-CORRECT"},
+        channel={"id": "local-1", "youtube_channel_id": "UC-CORRECT", "composio_connected_account_id": "The-Financial-Mechanics"},
         account=None,
         video_path=str(tmp_path / "video.mp4"),
         title="Demo",
@@ -45,6 +44,7 @@ def test_default_composio_route_injects_task_youtube_channel_id(monkeypatch, tmp
         "language": "pt-BR",
     }
     assert captured["file_field"] == "videoFilePath"
+    assert captured["connected_account_id"] == "The-Financial-Mechanics"
 
 
 def test_default_composio_route_blocks_conflicting_channel(monkeypatch, tmp_path: Path):
