@@ -26,7 +26,7 @@ def composio_connected_account_id_from_channel_name(name: str) -> str:
     """Create the editable Composio account alias used by a YouTube channel."""
     normalized = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
     words = re.findall(r"[A-Za-z0-9]+", normalized)
-    return "-".join(word[:1].upper() + word[1:] for word in words)
+    return "-".join(words)
 
 
 def make_id(prefix: str) -> str:
