@@ -29,6 +29,20 @@ class AutomationCardsTests(unittest.TestCase):
         self.assertNotIn('st.caption("Horário do canal")', MAIN_SOURCE)
         self.assertIn('st.text_input("Horário (HH:MM)"', MAIN_SOURCE)
 
+    def test_automation_cards_expose_remake_action_for_both_platforms(self):
+        self.assertIn('"Refazer Vídeo"', MAIN_SOURCE)
+        self.assertIn('tiktok_automation_remake_video_', MAIN_SOURCE)
+        self.assertIn('automation_remake_video_', MAIN_SOURCE)
+        self.assertIn('remake_video_task(task_id)', MAIN_SOURCE)
+
+    def test_remake_operation_preserves_creative_artifacts_and_clears_only_video_upload(self):
+        domain_source = (ROOT / "hermes_ui" / "domain.py").read_text(encoding="utf-8")
+        self.assertIn('def remake_video_task(task_id: str)', domain_source)
+        self.assertIn('artifacts.pop("video", None)', domain_source)
+        self.assertIn('artifacts.pop("upload", None)', domain_source)
+        self.assertIn('"stage": "video"', domain_source)
+        self.assertIn('"state": "to_do"', domain_source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -470,6 +470,55 @@ def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:
     return update_json("tasks.json", [], mutate)
 
 
+def remake_video_task(task_id: str) -> dict[str, Any] | None:
+    """Queue a fresh video render while retaining the task's creative inputs.
+
+    The persisted script, blueprint, keywords/tags, voice, thumbnail prompt/image,
+    generation settings and any non-video media artefacts are intentionally kept.
+    Only the rendered video and publication result are invalidated so the worker
+    rebuilds the video instead of regenerating the creative brief.
+    """
+    normalized_id = str(task_id or "").strip()
+
+    def mutate(tasks: Any) -> dict[str, Any] | None:
+        if not isinstance(tasks, list):
+            raise StorageIntegrityError("O ficheiro tasks.json não contém uma lista válida.")
+        for task in tasks:
+            if not isinstance(task, dict) or str(task.get("id") or "") != normalized_id:
+                continue
+            if str(task.get("state") or "") == "doing":
+                raise ValueError("Pare a tarefa antes de refazer o vídeo.")
+            artifacts = dict(task.get("artifacts") or {})
+            artifacts.pop("video", None)
+            artifacts.pop("upload", None)
+            try:
+                remake_count = int(task.get("remake_count") or 0)
+            except (TypeError, ValueError):
+                remake_count = 0
+            for field in ("video_log", "video_result", "video_helper_status", "video_elapsed_seconds", "error"):
+                task.pop(field, None)
+            task.update({
+                "artifacts": artifacts,
+                "stage": "video",
+                "state": "to_do",
+                "progress": 50,
+                "video_ready": False,
+                "remake_requested_at": now(),
+                "remake_count": remake_count + 1,
+                "error": None,
+                "updated_at": now(),
+            })
+            orchestration = dict(task.get("orchestration") or {})
+            orchestration["current_stage"] = "video"
+            orchestration["resumable"] = True
+            orchestration["last_transition_at"] = now()
+            task["orchestration"] = orchestration
+            return task
+        return None
+
+    return update_json("tasks.json", [], mutate)
+
+
 def pipeline_summary() -> dict[str, Any]:
     tasks = read_json("tasks.json", [])
     channels = read_json("channels.json", [])
