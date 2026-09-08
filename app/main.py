@@ -35,6 +35,7 @@ from typing import Any
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -267,34 +268,57 @@ ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
 theme_base = (st.get_option("theme.base") or "dark").lower()
-
-if theme_base == "light":
-    st.markdown(
-        """
-<style>
-:root {
-    --primary-bg-color: #7A6FE4;
-}
-
-html,
-body,
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > .main {
-    min-height: 100vh;
-    margin: 0;
-    background: var(--primary-bg-color) !important;
+components.html(
+    """
+<script>
+(() => {
+    const STYLE_ID = "thunderbolt-light-theme-style";
+    const COLOR = "#7A6FE4";
+    const getStoredTheme = () => {
+        try {
+            return JSON.parse(window.parent.localStorage.getItem("stActiveTheme-/-v2") || '"System"');
+        } catch (_error) {
+            return "System";
+        }
+    };
+    const isLightTheme = () => {
+        const selected = getStoredTheme();
+        if (selected === "Light") return true;
+        if (selected === "Dark") return false;
+        return window.parent.matchMedia("(prefers-color-scheme: light)").matches;
+    };
+    const applyTheme = () => {
+        const document = window.parent.document;
+        const existing = document.getElementById(STYLE_ID);
+        if (!isLightTheme()) {
+            if (existing) existing.remove();
+            return;
+        }
+        const style = existing || document.createElement("style");
+        style.id = STYLE_ID;
+        style.textContent = `
+:root { --primary-bg-color: ${COLOR}; }
+html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stAppViewContainer"] > .main {
+    min-height: 100vh !important;
+    margin: 0 !important;
+    background: ${COLOR} !important;
     background-image: none !important;
 }
-
 [data-testid="stSidebar"] {
-    background: var(--primary-bg-color) !important;
+    background: ${COLOR} !important;
     background-image: none !important;
 }
-</style>
-        """,
-        unsafe_allow_html=True,
-    )
+`;
+        if (!existing) document.head.appendChild(style);
+    };
+    applyTheme();
+    window.setInterval(applyTheme, 500);
+})();
+</script>
+    """,
+    height=0,
+    width=0,
+)
 
 st.markdown("""
 <style>
