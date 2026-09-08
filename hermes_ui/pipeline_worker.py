@@ -41,6 +41,8 @@ PIPELINE_LOG_FILENAME = "pipeline_worker.json"
 VIDEO_TIMEOUT_SECONDS = 20 * 60
 LONG_STOCK_VIDEO_TIMEOUT_SECONDS = 90 * 60
 VIDEO_IDLE_TIMEOUT_SECONDS = 10 * 60
+# O helper do MoneyPrinterTurbo pode ficar silencioso durante downloads/API.
+# Mantemos uma janela de inactividade maior para Pixabay, sem remover o watchdog.
 STOCK_VIDEO_IDLE_TIMEOUT_SECONDS = 30 * 60
 STALE_TASK_SECONDS = VIDEO_TIMEOUT_SECONDS + 5 * 60
 WORKER_HEARTBEAT_TIMEOUT_SECONDS = 15
@@ -718,23 +720,25 @@ def _material_video_routes(task: dict[str, Any], settings: dict[str, Any]) -> li
 
 
 def _video_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
-    """Reserve extra bounded time only for long stock-video downloads and assembly."""
+    """Reserve extra bounded time for long stock-video downloads and assembly."""
     effective_settings = settings if isinstance(settings, dict) else _settings()
     route = _normalise_video_route(task, effective_settings)
     script = str(task.get("video_script") or "").strip()
-    if route in {"pexels", "pixabay"} and len(script) >= 1_200:
+    if route == "pixabay" or (route == "pexels" and len(script) >= 1_200):
         return max(VIDEO_TIMEOUT_SECONDS, LONG_STOCK_VIDEO_TIMEOUT_SECONDS)
     return VIDEO_TIMEOUT_SECONDS
 
 
 def _video_idle_timeout_seconds(task: dict[str, Any], settings: dict[str, Any] | None = None) -> int:
-    """Allow slow stock downloads to stay quiet without treating them as hung."""
+    """Allow Pixabay downloads to stay quiet without treating them as hung."""
     configured = VIDEO_IDLE_TIMEOUT_SECONDS
     if configured <= 0:
         return configured
     effective_settings = settings if isinstance(settings, dict) else _settings()
     route = _normalise_video_route(task, effective_settings)
-    if route in {"pexels", "pixabay"}:
+    if route == "pixabay":
+        return max(configured, STOCK_VIDEO_IDLE_TIMEOUT_SECONDS)
+    if route == "pexels":
         return max(configured, STOCK_VIDEO_IDLE_TIMEOUT_SECONDS)
     return configured
 
