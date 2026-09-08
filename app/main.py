@@ -6326,6 +6326,7 @@ def render_upload_composio():
     settings = read_json("settings.json", {})
     api_key = str(settings.get("composio_api_key") or "").strip()
     user_id = str(settings.get("composio_user_id") or "").strip()
+    connected_account_id = str(settings.get("composio_connected_account_id") or "").strip()
     if not settings.get("composio_enabled", False) or not api_key:
         st.warning("Composio está desactivado ou sem API key. Configure-o em Configuração API > API Keys Upload > Composio.")
         return
@@ -6377,7 +6378,7 @@ def render_upload_composio():
     if st.button("Enviar vídeo via Composio", type="primary", key=f"composio_upload_send_{selected_task_id}", use_container_width=True):
         try:
             parse_arguments(arguments_json)
-            result = execute_upload(api_key, user_id, selected_slug, video_path, file_field, arguments_json)
+            result = execute_upload(api_key, user_id, selected_slug, video_path, file_field, arguments_json, connected_account_id)
             record = {"id": uuid.uuid4().hex, "task_id": task.get("id"), "destination": "Composio", "target": {"toolkit": selected_tool.get("toolkit"), "slug": selected_slug, "file_field": file_field}, "status": "published" if result.get("successful") else "failed", "message": result.get("error") or "Upload Composio concluído.", "data": result.get("data") or {}, "log_id": result.get("log_id") or "", "created_at": now()}
             uploads = read_json("uploads.json", [])
             uploads.append(record)
