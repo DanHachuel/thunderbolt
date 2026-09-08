@@ -22,7 +22,7 @@ def _settings(arguments="{}"):
 def test_default_composio_route_injects_task_youtube_channel_id(monkeypatch, tmp_path: Path):
     captured = {}
 
-    def fake_execute(api_key, user_id, slug, video_path, file_field, arguments_json):
+    def fake_execute(api_key, user_id, slug, video_path, file_field, arguments_json, connected_account_id=""):
         captured.update(api_key=api_key, user_id=user_id, slug=slug, video_path=video_path, file_field=file_field, arguments=json.loads(arguments_json))
         return {"successful": True, "data": {"remote_id": "abc"}, "error": "", "log_id": "log-1"}
 

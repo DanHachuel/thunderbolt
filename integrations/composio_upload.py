@@ -112,28 +112,34 @@ def _client(api_key: str, *, upload_dir: Path | None = None):
 
 
 def _connected_account_id(client: Any, user_id: str, toolkit: str, selector: str) -> str:
-    """Resolve a connected-account ID from an ID or UI alias."""
+    """Resolve a connected-account ID from an ID, alias, or sole active account."""
     value = str(selector or "").strip()
-    if not value:
-        return ""
     try:
         response = client.connected_accounts.list(user_ids=[_require_user_id(user_id)], statuses=["ACTIVE"])
         raw = _safe_value(response)
         items = raw.get("items", []) if isinstance(raw, dict) else raw
         if not isinstance(items, list):
             items = []
-        wanted = value.casefold()
+        matching_items = []
         for item in items:
             if not isinstance(item, dict):
                 continue
             toolkit_value = item.get("toolkit")
             if isinstance(toolkit_value, dict):
                 toolkit_value = toolkit_value.get("slug") or toolkit_value.get("name")
-            candidates = [item.get("id"), item.get("nanoid"), item.get("alias"), item.get("name")]
             if str(toolkit or "").strip() and toolkit.casefold() not in str(toolkit_value or "").casefold():
                 continue
-            if any(str(candidate or "").strip().casefold() == wanted for candidate in candidates):
-                return str(item.get("id") or item.get("nanoid") or value).strip()
+            matching_items.append(item)
+        if value:
+            wanted = value.casefold()
+            for item in matching_items:
+                candidates = [item.get("id"), item.get("nanoid"), item.get("alias"), item.get("name")]
+                if any(str(candidate or "").strip().casefold() == wanted for candidate in candidates):
+                    return str(item.get("id") or item.get("nanoid") or value).strip()
+            return value
+        if len(matching_items) == 1:
+            item = matching_items[0]
+            return str(item.get("id") or item.get("nanoid") or "").strip()
     except Exception:
         # Preserve the original selector so Composio returns its actionable error.
         return value
@@ -237,8 +243,12 @@ def execute_upload(api_key: str, user_id: str, slug: str, video_path: str, file_
             "dangerously_skip_version_check": True,
         }
         selected_account = _connected_account_id(client, user_id, "youtube", connected_account_id)
-        if selected_account:
-            execute_kwargs["connected_account_id"] = selected_account
+        if not selected_account:
+            raise ComposioUploadError(
+                f"Nenhuma conta YouTube activa está ligada ao Composio user ID `{_require_user_id(user_id)}`. "
+                "Use `Autorizar toolkit no Composio` ou configure o Connected account ID correcto."
+            )
+        execute_kwargs["connected_account_id"] = selected_account
         result = client.tools.execute(slug, **execute_kwargs)
         response = _response(result)
         if not response["successful"] and not response["error"]:
