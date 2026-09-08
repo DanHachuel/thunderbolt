@@ -272,59 +272,26 @@ if theme_base == "light":
     st.markdown(
         """
 <style>
+:root {
+    --primary-bg-color: #7A6FE4;
+}
+
 html,
 body,
 .stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stAppViewContainer"] > .main {
-    background: linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%);
-    background-size: 400% 400%;
-    background-attachment: fixed;
-    animation: thunderbolt-prismatic-gradient 15s ease infinite;
-}
-
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > .main {
     min-height: 100vh;
     margin: 0;
-    background-color: transparent !important;
-    background-image: linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%) !important;
-    background-size: 400% 400% !important;
-    background-attachment: fixed;
+    background: var(--primary-bg-color) !important;
+    background-image: none !important;
 }
 
 [data-testid="stSidebar"] {
-    background: rgba(255, 255, 255, 0.72) !important;
-}
-
-@keyframes thunderbolt-prismatic-gradient {
-    0% { background-position: 0% 0%; }
-    50% { background-position: 100% 100%; }
-    100% { background-position: 0% 0%; }
+    background: var(--primary-bg-color) !important;
+    background-image: none !important;
 }
 </style>
-<script>
-(function () {
-    const gradient = 'linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%)';
-    const selectors = [
-        'html',
-        'body',
-        '.stApp',
-        '[data-testid="stAppViewContainer"]',
-        '[data-testid="stAppViewContainer"] > .main'
-    ];
-    const applyGradient = () => selectors.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((element) => {
-            element.style.setProperty('background-image', gradient, 'important');
-            element.style.setProperty('background-size', '400% 400%', 'important');
-            element.style.setProperty('background-attachment', 'fixed');
-        });
-    };
-    applyGradient();
-    new MutationObserver(applyGradient).observe(document.documentElement, { childList: true, subtree: true });
-})();
-</script>
         """,
         unsafe_allow_html=True,
     )

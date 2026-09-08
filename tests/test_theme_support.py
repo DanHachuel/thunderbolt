@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.6.94"' in PACKAGE_SOURCE
+    assert '"version": "0.6.95"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
@@ -51,20 +51,22 @@ def test_custom_css_inherits_active_streamlit_theme_instead_of_forcing_dark_pale
         assert forced_dark_rule not in css
 
 
-def test_prismatic_gradient_is_injected_only_for_light_theme():
+def test_light_theme_uses_flat_primary_background_only():
     light_block_start = MAIN_SOURCE.index('if theme_base == "light":')
     light_block_end = MAIN_SOURCE.index('st.markdown("""', light_block_start)
     light_block = MAIN_SOURCE[light_block_start:light_block_end]
 
+    assert "--primary-bg-color: #7A6FE4" in light_block
     assert "html," in light_block
     assert '[data-testid="stAppViewContainer"] > .main' in light_block
-    assert "linear-gradient(315deg" in light_block
-    assert "background-image" in light_block
+    assert "background: var(--primary-bg-color) !important" in light_block
+    assert "background-image: none !important" in light_block
+    assert "linear-gradient" not in light_block
+    assert "@keyframes" not in light_block
+    assert "MutationObserver" not in light_block
     assert "!important" in light_block
     assert 'theme_base = (st.get_option("theme.base") or "dark").lower()' in MAIN_SOURCE
-    assert "MutationObserver" in light_block
     assert '[data-testid="stSidebar"]' in light_block
-    assert "@keyframes thunderbolt-prismatic-gradient" in light_block
     assert "unsafe_allow_html=True" in light_block
     assert 'st.get_option("theme.base") == "dark"' not in MAIN_SOURCE
 
