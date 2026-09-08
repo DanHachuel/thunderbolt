@@ -266,7 +266,9 @@ SUBTITLE_POSITION_OPTIONS = ["Bottom (Recommended)", "Top", "Center"]
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
-if st.get_option("theme.base") == "light":
+theme_base = (st.get_option("theme.base") or "light").lower()
+
+if theme_base == "light":
     st.markdown(
         """
 <style>
@@ -292,12 +294,37 @@ body,
     background-attachment: fixed;
 }
 
+[data-testid="stSidebar"] {
+    background: rgba(255, 255, 255, 0.72) !important;
+}
+
 @keyframes thunderbolt-prismatic-gradient {
     0% { background-position: 0% 0%; }
     50% { background-position: 100% 100%; }
     100% { background-position: 0% 0%; }
 }
 </style>
+<script>
+(function () {
+    const gradient = 'linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%)';
+    const selectors = [
+        'html',
+        'body',
+        '.stApp',
+        '[data-testid="stAppViewContainer"]',
+        '[data-testid="stAppViewContainer"] > .main'
+    ];
+    const applyGradient = () => selectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((element) => {
+            element.style.setProperty('background-image', gradient, 'important');
+            element.style.setProperty('background-size', '400% 400%', 'important');
+            element.style.setProperty('background-attachment', 'fixed');
+        });
+    };
+    applyGradient();
+    new MutationObserver(applyGradient).observe(document.documentElement, { childList: true, subtree: true });
+})();
+</script>
         """,
         unsafe_allow_html=True,
     )
