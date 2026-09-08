@@ -266,6 +266,28 @@ SUBTITLE_POSITION_OPTIONS = ["Bottom (Recommended)", "Top", "Center"]
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
+if st.get_option("theme.base") == "light":
+    st.markdown(
+        """
+<style>
+.stApp {
+    background: linear-gradient(315deg, #4f2991 3%, #7dc4ff 38%, #36cfcc 68%, #a92ed3 98%);
+    background-size: 400% 400%;
+    animation: thunderbolt-prismatic-gradient 15s ease infinite;
+    min-height: 100vh;
+    margin: 0;
+}
+
+@keyframes thunderbolt-prismatic-gradient {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 st.markdown("""
 <style>
 /*

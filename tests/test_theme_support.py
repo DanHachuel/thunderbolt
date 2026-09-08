@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.3.75"' in PACKAGE_SOURCE
+    assert '"version": "0.6.90"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
@@ -49,6 +49,17 @@ def test_custom_css_inherits_active_streamlit_theme_instead_of_forcing_dark_pale
         "color:#9cafbf",
     ):
         assert forced_dark_rule not in css
+
+
+def test_prismatic_gradient_is_injected_only_for_light_theme():
+    light_block_start = MAIN_SOURCE.index('if st.get_option("theme.base") == "light":')
+    light_block_end = MAIN_SOURCE.index('st.markdown("""', light_block_start)
+    light_block = MAIN_SOURCE[light_block_start:light_block_end]
+
+    assert "linear-gradient(315deg" in light_block
+    assert "@keyframes thunderbolt-prismatic-gradient" in light_block
+    assert "unsafe_allow_html=True" in light_block
+    assert 'st.get_option("theme.base") == "dark"' not in MAIN_SOURCE
 
 
 def test_theme_labels_are_available_for_all_supported_languages():
