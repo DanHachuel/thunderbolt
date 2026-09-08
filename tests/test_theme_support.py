@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.6.93"' in PACKAGE_SOURCE
+    assert '"version": "0.6.94"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
@@ -61,7 +61,7 @@ def test_prismatic_gradient_is_injected_only_for_light_theme():
     assert "linear-gradient(315deg" in light_block
     assert "background-image" in light_block
     assert "!important" in light_block
-    assert 'theme_base = (st.get_option("theme.base") or "light").lower()' in MAIN_SOURCE
+    assert 'theme_base = (st.get_option("theme.base") or "dark").lower()' in MAIN_SOURCE
     assert "MutationObserver" in light_block
     assert '[data-testid="stSidebar"]' in light_block
     assert "@keyframes thunderbolt-prismatic-gradient" in light_block

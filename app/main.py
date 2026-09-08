@@ -266,7 +266,7 @@ SUBTITLE_POSITION_OPTIONS = ["Bottom (Recommended)", "Top", "Center"]
 ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
-theme_base = (st.get_option("theme.base") or "light").lower()
+theme_base = (st.get_option("theme.base") or "dark").lower()
 
 if theme_base == "light":
     st.markdown(
