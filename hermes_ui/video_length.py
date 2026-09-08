@@ -7,17 +7,25 @@ from typing import Any
 
 WORDS_PER_MINUTE = 150
 DEFAULT_AVERAGE_VIDEO_TIME = "12:00"
+DEFAULT_TIKTOK_AVERAGE_VIDEO_TIME = "01:20"
 AVERAGE_VIDEO_TIME_KEY = "average_video_time"
 AVERAGE_VIDEO_WORD_COUNT_KEY = "average_video_word_count"
 
 
+def default_average_video_time(channel: dict[str, Any] | None = None) -> str:
+    """Return the platform-specific default duration for a channel."""
+    platform = str((channel or {}).get("platform") or "").strip().casefold()
+    return DEFAULT_TIKTOK_AVERAGE_VIDEO_TIME if platform == "tiktok" else DEFAULT_AVERAGE_VIDEO_TIME
+
+
 def channel_video_time_value(channel: dict[str, Any]) -> str:
     """Return the card value, migrating only the historical twelve-minute default."""
+    default_time = default_average_video_time(channel)
     value = str(channel.get(AVERAGE_VIDEO_TIME_KEY) or "").strip()
     configured_words = str(channel.get(AVERAGE_VIDEO_WORD_COUNT_KEY) or "").strip()
     if value == "00:12" and configured_words in {"", "0", "1800"}:
-        return DEFAULT_AVERAGE_VIDEO_TIME
-    return value or DEFAULT_AVERAGE_VIDEO_TIME
+        return default_time
+    return value or default_time
 
 
 def valid_hhmm(value: Any) -> bool:
@@ -115,8 +123,9 @@ def channel_video_length(channel: dict[str, Any], blueprint: Any = None, prompt_
     words = explicit_word_count(blueprint, prompt_master)
     if words:
         return words, hhmm_from_minutes(round(words / WORDS_PER_MINUTE)), "Blueprint/Prompt Master"
-    default_minutes = minutes_from_hhmm(DEFAULT_AVERAGE_VIDEO_TIME)
-    return round(default_minutes * WORDS_PER_MINUTE), DEFAULT_AVERAGE_VIDEO_TIME, "padrão do canal"
+    default_time = default_average_video_time(channel)
+    default_minutes = minutes_from_hhmm(default_time)
+    return round(default_minutes * WORDS_PER_MINUTE), default_time, "padrão do canal"
 
 
 def words_from_channel_time(value: Any) -> int:
@@ -138,6 +147,8 @@ __all__ = [
     "AVERAGE_VIDEO_TIME_KEY",
     "AVERAGE_VIDEO_WORD_COUNT_KEY",
     "DEFAULT_AVERAGE_VIDEO_TIME",
+    "DEFAULT_TIKTOK_AVERAGE_VIDEO_TIME",
+    "default_average_video_time",
     "channel_video_time_value",
     "WORDS_PER_MINUTE",
     "channel_video_length",
