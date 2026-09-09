@@ -166,6 +166,38 @@ def test_automation_defaults_are_carried_into_created_tasks(tmp_path, monkeypatc
     assert task["generation_settings"]["background_music_volume"] == "0%"
 
 
+def test_automation_channel_subtitle_defaults_override_stale_payload_settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import create_batch, create_channel, create_tasks_for_batch
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    channel = create_channel("Canal com legendas", metadata={
+        "default_enable_subtitles": True,
+        "default_subtitle_position": "Top",
+        "default_subtitle_font": "Arial.ttf",
+    })
+    batch = create_batch("single", [channel["id"]], "Tema", 1, {
+        "automation_worker": True,
+        "channel_payloads": {channel["id"]: {
+            "generation_settings": {
+                "enable_subtitles": False,
+                "subtitle_position": "Bottom",
+                "subtitle_font": "OldFont.ttf",
+            },
+        }},
+    })
+
+    task = create_tasks_for_batch(batch)[0]
+
+    assert task["automation_worker"] is True
+    assert task["generation_settings"]["enable_subtitles"] is True
+    assert task["generation_settings"]["subtitle_position"] == "Top"
+    assert task["generation_settings"]["subtitle_font"] == "Arial.ttf"
+
+
 def test_set_channel_defaults_syncs_aliases_and_tasks(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage
