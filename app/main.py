@@ -3152,7 +3152,7 @@ def render_channels():
                 st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
             with header_cols[4]:
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
-            with header_cols[6]:
+            with header_cols[5]:
                 if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", width="stretch"):
                     with st.spinner("A actualizar métricas YouTube…"):
                         refreshed, message = _refresh_youtube_channel_metrics(channel, youtube)
