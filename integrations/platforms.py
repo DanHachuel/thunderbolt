@@ -81,7 +81,7 @@ def _parse_public_count(value: Any) -> int | None:
     text = _text_from_node(value).lower().replace(" ", "")
     if not text:
         return None
-    match = re.search(r"([0-9][0-9.,]*)(mil|milhões|mi|bi|[kmb])?", text)
+    match = re.search(r"([0-9][0-9.,]*)(milhões|mil|mi|bi|[kmb])?", text)
     if not match:
         return None
     number = match.group(1)
@@ -89,6 +89,16 @@ def _parse_public_count(value: Any) -> int | None:
     if suffix == "milhões":
         suffix = "m"
     try:
+        if suffix:
+            # YouTube pode devolver "193 mil", "193,4 mil" ou "1.234 mil".
+            # Um ponto seguido de três algarismos é separador de milhares;
+            # vírgula/ponto com 1–2 algarismos é a parte decimal.
+            if "." in number and "," in number:
+                number = number.replace(".", "").replace(",", ".")
+            elif "," in number:
+                number = number.replace(",", ".")
+            elif re.fullmatch(r"\d+\.\d{3}", number):
+                number = number.replace(".", "")
         if suffix in {"k", "mil"}:
             return int(float(number.replace(",", ".")) * 1_000)
         if suffix in {"m", "mi"}:
@@ -412,6 +422,7 @@ class YouTubeAdapter:
                     break
             subscriber_value = _find_first_key(initial_data, "subscriberCountText")
             video_value = _find_first_key(initial_data, "videoCountText")
+            view_value = _find_first_key(initial_data, "viewCountText")
             data = {
                 "youtube_id": youtube_id or feed.get("youtube_id", ""),
                 "name": title,
@@ -421,7 +432,7 @@ class YouTubeAdapter:
                 "thumbnail_url": thumbnail_url,
                 "subscriber_count": _parse_public_count(subscriber_value),
                 "video_count": _parse_public_count(video_value) or feed.get("video_count"),
-                "view_count": None,
+                "view_count": _parse_public_count(view_value),
                 "metrics_source": "youtube_public_page" if (page_title or page_description or page_thumbnail) else ("youtube_public_feed" if feed.get("name") else "youtube_public_page"),
                 "public_lookup": True,
             }

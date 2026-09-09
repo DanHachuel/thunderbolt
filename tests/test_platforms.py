@@ -17,6 +17,9 @@ def test_public_count_parsing():
     assert _parse_public_count({"simpleText": "1,2 mil inscritos"}) == 1200
     assert _parse_public_count({"simpleText": "3.4M subscribers"}) == 3_400_000
     assert _parse_public_count({"simpleText": "12.345 vídeos"}) == 12345
+    assert _parse_public_count({"simpleText": "193.000 inscritos"}) == 193000
+    assert _parse_public_count({"simpleText": "193 mil inscritos"}) == 193000
+    assert _parse_public_count({"simpleText": "1,2 milhões de visualizações"}) == 1_200_000
 
 
 def test_json_assignment_handles_nested_braces_and_escaped_strings():
@@ -47,6 +50,27 @@ def test_fetch_channel_public_without_api_key(monkeypatch):
     assert result.data["handle"] == "@canalpublico"
     assert result.data["metrics_source"] == "youtube_public_page"
     assert result.data["thumbnail_url"].endswith("avatar.jpg")
+
+
+def test_fetch_channel_public_reads_view_count(monkeypatch):
+    initial = {
+        "metadata": {
+            "channelMetadataRenderer": {
+                "title": "Canal Público",
+                "externalId": "UC123",
+                "subscriberCountText": {"simpleText": "193 mil inscritos"},
+                "videoCountText": {"simpleText": "361 vídeos"},
+                "viewCountText": {"simpleText": "1,2 milhões de visualizações"},
+            }
+        }
+    }
+    html = "<html><script>var ytInitialData = " + json.dumps(initial, ensure_ascii=False) + ";</script></html>"
+    monkeypatch.setattr("integrations.platforms.requests.get", lambda *args, **kwargs: FakeResponse(html))
+    result = YouTubeAdapter(settings={}).fetch_channel_public("@canalpublico")
+    assert result.ok
+    assert result.data["subscriber_count"] == 193000
+    assert result.data["video_count"] == 361
+    assert result.data["view_count"] == 1_200_000
 
 
 def test_public_lookup_falls_back_to_open_graph_metadata(monkeypatch):
