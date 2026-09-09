@@ -697,6 +697,46 @@ def blueprint_for_channel(channel: dict) -> dict[str, Any]:
     return {"id": blueprint_id, "name": blueprint_id}
 
 
+def _resolve_saved_script_blueprint(record: dict[str, Any], channel: dict[str, Any]) -> tuple[str, str]:
+    """Resolve legacy script Blueprint metadata from channel fields or its saved name."""
+    blueprint_id = str(
+        channel.get("default_blueprint_id")
+        or channel.get("blueprint_id")
+        or record.get("blueprint_id")
+        or ""
+    ).strip()
+    blueprint_name = str(
+        channel.get("default_blueprint_name")
+        or channel.get("blueprint_name")
+        or channel.get("blueprint")
+        or record.get("blueprint_name")
+        or record.get("blueprint")
+        or ""
+    ).strip()
+    resolved = blueprint_for_channel(channel) if blueprint_id else {}
+    resolved_name = str(resolved.get("name") or "").strip()
+    if resolved_name and (resolved_name.casefold() != blueprint_id.casefold() or not blueprint_name):
+        blueprint_name = resolved_name
+    wanted = {value.casefold() for value in (blueprint_id, blueprint_name) if value}
+    if wanted:
+        for path in list_blueprint_files():
+            try:
+                data = load_blueprint_file(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            display_name = get_display_name("blueprints", path, str(data.get("name") or data.get("title") or path.stem)).strip()
+            identifiers = {
+                str(data.get("id") or "").strip(),
+                path.stem.strip(),
+                str(data.get("name") or "").strip(),
+                str(data.get("title") or "").strip(),
+                display_name,
+            }
+            if wanted.intersection({value.casefold() for value in identifiers if value}):
+                return str(data.get("id") or path.stem).strip(), display_name
+    return blueprint_id, blueprint_name or (blueprint_id if blueprint_id else "SEM BLUEPRINT CONFIGURADO")
+
+
 def _script_channel(record: dict[str, Any], channels: list[dict[str, Any]]) -> dict[str, Any]:
     channel_id = str(record.get("channel_id") or "").strip()
     channel_name = str(record.get("channel_name") or record.get("channel") or "").strip().casefold()
@@ -724,9 +764,7 @@ def _backfill_saved_script_blueprints(records: list[dict[str, Any]] | None = Non
         channel = _script_channel(record, channels)
         if not channel:
             continue
-        blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
-        blueprint = blueprint_for_channel(channel)
-        blueprint_name = str(blueprint.get("name") or blueprint_id or "SEM BLUEPRINT CONFIGURADO").strip()
+        blueprint_id, blueprint_name = _resolve_saved_script_blueprint(record, channel)
         current_id = str(record.get("blueprint_id") or "").strip()
         current_name = str(record.get("blueprint_name") or record.get("blueprint") or "").strip()
         if current_id == blueprint_id and current_name == blueprint_name:
