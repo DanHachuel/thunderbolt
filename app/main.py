@@ -2405,11 +2405,21 @@ def render_tiktok_channels():
                     st.rerun()
         st.divider()
         st.subheader(f"Canais TikTok cadastrados ({len(channels)})")
-        if channels:
-            for channel in channels:
+        tiktok_channel_search = st.text_input(
+            "Pesquisar nomes dos canais TikTok",
+            key="tiktok_registered_channels_search",
+            placeholder="Digite o nome do canal",
+        )
+        visible_tiktok_channels = [
+            channel for channel in channels
+            if not tiktok_channel_search.strip()
+            or tiktok_channel_search.strip().casefold() in str(channel.get("name") or "").casefold()
+        ]
+        if channels and visible_tiktok_channels:
+            for channel in visible_tiktok_channels:
                 channel_id = str(channel.get("id") or "")
                 with st.container(border=True):
-                    card_cols = st.columns([0.7, 3.05, 1.05, 1.05, 1.25, 1.7, 1.35], gap="small")
+                    card_cols = st.columns([0.7, 3.05, 1.05, 1.05, 1.25, 1.35], gap="small")
                     with card_cols[0]:
                         avatar_url = _tiktok_avatar_url(channel)
                         if avatar_url:
@@ -2428,6 +2438,17 @@ def render_tiktok_channels():
                     with card_cols[4]:
                         st.metric("Vídeos", format_metric_number(channel.get("video_count")))
                     with card_cols[5]:
+                        if st.button("↻", key=f"refresh_tiktok_metrics_{channel_id}", help="Actualizar Seguidores, Vídeos e Curtidas", width="stretch"):
+                            with st.spinner("A actualizar métricas TikTok…"):
+                                refreshed, message = _refresh_tiktok_channel_metrics(channel)
+                            (st.success if refreshed else st.warning)(message)
+                            if refreshed:
+                                st.rerun()
+                        active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
+                        if active != bool(channel.get("active", True)):
+                            update_channel(channel_id, {"active": active})
+                            st.rerun()
+                    with st.expander("Detalhes e configuração do canal", expanded=False):
                         prompt_file = TIKTOK_PROMPT_MASTERS / str(channel.get("default_prompt_master") or channel.get("prompt_master") or "")
                         prompt_content = load_prompt_master_file(prompt_file) if prompt_file.is_file() else ""
                         calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel, prompt_master=prompt_content)
@@ -2439,89 +2460,80 @@ def render_tiktok_channels():
                                 update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
                                 st.success("Tempo médio do canal TikTok guardado.")
                                 st.rerun()
-                    with card_cols[6]:
-                        if st.button("↻", key=f"refresh_tiktok_metrics_{channel_id}", help="Actualizar Seguidores, Vídeos e Curtidas", width="stretch"):
-                            with st.spinner("A actualizar métricas TikTok…"):
-                                refreshed, message = _refresh_tiktok_channel_metrics(channel)
-                            (st.success if refreshed else st.warning)(message)
-                            if refreshed:
-                                st.rerun()
-                        active = st.toggle("Activo", value=bool(channel.get("active", True)), key=f"tiktok_import_card_active_{channel_id}")
-                        if active != bool(channel.get("active", True)):
-                            update_channel(channel_id, {"active": active})
-                            st.rerun()
                         if st.button("Editar", key=f"tiktok_import_card_edit_{channel_id}"):
                             st.session_state[f"tiktok_edit_{channel_id}"] = not st.session_state.get(f"tiktok_edit_{channel_id}", False)
                             st.rerun()
                         if st.button("Apagar card", key=f"tiktok_import_card_delete_{channel_id}"):
                             st.session_state[f"tiktok_delete_{channel_id}"] = True
                             st.rerun()
-                    summary_cols = st.columns(4, gap="medium")
-                    with summary_cols[0]:
-                        st.markdown("**Blueprint Padrão**")
-                        st.caption(prompt_labels.get(str(channel.get("default_prompt_master") or channel.get("prompt_master") or ""), "Sem Blueprint padrão"))
-                    with summary_cols[1]:
-                        st.markdown("**Nicho**")
-                        st.caption(channel_niche_label(channel))
-                    with summary_cols[2]:
-                        st.markdown("**Narrador/Voz Padrão**")
-                        st.caption(str(channel.get("default_voice") or channel.get("voice") or "Sem voz padrão"))
-                    with summary_cols[3]:
-                        st.markdown("**Idioma**")
-                        st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
-                    st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))} · Proporção: {channel.get('video_aspect_ratio') or 'Portrait 9:16'}")
-                    if st.session_state.get(f"tiktok_delete_{channel_id}"):
-                        st.warning("Apagar este canal TikTok e os dados locais associados?")
-                        confirm_cols = st.columns(2)
-                        with confirm_cols[0]:
-                            if st.button("Confirmar apagar", type="primary", key=f"tiktok_confirm_delete_{channel_id}"):
-                                delete_channel(channel_id)
-                                st.session_state.pop(f"tiktok_delete_{channel_id}", None)
-                                st.rerun()
-                        with confirm_cols[1]:
-                            if st.button("Cancelar", key=f"tiktok_cancel_delete_{channel_id}"):
-                                st.session_state.pop(f"tiktok_delete_{channel_id}", None)
-                                st.rerun()
-                    if st.session_state.get(f"tiktok_edit_{channel_id}"):
-                        with st.form(f"tiktok_edit_form_{channel_id}"):
-                            edit_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
-                            edit_url = st.text_input("URL pública", value=str(channel.get("url") or ""))
-                            edit_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
-                            edit_language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label)
-                            edit_source = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
-                            edit_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Portrait 9:16")) if str(channel.get("video_aspect_ratio") or "Portrait 9:16") in CHANNEL_ASPECT_RATIO_OPTIONS else 1)
-                            edit_niche = st.text_input("Nicho", value=str(channel.get("niche") or ""))
-                            edit_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(str(channel.get("default_voice") or channel.get("voice") or "")) if str(channel.get("default_voice") or channel.get("voice") or "") in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
-                            edit_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_edit_automation_{channel_id}")
-                            edit_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
-                            st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))}")
-                            edit_description = st.text_area("Descrição", value=str(channel.get("description") or ""))
-                            if st.form_submit_button("Guardar edição", type="primary"):
-                                if not valid_hhmm(edit_time):
-                                    st.error("O horário diário deve estar no formato HH:MM.")
-                                else:
-                                    update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "niche": edit_niche.strip(), "reference_channels": [edit_niche.strip()] if edit_niche.strip() else [], "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
-                                    st.session_state.pop(f"tiktok_edit_{channel_id}", None)
+                        summary_cols = st.columns(4, gap="medium")
+                        with summary_cols[0]:
+                            st.markdown("**Blueprint Padrão**")
+                            st.caption(prompt_labels.get(str(channel.get("default_prompt_master") or channel.get("prompt_master") or ""), "Sem Blueprint padrão"))
+                        with summary_cols[1]:
+                            st.markdown("**Nicho**")
+                            st.caption(channel_niche_label(channel))
+                        with summary_cols[2]:
+                            st.markdown("**Narrador/Voz Padrão**")
+                            st.caption(str(channel.get("default_voice") or channel.get("voice") or "Sem voz padrão"))
+                        with summary_cols[3]:
+                            st.markdown("**Idioma**")
+                            st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
+                        st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))} · Proporção: {channel.get('video_aspect_ratio') or 'Portrait 9:16'}")
+                        if st.session_state.get(f"tiktok_delete_{channel_id}"):
+                            st.warning("Apagar este canal TikTok e os dados locais associados?")
+                            confirm_cols = st.columns(2)
+                            with confirm_cols[0]:
+                                if st.button("Confirmar apagar", type="primary", key=f"tiktok_confirm_delete_{channel_id}"):
+                                    delete_channel(channel_id)
+                                    st.session_state.pop(f"tiktok_delete_{channel_id}", None)
                                     st.rerun()
-                    render_channel_audio_subtitle_defaults(channel)
-                    with st.expander("Últimos 10 vídeos publicados", expanded=False):
-                        recent_videos = channel_videos_for(channel, limit=10)
-                        if not recent_videos:
-                            st.info("Ainda não existem vídeos públicos sincronizados para este canal TikTok.")
-                        for recent_video in recent_videos[:10]:
-                            video_cols = st.columns([0.7, 3.5, 1.2])
-                            with video_cols[0]:
-                                if recent_video.get("thumbnail_url"):
-                                    st.image(recent_video["thumbnail_url"], width=64)
-                                else:
-                                    st.markdown("### TT")
-                            with video_cols[1]:
-                                st.write(f"**{recent_video.get('title') or 'Vídeo sem título'}**")
-                                st.caption(f"{recent_video.get('published_at') or 'Sem data'} · {recent_video.get('url') or 'Sem URL'}")
-                            with video_cols[2]:
-                                st.caption(str(recent_video.get("status") or "publicado").title())
-        else:
+                            with confirm_cols[1]:
+                                if st.button("Cancelar", key=f"tiktok_cancel_delete_{channel_id}"):
+                                    st.session_state.pop(f"tiktok_delete_{channel_id}", None)
+                                    st.rerun()
+                        if st.session_state.get(f"tiktok_edit_{channel_id}"):
+                            with st.form(f"tiktok_edit_form_{channel_id}"):
+                                edit_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
+                                edit_url = st.text_input("URL pública", value=str(channel.get("url") or ""))
+                                edit_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
+                                edit_language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label)
+                                edit_source = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
+                                edit_aspect = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, index=CHANNEL_ASPECT_RATIO_OPTIONS.index(str(channel.get("video_aspect_ratio") or "Portrait 9:16")) if str(channel.get("video_aspect_ratio") or "Portrait 9:16") in CHANNEL_ASPECT_RATIO_OPTIONS else 1)
+                                edit_niche = st.text_input("Nicho", value=str(channel.get("niche") or ""))
+                                edit_voice = st.selectbox("Narrador/Voz Padrão", voice_options, index=voice_options.index(str(channel.get("default_voice") or channel.get("voice") or "")) if str(channel.get("default_voice") or channel.get("voice") or "") in voice_options else 0, format_func=lambda item: item or "Sem voz padrão")
+                                edit_automation = st.toggle("Automação ON", value=bool(channel.get("automation_on", False)), key=f"tiktok_edit_automation_{channel_id}")
+                                edit_time = st.text_input("Horário diário (HH:MM)", value=str(channel.get("automation_time") or "00:00"))
+                                st.caption(f"Fonte do vídeo: {channel_video_source_value(channel.get('style_wide'))}")
+                                edit_description = st.text_area("Descrição", value=str(channel.get("description") or ""))
+                                if st.form_submit_button("Guardar edição", type="primary"):
+                                    if not valid_hhmm(edit_time):
+                                        st.error("O horário diário deve estar no formato HH:MM.")
+                                    else:
+                                        update_channel(channel_id, {"name": edit_name.strip(), "url": edit_url.strip(), "handle": edit_handle.strip(), "language": edit_language, "niche": edit_niche.strip(), "reference_channels": [edit_niche.strip()] if edit_niche.strip() else [], "default_voice": edit_voice, "voice": edit_voice, "style_wide": channel_video_source_storage(edit_source), "video_aspect_ratio": edit_aspect, "automation_on": edit_automation, "automation_time": edit_time.strip(), "description": edit_description.strip(), "platform": "tiktok"})
+                                        st.session_state.pop(f"tiktok_edit_{channel_id}", None)
+                                        st.rerun()
+                        render_channel_audio_subtitle_defaults(channel)
+                        with st.expander("Últimos 10 vídeos publicados", expanded=False):
+                            recent_videos = channel_videos_for(channel, limit=10)
+                            if not recent_videos:
+                                st.info("Ainda não existem vídeos públicos sincronizados para este canal TikTok.")
+                            for recent_video in recent_videos[:10]:
+                                video_cols = st.columns([0.7, 3.5, 1.2])
+                                with video_cols[0]:
+                                    if recent_video.get("thumbnail_url"):
+                                        st.image(recent_video["thumbnail_url"], width=64)
+                                    else:
+                                        st.markdown("### TT")
+                                with video_cols[1]:
+                                    st.write(f"**{recent_video.get('title') or 'Vídeo sem título'}**")
+                                    st.caption(f"{recent_video.get('published_at') or 'Sem data'} · {recent_video.get('url') or 'Sem URL'}")
+                                with video_cols[2]:
+                                    st.caption(str(recent_video.get("status") or "publicado").title())
+        elif not channels:
             st.info("Ainda não existem canais TikTok cadastrados. Use o campo abaixo para pesquisar e cadastrar um perfil público.")
+        else:
+            st.info("Nenhum canal TikTok corresponde à pesquisa.")
     with spreadsheet_tab:
         uploaded = st.file_uploader("Upload da planilha de canais TikTok", type=["xlsx", "xls"], key="tiktok_channel_spreadsheet")
         if uploaded and st.button("Ler e cadastrar planilha TikTok", type="primary", key="tiktok_read_sheet"):
@@ -2900,10 +2912,22 @@ def render_channels():
                 st.rerun()
 
         st.divider()
-        st.subheader("Canais cadastrados")
         registered_channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
+        st.subheader(f"Canais Youtube cadastrados ({len(registered_channels)})")
+        youtube_channel_search = st.text_input(
+            "Pesquisar nomes dos canais YouTube",
+            key="youtube_registered_channels_search",
+            placeholder="Digite o nome do canal",
+        )
+        visible_registered_channels = [
+            channel for channel in registered_channels
+            if not youtube_channel_search.strip()
+            or youtube_channel_search.strip().casefold() in str(channel.get("name") or "").casefold()
+        ]
         if not registered_channels:
             st.info("Nenhum canal cadastrado.")
+        elif not visible_registered_channels:
+            st.info("Nenhum canal YouTube corresponde à pesquisa.")
         else:
             wide_style_labels = {
                 "pexels": "Pexels/Pixabay",
@@ -3108,11 +3132,11 @@ def render_channels():
     channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
     if not channels:
         return
-    for channel in channels:
+    for channel in visible_registered_channels:
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
-            header_cols = st.columns([0.7, 2.75, 1.1, 1.0, 1.35, 1.75, 1.35])
+            header_cols = st.columns([0.7, 2.75, 1.1, 1.0, 1.35, 1.35])
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=64)
@@ -3128,16 +3152,6 @@ def render_channels():
                 st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
             with header_cols[4]:
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
-            with header_cols[5]:
-                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
-                average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
-                if st.button("Guardar tempo", key=f"save_youtube_channel_average_video_time_{channel_id}", width="stretch"):
-                    if not valid_hhmm(average_video_time):
-                        st.error("Use o formato MM:SS, por exemplo 12:00.")
-                    else:
-                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
-                        st.success("Tempo médio do canal YouTube guardado.")
-                        st.rerun()
             with header_cols[6]:
                 if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", width="stretch"):
                     with st.spinner("A actualizar métricas YouTube…"):
@@ -3149,106 +3163,116 @@ def render_channels():
                 if active != channel.get("active"):
                     update_channel(channel_id, {"active": active})
                     st.rerun()
+                delete_key = f"delete_pending_{channel_id}"
+            with st.expander("Detalhes e configuração do canal", expanded=False):
+                calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
+                average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
+                if st.button("Guardar tempo", key=f"save_youtube_channel_average_video_time_{channel_id}", width="stretch"):
+                    if not valid_hhmm(average_video_time):
+                        st.error("Use o formato MM:SS, por exemplo 12:00.")
+                    else:
+                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
+                        st.success("Tempo médio do canal YouTube guardado.")
+                        st.rerun()
                 action_cols = st.columns(2)
                 with action_cols[0]:
                     if st.button("Editar", key=f"edit_channel_button_{channel_id}", width="stretch"):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with action_cols[1]:
-                    delete_key = f"delete_pending_{channel_id}"
                     if st.button("Apagar", key=f"delete_{channel_id}", width="stretch"):
                         st.session_state[delete_key] = True
                         st.rerun()
-            if st.session_state.get(delete_key):
-                st.warning("Apagar este canal YouTube e os dados locais associados?")
-                confirm_cols = st.columns(2)
-                with confirm_cols[0]:
-                    if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_{channel_id}"):
-                        removed = delete_channel(channel_id)
-                        st.session_state.pop(delete_key, None)
-                        if removed is None:
-                            st.error("O canal já não existe ou não pôde ser removido.")
-                        else:
-                            st.success(f"Canal {removed.get('name') or channel_id} apagado.")
+                if st.session_state.get(delete_key):
+                    st.warning("Apagar este canal YouTube e os dados locais associados?")
+                    confirm_cols = st.columns(2)
+                    with confirm_cols[0]:
+                        if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_{channel_id}"):
+                            removed = delete_channel(channel_id)
+                            st.session_state.pop(delete_key, None)
+                            if removed is None:
+                                st.error("O canal já não existe ou não pôde ser removido.")
+                            else:
+                                st.success(f"Canal {removed.get('name') or channel_id} apagado.")
+                                st.rerun()
+                    with confirm_cols[1]:
+                        if st.button("Cancelar", key=f"cancel_delete_{channel_id}"):
+                            st.session_state.pop(delete_key, None)
                             st.rerun()
-                with confirm_cols[1]:
-                    if st.button("Cancelar", key=f"cancel_delete_{channel_id}"):
-                        st.session_state.pop(delete_key, None)
-                        st.rerun()
-            if st.session_state.get(edit_key):
-                render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
-            else:
-                summary = channel_blueprint_summary(channel)
-                render_channel_thumbnail_blueprint_panel(channel, compact=True)
-                channel_language = language_label(channel.get("language") or "pt")
-                block_cols = st.columns(4, gap="small")
-                with block_cols[0]:
-                    st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
-                    if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", width="stretch"):
-                        st.session_state[edit_key] = True
-                        st.rerun()
-                with block_cols[1]:
-                    st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
-                    if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", width="stretch"):
-                        st.session_state[edit_key] = True
-                        st.rerun()
-                with block_cols[2]:
-                    st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
-                    if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", width="stretch"):
-                        st.session_state[edit_key] = True
-                        st.rerun()
-                with block_cols[3]:
-                    st.markdown(f"**Idioma**\n\n{channel_language}")
-
-            channel_account_ids = list(youtube_account_ids)
-            current_channel_account_id = str(channel.get("google_account_id", ""))
-            if current_channel_account_id and current_channel_account_id not in channel_account_ids:
-                channel_account_ids.append(current_channel_account_id)
-                youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
-            with st.expander("Upload directo — documento da conta deste canal", expanded=False):
-                st.caption("O DELEGATED_SESSION_ID é individual deste canal. Guarde-o aqui; o valor fica no registo local do canal e não é copiado para o documento JSON partilhado da conta Google.")
-                with st.form(f"channel_direct_credentials_{channel_id}"):
-                    channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel_id}")
-                    channel_delegated_session_id = st.text_input(
-                        "DELEGATED_SESSION_ID deste canal",
-                        value=str(channel.get("delegated_session_id") or ""),
-                        type="password",
-                        key=f"channel_delegated_session_id_{channel_id}",
-                        help="Identificador individual usado pelo Upload directo deste canal. Não é partilhado com outros canais nem mostrado nos diagnósticos.",
-                    )
-                    save_channel_direct_credentials = st.form_submit_button("Guardar conta Google e DELEGATED_SESSION_ID", type="primary", width="stretch")
-                selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
-                if selected_channel_account:
-                    selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
-                    if selected_account_status["ready"]:
-                        st.success("Documento da conta completo e DELEGATED_SESSION_ID deste canal encontrado no documento.")
-                    elif not selected_account_status["document_exists"]:
-                        st.warning("A conta seleccionada ainda não tem documento JSON de credenciais.")
-                    else:
-                        missing_channel_parts = list(selected_account_status["missing_cookies"])
-                        if not selected_account_status["has_session_info"]:
-                            missing_channel_parts.append("sessionInfo")
-                        if not selected_account_status["has_innertube_api_key"]:
-                            missing_channel_parts.append("INNERTUBE_API_KEY")
-                        if not selected_account_status["has_delegated_session_id"]:
-                            missing_channel_parts.append("DELEGATED_SESSION_ID deste canal")
-                        st.warning(f"Documento incompleto: {', '.join(missing_channel_parts)}")
+                if st.session_state.get(edit_key):
+                    render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
                 else:
-                    st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
-                if save_channel_direct_credentials:
-                    update_channel(
-                        channel_id,
-                        {
-                            "google_account_id": channel_account_id.strip(),
-                            "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", "")),
-                            "delegated_session_id": channel_delegated_session_id.strip(),
-                        },
-                    )
-                    st.success("Conta Google e DELEGATED_SESSION_ID individual do canal guardados.")
-                    st.rerun()
+                    summary = channel_blueprint_summary(channel)
+                    render_channel_thumbnail_blueprint_panel(channel, compact=True)
+                    channel_language = language_label(channel.get("language") or "pt")
+                    block_cols = st.columns(4, gap="small")
+                    with block_cols[0]:
+                        st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
+                        if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", width="stretch"):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+                    with block_cols[1]:
+                        st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
+                        if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", width="stretch"):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+                    with block_cols[2]:
+                        st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
+                        if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", width="stretch"):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+                    with block_cols[3]:
+                        st.markdown(f"**Idioma**\n\n{channel_language}")
 
-            render_channel_audio_subtitle_defaults(channel)
-            render_channel_videos(channel)
+                channel_account_ids = list(youtube_account_ids)
+                current_channel_account_id = str(channel.get("google_account_id", ""))
+                if current_channel_account_id and current_channel_account_id not in channel_account_ids:
+                    channel_account_ids.append(current_channel_account_id)
+                    youtube_account_labels[current_channel_account_id] = "Conta Google não configurada"
+                with st.expander("Upload directo — documento da conta deste canal", expanded=False):
+                    st.caption("O DELEGATED_SESSION_ID é individual deste canal. Guarde-o aqui; o valor fica no registo local do canal e não é copiado para o documento JSON partilhado da conta Google.")
+                    with st.form(f"channel_direct_credentials_{channel_id}"):
+                        channel_account_id = st.selectbox("Conta Google do documento deste canal", channel_account_ids, index=channel_account_ids.index(current_channel_account_id) if current_channel_account_id in channel_account_ids else 0, format_func=lambda item: youtube_account_labels.get(item, item or "Sem conta Google associada"), key=f"channel_account_{channel_id}")
+                        channel_delegated_session_id = st.text_input(
+                            "DELEGATED_SESSION_ID deste canal",
+                            value=str(channel.get("delegated_session_id") or ""),
+                            type="password",
+                            key=f"channel_delegated_session_id_{channel_id}",
+                            help="Identificador individual usado pelo Upload directo deste canal. Não é partilhado com outros canais nem mostrado nos diagnósticos.",
+                        )
+                        save_channel_direct_credentials = st.form_submit_button("Guardar conta Google e DELEGATED_SESSION_ID", type="primary", width="stretch")
+                    selected_channel_account = youtube_accounts_by_id.get(channel_account_id)
+                    if selected_channel_account:
+                        selected_account_status = document_status(STORAGE, selected_channel_account, channel, settings, channels)
+                        if selected_account_status["ready"]:
+                            st.success("Documento da conta completo e DELEGATED_SESSION_ID deste canal encontrado no documento.")
+                        elif not selected_account_status["document_exists"]:
+                            st.warning("A conta seleccionada ainda não tem documento JSON de credenciais.")
+                        else:
+                            missing_channel_parts = list(selected_account_status["missing_cookies"])
+                            if not selected_account_status["has_session_info"]:
+                                missing_channel_parts.append("sessionInfo")
+                            if not selected_account_status["has_innertube_api_key"]:
+                                missing_channel_parts.append("INNERTUBE_API_KEY")
+                            if not selected_account_status["has_delegated_session_id"]:
+                                missing_channel_parts.append("DELEGATED_SESSION_ID deste canal")
+                            st.warning(f"Documento incompleto: {', '.join(missing_channel_parts)}")
+                    else:
+                        st.info("Associe este canal a uma conta Google para validar o documento de credenciais.")
+                    if save_channel_direct_credentials:
+                        update_channel(
+                            channel_id,
+                            {
+                                "google_account_id": channel_account_id.strip(),
+                                "google_account_email": str(youtube_accounts_by_id.get(channel_account_id, {}).get("email", "")),
+                                "delegated_session_id": channel_delegated_session_id.strip(),
+                            },
+                        )
+                        st.success("Conta Google e DELEGATED_SESSION_ID individual do canal guardados.")
+                        st.rerun()
+
+                render_channel_audio_subtitle_defaults(channel)
+                render_channel_videos(channel)
 
 
 def _saved_video_draft_records() -> list[dict[str, Any]]:
