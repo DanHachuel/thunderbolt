@@ -18,7 +18,7 @@ def test_streamlit_theme_config_defaults_to_dark_with_moneyprinter_style_semanti
 
 
 def test_package_distributes_streamlit_theme_config_and_new_release_version():
-    assert '"version": "0.6.96"' in PACKAGE_SOURCE
+    assert '"version": "0.7.18"' in PACKAGE_SOURCE
     assert '".streamlit/config.toml"' in PACKAGE_SOURCE
 
 
@@ -88,3 +88,12 @@ def test_growth_labels_have_translation_entries():
     source = Path(__file__).parents[1].joinpath("hermes_ui", "languages.py").read_text(encoding="utf-8")
     assert source.count('"Analista Facebook Pages"') >= 10
     assert source.count('"Analista Bilibili"') >= 10
+
+
+def test_theme_bootstrap_uses_native_streamlit_iframe_without_deprecated_components_html():
+    assert "import streamlit.components.v1" not in MAIN_SOURCE
+    assert "components.html" not in MAIN_SOURCE
+    assert "st.iframe(" in MAIN_SOURCE
+    assert "srcdoc=" in MAIN_SOURCE
+    assert "height=0" in MAIN_SOURCE
+    assert "width=0" in MAIN_SOURCE
