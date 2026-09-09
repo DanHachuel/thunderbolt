@@ -2911,76 +2911,6 @@ def render_channels():
                 st.session_state.pop("channel_spreadsheet_rows", None)
                 st.rerun()
 
-        st.divider()
-        registered_channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
-        st.subheader(f"Canais Youtube cadastrados ({len(registered_channels)})")
-        youtube_channel_search = st.text_input(
-            "Pesquisar nomes dos canais YouTube",
-            key="youtube_registered_channels_search",
-            placeholder="Digite o nome do canal",
-        )
-        visible_registered_channels = [
-            channel for channel in registered_channels
-            if not youtube_channel_search.strip()
-            or youtube_channel_search.strip().casefold() in str(channel.get("name") or "").casefold()
-        ]
-        if not registered_channels:
-            st.info("Nenhum canal cadastrado.")
-        elif not visible_registered_channels:
-            st.info("Nenhum canal YouTube corresponde à pesquisa.")
-        else:
-            wide_style_labels = {
-                "pexels": "Pexels/Pixabay",
-                "full_ia": "Full IA",
-                "music": "Apenas Música",
-            }
-            registered_rows = [
-                {
-                    "URL canal": str(channel.get("url") or ""),
-                    "Nome canal": str(channel.get("name") or ""),
-                    "Handle canal": str(channel.get("handle") or ""),
-                    "Narrador/ voz padrão": str(channel.get("default_voice") or channel.get("voice") or ""),
-                    "Idioma": language_label(channel.get("language") or "pt"),
-                    "Nicho": channel_niche_label(channel),
-                    "Blueprint Padrão": channel_blueprint_summary(channel)["name"],
-                    "Estilo Wide": wide_style_labels.get(str(channel.get("style_wide") or "").strip().lower(), str(channel.get("style_wide") or "")),
-                    "Activo": "Sim" if channel.get("active", True) else "Não",
-                    "Descrição": str(channel.get("description") or ""),
-                    "Conta Google do Documento deste Canal": str(channel.get("google_account_email") or youtube_account_labels.get(str(channel.get("google_account_id") or ""), "")),
-                    "Automação Ligada": "Sim" if channel.get("automation_on", False) else "Não",
-                    "Horário diário (HH:MM)": str(channel.get("automation_time") or "00:00"),
-                    "DELEGATED_SESSION_ID": str(channel.get("delegated_session_id") or ""),
-                    "Duração Padrão Vídeos (Min)": channel.get("default_video_duration_minutes") if channel.get("default_video_duration_minutes") is not None else None,
-                    "Origem": str(channel.get("import_source") or channel.get("metrics_source") or "manual"),
-                }
-                for channel in registered_channels
-            ]
-            st.dataframe(
-                registered_rows,
-                width="stretch",
-                hide_index=True,
-                height=420,
-                column_config={
-                    "URL canal": st.column_config.LinkColumn("URL canal", width=260),
-                    "Nome canal": st.column_config.TextColumn("Nome canal", width=180),
-                    "Handle canal": st.column_config.TextColumn("Handle canal", width=150),
-                    "Narrador/ voz padrão": st.column_config.TextColumn("Narrador/ voz padrão", width=220),
-                    "Idioma": st.column_config.TextColumn("Idioma", width=150),
-                    "Nicho": st.column_config.TextColumn("Nicho", width=180),
-                    "Blueprint Padrão": st.column_config.TextColumn("Blueprint Padrão", width=240),
-                    "Estilo Wide": st.column_config.TextColumn("Estilo Wide", width=150),
-                    "Activo": st.column_config.TextColumn("Activo", width=80),
-                    "Descrição": st.column_config.TextColumn("Descrição", width=420),
-                    "Conta Google do Documento deste Canal": st.column_config.TextColumn("Conta Google do Documento deste Canal", width=300),
-                    "Automação Ligada": st.column_config.TextColumn("Automação Ligada", width=150),
-                    "Horário diário (HH:MM)": st.column_config.TextColumn("Horário diário (HH:MM)", width=180),
-                    "DELEGATED_SESSION_ID": st.column_config.TextColumn("DELEGATED_SESSION_ID", width=260),
-                    "Duração Padrão Vídeos (Min)": st.column_config.NumberColumn("Duração Padrão Vídeos (Min)", width=220),
-                    "Origem": st.column_config.TextColumn("Origem", width=150),
-                },
-            )
-            st.caption("Tabela de canais cadastrados. Use a barra inferior para navegar horizontalmente e a barra lateral para percorrer os registos.")
-
     with batch_tab:
         st.caption("Esta subaba usa a conta Google/YouTube seleccionada para listar os canais que ela gere. Não lê a caixa Gmail e não usa e-mails como pesquisa pública.")
         accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
@@ -3130,7 +3060,23 @@ def render_channels():
                     st.rerun()
 
     channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
+    st.divider()
+    st.subheader(f"Canais Youtube cadastrados ({len(channels)})")
+    youtube_channel_search = st.text_input(
+        "Pesquisar nomes dos canais YouTube",
+        key="youtube_registered_channels_search",
+        placeholder="Digite o nome do canal",
+    )
+    visible_registered_channels = [
+        channel for channel in channels
+        if not youtube_channel_search.strip()
+        or youtube_channel_search.strip().casefold() in str(channel.get("name") or "").casefold()
+    ]
     if not channels:
+        st.info("Nenhum canal YouTube cadastrado.")
+        return
+    if not visible_registered_channels:
+        st.info("Nenhum canal YouTube corresponde à pesquisa.")
         return
     for channel in visible_registered_channels:
         channel_id = str(channel["id"])
