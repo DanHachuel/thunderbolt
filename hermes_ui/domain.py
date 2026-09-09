@@ -196,18 +196,30 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 artifacts.setdefault("thumbnail", thumbnail_path)
             initial_stage = "topic" if pending_creative else "script"
             channel_generation_defaults = {
-                key.removeprefix("default_"): channel[key]
-                for key in (
-                    "default_enable_subtitles", "default_subtitle_font", "default_subtitle_position", "default_subtitle_color",
-                    "default_subtitle_background", "default_subtitle_background_color", "default_subtitle_rounded_background",
-                    "default_subtitle_font_size", "default_subtitle_outline", "default_subtitle_outline_width",
-                    "default_background_music_source", "default_background_music_volume",
-                )
-                if key in channel
+                key.removeprefix("default_"): channel.get(key, default)
+                for key, default in {
+                    "default_enable_subtitles": True,
+                    "default_subtitle_font": "MicrosoftYaHeiBold.ttc",
+                    "default_subtitle_position": "Bottom (Recommended)",
+                    "default_subtitle_color": "#FFFFFF",
+                    "default_subtitle_background": True,
+                    "default_subtitle_background_color": "#000000",
+                    "default_subtitle_rounded_background": False,
+                    "default_subtitle_font_size": 60,
+                    "default_subtitle_outline": "#000000",
+                    "default_subtitle_outline_width": 1.5,
+                    "default_background_music_source": "Sem música",
+                    "default_background_music_volume": "20%",
+                }.items()
             }
             configured_generation_settings = options.get("generation_settings") if isinstance(options.get("generation_settings"), dict) else {}
             payload_generation_settings = payload.get("generation_settings") if isinstance(payload.get("generation_settings"), dict) else {}
             generation_settings = {**channel_generation_defaults, **configured_generation_settings, **payload_generation_settings}
+            # Em automações, as definições guardadas no canal são a fonte de
+            # verdade. O payload pendente pode ter sido criado antes de o
+            # utilizador alterar as legendas e não deve desligá-las.
+            if bool(options.get("automation_worker")):
+                generation_settings.update(channel_generation_defaults)
             task = {
                 "id": make_id("video"),
                 "batch_id": batch["id"],
@@ -234,6 +246,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "voice": payload.get("voice") or channel.get("default_voice") or channel.get("voice", ""),
                 "automation_on": bool(channel.get("automation_on", False)),
                 "automation_time": channel.get("automation_time", "00:00"),
+                "automation_worker": bool(options.get("automation_worker")),
                 "thumbnail_variant": thumbnail_variant,
                 "thumbnail_variants": thumbnail_variants,
                 "thumbnail_prompt": thumbnail_prompt,

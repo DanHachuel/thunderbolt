@@ -680,6 +680,21 @@ def test_moneyprinter_cli_args_prioritise_wide_and_shorts_format_aspect_ratio():
     assert shorts_args[shorts_args.index("--video-aspect") + 1] == "9:16"
 
 
+def test_moneyprinter_cli_args_forwards_channel_subtitle_defaults():
+    args = pipeline_worker._moneyprinter_cli_args(
+        {"generation_settings": {
+            "enable_subtitles": True,
+            "subtitle_position": "Top",
+            "subtitle_font": "Arial.ttf",
+        }},
+        "pexels",
+    )
+
+    assert "--subtitle-enabled" in args
+    assert args[args.index("--subtitle-position") + 1] == "top"
+    assert args[args.index("--font-name") + 1] == "Arial.ttf"
+
+
 def test_normalise_video_route_keeps_stock_ai_and_music_separate():
     assert pipeline_worker._normalise_video_route({"style_wide": "Pexels/Pixabay"}, {}) == "pexels"
     assert pipeline_worker._normalise_video_route({"style_wide": "pixabay"}, {}) == "pixabay"
