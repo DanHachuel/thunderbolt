@@ -3096,7 +3096,7 @@ def render_channels():
         channel_id = str(channel["id"])
         edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
-            header_cols = st.columns([0.7, 2.75, 1.1, 1.0, 1.35, 1.35])
+            header_cols = st.columns([0.7, 2.75, 1.15, 1.1, 1.0, 1.35, 1.35])
             channel_url = str(channel.get("url") or "").strip()
             if not channel_url:
                 channel_id_or_handle = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("handle") or "").strip()
@@ -3119,14 +3119,15 @@ def render_channels():
                 st.caption(channel_niche_label(channel))
                 st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
             with header_cols[2]:
-                st.metric("Inscritos", _format_channel_count(channel.get("subscriber_count")))
-            with header_cols[3]:
-                st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
-            with header_cols[4]:
-                st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
-            with header_cols[5]:
                 if channel_url:
                     st.link_button("Abrir canal", channel_url, type="primary", width="content")
+            with header_cols[3]:
+                st.metric("Inscritos", _format_channel_count(channel.get("subscriber_count")))
+            with header_cols[4]:
+                st.metric("Vídeos", _format_channel_count(channel.get("video_count")))
+            with header_cols[5]:
+                st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
+            with header_cols[6]:
                 if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", width="stretch"):
                     with st.spinner("A actualizar métricas YouTube…"):
                         refreshed, message = _refresh_youtube_channel_metrics(channel, youtube)
