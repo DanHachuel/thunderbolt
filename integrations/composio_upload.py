@@ -117,7 +117,17 @@ def _connected_account_id(client: Any, user_id: str, toolkit: str, selector: str
     try:
         response = client.connected_accounts.list(user_ids=[_require_user_id(user_id)], statuses=["ACTIVE"])
         raw = _safe_value(response)
-        items = raw.get("items", []) if isinstance(raw, dict) else raw
+        if isinstance(raw, dict):
+            # Composio SDK versions expose the list either directly or under
+            # ``data``; accept both shapes so aliases are never sent as IDs.
+            items = raw.get("items")
+            if items is None:
+                data = raw.get("data")
+                items = data.get("items", data) if isinstance(data, dict) else data
+            if items is None:
+                items = raw.get("connected_accounts", [])
+        else:
+            items = raw
         if not isinstance(items, list):
             items = []
         matching_items = []
@@ -135,8 +145,15 @@ def _connected_account_id(client: Any, user_id: str, toolkit: str, selector: str
             for item in matching_items:
                 candidates = [item.get("id"), item.get("nanoid"), item.get("alias"), item.get("name")]
                 if any(str(candidate or "").strip().casefold() == wanted for candidate in candidates):
-                    return str(item.get("id") or item.get("nanoid") or value).strip()
-            return value
+                    technical_id = str(item.get("id") or item.get("nanoid") or "").strip()
+                    if technical_id:
+                        return technical_id
+            available = [str(item.get("alias") or item.get("name") or item.get("id") or "").strip() for item in matching_items]
+            available = [item for item in available if item]
+            suffix = f" Contas activas: {', '.join(available)}." if available else ""
+            raise ComposioUploadError(
+                f"A connected account `{value}` não foi encontrada para o toolkit {toolkit or 'seleccionado'}.{suffix}"
+            )
         if len(matching_items) == 1:
             item = matching_items[0]
             return str(item.get("id") or item.get("nanoid") or "").strip()
