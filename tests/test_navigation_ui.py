@@ -183,6 +183,11 @@ def test_youtube_cards_format_large_counts_with_pt_separators():
     assert 'st.metric("Visualizações", _format_channel_count(channel.get("view_count")))' in MAIN_SOURCE
 
 
+def test_youtube_cards_have_small_blue_open_channel_button():
+    assert 'st.link_button("Abrir canal", channel_url, type="primary", width="content")' in MAIN_SOURCE
+    assert 'channel.get("url") or ""' in MAIN_SOURCE
+
+
 def test_tiktok_cards_use_shared_large_count_formatter():
     assert 'return f"{int(normalized):,}".replace(",", ".")' in MAIN_SOURCE
     assert 'st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))' in MAIN_SOURCE
