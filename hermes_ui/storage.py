@@ -450,6 +450,7 @@ _LOCK_TIMEOUT_SECONDS = 30.0
 _LOCK_POLL_SECONDS = 0.05
 _LOCK_STALE_SECONDS = 120
 _PROTECTED_STATE_FILES = {"channels.json", "tasks.json", "batches.json", "queues.json", "uploads.json"}
+_REPLACE_RETRY_DELAYS_SECONDS = (0.05, 0.1, 0.2, 0.4, 0.8, 1.0, 1.0, 1.0)
 
 
 class StorageIntegrityError(RuntimeError):
@@ -533,10 +534,31 @@ def _atomic_write_unlocked(path: Path, data: Any) -> None:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_name, path)
+        replace_error: PermissionError | None = None
+        for delay in (0.0, *_REPLACE_RETRY_DELAYS_SECONDS):
+            if delay:
+                time.sleep(delay)
+            try:
+                os.replace(temp_name, path)
+                replace_error = None
+                break
+            except PermissionError as exc:
+                # Windows can briefly keep the destination open while Streamlit,
+                # an antivirus scanner, or the previous reader releases it.
+                # Keep the atomic replace, but give that transient handle time
+                # to disappear instead of failing the pipeline at its next
+                # progress checkpoint.
+                replace_error = exc
+        if replace_error is not None:
+            raise replace_error
     finally:
-        if os.path.exists(temp_name):
-            os.unlink(temp_name)
+        try:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        except OSError:
+            # A scanner may also briefly hold the temporary file. The next
+            # write can clean it up; never hide the replace error with cleanup.
+            pass
 
 
 def atomic_write(path: Path, data: Any) -> None:

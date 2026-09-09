@@ -67,6 +67,27 @@ def test_read_json_survives_windows_lock_permission_error(tmp_path, monkeypatch)
     assert storage.read_json("display_names.json")["prompt_masters"]["prompt.md"] == "Prompt"
 
 
+def test_atomic_write_retries_transient_replace_permission_error(tmp_path, monkeypatch):
+    storage = _isolated_storage(tmp_path, monkeypatch)
+    path = storage.STATE / "tasks.json"
+    original_replace = storage.os.replace
+    attempts = 0
+
+    def flaky_replace(source, target):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError(13, "Permission denied")
+        original_replace(source, target)
+
+    monkeypatch.setattr(storage.os, "replace", flaky_replace)
+
+    storage.atomic_write(path, [{"id": "video-1", "progress": 80}])
+
+    assert attempts == 3
+    assert storage.read_json("tasks.json")[0]["progress"] == 80
+
+
 def test_install_merges_legacy_tasks_when_new_storage_already_exists(tmp_path):
     legacy_state = tmp_path / "Hermes-UI" / "storage" / "state"
     current_state = tmp_path / ".thunderbolt" / "storage" / "state"
