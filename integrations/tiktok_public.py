@@ -212,7 +212,7 @@ def fetch_public_tiktok_profile(source: str) -> IntegrationResult:
         "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     }
     try:
-        response = requests.get(reference["url"], headers=headers, timeout=12, allow_redirects=True)
+        response = requests.get(reference["url"], headers=headers, timeout=8, allow_redirects=True)
     except requests.RequestException as exc:
         return IntegrationResult(False, f"Não foi possível consultar o perfil público do TikTok: {exc}", reference)
     if response.status_code in {401, 403, 429}:
