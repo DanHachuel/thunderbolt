@@ -5910,6 +5910,19 @@ def render_automation():
                 with header_cols[1]:
                     st.write(f"**{channel.get('name', 'Sem nome')}**")
                     st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+                    channel_url = str(channel.get("url") or "").strip()
+                    if not channel_url:
+                        channel_id_or_handle = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("handle") or "").strip()
+                        if channel_id_or_handle.startswith("http"):
+                            channel_url = channel_id_or_handle
+                        elif channel_id_or_handle.startswith("UC"):
+                            channel_url = f"https://www.youtube.com/channel/{channel_id_or_handle}"
+                        elif channel_id_or_handle.startswith(("@", "channel/")):
+                            channel_url = f"https://www.youtube.com/{channel_id_or_handle}"
+                        elif channel_id_or_handle:
+                            channel_url = f"https://www.youtube.com/@{channel_id_or_handle}"
+                    if channel_url:
+                        st.link_button("Abrir canal", channel_url, type="primary", width="content")
                 with header_cols[2]:
                     st.markdown("**Thumbnail Blueprint**")
                     st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
