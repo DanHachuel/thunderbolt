@@ -35,6 +35,7 @@ from typing import Any
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -267,8 +268,8 @@ ensure_storage()
 st.set_page_config(page_title="Thunderbolt", page_icon="T", layout="wide", initial_sidebar_state="expanded")
 
 theme_base = (st.get_option("theme.base") or "dark").lower()
-st.iframe(
-    srcdoc="""
+components.html(
+    """
 <script>
 (() => {
     const STYLE_ID = "thunderbolt-light-theme-style";
