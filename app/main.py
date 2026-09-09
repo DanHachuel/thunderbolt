@@ -2626,7 +2626,16 @@ def _channel_average_video_time(channel: dict[str, Any], *, prompt_master: str =
 
 def _refresh_youtube_channel_metrics(channel: dict[str, Any], youtube: YouTubeAdapter) -> tuple[bool, str]:
     channel_ref = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("url") or channel.get("handle") or "")
-    result = youtube.fetch_channel(channel_ref) if youtube.api_key else youtube.fetch_channel_public(channel_ref)
+    if not channel_ref:
+        return False, "Este canal não tem URL, handle ou ID YouTube para actualizar as métricas."
+    try:
+        result = youtube.fetch_channel(channel_ref) if youtube.api_key else youtube.fetch_channel_public(channel_ref)
+        if not result.ok and youtube.api_key:
+            public_result = youtube.fetch_channel_public(channel_ref)
+            if public_result.ok:
+                result = public_result
+    except Exception as exc:
+        return False, f"Não foi possível actualizar as métricas YouTube ({type(exc).__name__}). Tente novamente."
     if not result.ok or not isinstance(result.data, dict):
         return False, result.message
     data = result.data
