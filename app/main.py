@@ -3437,10 +3437,9 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 mode = "single"
                 st.info("Os Shorts são sempre criados para um canal TikTok específico e em formato Portrait 9:16.")
             else:
-                mode_label = st.radio(
+                mode_label = st.selectbox(
                     "Modo de criação",
                     ["Canal específico", "Lote no mesmo canal", "Lote geral"],
-                    horizontal=True,
                     key=f"{prefix}_mode",
                 )
                 mode = {"Canal específico": "single", "Lote no mesmo canal": "same_channel", "Lote geral": "general"}[mode_label]
@@ -4032,7 +4031,7 @@ def render_scripts():
         else:
             st.warning("Sem Blueprint seleccionado: o documento pode ser criado, mas não terá contexto editorial de Blueprint.")
 
-        document_type = st.radio("Tipo de documento", ["Roteiro de vídeo", "Letra de música"], horizontal=True, key="script_document_type")
+        document_type = st.selectbox("Tipo de documento", ["Roteiro de vídeo", "Letra de música"], key="script_document_type")
         script_settings = render_video_generation_settings(
             "pipeline_scripts",
             current_language=str(st.session_state.get("script_language") or read_json("settings.json", {}).get("video_language") or "pt"),
