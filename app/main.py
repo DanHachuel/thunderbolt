@@ -2668,12 +2668,15 @@ def render_channels():
 
     with import_tab:
         st.caption("A pesquisa pública funciona sem API Key. A Data API é opcional e fica disponível numa opção separada para métricas oficiais.")
-        source = st.text_input("URL, handle ou ID do canal", placeholder="https://youtube.com/@seucanal", key="youtube_channel_source")
-        lookup_cols = st.columns(2)
+        lookup_cols = st.columns([2.2, 1.0], gap="medium")
         with lookup_cols[0]:
-            lookup_mode = st.radio("Método de consulta", ["Página pública — sem API Key", "YouTube Data API — API Key opcional"], horizontal=True, key="youtube_channel_lookup_mode")
+            source = st.text_input("URL, handle ou ID do canal", placeholder="https://youtube.com/@seucanal", key="youtube_channel_source")
         with lookup_cols[1]:
-            st.caption("Os canais cadastrados são apresentados apenas em lista.")
+            lookup_mode = st.selectbox(
+                "Método de consulta",
+                ["Página pública — sem API Key", "YouTube Data API — API Key opcional"],
+                key="youtube_channel_lookup_mode",
+            )
         col1, col2 = st.columns([1, 1])
         with col1:
             if st.button("Buscar no YouTube", type="primary", width="stretch", key="youtube_channel_lookup"):
