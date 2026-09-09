@@ -142,7 +142,7 @@ def render_growth_bilibili() -> None:
         )
     with status_col:
         st.write("")
-        st.button("ANALISAR CANAL", disabled=True, use_container_width=True, key="growth_bilibili_analyse_disabled")
+        st.button("ANALISAR CANAL", disabled=True, width="stretch", key="growth_bilibili_analyse_disabled")
         st.caption("A ligação ao Studio será usada quando autorizada.")
 
     st.subheader("Dashboard de Growth")

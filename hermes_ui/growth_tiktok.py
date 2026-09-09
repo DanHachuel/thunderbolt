@@ -185,7 +185,7 @@ def render_growth_tiktok() -> None:
         selected = st.selectbox("Conta a analisar", channels, format_func=lambda item: str(item.get("name") or item.get("handle") or "Conta sem nome"), key="growth_tiktok_channel")
     with action_col:
         st.write("")
-        analyse_clicked = st.button("ANALISAR CONTA", type="primary", use_container_width=True, key="growth_tiktok_analyse")
+        analyse_clicked = st.button("ANALISAR CONTA", type="primary", width="stretch", key="growth_tiktok_analyse")
     st.markdown("**Estado das APIs de Growth**")
     api_cols = st.columns(2, gap="small")
     with api_cols[0]:
@@ -216,9 +216,9 @@ def render_growth_tiktok() -> None:
         st.write("")
         report_path = Path(str(selected_record.get("report_path") or "")) if selected_record else Path()
         if report_path.is_file():
-            st.download_button("BAIXAR ANALISE COMPLETA", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", use_container_width=True, key=f"tiktok_download_{selected_record['code']}")
+            st.download_button("BAIXAR ANALISE COMPLETA", report_path.read_bytes(), file_name=report_path.name, mime="text/markdown", width="stretch", key=f"tiktok_download_{selected_record['code']}")
         else:
-            st.button("BAIXAR ANALISE COMPLETA", disabled=True, use_container_width=True, key="tiktok_download_disabled")
+            st.button("BAIXAR ANALISE COMPLETA", disabled=True, width="stretch", key="tiktok_download_disabled")
     st.subheader("Dashboard de Growth")
     st.caption("3 pilares críticos em destaque e camadas operacionais abaixo. Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100.")
     def item(label: str, target: str, available: bool = False) -> tuple[str, str, str, str, str]:
