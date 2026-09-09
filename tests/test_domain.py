@@ -178,6 +178,8 @@ def test_automation_channel_subtitle_defaults_override_stale_payload_settings(tm
         "default_enable_subtitles": True,
         "default_subtitle_position": "Top",
         "default_subtitle_font": "Arial.ttf",
+        "default_background_music_source": "Sem música",
+        "default_background_music_volume": "0%",
     })
     batch = create_batch("single", [channel["id"]], "Tema", 1, {
         "automation_worker": True,
@@ -186,6 +188,8 @@ def test_automation_channel_subtitle_defaults_override_stale_payload_settings(tm
                 "enable_subtitles": False,
                 "subtitle_position": "Bottom",
                 "subtitle_font": "OldFont.ttf",
+                "background_music_source": "Random Background Music",
+                "background_music_volume": "80%",
             },
         }},
     })
@@ -196,6 +200,8 @@ def test_automation_channel_subtitle_defaults_override_stale_payload_settings(tm
     assert task["generation_settings"]["enable_subtitles"] is True
     assert task["generation_settings"]["subtitle_position"] == "Top"
     assert task["generation_settings"]["subtitle_font"] == "Arial.ttf"
+    assert task["generation_settings"]["background_music_source"] == "Sem música"
+    assert task["generation_settings"]["background_music_volume"] == "0%"
 
 
 def test_set_channel_defaults_syncs_aliases_and_tasks(tmp_path, monkeypatch):
