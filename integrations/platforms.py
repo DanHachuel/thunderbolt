@@ -235,7 +235,7 @@ def _public_feed_data(channel_id: str, headers: dict[str, str]) -> dict[str, Any
         response = requests.get(
             f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}",
             headers=headers,
-            timeout=12,
+            timeout=6,
         )
         response.raise_for_status()
         root = ET.fromstring(response.text)
@@ -375,7 +375,7 @@ class YouTubeAdapter:
         for page_url in _public_page_candidates(source):
             last_url = page_url
             try:
-                response = requests.get(page_url, headers=headers, timeout=20, allow_redirects=True)
+                response = requests.get(page_url, headers=headers, timeout=8, allow_redirects=True)
                 response.raise_for_status()
             except requests.RequestException as exc:
                 last_error = f"Falha HTTP: {exc}"
