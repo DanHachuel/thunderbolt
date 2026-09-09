@@ -62,6 +62,18 @@ def test_recover_stale_task_marks_it_failed(tmp_path, monkeypatch):
     assert "heartbeat" in task["error"]
 
 
+def test_manual_saved_script_is_not_selected_until_start(tmp_path, monkeypatch):
+    _isolate_storage(tmp_path, monkeypatch)
+    tasks = [
+        {"id": "saved-script", "state": "to_do", "manual_start_required": True},
+        {"id": "automatic-task", "state": "to_do", "manual_start_required": False},
+    ]
+
+    assert pipeline_worker._next_runnable_task(tasks)["id"] == "automatic-task"
+    tasks[0]["state"] = "doing"
+    assert pipeline_worker._next_runnable_task(tasks)["id"] == "saved-script"
+
+
 def test_run_task_reuses_prepared_title_and_thumbnail_without_full_creative_generation(tmp_path, monkeypatch):
     _isolate_storage(tmp_path, monkeypatch)
     video_path = tmp_path / "prepared.mp4"

@@ -90,6 +90,28 @@ def test_save_script_document_writes_markdown_and_history(tmp_path, monkeypatch)
     assert script_documents.read_script_document(record).endswith("Vento sobre o mar\n")
 
 
+def test_update_and_delete_script_document_preserve_index_and_file(tmp_path, monkeypatch):
+    storage_root = tmp_path / "storage"
+    history = []
+    monkeypatch.setattr(script_documents, "STORAGE", storage_root)
+    monkeypatch.setattr(script_documents, "ensure_storage", lambda: None)
+    monkeypatch.setattr(script_documents, "read_json", lambda _name, _default=None: list(history))
+    monkeypatch.setattr(script_documents, "write_json", lambda _name, value: history.__setitem__(slice(None), value))
+
+    record = script_documents.save_script_document(
+        {"title": "Roteiro antigo", "content": "# Corpo original", "channel_name": "Canal", "blueprint_id": "old-id", "blueprint_name": "Old"}
+    )
+    updated = script_documents.update_script_document_metadata(record["id"], {"blueprint_id": "new-id", "blueprint": "New"})
+    assert updated["blueprint_id"] == "new-id"
+    assert updated["blueprint_name"] == "New"
+    assert "blueprint_id: new-id" in Path(record["path"]).read_text(encoding="utf-8")
+    assert script_documents.update_script_document(record["id"], "---\nid: %s\n---\n\n# Corpo editado" % record["id"])["title"] == "Roteiro antigo"
+    assert "# Corpo editado" in Path(record["path"]).read_text(encoding="utf-8")
+    assert script_documents.delete_script_document(record["id"]) is True
+    assert not Path(record["path"]).exists()
+    assert history == []
+
+
 def test_pipeline_resolves_blueprint_from_imported_file(monkeypatch, tmp_path):
     blueprint_path = tmp_path / "BlueprintNatureVault.json"
     blueprint_path.write_text("{}", encoding="utf-8")

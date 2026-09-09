@@ -297,6 +297,26 @@ def _update(task_id: str, **updates: Any) -> dict[str, Any]:
         orchestration=updated.get("orchestration") or {},
     )
     return updated
+
+
+def _next_runnable_task(tasks: Any) -> dict[str, Any] | None:
+    """Return the first active task, excluding saved scripts awaiting Start."""
+    if not isinstance(tasks, list):
+        return None
+    return next(
+        (
+            task
+            for task in tasks
+            if isinstance(task, dict)
+            and (
+                task.get("state") == "doing"
+                or (task.get("state") == "to_do" and not bool(task.get("manual_start_required", False)))
+            )
+        ),
+        None,
+    )
+
+
 def _channel_for_task(task: dict[str, Any]) -> dict[str, Any]:
     channel_id = str(task.get("channel_id") or "")
     return next((channel for channel in read_json("channels.json", []) if str(channel.get("id")) == channel_id), {})
@@ -1641,7 +1661,7 @@ def run_once() -> dict[str, Any]:
             _worker_heartbeat(session_info_health_error=type(exc).__name__)
         recovered = _recover_stale_tasks()
         tasks = read_json("tasks.json", [])
-        candidate = next((task for task in tasks if isinstance(task, dict) and task.get("state") in {"to_do", "doing"}), None)
+        candidate = _next_runnable_task(tasks)
         if not candidate:
             _worker_heartbeat(last_task_id=None, last_error="", status="idle", stage="idle", progress=0, recovered_task_ids=recovered)
             return {"ok": True, "status": "idle", "recovered_task_ids": recovered}

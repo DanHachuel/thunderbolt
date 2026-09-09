@@ -83,7 +83,7 @@ from hermes_ui.channel_import import build_channel_template_xlsx, channel_is_dup
 from hermes_ui.drafts import list_drafts, save_draft
 from hermes_ui.automation_worker import load_worker_status
 from hermes_ui.pipeline_worker import load_pipeline_worker_status, recover_stale_tasks, STALE_TASK_SECONDS, WORKER_HEARTBEAT_TIMEOUT_SECONDS
-from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, atomic_write, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, write_json
+from hermes_ui.storage import BLUEPRINTS, DEFAULT_LLM_PROVIDER, MEDIA_DOWNLOADS, STORAGE, TIKTOK_PROMPT_MASTERS, atomic_write, ensure_storage, get_display_name, list_blueprint_files, list_prompt_master_files, load_blueprint_file, load_prompt_master_file, now, read_json, set_display_name, update_json, write_json
 from app.modules.niche_finder.apify import ApifyError, DEFAULT_ACTOR_ID, abort_actor_run, build_actor_input, get_dataset_items, normalize_video_items, start_actor_run, wait_for_actor_run
 from app.modules.niche_finder.core import NicheAnalysisError, run_niche_analysis
 from app.modules.niche_finder.data_loader import DatasetError, download_kaggle_dataset
@@ -115,7 +115,7 @@ from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_data
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 from hermes_ui.update_manager import check_version, restart_current_process, update_to_latest
 
-from hermes_ui.script_documents import list_script_documents, read_script_document, save_script_document, script_storage_path
+from hermes_ui.script_documents import delete_script_document, list_script_documents, read_script_document, save_script_document, script_storage_path, update_script_document, update_script_document_metadata
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.video_length import DEFAULT_AVERAGE_VIDEO_TIME, channel_video_length, channel_video_time_value, default_average_video_time, length_generation_settings, words_from_channel_time
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
@@ -696,6 +696,52 @@ def blueprint_for_channel(channel: dict) -> dict[str, Any]:
             resolved["name"] = get_display_name("blueprints", path, str(data.get("name") or path.stem))
             return resolved
     return {"id": blueprint_id, "name": blueprint_id}
+
+
+def _script_channel(record: dict[str, Any], channels: list[dict[str, Any]]) -> dict[str, Any]:
+    channel_id = str(record.get("channel_id") or "").strip()
+    channel_name = str(record.get("channel_name") or record.get("channel") or "").strip().casefold()
+    return next(
+        (
+            channel
+            for channel in channels
+            if isinstance(channel, dict)
+            and (
+                (channel_id and str(channel.get("id") or "").strip() == channel_id)
+                or (channel_name and str(channel.get("name") or "").strip().casefold() == channel_name)
+            )
+        ),
+        {},
+    )
+
+
+def _backfill_saved_script_blueprints(records: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Attach every saved video script to the Blueprint configured on its channel."""
+    channels = [item for item in read_json("channels.json", []) if isinstance(item, dict)]
+    updated_records: list[dict[str, Any]] = []
+    for record in records if records is not None else list_script_documents():
+        if str(record.get("document_type") or "video_script").strip() != "video_script":
+            continue
+        channel = _script_channel(record, channels)
+        if not channel:
+            continue
+        blueprint_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
+        blueprint = blueprint_for_channel(channel)
+        blueprint_name = str(blueprint.get("name") or blueprint_id or "SEM BLUEPRINT CONFIGURADO").strip()
+        current_id = str(record.get("blueprint_id") or "").strip()
+        current_name = str(record.get("blueprint_name") or record.get("blueprint") or "").strip()
+        if current_id == blueprint_id and current_name == blueprint_name:
+            updated_records.append(record)
+            continue
+        try:
+            updated = update_script_document_metadata(
+                str(record.get("id") or ""),
+                {"blueprint_id": blueprint_id, "blueprint": blueprint_name},
+            )
+        except (FileNotFoundError, OSError, ValueError):
+            updated = {**record, "blueprint_id": blueprint_id, "blueprint_name": blueprint_name}
+        updated_records.append(updated)
+    return updated_records
 
 
 def channel_video_language(channel: dict[str, Any] | None, fallback: str = "pt") -> str:
@@ -3355,10 +3401,29 @@ def _create_video_task_from_saved_script(record: dict[str, Any], channel: dict[s
         {
             **payload,
             "topic_source": "saved_script",
+            "script_document_id": str(record.get("id") or ""),
             "channel_payloads": {str(channel.get("id") or ""): payload},
         },
     )
-    return create_tasks_for_batch(batch)
+    tasks = create_tasks_for_batch(batch)
+    for task in tasks:
+        task["script_document_id"] = str(record.get("id") or "")
+        task["manual_start_required"] = True
+        task["created_at"] = str(record.get("created_at") or task.get("created_at") or now())
+        task["updated_at"] = now()
+    if tasks:
+        task_ids = {str(task.get("id") or "") for task in tasks}
+        created_by_id = {str(task.get("id") or ""): task for task in tasks}
+
+        def persist_created_metadata(entries: Any) -> None:
+            if not isinstance(entries, list):
+                return
+            for entry in entries:
+                if isinstance(entry, dict) and str(entry.get("id") or "") in task_ids:
+                    entry.update(created_by_id[str(entry.get("id") or "")])
+
+        update_json("tasks.json", [], persist_created_metadata)
+    return tasks
 
 
 def render_video_from_draft(prefix: str = "new_video") -> None:
@@ -4172,7 +4237,7 @@ def render_scripts():
 
     with history_tab:
         st.caption(f"Histórico persistente: `{script_dir}` · índice em `{STORAGE / 'state' / 'scripts.json'}`")
-        records = list_script_documents()
+        records = _backfill_saved_script_blueprints(list_script_documents())
         if not records:
             st.info("Ainda não existem roteiros ou letras guardados.")
         for record in records[:50]:
@@ -4182,9 +4247,54 @@ def render_scripts():
                 stored_path = Path(str(record.get("path") or ""))
                 content = read_script_document(record)
                 if content:
-                    st.text_area("Conteúdo", value=content, height=220, key=f"stored_script_{record.get('id')}")
+                    document_id = str(record.get("id") or "")
+                    edit_key = f"editing_script_{document_id}"
+                    if st.session_state.get(edit_key):
+                        edited_content = st.text_area("Markdown editável", value=content, height=320, key=f"stored_script_edit_{document_id}")
+                        edit_save_col, edit_cancel_col = st.columns(2, gap="small")
+                        with edit_save_col:
+                            if st.button("Guardar edição", type="primary", width="stretch", key=f"save_script_edit_{document_id}"):
+                                try:
+                                    update_script_document(document_id, edited_content)
+                                    st.session_state.pop(edit_key, None)
+                                    st.success("Roteiro actualizado.")
+                                    st.rerun()
+                                except (FileNotFoundError, OSError, ValueError) as exc:
+                                    st.error(f"Não foi possível actualizar o roteiro: {exc}")
+                        with edit_cancel_col:
+                            if st.button("Cancelar edição", width="stretch", key=f"cancel_script_edit_{document_id}"):
+                                st.session_state.pop(edit_key, None)
+                                st.rerun()
+                    else:
+                        st.text_area("Conteúdo", value=content, height=220, key=f"stored_script_{document_id}")
                     if stored_path.is_file():
-                        st.download_button("Descarregar Markdown", data=stored_path.read_bytes(), file_name=stored_path.name, mime="text/markdown", key=f"download_script_{record.get('id')}")
+                        download_col, edit_col, delete_col = st.columns([1.25, 0.75, 0.75], gap="small")
+                        with download_col:
+                            st.download_button("Descarregar Markdown", data=stored_path.read_bytes(), file_name=stored_path.name, mime="text/markdown", key=f"download_script_{document_id}", width="stretch")
+                        with edit_col:
+                            if st.button("Editar", key=f"edit_script_{document_id}", width="stretch"):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                        with delete_col:
+                            confirm_delete_key = f"confirm_delete_script_{document_id}"
+                            if st.button("Apagar", key=f"delete_script_{document_id}", type="primary", width="stretch"):
+                                st.session_state[confirm_delete_key] = True
+                                st.rerun()
+                        if st.session_state.get(confirm_delete_key):
+                            st.warning("Apagar este roteiro do histórico e do storage?")
+                            confirm_col, cancel_col = st.columns(2, gap="small")
+                            with confirm_col:
+                                if st.button("Confirmar apagar", key=f"confirm_delete_script_button_{document_id}", type="primary", width="stretch"):
+                                    try:
+                                        delete_script_document(document_id)
+                                        st.session_state.pop(confirm_delete_key, None)
+                                        st.rerun()
+                                    except (OSError, ValueError) as exc:
+                                        st.error(f"Não foi possível apagar o roteiro: {exc}")
+                            with cancel_col:
+                                if st.button("Cancelar", key=f"cancel_delete_script_{document_id}", width="stretch"):
+                                    st.session_state.pop(confirm_delete_key, None)
+                                    st.rerun()
                 else:
                     st.warning("O ficheiro deste registo já não está disponível no storage.")
 
@@ -5002,10 +5112,79 @@ def task_platform(task: dict[str, Any]) -> str:
     return "tiktok" if format_value in {"portrait", "portrait 9:16", "9:16"} else "youtube"
 
 
+def _saved_script_task_matches(task: dict[str, Any], record: dict[str, Any], channel: dict[str, Any], content: str) -> bool:
+    document_id = str(record.get("id") or "").strip()
+    if document_id and str(task.get("script_document_id") or "").strip() == document_id:
+        return True
+    if str(task.get("topic_source") or "").strip() != "saved_script":
+        return False
+    if str(task.get("channel_id") or "").strip() != str(channel.get("id") or "").strip():
+        return False
+    generation_settings = task.get("generation_settings") if isinstance(task.get("generation_settings"), dict) else {}
+    saved_content = str(generation_settings.get("video_script") or task.get("video_script") or "").strip()
+    if saved_content and saved_content == content.strip():
+        return True
+    title = str(record.get("title") or "").strip()
+    return bool(title and str(task.get("title") or task.get("topic") or "").strip() == title)
+
+
+def _sync_saved_scripts_to_youtube_automation() -> None:
+    """Expose every saved video script as one manual YouTube task, without duplicates."""
+    records = _backfill_saved_script_blueprints(list_script_documents())
+    channels = [item for item in read_json("channels.json", []) if isinstance(item, dict)]
+    existing_tasks = load_video_tasks_for_catalog()
+    for raw_record in records:
+        if str(raw_record.get("document_type") or "video_script").strip() != "video_script":
+            continue
+        content = read_script_document(raw_record)
+        if not content:
+            continue
+        channel = _script_channel(raw_record, channels)
+        if not channel or task_platform({"platform": channel.get("platform", "youtube"), "channel_id": channel.get("id")}) != "youtube":
+            continue
+        record = normalise_saved_script({**raw_record, "channel_id": str(channel.get("id") or "")}, content)
+        matched_task = next((task for task in existing_tasks if _saved_script_task_matches(task, record, channel, content)), None)
+        if matched_task:
+            if str(matched_task.get("script_document_id") or "") != str(record.get("id") or "") or (
+                str(matched_task.get("state") or "") == "to_do" and not bool(matched_task.get("manual_start_required", False))
+            ):
+                matched_id = str(matched_task.get("id") or "")
+
+                def mark_existing_script(entries: Any) -> None:
+                    if not isinstance(entries, list):
+                        return
+                    for entry in entries:
+                        if isinstance(entry, dict) and str(entry.get("id") or "") == matched_id:
+                            entry["script_document_id"] = str(record.get("id") or "")
+                            if str(entry.get("state") or "") == "to_do":
+                                entry["manual_start_required"] = True
+
+                update_json("tasks.json", [], mark_existing_script)
+            continue
+        created = _create_video_task_from_saved_script(record, channel, {})
+        existing_tasks.extend(created)
+
+
+def _automation_created_at(task: dict[str, Any]) -> tuple[datetime, str]:
+    value = str(task.get("created_at") or "").strip()
+    try:
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        parsed = datetime.min.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc), str(task.get("id") or "")
+
+
 def load_automation_tasks_for_platform(platform_name: str) -> list[dict[str, Any]]:
     """Return only automation/catalog tasks belonging to one publishing platform."""
     target = str(platform_name or "").strip().casefold()
-    return [task for task in load_video_tasks_for_catalog() if task_platform(task) == target]
+    if target == "youtube":
+        _sync_saved_scripts_to_youtube_automation()
+    return sorted(
+        [task for task in load_video_tasks_for_catalog() if task_platform(task) == target],
+        key=_automation_created_at,
+    )
 
 
 def _task_thumbnail_path(task: dict[str, Any]) -> Path | None:
@@ -5126,6 +5305,8 @@ def _start_pipeline_task(task_id: str, state: str) -> bool:
     """Start or retry a video task from any platform automation card."""
     if state in {"blocked", "failed"}:
         updated = retry_task_with_current_settings(task_id)
+        if updated and bool(updated.get("manual_start_required", False)):
+            updated = transition_task(task_id, "doing")
     else:
         updated = transition_task(task_id, "doing")
     if not updated:
