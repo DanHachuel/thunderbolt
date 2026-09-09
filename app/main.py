@@ -3088,6 +3088,18 @@ def render_channels():
         edit_key = f"edit_channel_{channel_id}"
         with st.container(border=True):
             header_cols = st.columns([0.7, 2.75, 1.1, 1.0, 1.35, 1.35])
+            channel_url = str(channel.get("url") or "").strip()
+            if not channel_url:
+                channel_id_or_handle = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("handle") or "").strip()
+                if channel_id_or_handle:
+                    if channel_id_or_handle.startswith("http"):
+                        channel_url = channel_id_or_handle
+                    elif channel_id_or_handle.startswith("UC"):
+                        channel_url = f"https://www.youtube.com/channel/{channel_id_or_handle}"
+                    elif channel_id_or_handle.startswith(("@", "channel/")):
+                        channel_url = f"https://www.youtube.com/{channel_id_or_handle}"
+                    else:
+                        channel_url = f"https://www.youtube.com/@{channel_id_or_handle}"
             with header_cols[0]:
                 if channel.get("thumbnail_url"):
                     st.image(channel["thumbnail_url"], width=64)
@@ -3104,6 +3116,8 @@ def render_channels():
             with header_cols[4]:
                 st.metric("Visualizações", _format_channel_count(channel.get("view_count")))
             with header_cols[5]:
+                if channel_url:
+                    st.link_button("Abrir canal", channel_url, type="primary", width="content")
                 if st.button("↻", key=f"refresh_youtube_metrics_{channel_id}", help="Actualizar Inscritos, Vídeos e Visualizações", width="stretch"):
                     with st.spinner("A actualizar métricas YouTube…"):
                         refreshed, message = _refresh_youtube_channel_metrics(channel, youtube)
