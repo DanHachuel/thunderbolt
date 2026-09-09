@@ -2625,17 +2625,19 @@ def _channel_average_video_time(channel: dict[str, Any], *, prompt_master: str =
 
 
 def _refresh_youtube_channel_metrics(channel: dict[str, Any], youtube: YouTubeAdapter) -> tuple[bool, str]:
-    result = youtube.fetch_channel_public(str(channel.get("url") or channel.get("handle") or ""))
+    channel_ref = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("url") or channel.get("handle") or "")
+    result = youtube.fetch_channel(channel_ref) if youtube.api_key else youtube.fetch_channel_public(channel_ref)
     if not result.ok or not isinstance(result.data, dict):
         return False, result.message
     data = result.data
-    update_channel(str(channel["id"]), {
-        "subscriber_count": data.get("subscriber_count"),
-        "video_count": data.get("video_count"),
-        "view_count": data.get("view_count"),
+    updates = {
         "metrics_source": data.get("metrics_source", "youtube_public_page"),
         "last_public_lookup_at": data.get("last_public_lookup_at", now()),
-    })
+    }
+    for field in ("youtube_id", "name", "handle", "url", "thumbnail_url", "subscriber_count", "video_count", "view_count"):
+        if data.get(field) is not None and data.get(field) != "":
+            updates[field] = data[field]
+    update_channel(str(channel["id"]), updates)
     return True, "Métricas YouTube actualizadas."
 
 
