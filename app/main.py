@@ -3252,17 +3252,18 @@ def _saved_video_draft_records() -> list[dict[str, Any]]:
     return records
 
 
-def _seed_resume_video_settings(record: dict[str, Any]) -> None:
+def _seed_resume_video_settings(record: dict[str, Any], prefix: str = "new_video") -> None:
     """Load one persisted record into the namespaced resume widgets."""
     resume_id = str(record.get("resume_id") or "")
-    if st.session_state.get("new_video_resume_loaded_id") == resume_id:
+    state_prefix = f"{prefix}_resume"
+    if st.session_state.get(f"{state_prefix}_loaded_id") == resume_id:
         return
     generation_settings = record.get("generation_settings") if isinstance(record.get("generation_settings"), dict) else {}
-    st.session_state["new_video_resume_sections"] = missing_setting_sections(generation_settings)
+    st.session_state[f"{state_prefix}_sections"] = missing_setting_sections(generation_settings)
     for suffix in setting_widget_suffixes():
         if suffix in generation_settings:
-            st.session_state[f"new_video_resume_{suffix}"] = generation_settings[suffix]
-    st.session_state["new_video_resume_loaded_id"] = resume_id
+            st.session_state[f"{state_prefix}_{suffix}"] = generation_settings[suffix]
+    st.session_state[f"{state_prefix}_loaded_id"] = resume_id
 
 
 def _create_video_task_from_saved_script(record: dict[str, Any], channel: dict[str, Any], settings: dict[str, Any]) -> list[dict[str, Any]]:
@@ -3313,7 +3314,7 @@ def _create_video_task_from_saved_script(record: dict[str, Any], channel: dict[s
     return create_tasks_for_batch(batch)
 
 
-def render_video_from_draft() -> None:
+def render_video_from_draft(prefix: str = "new_video") -> None:
     """Render the continuation flow for saved scripts and local pipeline drafts."""
     st.subheader("Roteiros guardados")
     st.caption("Seleccione um roteiro guardado para continuar a criação do vídeo sem perder o conteúdo já preparado.")
@@ -3327,15 +3328,15 @@ def render_video_from_draft() -> None:
         "Seleccione um roteiro",
         list(record_by_id),
         format_func=lambda identifier: f"{record_by_id[identifier].get('title') or 'Roteiro sem título'} · {record_by_id[identifier].get('source_label') or 'Rascunho'}",
-        key="new_video_resume_selected",
+        key=f"{prefix}_resume_selected",
     )
     record = record_by_id[selected_id]
-    _seed_resume_video_settings(record)
+    _seed_resume_video_settings(record, prefix)
     with st.container(border=True):
         st.markdown(f"**Video Subject:** {record.get('video_subject') or '—'}")
         st.caption(f"{record.get('source_label') or 'Rascunho'} · {record.get('channel_name') or 'Documento independente'} · Blueprint: {record.get('blueprint_name') or '—'}")
         if record.get("video_script"):
-            st.text_area("Video Script (Optional)", value=str(record["video_script"]), height=150, disabled=True, key=f"resume_preview_script_{selected_id}")
+            st.text_area("Video Script (Optional)", value=str(record["video_script"]), height=150, disabled=True, key=f"{prefix}_resume_preview_script_{selected_id}")
         if record.get("video_keywords"):
             st.caption(f"**Video Keywords:** {record['video_keywords']}")
 
@@ -3352,7 +3353,7 @@ def render_video_from_draft() -> None:
                 "Configurações a completar",
                 list(DRAFT_SETTING_SECTIONS),
                 default=missing_sections,
-                key="new_video_resume_sections",
+                key=f"{prefix}_resume_sections",
                 help="Seleccione uma ou mais áreas para completar antes de criar a tarefa.",
             )
         )
@@ -3377,11 +3378,11 @@ def render_video_from_draft() -> None:
         selectable_channels,
         index=channel_index,
         format_func=lambda channel: str(channel.get("name") or "Canal sem nome"),
-        key="new_video_resume_channel",
+        key=f"{prefix}_resume_channel",
     )
 
     settings_from_form = render_video_generation_settings(
-        "new_video_resume",
+        f"{prefix}_resume",
         current_language=str(record.get("language") or "pt"),
         channel=selected_channel,
         sections=selected_sections,
@@ -3394,7 +3395,7 @@ def render_video_from_draft() -> None:
         st.caption(f"Faltam: {', '.join(still_missing)}")
     elif not missing_sections:
         st.caption("Este roteiro será usado directamente, sem regenerar o conteúdo editorial guardado.")
-    if st.button(action_label, type="primary", width="stretch", key="new_video_resume_submit", icon=":material/movie:"):
+    if st.button(action_label, type="primary", width="stretch", key=f"{prefix}_resume_submit", icon=":material/movie:"):
         if still_missing:
             st.error(f"Complete as configurações seleccionadas: {', '.join(still_missing)}.")
         elif not selected_channel.get("id"):
@@ -3821,7 +3822,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
     _render_pipeline_progress_panel()
     if draft_tab is not None:
         with draft_tab:
-            render_video_from_draft()
+            render_video_from_draft(prefix)
 
 
 def render_music_creation():
