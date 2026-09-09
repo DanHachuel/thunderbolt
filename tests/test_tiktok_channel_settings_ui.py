@@ -35,6 +35,7 @@ def test_tiktok_cards_include_all_requested_actions_and_download_names():
 
 def test_youtube_downloads_use_the_same_requested_name_patterns():
     card_block = SOURCE.split("def _render_youtube_automation_cards():", 1)[1].split("def render_automation():", 1)[0]
+    assert not SOURCE.split("def _render_youtube_automation_cards():", 1)[0].rstrip().endswith("@st.fragment(run_every=5.0)")
     assert '_automation_download_name("Thumbnail", task, thumbnail_path, ".png")' in card_block
     assert '_automation_download_name("Thumbnail-Prompt", task, thumbnail_prompt_path, ".txt")' in card_block
     assert '_automation_download_name("Script", task, script_path, ".md")' in card_block
