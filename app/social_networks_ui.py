@@ -186,11 +186,11 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
     with st.expander("Últimos posts do Instagram", expanded=False):
         action_cols = st.columns(3)
         with action_cols[0]:
-            load_clicked = st.button("Carregar últimos 10", key=f"load_instagram_posts_{profile_id}", use_container_width=True)
+            load_clicked = st.button("Carregar últimos 10", key=f"load_instagram_posts_{profile_id}", width="stretch")
         with action_cols[1]:
-            refresh_clicked = st.button("Actualizar tudo", key=f"refresh_instagram_posts_{profile_id}", use_container_width=True)
+            refresh_clicked = st.button("Actualizar tudo", key=f"refresh_instagram_posts_{profile_id}", width="stretch")
         with action_cols[2]:
-            download_clicked = bool(posts) and st.download_button("Baixar todos", data=_instagram_posts_archive(posts), file_name=f"instagram-{profile_id}-posts.zip", mime="application/zip", key=f"download_instagram_posts_{profile_id}", use_container_width=True)
+            download_clicked = bool(posts) and st.download_button("Baixar todos", data=_instagram_posts_archive(posts), file_name=f"instagram-{profile_id}-posts.zip", mime="application/zip", key=f"download_instagram_posts_{profile_id}", width="stretch")
         if load_clicked or refresh_clicked:
             target = max(10, len(posts)) if refresh_clicked else 10
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=target)
@@ -212,13 +212,13 @@ def _render_instagram_posts(profile: Mapping[str, Any]) -> None:
                 post_cols = st.columns([1, 3])
                 with post_cols[0]:
                     if _clean(post.get("image_url")):
-                        st.image(post["image_url"], use_container_width=True)
+                        st.image(post["image_url"], width="stretch")
                 with post_cols[1]:
                     if _clean(post.get("url")):
                         st.link_button("Abrir post", post["url"])
                     if _clean(post.get("caption")):
                         st.caption(post["caption"])
-        if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", use_container_width=True):
+        if st.button("Mostrar + 10", key=f"more_instagram_posts_{profile_id}", width="stretch"):
             posts_ok, posts_message, loaded_posts = _load_instagram_posts(profile, limit=len(posts) + 10)
             if posts_ok:
                 _persist_instagram_posts(profile, loaded_posts)
@@ -314,11 +314,11 @@ def render_meta_api_cards(settings: dict[str, Any], kind: str) -> None:
                 token = st.text_input("Access Token", value=_clean(card.get("access_token")), type="password", key=f"{kind}_api_{card_id}_token")
                 action_cols = st.columns(3)
                 with action_cols[0]:
-                    test_clicked = st.form_submit_button("Teste chamada API", use_container_width=True)
+                    test_clicked = st.form_submit_button("Teste chamada API", width="stretch")
                 with action_cols[1]:
-                    save_clicked = st.form_submit_button("Guardar Card", type="primary", use_container_width=True)
+                    save_clicked = st.form_submit_button("Guardar Card", type="primary", width="stretch")
                 with action_cols[2]:
-                    delete_clicked = st.form_submit_button("Apagar Card", use_container_width=True)
+                    delete_clicked = st.form_submit_button("Apagar Card", width="stretch")
             edited = {
                 "id": card_id,
                 "label": label.strip(),
@@ -345,7 +345,7 @@ def render_meta_api_cards(settings: dict[str, Any], kind: str) -> None:
                 _persist_api_cards(settings, kind, cards)
                 st.success(f"{title} apagada.")
                 st.rerun()
-    if st.button("Adicionar nova API", type="primary", use_container_width=True, key=f"add_{kind}_api_card"):
+    if st.button("Adicionar nova API", type="primary", width="stretch", key=f"add_{kind}_api_card"):
         identifier_key = "account_id" if is_instagram else "page_id"
         cards.append({"id": f"{kind}-api-{uuid.uuid4().hex[:10]}", "label": f"Conta {len(cards) + 1}", identifier_key: "", "access_token": ""})
         _persist_api_cards(settings, kind, cards)
@@ -498,29 +498,29 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                         st.rerun()
                     st.warning(refreshed_message)
             with edit_col:
-                if st.button("Editar", key=f"edit_instagram_button_{profile_id}", use_container_width=True):
+                if st.button("Editar", key=f"edit_instagram_button_{profile_id}", width="stretch"):
                     for field in ("name", "handle", "bio", "country", "language", "posts", "followers", "following"):
                         st.session_state.pop(f"instagram_edit_{field}_{profile_id}", None)
                     st.session_state[edit_key] = True
                     st.rerun()
-            if st.button("Apagar", key=f"delete_instagram_button_{profile_id}", use_container_width=True):
+            if st.button("Apagar", key=f"delete_instagram_button_{profile_id}", width="stretch"):
                 st.session_state[f"confirm_delete_instagram_{profile_id}"] = True
                 st.rerun()
             url = _clean(profile.get("url"))
             if url:
-                st.link_button("Abrir Instagram", url, use_container_width=True)
+                st.link_button("Abrir Instagram", url, width="stretch")
 
         if st.session_state.get(f"confirm_delete_instagram_{profile_id}"):
             st.warning("Apagar este card remove o cadastro da conta Instagram, mas não os ficheiros associados.")
             confirm_cols = st.columns(2)
             with confirm_cols[0]:
-                if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_instagram_button_{profile_id}", use_container_width=True):
+                if st.button("Confirmar apagar", type="primary", key=f"confirm_delete_instagram_button_{profile_id}", width="stretch"):
                     delete_channel(profile_id)
                     st.session_state.pop(f"confirm_delete_instagram_{profile_id}", None)
                     st.success("Conta Instagram apagada.")
                     st.rerun()
             with confirm_cols[1]:
-                if st.button("Cancelar", key=f"cancel_delete_instagram_button_{profile_id}", use_container_width=True):
+                if st.button("Cancelar", key=f"cancel_delete_instagram_button_{profile_id}", width="stretch"):
                     st.session_state.pop(f"confirm_delete_instagram_{profile_id}", None)
                     st.rerun()
 
@@ -537,7 +537,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
                     posts = st.number_input("posts", min_value=0, value=_metric_input(_profile_metric(profile, "post_count", "posts", "media_count")), placeholder="Não encontrado", key=f"instagram_edit_posts_{profile_id}")
                     followers = st.number_input("Seguidores", min_value=0, value=_metric_input(_profile_metric(profile, "subscriber_count", "followers_count", "follower_count", "followers", "edge_followed_by")), placeholder="Não encontrado", key=f"instagram_edit_followers_{profile_id}")
                     following = st.number_input("seguindo", min_value=0, value=_metric_input(_profile_metric(profile, "following_count", "following", "follows", "followingCount", "edge_follow")), placeholder="Não encontrado", key=f"instagram_edit_following_{profile_id}")
-                save_edit = st.form_submit_button("Guardar alterações", type="primary", use_container_width=True)
+                save_edit = st.form_submit_button("Guardar alterações", type="primary", width="stretch")
             if save_edit:
                 update_channel(profile_id, {"name": name.strip(), "handle": handle.strip(), "bio": bio, "bio_raw": bio, "country": _normalise_country(country), "language": language, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                 st.session_state.pop(edit_key, None)
@@ -558,7 +558,7 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
         character_labels = {"": "Sem personagem associado"} | {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters}
         current_character = _clean(profile.get("character_id"))
         selected_character = st.selectbox("Personagem", character_options, index=character_options.index(current_character) if current_character in character_options else 0, format_func=lambda value: character_labels.get(value, value), key=f"instagram_character_{profile_id}")
-        if st.button("Atrelar Personagem", key=f"attach_instagram_character_{profile_id}", use_container_width=True):
+        if st.button("Atrelar Personagem", key=f"attach_instagram_character_{profile_id}", width="stretch"):
             update_channel(profile_id, {"character_id": selected_character})
             st.success("Personagem associado à conta Instagram.")
             st.rerun()
@@ -574,9 +574,9 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         source = st.text_input("URL pública ou @handler Instagram", placeholder="https://www.instagram.com/conta/ ou @conta", key="social_instagram_source")
         search_cols = st.columns(2)
         with search_cols[0]:
-            search_clicked = st.button("Pesquisar conta pública", type="primary", use_container_width=True, key="social_instagram_search")
+            search_clicked = st.button("Pesquisar conta pública", type="primary", width="stretch", key="social_instagram_search")
         with search_cols[1]:
-            if st.button("Limpar pesquisa", use_container_width=True, key="social_instagram_clear"):
+            if st.button("Limpar pesquisa", width="stretch", key="social_instagram_clear"):
                 for key in ("social_instagram_result", "social_instagram_ok", "social_instagram_message"):
                     st.session_state.pop(key, None)
                 st.rerun()
@@ -622,7 +622,7 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     character_options = [""] + [_clean(item.get("id")) for item in characters if _clean(item.get("id"))]
                     character_labels = {"": "Sem personagem associado"} | {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters}
                     selected_character = st.selectbox("Personagem", character_options, format_func=lambda value: character_labels.get(value, value), key=f"social_instagram_result_character_{result_widget_id}")
-                    save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", use_container_width=True)
+                    save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", width="stretch")
                 if save_profile:
                     profile_data = dict(data)
                     profile_data.update({"name": name, "bio": bio, "bio_raw": bio, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})

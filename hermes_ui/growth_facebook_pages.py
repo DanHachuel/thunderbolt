@@ -131,7 +131,7 @@ def render_growth_facebook_pages() -> None:
         selected = st.selectbox("Página a analisar", pages, format_func=lambda item: str(item.get("name") or item.get("page_name") or "Página sem nome"), key="growth_facebook_page")
     with action_col:
         st.write("")
-        analyse_clicked = st.button("ANALISAR PÁGINA", type="primary", use_container_width=True, key="growth_facebook_analyse")
+        analyse_clicked = st.button("ANALISAR PÁGINA", type="primary", width="stretch", key="growth_facebook_analyse")
     st.markdown("**Estado das APIs de Growth**")
     api_cols = st.columns(2, gap="small")
     with api_cols[0]:
@@ -161,9 +161,9 @@ def render_growth_facebook_pages() -> None:
         st.write("")
         path = Path(str(selected_record.get("report_path") or "")) if selected_record else Path()
         if path.is_file():
-            st.download_button("BAIXAR ANALISE COMPLETA", path.read_bytes(), file_name=path.name, mime="text/markdown", use_container_width=True, key=f"facebook_download_{selected_record['code']}")
+            st.download_button("BAIXAR ANALISE COMPLETA", path.read_bytes(), file_name=path.name, mime="text/markdown", width="stretch", key=f"facebook_download_{selected_record['code']}")
         else:
-            st.button("BAIXAR ANALISE COMPLETA", disabled=True, use_container_width=True, key="facebook_download_disabled")
+            st.button("BAIXAR ANALISE COMPLETA", disabled=True, width="stretch", key="facebook_download_disabled")
     st.subheader("Dashboard de Growth")
     st.caption("3 pilares críticos em destaque e camadas operacionais abaixo. Vermelho: 0–30 · Amarelo: 31–69 · Verde: 70–100.")
     def item(label: str, target: str, available: bool = False) -> tuple[str, str, str, str, str]:
