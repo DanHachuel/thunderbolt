@@ -448,7 +448,7 @@ def ensure_storage() -> None:
 
 _LOCK_TIMEOUT_SECONDS = 30.0
 _LOCK_POLL_SECONDS = 0.05
-_LOCK_STALE_SECONDS = 15 * 60
+_LOCK_STALE_SECONDS = 120
 _PROTECTED_STATE_FILES = {"channels.json", "tasks.json", "batches.json", "queues.json", "uploads.json"}
 
 
@@ -466,6 +466,12 @@ def _state_lock(path: Path, *, read_only: bool = False) -> Iterator[None]:
     """
     lock_path = path.with_name(f".{path.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
+    if read_only:
+        # JSON writes use os.replace(), so a reader can safely read either the
+        # old complete file or the new complete file. Never make page loads
+        # wait for a writer/antivirus handle on Windows.
+        yield
+        return
     deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
     descriptor: int | None = None
     while descriptor is None:
@@ -483,7 +489,22 @@ def _state_lock(path: Path, *, read_only: bool = False) -> Iterator[None]:
             return
         except FileExistsError:
             try:
-                if time.time() - lock_path.stat().st_mtime > _LOCK_STALE_SECONDS:
+                lock_age = time.time() - lock_path.stat().st_mtime
+                owner_pid = ""
+                try:
+                    owner_pid = lock_path.read_text(encoding="ascii").split("pid=", 1)[1].splitlines()[0].strip()
+                except (IndexError, OSError, UnicodeDecodeError):
+                    pass
+                owner_alive = False
+                if owner_pid.isdigit():
+                    try:
+                        os.kill(int(owner_pid), 0)
+                        owner_alive = True
+                    except PermissionError:
+                        owner_alive = True
+                    except (ProcessLookupError, OSError):
+                        owner_alive = False
+                if (owner_pid and not owner_alive) or (not owner_pid and lock_age > _LOCK_STALE_SECONDS):
                     lock_path.unlink()
                     continue
             except OSError:
