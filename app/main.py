@@ -2419,7 +2419,7 @@ def render_tiktok_channels():
             for channel in visible_tiktok_channels:
                 channel_id = str(channel.get("id") or "")
                 with st.container(border=True):
-                    card_cols = st.columns([0.7, 3.05, 1.05, 1.05, 1.25, 1.35], gap="small")
+                    card_cols = st.columns([0.7, 2.55, 1.15, 1.05, 1.05, 1.25, 1.35], gap="small")
                     with card_cols[0]:
                         avatar_url = _tiktok_avatar_url(channel)
                         if avatar_url:
@@ -2432,12 +2432,16 @@ def render_tiktok_channels():
                         st.caption(channel.get("description") or "Perfil carregado da página pública do TikTok.")
                         st.caption(f"Nicho: {channel.get('niche') or 'não configurado'}")
                     with card_cols[2]:
-                        st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
+                        tiktok_url = _tiktok_channel_url(channel)
+                        if tiktok_url:
+                            st.link_button("Abrir canal", tiktok_url, type="primary", width="content")
                     with card_cols[3]:
-                        st.metric("Curtidas", format_metric_number(channel.get("likes_count")))
+                        st.metric("Seguidores", format_metric_number(channel.get("subscriber_count")))
                     with card_cols[4]:
-                        st.metric("Vídeos", format_metric_number(channel.get("video_count")))
+                        st.metric("Curtidas", format_metric_number(channel.get("likes_count")))
                     with card_cols[5]:
+                        st.metric("Vídeos", format_metric_number(channel.get("video_count")))
+                    with card_cols[6]:
                         if st.button("↻", key=f"refresh_tiktok_metrics_{channel_id}", help="Actualizar Seguidores, Vídeos e Curtidas", width="stretch"):
                             with st.spinner("A actualizar métricas TikTok…"):
                                 refreshed, message = _refresh_tiktok_channel_metrics(channel)
@@ -2651,18 +2655,35 @@ def _refresh_youtube_channel_metrics(channel: dict[str, Any], youtube: YouTubeAd
 
 
 def _refresh_tiktok_channel_metrics(channel: dict[str, Any]) -> tuple[bool, str]:
-    result = fetch_public_tiktok_profile(str(channel.get("url") or channel.get("handle") or ""))
+    channel_ref = str(channel.get("url") or channel.get("handle") or "").strip()
+    if not channel_ref:
+        return False, "Este canal não tem URL ou handle TikTok para actualizar as métricas."
+    try:
+        result = fetch_public_tiktok_profile(channel_ref)
+    except Exception as exc:
+        return False, f"Não foi possível actualizar as métricas TikTok ({type(exc).__name__}). Tente novamente."
     if not result.ok or not isinstance(result.data, dict):
         return False, result.message
     data = result.data
-    update_channel(str(channel["id"]), {
-        "subscriber_count": data.get("subscriber_count"),
-        "likes_count": data.get("likes_count"),
-        "video_count": data.get("video_count"),
+    updates = {
         "metrics_source": data.get("metrics_source", "tiktok_public_page"),
         "last_public_lookup_at": data.get("last_public_lookup_at", now()),
-    })
+    }
+    for field in ("subscriber_count", "likes_count", "video_count", "view_count", "name", "handle", "url", "avatar_url", "thumbnail_url"):
+        if data.get(field) is not None and data.get(field) != "":
+            updates[field] = data[field]
+    update_channel(str(channel["id"]), updates)
     return True, "Métricas TikTok actualizadas."
+
+
+def _tiktok_channel_url(channel: dict[str, Any]) -> str:
+    source = str(channel.get("url") or channel.get("handle") or channel.get("username") or "").strip()
+    if not source:
+        return ""
+    try:
+        return str(normalize_tiktok_reference(source).get("url") or "").strip()
+    except ValueError:
+        return source if source.startswith(("http://", "https://")) else ""
 
 
 def render_channels():
@@ -5590,6 +5611,11 @@ def _render_tiktok_automation_cards():
         st.subheader("Vídeos cadastrados TikTok")
         st.caption("Esta fila mostra exclusivamente tarefas associadas a canais TikTok.")
         tiktok_tasks = load_automation_tasks_for_platform("tiktok")
+        tiktok_channels_by_id = {
+            str(channel.get("id")): channel
+            for channel in read_json("channels.json", [])
+            if isinstance(channel, dict) and classify_channel_platform(channel) == "tiktok"
+        }
         if not tiktok_tasks:
             st.info("Ainda não existem vídeos TikTok cadastrados.")
         for task in tiktok_tasks:
@@ -5608,6 +5634,15 @@ def _render_tiktok_automation_cards():
                         st.caption("Thumbnail ainda não pronta")
                     st.write(f"**{task.get('title') or task.get('topic') or 'Vídeo TikTok'}**")
                     st.caption(f"{task.get('channel_name') or 'Canal TikTok'} · {task_id}")
+                    task_channel = tiktok_channels_by_id.get(str(task.get("channel_id") or ""))
+                    if task_channel is None:
+                        task_channel = next(
+                            (channel for channel in tiktok_channels_by_id.values() if str(channel.get("name") or "").strip() == str(task.get("channel_name") or "").strip()),
+                            None,
+                        )
+                    task_channel_url = _tiktok_channel_url(task_channel or {})
+                    if task_channel_url:
+                        st.link_button("Abrir canal", task_channel_url, type="primary", width="content")
                     thumbnail_download_col, prompt_download_col = st.columns(2, gap="small")
                     with thumbnail_download_col:
                         st.download_button(
