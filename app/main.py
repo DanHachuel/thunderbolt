@@ -111,6 +111,7 @@ from hermes_ui.notifications import clear_notifications, list_notifications, mar
 from hermes_ui.influencers import BACKEND_OPTIONS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, backend_name, backend_status, get_repository, test_backend
 from hermes_ui.logs import list_logs, logs_to_rows
 from hermes_ui.languages import LANGUAGE_CODES, VIDEO_LANGUAGE_CODES, LANGUAGE_FLAG_DATA_URIS, language_code, language_label, ui_language_menu_label, ui_text, video_language_label, video_language_options
+from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.api_key_tests import test_apify_credentials, test_influencer_database, test_innertube_api_key, test_kaggle_credentials, test_material_source_credentials, test_media_provider_card, test_nano_banana_credentials, test_postiz_credentials, test_telegram_credentials, test_tiktok_credentials, test_upload_post_credentials, test_voice_provider
 from hermes_ui.tutorials import tutorial_body, tutorial_caption, tutorial_title
 from hermes_ui.update_manager import check_version, restart_current_process, update_to_latest
@@ -1558,6 +1559,9 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             edited_name = st.text_input("Nome do canal", value=str(channel.get("name") or ""))
             edited_url = st.text_input("URL", value=str(channel.get("url") or ""))
             edited_handle = st.text_input("Handle", value=str(channel.get("handle") or ""))
+            country_options = [""] + list(COUNTRY_OPTIONS)
+            current_country = str(channel.get("country") or "")
+            edited_country = st.selectbox("País", country_options, index=country_options.index(current_country) if current_country in country_options else 0)
             language_options = VIDEO_LANGUAGE_SELECTION_OPTIONS
             edited_language = st.selectbox("Idioma do roteiro", language_options, index=language_options.index(normalize_video_language(channel.get("language") or "pt")) if normalize_video_language(channel.get("language") or "pt") in language_options else 0, format_func=video_language_label)
             edited_style = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=WIDE_STYLE_OPTIONS.index(channel_video_source_value(channel.get("style_wide"))) if channel_video_source_value(channel.get("style_wide")) in WIDE_STYLE_OPTIONS else 0)
@@ -1588,7 +1592,7 @@ def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], yout
             update_channel(channel_id, {
                 "name": edited_name.strip(), "url": edited_url.strip(), "handle": edited_handle.strip(), "language": edited_language,
                 "style_wide": channel_video_source_storage(edited_style), "video_aspect_ratio": edited_aspect,
-                "niche": edited_niche.strip(), "reference_channels": [item.strip() for item in re.split(r"[,|]", edited_niche) if item.strip()],
+                "niche": edited_niche.strip(), "reference_channels": [item.strip() for item in re.split(r"[,|]", edited_niche) if item.strip()], "country": edited_country.strip(),
                 "default_blueprint_id": edited_blueprint.strip(), "blueprint_id": edited_blueprint.strip(),
                 "default_voice": edited_voice.strip(), "voice": edited_voice.strip(),
                 "google_account_id": edited_account.strip(), "google_account_email": str(youtube_accounts_by_id.get(edited_account, {}).get("email", "")),
@@ -2381,6 +2385,8 @@ def classify_channel_platform(channel: Any) -> str:
         return "tiktok"
     if value in {"instagram", "ig"}:
         return "instagram"
+    if value in {"facebook", "facebook_page", "facebook_pages", "fb"}:
+        return "facebook"
     def has_tiktok_marker(item: Any) -> bool:
         if isinstance(item, dict):
             return any(has_tiktok_marker(key) or has_tiktok_marker(value) for key, value in item.items())
@@ -2778,6 +2784,103 @@ def _tiktok_channel_url(channel: dict[str, Any]) -> str:
         return source if source.startswith(("http://", "https://")) else ""
 
 
+def render_facebook_pages():
+    st.title("Facebook Pages")
+    st.caption("Cadastre páginas públicas do Facebook por URL. Esta área aceita apenas páginas Facebook e não perfis pessoais.")
+    with st.form("facebook_page_form"):
+        form_cols = st.columns(2)
+        with form_cols[0]:
+            name = st.text_input("Nome da página", key="facebook_page_name")
+            url = st.text_input("URL pública da página", placeholder="https://www.facebook.com/suapagina", key="facebook_page_url")
+            country_options = [""] + list(COUNTRY_OPTIONS)
+            country = st.selectbox("País", country_options, key="facebook_page_country")
+        with form_cols[1]:
+            description = st.text_area("Descrição", key="facebook_page_description")
+            niche = st.text_input("Nicho", key="facebook_page_niche")
+            active = st.toggle("Activo", value=True, key="facebook_page_active")
+        submitted = st.form_submit_button("Guardar página Facebook", type="primary", width="stretch")
+    if submitted:
+        normalized_url = url.strip()
+        if not name.strip():
+            st.error("Informe o nome da página.")
+        elif not normalized_url.startswith(("https://www.facebook.com/", "https://facebook.com/", "http://www.facebook.com/", "http://facebook.com/")):
+            st.error("Informe uma URL pública válida de uma página Facebook.")
+        else:
+            existing = [item for item in read_json("channels.json", []) if isinstance(item, dict)]
+            duplicate = next((item for item in existing if classify_channel_platform(item) == "facebook" and str(item.get("url") or "").strip().casefold() == normalized_url.casefold()), None)
+            if duplicate:
+                st.warning("Esta página Facebook já está cadastrada.")
+            else:
+                page = create_channel(name.strip(), normalized_url, {
+                    "platform": "facebook",
+                    "social_network": "Facebook Pages",
+                    "country": country.strip(),
+                    "description": description.strip(),
+                    "niche": niche.strip(),
+                    "active": bool(active),
+                    "metrics_source": "public_url",
+                })
+                update_channel(page["id"], {"platform": "facebook", "social_network": "Facebook Pages"})
+                st.success(f"Página {page['name']} guardada.")
+                st.rerun()
+
+    pages = [item for item in read_json("channels.json", []) if isinstance(item, dict) and classify_channel_platform(item) == "facebook"]
+    st.divider()
+    st.subheader(f"Facebook Pages cadastradas ({len(pages)})")
+    if not pages:
+        st.info("Nenhuma página Facebook cadastrada.")
+        return
+    for page in pages:
+        page_id = str(page.get("id") or "")
+        with st.container(border=True):
+            header_cols = st.columns([0.7, 2.75, 1.15, 1.1, 1.0, 1.35, 1.35])
+            with header_cols[0]:
+                st.markdown("### FB")
+            with header_cols[1]:
+                page_country = str(page.get("country") or "").strip()
+                st.write(f"**{page.get('name', 'Sem nome')}**{f' · {page_country}' if page_country else ''}")
+                st.caption(page.get("niche") or "SEM NICHO CONFIGURADO")
+                st.caption(page.get("url") or "sem URL")
+            with header_cols[2]:
+                if page.get("url"):
+                    st.link_button("Abrir página", str(page["url"]), type="primary", width="content")
+            with header_cols[3]:
+                st.metric("País", page_country or "—")
+            with header_cols[4]:
+                st.metric("Estado", "Activo" if page.get("active", True) else "Inactivo")
+            with header_cols[5]:
+                st.caption("Facebook Page")
+            with header_cols[6]:
+                active_value = st.toggle("Activo", value=bool(page.get("active", True)), key=f"facebook_active_{page_id}")
+                if active_value != bool(page.get("active", True)):
+                    update_channel(page_id, {"active": active_value})
+                    st.rerun()
+            with st.expander("Detalhes e configuração da página", expanded=False):
+                with st.form(f"facebook_page_edit_{page_id}"):
+                    edited_name = st.text_input("Nome da página", value=str(page.get("name") or ""))
+                    edited_url = st.text_input("URL pública", value=str(page.get("url") or ""))
+                    edit_country_options = [""] + list(COUNTRY_OPTIONS)
+                    current_page_country = str(page.get("country") or "")
+                    edited_country = st.selectbox("País", edit_country_options, index=edit_country_options.index(current_page_country) if current_page_country in edit_country_options else 0)
+                    edited_description = st.text_area("Descrição", value=str(page.get("description") or ""))
+                    edited_niche = st.text_input("Nicho", value=str(page.get("niche") or ""))
+                    save_page = st.form_submit_button("Guardar alterações", type="primary")
+                action_cols = st.columns(2)
+                with action_cols[0]:
+                    if save_page:
+                        if not edited_name.strip() or not edited_url.strip().startswith(("https://www.facebook.com/", "https://facebook.com/", "http://www.facebook.com/", "http://facebook.com/")):
+                            st.error("Informe o nome e uma URL pública válida de uma página Facebook.")
+                        else:
+                            update_channel(page_id, {"name": edited_name.strip(), "url": edited_url.strip(), "country": edited_country.strip(), "description": edited_description.strip(), "niche": edited_niche.strip()})
+                            st.success("Página Facebook actualizada.")
+                            st.rerun()
+                with action_cols[1]:
+                    if st.button("Apagar", key=f"facebook_delete_{page_id}"):
+                        delete_channel(page_id)
+                        st.success("Página Facebook apagada.")
+                        st.rerun()
+
+
 def render_channels():
     st.title("Canais Youtube")
     st.caption("Escolha entre importar dados públicos do YouTube ou preencher o canal manualmente.")
@@ -2849,6 +2952,8 @@ def render_channels():
                 url = st.text_input("URL", value=imported.get("url", source if source.startswith("http") else ""), key="yt_import_url")
                 handle = st.text_input("Handle", value=imported.get("handle", ""), key="yt_import_handle")
                 language = st.selectbox("Idioma do roteiro", VIDEO_LANGUAGE_SELECTION_OPTIONS, index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalize_video_language(imported.get("language") or "pt")) if normalize_video_language(imported.get("language") or "pt") in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0, format_func=video_language_label, key="yt_import_language")
+                import_country_options = [""] + list(COUNTRY_OPTIONS)
+                import_country = st.selectbox("País", import_country_options, index=import_country_options.index(str(imported.get("country") or "")) if str(imported.get("country") or "") in import_country_options else 0, key="yt_import_country")
                 style = st.selectbox("Fonte do vídeo", WIDE_STYLE_OPTIONS, index=0, key="yt_import_style")
                 video_aspect_ratio = st.selectbox("Proporção do vídeo", CHANNEL_ASPECT_RATIO_OPTIONS, key="yt_import_aspect_ratio")
                 blueprint = st.selectbox("Blueprint Padrão", blueprint_ids, index=blueprint_ids.index(imported_blueprint) if imported_blueprint in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key="yt_import_blueprint")
@@ -2879,7 +2984,7 @@ def render_channels():
                             "description": description.strip(),
                             "niche": niche.strip(),
                             "reference_channels": [item.strip() for item in re.split(r"[,|]", niche) if item.strip()],
-                            "language": language,
+                            "language": language, "country": import_country.strip(),
                             "style_wide": channel_video_source_storage(style), "video_aspect_ratio": video_aspect_ratio, "format": "wide",
                             "blueprint_id": blueprint.strip(),
                             "default_blueprint_id": blueprint.strip(),
@@ -3138,6 +3243,8 @@ def render_channels():
             description = st.text_area("Descrição", key="manual_channel_description")
             niche = st.text_input("Nicho", placeholder="Ex.: História militar, mistérios, ciência", key="manual_channel_niche")
             language = st.selectbox("Idioma", list(LANGUAGE_CODES), index=list(LANGUAGE_CODES).index("pt"), format_func=language_label, key="manual_channel_language")
+            manual_country_options = [""] + list(COUNTRY_OPTIONS)
+            manual_country = st.selectbox("País", manual_country_options, key="manual_channel_country")
             style = st.selectbox("Estilo wide", ["Pexels/Pixabay", "full_ia", "Apenas Música"], index=0, key="manual_channel_style")
             manual_blueprint_items = blueprint_catalog()
             manual_blueprint_ids = [item[0] for item in manual_blueprint_items]
@@ -3166,7 +3273,7 @@ def render_channels():
                         "description": description.strip(),
                         "niche": niche.strip(),
                         "reference_channels": [item.strip() for item in re.split(r"[,|]", niche) if item.strip()],
-                        "language": language,
+                        "language": language, "country": manual_country.strip(),
                         "style_wide": {"Pexels/Pixabay": "pexels", "full_ia": "full_ia", "Apenas Música": "music"}.get(style, style),
                         "blueprint_id": blueprint.strip(),
                         "default_blueprint_id": blueprint.strip(),
@@ -3228,7 +3335,8 @@ def render_channels():
                 else:
                     st.markdown("### YT")
             with header_cols[1]:
-                st.write(f"**{channel.get('name', 'Sem nome')}**")
+                country_label = str(channel.get("country") or "").strip()
+                st.write(f"**{channel.get('name', 'Sem nome')}**{f' · {country_label}' if country_label else ''}")
                 st.caption(channel_niche_label(channel))
                 st.caption(f"{channel.get('handle') or channel.get('url') or 'sem URL'} · {channel.get('metrics_source', 'manual')}")
             with header_cols[2]:
@@ -9552,12 +9660,13 @@ def main():
     channel_profile_items = [
         ("Canais YouTube", ":material/ondemand_video:", "Canais YouTube"),
         ("Canais Tiktok", ":material/music_video:", "Canais Tiktok"),
+        ("Contas Instagram", ":material/share:", "Contas Instagram"),
+        ("Facebook Pages", ":material/public:", "Facebook Pages"),
         ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
         ("Thumbnail Blueprints", ":material/image:", "Thumbnail Blueprints"),
         ("Brandings Youtube", ":material/brush:", "Brandings Youtube"),
         ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
         ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
-        ("Facebook Pages", ":material/public:", "Facebook Pages"),
     ]
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
@@ -9570,7 +9679,6 @@ def main():
         ("Geração de Conteúdo IA", ":material/auto_awesome:", "Geração de Conteúdo IA"),
         ("Motion Control", ":material/motion_photos_on:", "Motion Control"),
         ("UGC Products", ":material/shopping_bag:", "UGC Products"),
-        ("Contas Instagram", ":material/share:", "Contas Instagram"),
     ]
     growth_items = [
         ("Analista Growth Youtube", ":material/analytics:", "Analista Growth Youtube"),
@@ -9601,6 +9709,11 @@ def main():
     automation_items = [
         ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
         ("Automação Tiktok", ":material/schedule:", "Automação Tiktok"),
+        ("Automação Facebook", ":material/schedule:", "Automação Facebook"),
+        ("Automação Musicas", ":material/schedule:", "Automação Musicas"),
+        ("Automação UGC", ":material/schedule:", "Automação UGC"),
+        ("Automação Influencer Content", ":material/schedule:", "Automação Influencer Content"),
+        ("Automação Bilibili", ":material/schedule:", "Automação Bilibili"),
     ]
     edition_items = [
         ("Limpador de Metadados", ":material/edit_note:", "Limpador de Metadados"),
@@ -9634,12 +9747,12 @@ def main():
         "Configurações": settings_items,
     }
     nav_paths = {
-        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok",
+        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok", "Automação Facebook": "/automacao/facebook", "Automação Musicas": "/automacao/musicas", "Automação UGC": "/automacao/ugc", "Automação Influencer Content": "/automacao/influencer-content", "Automação Bilibili": "/automacao/bilibili",
         "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
         "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload", "Update Youtube Vídeos": "/pipeline-videos/update-youtube",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
-        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters", "Facebook Pages": "/canais-perfis-videos/facebook-pages",
-        "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products", "Contas Instagram": "/ai-influencers/redes-sociais",
+        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Contas Instagram": "/canais-perfis-videos/contas-instagram", "Facebook Pages": "/canais-perfis-videos/facebook-pages", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters",
+        "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
         "Documentação": "/documentacao", "Tutorial Meta": "/documentacao/meta", "Tutorial Supabase": "/documentacao/supabase", "Tutorial Kaggle": "/documentacao/kaggle", "Tutorial Apify": "/documentacao/apify", "Tutorial YouTube Video-Upload Frontend": "/documentacao/youtube-video-upload-frontend", "Tutorial OAuth do Google": "/documentacao/oauth-google", "Tutorial YouTube Data API Key (Public Data)": "/documentacao/youtube-data-api-key",
@@ -9731,9 +9844,14 @@ def main():
         "Canais YouTube": render_channels,
         "Canais Tiktok": render_tiktok_channels,
         "Contas TikTok": render_tiktok_accounts,
-        "Facebook Pages": lambda: render_edit_placeholder("Facebook Pages", ""),
+        "Facebook Pages": render_facebook_pages,
         "Automação Youtube": render_automation,
         "Automação Tiktok": render_tiktok_automation,
+        "Automação Facebook": lambda: None,
+        "Automação Musicas": lambda: None,
+        "Automação UGC": lambda: None,
+        "Automação Influencer Content": lambda: None,
+        "Automação Bilibili": lambda: None,
         "Niche Finder Kaggle": render_niche_finder,
         "Tutorial Kaggle": lambda: render_niche_tutorial("kaggle"),
         "Niche Finder Apify": render_niche_finder_apify,

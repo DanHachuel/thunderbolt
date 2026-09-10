@@ -196,7 +196,9 @@ def test_ai_influencers_navigation_has_characters_and_social_pages():
     assert 'models_ai_items = [' in source
     assert '("Personagens", ":material/person:", "Personagens")' in source
     assert '("Contas Instagram", ":material/share:", "Contas Instagram")' in source
-    assert source.index('("Personagens", ":material/person:') < source.index('("Contas Instagram", ":material/share:')
+    channel_start = source.index("channel_profile_items = [")
+    channel_end = source.index("    ]", channel_start)
+    assert channel_start < source.index('("Contas Instagram", ":material/share:') < channel_end
     assert '("AI Influencers", ":material/smart_toy:", "AI Influencers")' in source
     assert '"Models AI": "AI Influencers"' in source
     assert '"AI Influencers": lambda: render_edit_placeholder("AI Influencers"' in source
