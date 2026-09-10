@@ -53,3 +53,18 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify published tarball is downloadable
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TARBALL=$(npm view "@danhachuel/thunderbolt@${VERSION}" dist.tarball)
+          for attempt in $(seq 1 12); do
+            if curl --fail --location --silent --show-error --head "$TARBALL"; then
+              echo "Published tarball is available: $TARBALL"
+              exit 0
+            fi
+            echo "Tarball not available yet (attempt ${attempt}/12); waiting 5 seconds..."
+            sleep 5
+          done
+          echo "Published tarball was not downloadable: $TARBALL"
+          exit 1
