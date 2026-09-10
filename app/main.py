@@ -5651,7 +5651,27 @@ def render_thumbnails():
         return
 
     settings = read_json("settings.json", {})
-    for record in records:
+    page_size = 24
+    page_count = max(1, (len(records) + page_size - 1) // page_size)
+    current_page = st.session_state.get("thumbnail_gallery_page", 1)
+    try:
+        current_page = min(max(int(current_page), 1), page_count)
+    except (TypeError, ValueError):
+        current_page = 1
+    if page_count > 1:
+        current_page = st.selectbox(
+            "Página de thumbnails",
+            options=list(range(1, page_count + 1)),
+            index=current_page - 1,
+            format_func=lambda value: f"Página {value} de {page_count}",
+            key="thumbnail_gallery_page",
+        )
+        start = (current_page - 1) * page_size
+        visible_records = records[start : start + page_size]
+        st.caption(f"A mostrar {start + 1}–{min(start + page_size, len(records))} de {len(records)} thumbnails.")
+    else:
+        visible_records = records
+    for record in visible_records:
         task_id = record["task_id"]
         with st.container(border=True):
             image_col, details_col, action_col = st.columns([1.25, 2.35, 1.7])

@@ -97,3 +97,11 @@ def test_thumbnail_cards_offer_download_for_generated_images():
 
     assert '"Descarregar thumbnail"' in thumbnails
     assert 'key=f"thumbnail_download_{task_id}_{record[\'variant_index\']}"' in thumbnails
+
+
+def test_thumbnail_gallery_is_paginated_to_avoid_unbounded_initial_render():
+    thumbnails = MAIN_SOURCE.split("def render_thumbnails():", 1)[1].split("def render_automation():", 1)[0]
+
+    assert "page_size = 24" in thumbnails
+    assert '"Página de thumbnails"' in thumbnails
+    assert "visible_records = records[start : start + page_size]" in thumbnails
