@@ -378,6 +378,10 @@ def seed_blueprints() -> None:
             shutil.copy2(source, target)
     thumbnail_destination = BLUEPRINTS / "thumbnails"
     thumbnail_destination.mkdir(parents=True, exist_ok=True)
+    legacy_thumbnail = thumbnail_destination / "FINANCE_Thumbnail_Blueprint.md"
+    current_thumbnail = thumbnail_destination / "FINANCE USA_Thumbnail_Blueprint.md"
+    if legacy_thumbnail.is_file() and not current_thumbnail.exists():
+        legacy_thumbnail.replace(current_thumbnail)
     for source in sorted(SEED_THUMBNAIL_BLUEPRINTS.glob("*.md")):
         target = thumbnail_destination / source.name
         if not target.exists():
@@ -395,6 +399,82 @@ def seed_blueprints() -> None:
         except (OSError, UnicodeError, json.JSONDecodeError):
             if not pair_target.exists():
                 shutil.copy2(pair_source, pair_target)
+
+
+def _rename_pending_finance_thumbnail_references(value: Any) -> tuple[Any, bool]:
+    """Rename the legacy finance thumbnail only in unfinished work items."""
+    legacy = "FINANCE_Thumbnail_Blueprint"
+    current = "FINANCE USA_Thumbnail_Blueprint"
+    changed = False
+
+    def replace(item: Any) -> Any:
+        nonlocal changed
+        if isinstance(item, str):
+            if item == legacy:
+                changed = True
+                return current
+            return item
+        if isinstance(item, list):
+            return [replace(entry) for entry in item]
+        if isinstance(item, dict):
+            return {key: replace(entry) for key, entry in item.items()}
+        return item
+
+    return replace(value), changed
+
+
+def migrate_finance_thumbnail_blueprint() -> None:
+    """Move pending automation/video records to the renamed finance thumbnail."""
+    def load_state(name: str, default: Any) -> Any:
+        path = STATE / name
+        try:
+            return _load_json_unlocked(path)
+        except (OSError, json.JSONDecodeError):
+            return default
+
+    def save_state(name: str, value: Any) -> None:
+        _atomic_write_unlocked(STATE / name, value)
+
+    channels = load_state("channels.json", [])
+    if isinstance(channels, list):
+        updated_channels, channels_changed = _rename_pending_finance_thumbnail_references(channels)
+        if channels_changed:
+            save_state("channels.json", updated_channels)
+
+    tasks = load_state("tasks.json", [])
+    if isinstance(tasks, list):
+        pending_tasks = []
+        tasks_changed = False
+        for task in tasks:
+            if not isinstance(task, dict) or bool(task.get("video_ready")) or str(task.get("state") or "").casefold() == "done":
+                pending_tasks.append(task)
+                continue
+            updated_task, changed = _rename_pending_finance_thumbnail_references(task)
+            pending_tasks.append(updated_task)
+            tasks_changed = tasks_changed or changed
+        if tasks_changed:
+            save_state("tasks.json", pending_tasks)
+
+    batches = load_state("batches.json", [])
+    if isinstance(batches, list):
+        pending_batches = []
+        batches_changed = False
+        for batch in batches:
+            status = str(batch.get("status") or batch.get("state") or "").casefold() if isinstance(batch, dict) else ""
+            if status in {"done", "completed", "published", "cancelled", "canceled"}:
+                pending_batches.append(batch)
+                continue
+            updated_batch, changed = _rename_pending_finance_thumbnail_references(batch)
+            pending_batches.append(updated_batch)
+            batches_changed = batches_changed or changed
+        if batches_changed:
+            save_state("batches.json", pending_batches)
+
+    queues = load_state("queues.json", {})
+    if isinstance(queues, dict):
+        updated_queues, queues_changed = _rename_pending_finance_thumbnail_references(queues)
+        if queues_changed:
+            save_state("queues.json", updated_queues)
 
 
 def seed_prompt_masters() -> None:
@@ -444,6 +524,7 @@ def ensure_storage() -> None:
         target = STATE / filename
         if not target.exists():
             atomic_write(target, default)
+    migrate_finance_thumbnail_blueprint()
 
 
 _LOCK_TIMEOUT_SECONDS = 30.0
