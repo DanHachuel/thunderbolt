@@ -26,4 +26,5 @@ def test_social_pages_are_under_video_profiles_and_automation_placeholders_exist
     assert channel_block.index('("Canais Tiktok",') < channel_block.index('("Contas Instagram",') < channel_block.index('("Facebook Pages",')
     for label in ("Automação Facebook", "Automação Musicas", "Automação UGC", "Automação Influencer Content", "Automação Bilibili"):
         assert f'("{label}",' in MAIN_SOURCE
-        assert f'"{label}": lambda: None' in MAIN_SOURCE
+        expected_renderer = "render_facebook_automation" if label == "Automação Facebook" else "lambda: None"
+        assert f'"{label}": {expected_renderer}' in MAIN_SOURCE
