@@ -2155,7 +2155,7 @@ def render_thumbnail_blueprints():
                 script = st.selectbox("Blueprint de roteiro associado", blueprint_ids, index=blueprint_ids.index(current_script) if current_script in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_script_blueprint_channel_{channel_id}")
             with cols[2]:
                 if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", width="stretch"):
-                    if thumb == "Generic_Thumbnail_Blueprint" and script:
+                    if thumb in {"Youtube_Generic_Thumbnail_Blueprint", "Tiktok_Generic_Thumbnail_Blueprint"} and script:
                         st.error("Not Allowed to Associate, System Use Only")
                     else:
                         update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
@@ -6508,7 +6508,7 @@ def render_automation():
                         st.link_button("Abrir canal", channel_url, type="primary", width="content")
                 with header_cols[2]:
                     st.markdown("**Thumbnail Blueprint**")
-                    st.caption(str(paired_thumbnail.get("name") or "Generic_Thumbnail_Blueprint"))
+                    st.caption(str(paired_thumbnail.get("name") or "Youtube_Generic_Thumbnail_Blueprint"))
                 with header_cols[3]:
                     st.markdown("**Idioma do roteiro**")
                     st.caption(video_language_label(normalize_video_language(channel.get("language") or "pt")))
@@ -6561,7 +6561,7 @@ def render_automation():
                                 "format": automation_format,
                             })
                             set_channel_defaults(channel_id, automation_blueprint, automation_voice)
-                            paired_id = str(paired_thumbnail.get("id") or "Generic_Thumbnail_Blueprint")
+                            paired_id = str(paired_thumbnail.get("id") or "Youtube_Generic_Thumbnail_Blueprint")
                             update_channel(channel_id, {"thumbnail_blueprint_id": paired_id, "default_thumbnail_blueprint_id": paired_id})
                             st.success("Agendamento guardado.")
                             st.rerun()

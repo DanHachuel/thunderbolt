@@ -7,9 +7,12 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .provider_routing import route_llm_json
-from .storage import BLUEPRINTS, atomic_write, list_blueprint_files, load_blueprint_file
+from .storage import BLUEPRINTS, SEED_THUMBNAIL_BLUEPRINTS, atomic_write, list_blueprint_files, load_blueprint_file
 
-GENERIC_THUMBNAIL_BLUEPRINT_ID = "Generic_Thumbnail_Blueprint"
+HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID = "Youtube_Generic_Thumbnail_Blueprint"
+VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID = "Tiktok_Generic_Thumbnail_Blueprint"
+# Backwards-compatible name for callers that only need the landscape default.
+GENERIC_THUMBNAIL_BLUEPRINT_ID = HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
 GENERIC_ASSOCIATION_ERROR = "Not Allowed to Associate, System Use Only"
 
 PROMPT_MASTER = '''You are a forensic YouTube thumbnail analyst. Build a reusable Thumbnail Blueprint from the reference channel videos below.
@@ -38,26 +41,41 @@ def resolve_thumbnail_blueprint(identifier: Any) -> dict[str, Any]:
     wanted = str(identifier or "").strip()
     if not wanted:
         return {}
-    folder = BLUEPRINTS / "thumbnails"
-    for path in folder.glob("*.md"):
-        if path.stem == wanted or path.name == wanted:
-            return {"id": path.stem, "name": path.stem, "path": str(path), "content": path.read_text(encoding="utf-8")}
+    if wanted == "Generic_Thumbnail_Blueprint":
+        wanted = HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
+    folders = (BLUEPRINTS / "thumbnails", SEED_THUMBNAIL_BLUEPRINTS)
+    for folder in folders:
+        for path in folder.glob("*.md"):
+            if path.stem == wanted or path.name == wanted:
+                return {"id": path.stem, "name": path.stem, "path": str(path), "content": path.read_text(encoding="utf-8")}
     return {"id": wanted, "name": wanted}
 
 
-def thumbnail_blueprint_for_channel(channel: Mapping[str, Any]) -> dict[str, Any]:
+def _generic_thumbnail_blueprint_id(format_value: Any = "", platform: Any = "") -> str:
+    raw = str(format_value or "").strip().casefold()
+    if raw in {"portrait", "vertical", "shorts", "9:16", "tiktok", "reels"}:
+        return VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
+    platform_raw = str(platform or "").strip().casefold()
+    if platform_raw in {"tiktok", "instagram", "instagram reels", "shorts"} and not raw:
+        return VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
+    return HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
+
+
+def thumbnail_blueprint_for_channel(channel: Mapping[str, Any], format_value: Any = "") -> dict[str, Any]:
     direct = channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id")
     if direct:
         return resolve_thumbnail_blueprint(direct)
     script_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
     pairs = _pair_state()
-    return resolve_thumbnail_blueprint(pairs.get(script_id, "") or GENERIC_THUMBNAIL_BLUEPRINT_ID)
+    return resolve_thumbnail_blueprint(
+        pairs.get(script_id, "") or _generic_thumbnail_blueprint_id(format_value, channel.get("platform"))
+    )
 
 
 def thumbnail_blueprint_for_blueprint(blueprint_id: Any) -> dict[str, Any]:
     """Resolve the visual pair for a script Blueprint, falling back to Generic."""
     paired_id = _pair_state().get(str(blueprint_id or "").strip(), "")
-    return resolve_thumbnail_blueprint(paired_id or GENERIC_THUMBNAIL_BLUEPRINT_ID)
+    return resolve_thumbnail_blueprint(paired_id or HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID)
 
 
 def _pair_state() -> dict[str, str]:
@@ -70,7 +88,7 @@ def _pair_state() -> dict[str, str]:
 
 
 def save_thumbnail_blueprint_pair(thumbnail_id: str, blueprint_id: str) -> None:
-    if str(thumbnail_id) == GENERIC_THUMBNAIL_BLUEPRINT_ID and str(blueprint_id):
+    if str(thumbnail_id) in {HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID, VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID} and str(blueprint_id):
         raise ValueError(GENERIC_ASSOCIATION_ERROR)
     pairs = _pair_state()
     if blueprint_id:
