@@ -3176,7 +3176,7 @@ def render_channels():
         st.caption("Esta subaba usa a conta Google/YouTube seleccionada para listar os canais que ela gere. Não lê a caixa Gmail e não usa e-mails como pesquisa pública.")
         accounts = [account for account in settings.get("youtube_batch_accounts", []) if isinstance(account, dict) and account.get("id")]
         if not accounts:
-            st.info("Configure primeiro uma conta em Configurações > Configuração API > Contas Google/YouTube para canais em lote.")
+            st.info("Nenhuma conta Google/YouTube disponível para a lista em lote; a lista permanece vazia.")
         else:
             account_ids = [str(account["id"]) for account in accounts]
             account_labels = {str(account["id"]): f"{account.get('email', 'Conta Google')} — {account.get('label', 'Canais YouTube')}" for account in accounts}
@@ -3953,9 +3953,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                 with st.expander("Gerar Thumbnail com IA", expanded=False):
                     topic_for_thumbnail = str(generation_settings.get("video_subject") or "").strip()
                     if st.button("Gerar Thumbnail com IA", key=f"{prefix}_generate_creative", width="stretch"):
-                        if selected_one is None:
-                            st.error("Seleccione primeiro um canal.")
-                        elif not topic_for_thumbnail:
+                        if not topic_for_thumbnail:
                             st.error("Preencha o Video Subject antes de gerar a thumbnail.")
                         else:
                             try:
@@ -3963,7 +3961,7 @@ def render_new_video(page_title: str = "Criação de Vídeos", prefix: str = "ne
                                 existing_title = str(existing_payload.get("title") or topic_for_thumbnail).strip()
                                 generated = generate_thumbnail_variants_for_ui(
                                     read_json("settings.json", {}),
-                                    selected_one,
+                                    selected_one or {},
                                     topic_for_thumbnail,
                                     same_channel_quantity,
                                     title=existing_title,
@@ -6166,8 +6164,7 @@ def render_tiktok_automation():
     channels = _tiktok_channel_records()
     prompt_ids, prompt_labels = _tiktok_prompt_options()
     if not channels:
-        st.info("Cadastre primeiro um canal TikTok.")
-        return
+        st.info("Nenhum canal TikTok seleccionado. A lista de automação permanece vazia até existir um destino.")
     with st.expander("Canais cadastrados", expanded=False):
         for channel in channels:
             channel_id = str(channel["id"])
@@ -6426,8 +6423,7 @@ def render_facebook_automation() -> None:
     pages = _facebook_pages_for_automation()
     settings = read_json("settings.json", {})
     if not pages:
-        st.warning("Cadastre primeiro uma página em Canais e Perfis de Vídeos > Facebook Pages.")
-        return
+        st.info("Nenhuma Facebook Page seleccionada. A fila pode ser criada e preenchida; o destino poderá ser escolhido mais tarde.")
     with st.expander("Configurar API Facebook da página", expanded=False):
         for page in pages:
             page_id = str(page.get("id") or "")
@@ -6440,9 +6436,9 @@ def render_facebook_automation() -> None:
                     st.success("Credenciais da página guardadas localmente.")
                     st.rerun()
     with st.form("facebook_automation_new_post"):
-        page_options = [str(page.get("id")) for page in pages]
+        page_options = [""] + [str(page.get("id")) for page in pages]
         page_labels = {str(page.get("id")): str(page.get("name") or "Facebook Page") for page in pages}
-        selected_page = st.selectbox("Facebook Page", page_options, format_func=lambda value: page_labels.get(value, value))
+        selected_page = st.selectbox("Facebook Page", page_options, format_func=lambda value: page_labels.get(value, "Nenhuma página seleccionada"), key="facebook_automation_target_page")
         form_cols = st.columns([2.2, 1, 1.3])
         with form_cols[0]:
             theme = st.text_input("Tema/ideia opcional", placeholder="Deixe vazio para o LLM sugerir um tema")
@@ -6452,7 +6448,7 @@ def render_facebook_automation() -> None:
             start_stage = st.selectbox("Iniciar por", ["Ideia / Tema", "Tema já definido"])
         create_clicked = st.form_submit_button("Criar post na fila", type="primary", width="stretch")
     if create_clicked:
-        page = next(page for page in pages if str(page.get("id")) == selected_page)
+        page = next((page for page in pages if str(page.get("id")) == selected_page), {})
         post = create_post(page, image_count=int(image_count), theme=theme)
         if start_stage == "Tema já definido" and theme.strip():
             save_post({**post, "status": "artigo_pendente"})
@@ -7280,15 +7276,15 @@ def render_upload_destination_target(destination: str, channels: list[dict[str, 
     select_label = "Canal" if destination == "YouTube" else ("Conta TikTok" if destination == "TikTok" else ("Conta Bilibili" if destination == "Bilibili" else "Perfil / página"))
     empty_label = "Nenhum canal YouTube cadastrado" if destination == "YouTube" else ("Nenhuma conta TikTok cadastrada" if destination == "TikTok" else ("Nenhuma conta Bilibili activa" if destination == "Bilibili" else f"Nenhum {destination} configurado"))
     if not options:
-        st.selectbox(select_label, [empty_label], disabled=True, key=f"upload_target_{destination_key}")
+        st.selectbox(select_label, [""], format_func=lambda _value: empty_label, key=f"upload_target_{destination_key}")
         if destination == "YouTube":
-            st.caption("Cadastre ou liste pelo menos um canal YouTube antes de escolher o destino de envio.")
+            st.caption("Nenhum canal YouTube disponível; o destino permanece vazio e pode ser escolhido mais tarde.")
         elif destination == "TikTok":
-            st.caption("Cadastre uma conta em Pipeline TikTok > Contas TikTok antes de escolher o destino de envio.")
+            st.caption("Nenhuma conta TikTok disponível; o destino permanece vazio e pode ser escolhido mais tarde.")
         elif destination == "Bilibili":
-            st.caption("Configure e active uma conta em Configuração API > API Bilibili antes de escolher o destino de envio.")
+            st.caption("Nenhuma conta Bilibili disponível; o destino permanece vazio e pode ser escolhido mais tarde.")
         else:
-            st.caption(f"A lista de {destination} será ligada numa etapa própria de credenciais/API.")
+            st.caption(f"Nenhum destino {destination} disponível; a lista permanece vazia.")
         return None
     return st.selectbox(
         select_label,
@@ -7413,8 +7409,8 @@ def render_upload_conventional():
                 quota_count = official_upload_count(channel, account)
                 st.caption(f"API Oficial hoje: {quota_count}/{OFFICIAL_DAILY_LIMIT} envios nesta conta Gmail.")
                 if not selected_youtube_channel:
-                    st.caption("Seleccione primeiro um canal YouTube no selector acima para activar este envio.")
-                if st.button("Enviar pelo fluxo recomendado", type="primary", key=f"upload_youtube_{task['id']}", disabled=not selected_youtube_channel, help="Escolha o canal YouTube no selector acima." if not selected_youtube_channel else None):
+                    st.caption("Nenhum canal YouTube seleccionado; o destino permanece vazio e poderá ser escolhido mais tarde.")
+                if st.button("Enviar pelo fluxo recomendado", type="primary", key=f"upload_youtube_{task['id']}"):
                     tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
                     result = upload_with_default_route(
                         settings,
