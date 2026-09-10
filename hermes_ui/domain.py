@@ -492,6 +492,46 @@ def retry_task_with_current_settings(task_id: str) -> dict[str, Any] | None:
     return update_json("tasks.json", [], mutate)
 
 
+def _refresh_task_channel_video_settings(task: dict[str, Any]) -> None:
+    """Apply the channel's current video defaults while preserving the saved script."""
+    channel_id = str(task.get("channel_id") or "").strip()
+    channels = read_json("channels.json", [])
+    channel = next(
+        (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == channel_id),
+        None,
+    ) if isinstance(channels, list) else None
+    if not channel:
+        return
+    generation_settings = dict(task.get("generation_settings") or {})
+    channel_defaults = {
+        "enable_subtitles": ("default_enable_subtitles", True),
+        "subtitle_font": ("default_subtitle_font", "MicrosoftYaHeiBold.ttc"),
+        "subtitle_position": ("default_subtitle_position", "Bottom (Recommended)"),
+        "subtitle_color": ("default_subtitle_color", "#FFFFFF"),
+        "subtitle_background": ("default_subtitle_background", True),
+        "subtitle_background_color": ("default_subtitle_background_color", "#000000"),
+        "subtitle_rounded_background": ("default_subtitle_rounded_background", False),
+        "subtitle_font_size": ("default_subtitle_font_size", 60),
+        "subtitle_outline": ("default_subtitle_outline", "#000000"),
+        "subtitle_outline_width": ("default_subtitle_outline_width", 1.5),
+        "background_music_source": ("default_background_music_source", "Sem música"),
+        "background_music_volume": ("default_background_music_volume", "20%"),
+    }
+    for setting_name, (channel_key, default) in channel_defaults.items():
+        generation_settings[setting_name] = channel.get(channel_key, default)
+    task["generation_settings"] = generation_settings
+    task["voice"] = channel.get("default_voice") or channel.get("voice") or task.get("voice", "")
+    task["thumbnail_blueprint_id"] = (
+        channel.get("default_thumbnail_blueprint_id")
+        or channel.get("thumbnail_blueprint_id")
+        or task.get("thumbnail_blueprint_id")
+        or GENERIC_THUMBNAIL_BLUEPRINT_ID
+    )
+    task["blueprint_id"] = channel.get("default_blueprint_id") or channel.get("blueprint_id") or task.get("blueprint_id", "")
+    if channel.get("style_wide"):
+        task["style_wide"] = channel["style_wide"]
+
+
 def remake_video_task(task_id: str) -> dict[str, Any] | None:
     """Queue a fresh video render while retaining the task's creative inputs.
 
@@ -510,6 +550,7 @@ def remake_video_task(task_id: str) -> dict[str, Any] | None:
                 continue
             if str(task.get("state") or "") == "doing":
                 raise ValueError("Pare a tarefa antes de refazer o vídeo.")
+            _refresh_task_channel_video_settings(task)
             artifacts = dict(task.get("artifacts") or {})
             artifacts.pop("video", None)
             artifacts.pop("upload", None)

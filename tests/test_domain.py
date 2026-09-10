@@ -63,6 +63,50 @@ def test_retry_of_failed_task_clears_failure_without_storing_current_credentials
     assert "api_key" not in retried
 
 
+def test_remake_refreshes_current_channel_video_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
+    from hermes_ui import storage
+    from hermes_ui.domain import remake_video_task
+
+    storage.STORAGE = tmp_path / "storage"
+    storage.STATE = storage.STORAGE / "state"
+    storage.BLUEPRINTS = storage.STORAGE / "blueprints"
+    storage.ensure_storage()
+    storage.write_json("channels.json", [{
+        "id": "channel-current",
+        "default_enable_subtitles": False,
+        "default_subtitle_position": "Top",
+        "default_background_music_source": "Sem música",
+        "default_background_music_volume": "0%",
+        "default_thumbnail_blueprint_id": "thumb-modern",
+        "default_voice": "voice-current",
+        "style_wide": "pexels",
+    }])
+    storage.write_json("tasks.json", [{
+        "id": "video-remake-current-settings",
+        "channel_id": "channel-current",
+        "state": "done",
+        "generation_settings": {
+            "enable_subtitles": True,
+            "background_music_source": "Random Background Music",
+        },
+        "thumbnail_blueprint_id": "thumb-old",
+        "voice": "voice-old",
+        "artifacts": {"script": "/tmp/script.md", "video": "/tmp/old.mp4", "upload": "/tmp/upload.json"},
+    }])
+
+    remade = remake_video_task("video-remake-current-settings")
+
+    assert remade["state"] == "to_do"
+    assert remade["generation_settings"]["enable_subtitles"] is False
+    assert remade["generation_settings"]["subtitle_position"] == "Top"
+    assert remade["generation_settings"]["background_music_source"] == "Sem música"
+    assert remade["generation_settings"]["background_music_volume"] == "0%"
+    assert remade["thumbnail_blueprint_id"] == "thumb-modern"
+    assert remade["voice"] == "voice-current"
+    assert remade["artifacts"] == {"script": "/tmp/script.md"}
+
+
 def test_manual_stop_marks_user_reason_but_keeps_queue_state(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path / "storage"))
     from hermes_ui import storage
