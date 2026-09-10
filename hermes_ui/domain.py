@@ -7,7 +7,7 @@ from typing import Any
 
 from .notifications import record_notification
 from .storage import StorageIntegrityError, append_json, now, read_json, update_json, write_json
-from .thumbnail_blueprints import GENERIC_THUMBNAIL_BLUEPRINT_ID
+from .thumbnail_blueprints import thumbnail_blueprint_for_channel
 
 STAGES = ["niche", "blueprint", "brand", "topic", "script", "title", "keywords", "video", "thumbnail_prompt", "thumbnail", "upload"]
 # Ordem executada pelo worker. Cada etapa só é executada quando o seu artefacto
@@ -242,7 +242,7 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                 "generation_settings": generation_settings,
                 "blueprint_id": payload.get("blueprint_id") or channel.get("default_blueprint_id") or channel.get("blueprint_id", ""),
                 "blueprint_name": payload.get("blueprint_name", ""),
-                "thumbnail_blueprint_id": payload.get("thumbnail_blueprint_id") or channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or GENERIC_THUMBNAIL_BLUEPRINT_ID,
+                "thumbnail_blueprint_id": payload.get("thumbnail_blueprint_id") or channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id") or thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": ""}, payload.get("format", options.get("format", ""))).get("id", ""),
                 "voice": payload.get("voice") or channel.get("default_voice") or channel.get("voice", ""),
                 "automation_on": bool(channel.get("automation_on", False)),
                 "automation_time": channel.get("automation_time", "00:00"),
@@ -525,7 +525,7 @@ def _refresh_task_channel_video_settings(task: dict[str, Any]) -> None:
         channel.get("default_thumbnail_blueprint_id")
         or channel.get("thumbnail_blueprint_id")
         or task.get("thumbnail_blueprint_id")
-        or GENERIC_THUMBNAIL_BLUEPRINT_ID
+        or thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": ""}, task.get("format", "")).get("id", "")
     )
     task["blueprint_id"] = channel.get("default_blueprint_id") or channel.get("blueprint_id") or task.get("blueprint_id", "")
     if channel.get("style_wide"):

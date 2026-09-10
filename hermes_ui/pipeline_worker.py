@@ -1353,7 +1353,8 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
     blueprint = _blueprint_for_channel(channel)
     if not blueprint and (task.get("blueprint_id") or task.get("blueprint_name")):
         blueprint = {"id": str(task.get("blueprint_id") or ""), "name": str(task.get("blueprint_name") or task.get("blueprint_id") or "")}
-    visual_blueprint = thumbnail_blueprint_for_channel(channel)
+    visual_format = task.get("format") or ("portrait" if str(task.get("platform") or "").casefold() in {"tiktok", "instagram"} else "wide")
+    visual_blueprint = thumbnail_blueprint_for_channel(channel, visual_format)
     if visual_blueprint.get("content"):
         blueprint = {**blueprint, "thumbnail_blueprint_rules": visual_blueprint["content"]}
     route = _normalise_video_route(task, settings)

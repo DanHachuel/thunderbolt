@@ -34,7 +34,7 @@ def test_workflow_reads_blueprint_searches_edits_then_exports(tmp_path: Path):
     result = run_thumbnail_workflow(
         title="A grande batalha",
         topic="história militar",
-        channel={"thumbnail_blueprint_id": "Generic_Thumbnail_Blueprint"},
+        channel={"thumbnail_blueprint_id": "Youtube_Generic_Thumbnail_Blueprint"},
         width=1280,
         height=720,
         search_designs=lambda query: (calls.append(("search", query)) or [{"id": "design-1", "thumbnail": {"width": 1280, "height": 720}}]),
@@ -50,7 +50,7 @@ def test_workflow_never_exports_without_committed_edit():
         run_thumbnail_workflow(
             title="Teste",
             topic="",
-            channel={"thumbnail_blueprint_id": "Generic_Thumbnail_Blueprint"},
+            channel={"thumbnail_blueprint_id": "Youtube_Generic_Thumbnail_Blueprint"},
             search_designs=lambda query: [{"id": "design-1", "thumbnail": {"width": 1280, "height": 720}}],
             edit_design=lambda design_id, changes, blueprint: {"status": "manual_action_required", "design_id": design_id},
             export_design=lambda *args: (_ for _ in ()).throw(AssertionError("não deve exportar")),
