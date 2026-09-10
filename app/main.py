@@ -733,7 +733,17 @@ def _resolve_saved_script_blueprint(record: dict[str, Any], channel: dict[str, A
                 str(data.get("title") or "").strip(),
                 display_name,
             }
-            if wanted.intersection({value.casefold() for value in identifiers if value}):
+            normalized_identifiers = {value.casefold() for value in identifiers if value}
+            # Legacy records may contain a friendly alias such as MILITAR,
+            # while the catalog identifier is the filename stem.
+            matches_alias = any(
+                wanted_value == identifier
+                or wanted_value.endswith(identifier)
+                or identifier.endswith(wanted_value)
+                for wanted_value in wanted
+                for identifier in normalized_identifiers
+            )
+            if matches_alias:
                 return str(data.get("id") or path.stem).strip(), display_name
     return blueprint_id, blueprint_name or (blueprint_id if blueprint_id else "SEM BLUEPRINT CONFIGURADO")
 
@@ -756,15 +766,13 @@ def _script_channel(record: dict[str, Any], channels: list[dict[str, Any]]) -> d
 
 
 def _backfill_saved_script_blueprints(records: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
-    """Attach every saved video script to the Blueprint configured on its channel."""
+    """Attach every saved video script to its channel or stored Blueprint."""
     channels = [item for item in read_json("channels.json", []) if isinstance(item, dict)]
     updated_records: list[dict[str, Any]] = []
     for record in records if records is not None else list_script_documents():
         if str(record.get("document_type") or "video_script").strip() != "video_script":
             continue
         channel = _script_channel(record, channels)
-        if not channel:
-            continue
         blueprint_id, blueprint_name = _resolve_saved_script_blueprint(record, channel)
         current_id = str(record.get("blueprint_id") or "").strip()
         current_name = str(record.get("blueprint_name") or record.get("blueprint") or "").strip()
@@ -4281,7 +4289,10 @@ def render_scripts():
         for record in records[:50]:
             label = f"{record.get('title', 'Documento')} · {record.get('document_type', 'documento')}"
             with st.expander(label, expanded=False):
-                st.caption(f"{record.get('created_at', '—')} · {record.get('channel_name', 'Documento independente')} · Blueprint: {record.get('blueprint_name', '—')}")
+                st.caption(
+                    f"{record.get('created_at', '—')} · {record.get('channel_name', 'Documento independente')} · "
+                    f"Blueprint: {record.get('blueprint_name', '—')} · ID: {record.get('blueprint_id', '—')}"
+                )
                 stored_path = Path(str(record.get("path") or ""))
                 content = read_script_document(record)
                 if content:

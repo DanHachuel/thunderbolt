@@ -22,6 +22,12 @@ def test_scripts_ui_exposes_storage_paths_and_blueprint_generation():
     assert 'st.caption(f"Os vídeos são guardados em `{STORAGE / \'videos\'}`.")' in MAIN_SOURCE
     assert "Gerar com IA a partir do Blueprint" in MAIN_SOURCE
     assert "Histórico guardado" in MAIN_SOURCE
+    assert "Blueprint: {record.get('blueprint_name', '—')} · ID: {record.get('blueprint_id', '—')}" in MAIN_SOURCE
+
+
+def test_saved_script_blueprint_backfill_keeps_documents_without_channel():
+    assert '"Attach every saved video script to its channel or stored Blueprint."' in MAIN_SOURCE
+    assert "if not channel:\n            continue" not in MAIN_SOURCE[MAIN_SOURCE.index("def _backfill_saved_script_blueprints"):MAIN_SOURCE.index("def channel_video_language")]
 
 
 def test_storage_has_script_history_default():
