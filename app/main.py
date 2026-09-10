@@ -1,6 +1,8 @@
 import os
 import sys
 import io
+import shutil
+import subprocess
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["PYTHONUTF8"] = "1"
@@ -631,6 +633,32 @@ def card(label: str, value: str | int, note: str = ""):
 
 def _library_card_key(kind: str, path: Path) -> str:
     return hashlib.sha1(f"{kind}:{path.resolve()}".encode("utf-8")).hexdigest()[:12]
+
+
+def _video_thumbnail(path: Path) -> bytes | None:
+    """Create a small cached preview frame for a local video card."""
+    if not path.is_file():
+        return None
+    thumbnail_dir = STORAGE / "ui_cache" / "video_thumbnails"
+    thumbnail_dir.mkdir(parents=True, exist_ok=True)
+    target = thumbnail_dir / f"{hashlib.sha1(str(path.resolve()).encode('utf-8')).hexdigest()}.jpg"
+    try:
+        if target.is_file() and target.stat().st_mtime >= path.stat().st_mtime:
+            return target.read_bytes()
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            return None
+        completed = subprocess.run(
+            [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-ss", "00:00:01", "-i", str(path), "-frames:v", "1", "-vf", "scale=640:-2", str(target)],
+            capture_output=True,
+            check=False,
+            timeout=20,
+        )
+        if completed.returncode == 0 and target.is_file():
+            return target.read_bytes()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return None
 
 
 def _render_library_name_editor(kind: str, path: Path, current_name: str) -> str:
@@ -4833,12 +4861,7 @@ def render_media_download():
 
 def render_cuts():
     st.title("Cortes")
-    st.caption("Crie clips verticais, quadrados ou horizontais a partir de vídeos longos, com um fluxo local inspirado no Clip Generator do OpenShorts.")
-
-    st.markdown(
-        "<div class='tb-cuts-hero'><div class='tb-cuts-kicker'>01 · CLIP GENERATOR</div><h2>Create Viral Shorts</h2><p>Escolha um vídeo longo, defina o formato e gere clips locais sem sobrescrever a fonte.</p></div>",
-        unsafe_allow_html=True,
-    )
+    st.caption("Crie clips verticais, quadrados ou horizontais a partir de vídeos longos, sem sobrescrever a fonte.")
 
     source_path = None
     source_tab, url_tab, generated_tab, folder_tab = render_localized_tabs(["Upload ficheiro", "URL de vídeo", "Vídeos gerados", "Pasta local"])
@@ -4870,14 +4893,27 @@ def render_cuts():
     with generated_tab:
         generated_paths = list_cut_generated_videos(read_json("tasks.json", []))
         if not generated_paths:
-            st.info("Ainda não existem vídeos gerados com caminho registado na pipeline.")
+            st.info("Ainda não existem vídeos prontos na pipeline.")
         else:
-            generated_labels = [f"{path.name} — {path}" for path in generated_paths]
-            selected_generated = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: generated_labels[index], key="cuts_generated_index")
-            if st.button("Usar vídeo seleccionado", key="cuts_use_generated", width="stretch"):
-                source_path = generated_paths[selected_generated]
-                st.session_state["cuts_source_path"] = str(source_path)
-                st.session_state["cuts_source_label"] = f"Pipeline · {source_path.name}"
+            st.caption(f"{len(generated_paths)} vídeo(s) pronto(s) disponível(is).")
+            for index, generated_path in enumerate(generated_paths):
+                with st.expander(generated_path.stem, expanded=False):
+                    card_cols = st.columns([1.35, 2.4, 1.1])
+                    with card_cols[0]:
+                        thumbnail = _video_thumbnail(generated_path)
+                        if thumbnail:
+                            st.image(thumbnail, width="stretch")
+                        else:
+                            st.video(str(generated_path))
+                    with card_cols[1]:
+                        st.markdown(f"**{generated_path.stem}**")
+                        st.caption(f"Vídeo pronto · {generated_path.suffix.lstrip('.').upper()}")
+                        st.caption(f"{generated_path.stat().st_size / (1024 * 1024):.2f} MB")
+                    with card_cols[2]:
+                        if st.button("Usar vídeo", key=f"cuts_use_generated_{index}_{_library_card_key('cuts', generated_path)}", type="primary", width="stretch"):
+                            st.session_state["cuts_source_path"] = str(generated_path)
+                            st.session_state["cuts_source_label"] = f"Pipeline · {generated_path.stem}"
+                            st.rerun()
     with folder_tab:
         folder_value = st.text_input("Pasta de vídeos", value=str(STORAGE / "videos"), key="cuts_video_folder")
         folder_paths = list_cut_video_files(folder_value)
@@ -5028,11 +5064,28 @@ def render_python_editor():
             tasks = read_json("tasks.json", [])
             generated_paths = list_generated_videos(tasks)
             if not generated_paths:
-                st.info("Ainda não existem vídeos gerados com caminho registado nos artefactos da pipeline.")
+                st.info("Ainda não existem vídeos prontos nos artefactos da pipeline.")
             else:
-                labels = [f"{path.name} — {path}" for path in generated_paths]
-                selected_index = st.selectbox("Vídeo gerado", range(len(generated_paths)), format_func=lambda index: labels[index], key="python_editor_generated_index")
-                source_path = generated_paths[selected_index]
+                st.caption("Seleccione um vídeo pronto na pipeline.")
+                for index, generated_path in enumerate(generated_paths):
+                    with st.expander(generated_path.stem, expanded=False):
+                        card_cols = st.columns([1.35, 2.4, 1.1])
+                        with card_cols[0]:
+                            thumbnail = _video_thumbnail(generated_path)
+                            if thumbnail:
+                                st.image(thumbnail, width="stretch")
+                            else:
+                                st.video(str(generated_path))
+                        with card_cols[1]:
+                            st.markdown(f"**{generated_path.stem}**")
+                            st.caption(f"Vídeo pronto · {generated_path.suffix.lstrip('.').upper()}")
+                        with card_cols[2]:
+                            if st.button("Editar vídeo", key=f"python_use_generated_{index}_{_library_card_key('python', generated_path)}", type="primary", width="stretch"):
+                                st.session_state["python_editor_source_path"] = str(generated_path)
+                                st.rerun()
+                stored_generated = Path(str(st.session_state.get("python_editor_source_path") or ""))
+                if stored_generated.is_file() and stored_generated in generated_paths:
+                    source_path = stored_generated
         elif source_mode == "Pasta local":
             default_folder = str(STORAGE / "videos")
             folder_value = st.text_input("Pasta de vídeos", value=st.session_state.get("python_editor_folder", default_folder), key="python_editor_folder")

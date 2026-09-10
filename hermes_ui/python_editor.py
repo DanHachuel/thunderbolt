@@ -96,6 +96,8 @@ def list_video_files(folder: str | Path) -> list[Path]:
 def list_generated_videos(tasks: list[dict[str, Any]]) -> list[Path]:
     paths: dict[str, Path] = {}
     for task in tasks:
+        if "video_ready" in task and not bool(task.get("video_ready")):
+            continue
         artifacts = task.get("artifacts") or {}
         value = artifacts.get("video")
         if isinstance(value, str) and value.strip():
