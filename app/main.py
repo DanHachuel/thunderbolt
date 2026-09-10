@@ -5169,6 +5169,13 @@ def _saved_script_task_matches(task: dict[str, Any], record: dict[str, Any], cha
 def _sync_saved_scripts_to_youtube_automation() -> None:
     """Expose every saved video script as one manual YouTube task, without duplicates."""
     records = _backfill_saved_script_blueprints(list_script_documents())
+    sync_signature = "|".join(
+        f"{record.get('id', '')}:{record.get('created_at', '')}:{record.get('blueprint_id', '')}:{record.get('blueprint_name', '')}"
+        for record in records
+        if str(record.get("document_type") or "video_script").strip() == "video_script"
+    )
+    if st.session_state.get("youtube_script_sync_signature") == sync_signature:
+        return
     channels = [item for item in read_json("channels.json", []) if isinstance(item, dict)]
     existing_tasks = load_video_tasks_for_catalog()
     for raw_record in records:
@@ -5201,6 +5208,7 @@ def _sync_saved_scripts_to_youtube_automation() -> None:
             continue
         created = _create_video_task_from_saved_script(record, channel, {})
         existing_tasks.extend(created)
+    st.session_state["youtube_script_sync_signature"] = sync_signature
 
 
 def _automation_created_at(task: dict[str, Any]) -> tuple[datetime, str]:
