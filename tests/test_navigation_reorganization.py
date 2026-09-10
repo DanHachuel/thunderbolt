@@ -62,12 +62,14 @@ class NavigationReorganizationTests(unittest.TestCase):
         channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
         expected_children = [
             '("Canais YouTube",',
+            '("Canais Tiktok",',
+            '("Contas Instagram",',
+            '("Facebook Pages",',
             '("Blueprints Youtube",',
             '("Thumbnail Blueprints",',
             '("Brandings Youtube",',
             '("Contas TikTok",',
             '("Prompt Masters",',
-            '("Facebook Pages",',
         ]
         positions = [channel_block.index(item) for item in expected_children]
         self.assertEqual(positions, sorted(positions))
@@ -76,6 +78,19 @@ class NavigationReorganizationTests(unittest.TestCase):
         self.assertIn('"Thumbnail Blueprints": render_thumbnail_blueprints', MAIN_SOURCE)
         self.assertIn('"Brandings Youtube": render_youtube_brandings', MAIN_SOURCE)
         self.assertIn('def render_thumbnail_blueprints():', MAIN_SOURCE)
+
+    def test_requested_empty_automation_pages_are_present(self):
+        automation_block = MAIN_SOURCE.split("    automation_items = [", 1)[1].split("    ]", 1)[0]
+        labels = ("Automação Facebook", "Automação Musicas", "Automação UGC", "Automação Influencer Content", "Automação Bilibili")
+        for label in labels:
+            self.assertIn(f'("{label}",', automation_block)
+            self.assertIn(f'"{label}": lambda: None', MAIN_SOURCE)
+
+    def test_instagram_and_facebook_pages_are_video_profile_children(self):
+        channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
+        self.assertLess(channel_block.index('("Contas Instagram",'), channel_block.index('("Facebook Pages",'))
+        self.assertIn('"Contas Instagram": "/canais-perfis-videos/contas-instagram"', MAIN_SOURCE)
+        self.assertIn('"Facebook Pages": render_facebook_pages', MAIN_SOURCE)
 
     def test_video_backlog_is_not_nested_inside_video_creation(self):
         self.assertIn('tab_labels = ["Criar vídeo"] + (["Gerar de Rascunho"] if page_title == "Criação de Vídeos" else [])', MAIN_SOURCE)
@@ -154,12 +169,14 @@ def test_confirmed_video_profiles_children_are_ordered_and_base_files_is_removed
     channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
     expected_children = [
         '("Canais YouTube",',
+        '("Canais Tiktok",',
+        '("Contas Instagram",',
+        '("Facebook Pages",',
         '("Blueprints Youtube",',
         '("Thumbnail Blueprints",',
         '("Brandings Youtube",',
         '("Contas TikTok",',
         '("Prompt Masters",',
-        '("Facebook Pages",',
     ]
     positions = [channel_block.index(item) for item in expected_children]
     assert positions == sorted(positions)
