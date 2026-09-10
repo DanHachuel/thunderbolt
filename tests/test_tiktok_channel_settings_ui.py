@@ -54,3 +54,8 @@ def test_tiktok_automation_start_uses_shared_pipeline_start_helper():
     assert 'key=f"tiktok_automation_start_{task_id}"' in SOURCE
     assert '_start_pipeline_task(task_id, state)' in SOURCE
     assert 'disabled=state not in {"to_do", "blocked", "failed"}' in SOURCE
+
+
+def test_youtube_refresh_keeps_fragment_and_guards_script_sync():
+    assert '@st.fragment(run_every=5.0)\ndef _render_youtube_automation_cards()' in SOURCE
+    assert 'youtube_script_sync_signature' in SOURCE
