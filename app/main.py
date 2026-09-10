@@ -5225,8 +5225,6 @@ def _automation_created_at(task: dict[str, Any]) -> tuple[datetime, str]:
 def load_automation_tasks_for_platform(platform_name: str) -> list[dict[str, Any]]:
     """Return only automation/catalog tasks belonging to one publishing platform."""
     target = str(platform_name or "").strip().casefold()
-    if target == "youtube":
-        _sync_saved_scripts_to_youtube_automation()
     return sorted(
         [task for task in load_video_tasks_for_catalog() if task_platform(task) == target],
         key=_automation_created_at,
@@ -6149,6 +6147,7 @@ def _render_youtube_automation_cards():
 def render_automation():
     st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
+    _sync_saved_scripts_to_youtube_automation()
     worker_status = load_worker_status()
     local_now = datetime.now().astimezone()
     if worker_status.get("alive"):
