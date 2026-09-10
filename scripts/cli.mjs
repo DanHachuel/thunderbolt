@@ -9,6 +9,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const args = process.argv.slice(2);
+const packageVersion = (() => {
+  try { return JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version || "dev"; }
+  catch { return "dev"; }
+})();
 
 function getUserHome() {
   if (platform() !== "win32") return homedir();
@@ -200,6 +204,33 @@ const backendPort = await new Promise((resolve, reject) => {
   });
 });
 const supportedLanguages = new Set(["en", "zh", "de", "vi", "tr", "pt", "ru", "es", "id", "it"]);
+const dynamicChunkRecoveryScript = `<script data-thunderbolt-recovery="${packageVersion}">
+(() => {
+  const key = "thunderbolt-dynamic-chunk-recovery";
+  const recover = () => {
+    try {
+      const now = Date.now();
+      const previous = Number(sessionStorage.getItem(key) || 0);
+      if (now - previous < 30000) return;
+      sessionStorage.setItem(key, String(now));
+      const url = new URL(window.location.href);
+      url.searchParams.set("tb_refresh", String(now));
+      window.location.replace(url.href);
+    } catch (_) {
+      window.location.reload();
+    }
+  };
+  window.addEventListener("unhandledrejection", (event) => {
+    const message = String(event.reason?.message || event.reason || "");
+    if (/Failed to fetch dynamically imported module|Importing a module script failed/i.test(message)) recover();
+  });
+  window.addEventListener("error", (event) => {
+    const message = String(event.message || "");
+    if (/dynamically imported module|module script failed/i.test(message)) recover();
+  });
+  window.setTimeout(() => { try { sessionStorage.removeItem(key); } catch (_) {} }, 3500);
+})();
+</script>`;
 
 const proxy = http.createServer((request, response) => {
   const requestUrl = new URL(request.url || "/", `http://localhost:${publicPort}`);
@@ -240,8 +271,26 @@ const proxy = http.createServer((request, response) => {
     responseHeaders["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0";
     responseHeaders.pragma = "no-cache";
     responseHeaders.expires = "0";
-    response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
-    upstreamResponse.pipe(response);
+    const contentType = String(responseHeaders["content-type"] || "").toLowerCase();
+    const isHtml = contentType.includes("text/html") && !responseHeaders["content-encoding"];
+    if (!isHtml) {
+      response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
+      upstreamResponse.pipe(response);
+      return;
+    }
+    const chunks = [];
+    let totalBytes = 0;
+    upstreamResponse.on("data", (chunk) => {
+      chunks.push(chunk);
+      totalBytes += chunk.length;
+    });
+    upstreamResponse.on("end", () => {
+      let body = Buffer.concat(chunks, totalBytes).toString("utf8");
+      if (body.includes("</body>")) body = body.replace("</body>", `${dynamicChunkRecoveryScript}</body>`);
+      delete responseHeaders["content-length"];
+      response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
+      response.end(body);
+    });
   });
   upstream.on("error", (error) => {
     response.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
