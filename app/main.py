@@ -139,6 +139,7 @@ from hermes_ui.growth_tiktok import render_growth_tiktok
 from hermes_ui.growth_instagram import render_growth_instagram
 from hermes_ui.growth_facebook_pages import render_growth_facebook_pages
 from hermes_ui.growth_bilibili import render_growth_bilibili
+from hermes_ui.facebook_automation import caption_images, collect_images, create_post, generate_article, generate_theme, list_posts, publish_to_facebook, save_post
 from hermes_ui.canva_auth import authorization_url, create_pkce_pair, create_state, exchange_code
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -6283,6 +6284,130 @@ def _render_youtube_automation_cards():
                                     st.rerun()
 
 
+def _facebook_pages_for_automation() -> list[dict[str, Any]]:
+    return [channel for channel in read_json("channels.json", []) if isinstance(channel, dict) and classify_channel_platform(channel) == "facebook"]
+
+
+@st.fragment(run_every=5.0)
+def _render_facebook_automation_cards() -> None:
+    st.divider()
+    st.subheader("Posts Facebook em produção")
+    posts = list_posts()
+    if not posts:
+        st.info("Ainda não existem posts Facebook em produção.")
+        return
+    for post in posts:
+        post_id = str(post.get("id") or "")
+        with st.container(border=True):
+            cols = st.columns([2.5, 1.35, 1.15, 2.0], gap="small")
+            with cols[0]:
+                st.write(f"**{post.get('title') or post.get('theme') or 'Post sem tema'}**")
+                st.caption(f"{post.get('page_name') or 'Facebook Page'} · {post_id}")
+                st.caption(f"Etapa: {post.get('status', 'tema_pendente')}")
+                if post.get("article_text"):
+                    with st.expander("Ver artigo", expanded=False):
+                        st.text_area("Artigo", value=str(post["article_text"]), height=220, key=f"facebook_article_{post_id}", disabled=True)
+                image_records = post.get("images") if isinstance(post.get("images"), list) else []
+                if image_records:
+                    image_cols = st.columns(min(5, len(image_records)))
+                    for image_col, image in zip(image_cols, image_records):
+                        image_path = Path(str(image.get("captioned_path") or image.get("path") or ""))
+                        with image_col:
+                            if image_path.is_file():
+                                st.image(str(image_path), use_container_width=True)
+                            st.caption(str(image.get("status") or "pendente"))
+            with cols[1]:
+                st.caption("Estado")
+                st.write(str(post.get("status") or "tema_pendente").replace("_", " ").capitalize())
+                st.progress({"tema_pendente": 0, "artigo_pendente": 20, "imagens_pendentes": 45, "legendas_pendentes": 70, "pronto_upload": 90, "publicado": 100}.get(str(post.get("status")), 0), text=f"{len(post.get('images') or [])}/5 imagens")
+            with cols[2]:
+                st.caption("Imagens")
+                st.write(f"{len(post.get('images') or [])} previstas")
+                st.caption("Google Imagens ou IA")
+            with cols[3]:
+                settings = read_json("settings.json", {})
+                pages = _facebook_pages_for_automation()
+                page = next((item for item in pages if str(item.get("id")) == str(post.get("page_id"))), {})
+                if st.button("Gerar tema", key=f"facebook_generate_theme_{post_id}", disabled=str(post.get("status")) not in {"tema_pendente", "erro"}, width="stretch"):
+                    try:
+                        generate_theme(settings, post, page)
+                        st.success("Tema criado pelo LLM.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+                if st.button("Criar artigo", key=f"facebook_generate_article_{post_id}", disabled=str(post.get("status")) != "artigo_pendente", width="stretch"):
+                    try:
+                        generate_article(settings, post, page)
+                        st.success("Artigo e prompts de imagens criados pelo LLM.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+                source = st.selectbox("Fonte das imagens", ["Google Imagens", "Gerar com IA"], key=f"facebook_image_source_{post_id}")
+                if st.button("Buscar/Gerar imagens", key=f"facebook_collect_images_{post_id}", disabled=str(post.get("status")) != "imagens_pendentes", width="stretch"):
+                    try:
+                        collect_images(settings, post, source="google" if source == "Google Imagens" else "ai")
+                        st.success("Imagens processadas.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+                if st.button("Legendar imagens", key=f"facebook_caption_images_{post_id}", disabled=str(post.get("status")) != "legendas_pendentes", width="stretch"):
+                    try:
+                        caption_images(post)
+                        st.success("Textos aplicados nas imagens com Pillow.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+                if st.button("Upload para Facebook", key=f"facebook_publish_{post_id}", type="primary", disabled=str(post.get("status")) != "pronto_upload", width="stretch"):
+                    try:
+                        publish_to_facebook(post, page)
+                        st.success("Post publicado na Facebook Page.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+
+
+def render_facebook_automation() -> None:
+    st.title("Automação Facebook")
+    st.caption("Fluxo local de posts: Ideia/Tema → LLM → Artigo → Google Imagens ou IA → textos e legendas → Upload pela Meta Graph API.")
+    st.info("Esta página não usa planilhas nem Google Drive. Os artigos, imagens, legendas e estados ficam no armazenamento local do Thunderbolt.")
+    pages = _facebook_pages_for_automation()
+    settings = read_json("settings.json", {})
+    if not pages:
+        st.warning("Cadastre primeiro uma página em Canais e Perfis de Vídeos > Facebook Pages.")
+        return
+    with st.expander("Configurar API Facebook da página", expanded=False):
+        for page in pages:
+            page_id = str(page.get("id") or "")
+            with st.form(f"facebook_page_api_{page_id}"):
+                st.write(f"**{page.get('name') or 'Facebook Page'}**")
+                meta_page_id = st.text_input("Page ID da Meta", value=str(page.get("page_id") or page.get("facebook_page_id") or ""), key=f"facebook_meta_page_id_{page_id}")
+                access_token = st.text_input("Access Token da Page", value=str(page.get("access_token") or page.get("facebook_access_token") or ""), type="password", key=f"facebook_meta_token_{page_id}")
+                if st.form_submit_button("Guardar credenciais Facebook", type="primary"):
+                    update_channel(page_id, {"page_id": meta_page_id.strip(), "facebook_page_id": meta_page_id.strip(), "access_token": access_token.strip(), "facebook_access_token": access_token.strip()})
+                    st.success("Credenciais da página guardadas localmente.")
+                    st.rerun()
+    with st.form("facebook_automation_new_post"):
+        page_options = [str(page.get("id")) for page in pages]
+        page_labels = {str(page.get("id")): str(page.get("name") or "Facebook Page") for page in pages}
+        selected_page = st.selectbox("Facebook Page", page_options, format_func=lambda value: page_labels.get(value, value))
+        form_cols = st.columns([2.2, 1, 1.3])
+        with form_cols[0]:
+            theme = st.text_input("Tema/ideia opcional", placeholder="Deixe vazio para o LLM sugerir um tema")
+        with form_cols[1]:
+            image_count = st.number_input("Imagens", min_value=1, max_value=5, value=3, step=1)
+        with form_cols[2]:
+            start_stage = st.selectbox("Iniciar por", ["Ideia / Tema", "Tema já definido"])
+        create_clicked = st.form_submit_button("Criar post na fila", type="primary", width="stretch")
+    if create_clicked:
+        page = next(page for page in pages if str(page.get("id")) == selected_page)
+        post = create_post(page, image_count=int(image_count), theme=theme)
+        if start_stage == "Tema já definido" and theme.strip():
+            save_post({**post, "status": "artigo_pendente"})
+        st.success("Post criado na fila local. Execute cada etapa pelos botões do card.")
+        st.rerun()
+    _render_facebook_automation_cards()
+
+
 def render_automation():
     st.title("Automação Youtube")
     st.caption("Agendamento diário da geração por canal. O worker verifica o relógio local do computador e coloca os lotes agendados na fila.")
@@ -9847,7 +9972,7 @@ def main():
         "Facebook Pages": render_facebook_pages,
         "Automação Youtube": render_automation,
         "Automação Tiktok": render_tiktok_automation,
-        "Automação Facebook": lambda: None,
+        "Automação Facebook": render_facebook_automation,
         "Automação Musicas": lambda: None,
         "Automação UGC": lambda: None,
         "Automação Influencer Content": lambda: None,

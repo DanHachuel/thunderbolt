@@ -84,7 +84,8 @@ class NavigationReorganizationTests(unittest.TestCase):
         labels = ("Automação Facebook", "Automação Musicas", "Automação UGC", "Automação Influencer Content", "Automação Bilibili")
         for label in labels:
             self.assertIn(f'("{label}",', automation_block)
-            self.assertIn(f'"{label}": lambda: None', MAIN_SOURCE)
+            expected_renderer = 'render_facebook_automation' if label == "Automação Facebook" else 'lambda: None'
+            self.assertIn(f'"{label}": {expected_renderer}', MAIN_SOURCE)
 
     def test_instagram_and_facebook_pages_are_video_profile_children(self):
         channel_block = MAIN_SOURCE.split("    channel_profile_items = [", 1)[1].split("    ]", 1)[0]
