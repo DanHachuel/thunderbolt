@@ -74,6 +74,16 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         self.assertIn('from streamlit.web.cli import main', bootstrap)
         self.assertLess(bootstrap.index('os.environ["PYTHONIOENCODING"]'), bootstrap.index('from streamlit.web.cli import main'))
 
+    def test_dynamic_chunk_recovery_does_not_reset_its_session_guard(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        recovery = source.split("const dynamicChunkRecoveryScript", 1)[1].split("const proxy", 1)[0]
+        self.assertIn('sessionStorage.setItem(key, String(now));', recovery)
+        self.assertNotIn('sessionStorage.removeItem(key)', recovery)
+
+    def test_proxy_requests_uncompressed_html_for_chunk_recovery_injection(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        self.assertIn('"accept-encoding": "identity"', source)
+
     def test_streamlit_bootstrap_owns_sigint_without_click_shutdown(self):
         bootstrap = (ROOT / "scripts" / "streamlit_bootstrap.py").read_text(encoding="utf-8")
         self.assertIn("def _custom_sigint_handler", bootstrap)

@@ -228,7 +228,6 @@ const dynamicChunkRecoveryScript = `<script data-thunderbolt-recovery="${package
     const message = String(event.message || "");
     if (/dynamically imported module|module script failed/i.test(message)) recover();
   });
-  window.setTimeout(() => { try { sessionStorage.removeItem(key); } catch (_) {} }, 3500);
 })();
 </script>`;
 
@@ -260,7 +259,7 @@ const proxy = http.createServer((request, response) => {
     port: backendPort,
     method: request.method,
     path: `${requestUrl.pathname}${requestUrl.search}`,
-    headers: { ...request.headers, host: `127.0.0.1:${backendPort}` },
+    headers: { ...request.headers, host: `127.0.0.1:${backendPort}`, "accept-encoding": "identity" },
   }, (upstreamResponse) => {
     const responseHeaders = { ...upstreamResponse.headers };
     // Streamlit entrega HTML/JS de uma instância local que pode mudar após
