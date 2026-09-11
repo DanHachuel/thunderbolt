@@ -506,7 +506,8 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             st.write(f"**{_clean(profile.get('name')) or 'Sem nome'}**")
             st.caption(f"{_clean(profile.get('handle')) or _clean(profile.get('url')) or 'sem handler'}")
             _render_instagram_bio(_profile_bio(profile))
-            st.caption(f"{_profile_country(profile) or 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
+            country = _profile_country(profile)
+            st.caption(f"{_country_display(country) if country else 'País não definido'} · {_clean(profile.get('language')) or 'Idioma não definido'}")
         with header_cols[2]:
             st.metric("posts", _metric(_profile_metric(profile, "post_count", "posts", "media_count")))
         with header_cols[3]:
@@ -587,7 +588,8 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             with block_cols[1]:
                 st.markdown(f"**handler**\n\n{_clean(profile.get('handle')) or '—'}")
             with block_cols[2]:
-                st.markdown(f"**País**\n\n{_profile_country(profile) or '—'}")
+                country = _profile_country(profile)
+                st.markdown(f"**País**\n\n{_country_display(country) if country else '—'}")
             with block_cols[3]:
                 st.markdown(f"**Idioma**\n\n{_clean(profile.get('language')) or '—'}")
 

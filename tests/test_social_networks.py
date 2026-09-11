@@ -236,6 +236,11 @@ def test_country_normalization_only_normalizes_explicit_form_values():
     assert _normalise_country("Brasil/ SP") == ""
 
 
+def test_country_display_renders_flag_for_code_and_name():
+    assert _country_display("BR") == "🇧🇷 Brasil"
+    assert _country_display("Brasil") == "🇧🇷 Brasil"
+
+
 def test_load_posts_button_function_uses_saved_profile_url_and_returns_posts():
     result = Mock(ok=True, message="Posts públicos encontrados.", data={"posts": [{"id": "p1"}]})
     with patch("app.social_networks_ui.fetch_public_instagram_posts", return_value=result) as fetch:
