@@ -97,7 +97,7 @@ from app.modules.token_optimizer.metrics import get_stats as get_token_optimizer
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
 from app.social_networks_ui import render_meta_api_cards, render_social_networks
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
-from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
+from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, save_thumbnail_blueprint_pairs, thumbnail_blueprint_associations, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
 from hermes_ui.python_editor import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, PythonEditorError, change_speed, editor_manifest, extract_audio, list_edit_records as list_python_editor_records, list_generated_videos, list_scripts, list_video_files, read_script, remove_audio, replace_audio, resize_video, save_edit_record as save_python_editor_record, save_script, store_uploaded_asset, trim_video
 from hermes_ui.cuts import CutsError, download_direct_video_url, generate_clips, list_generated_videos as list_cut_generated_videos, list_runs as list_cut_runs, list_video_files as list_cut_video_files, manifest_bytes as cut_manifest_bytes, store_uploaded_video, zip_run as zip_cut_run
@@ -2122,11 +2122,13 @@ def render_thumbnail_blueprints():
             pair_options = blueprint_catalog()
             pair_ids = [item[0] for item in pair_options]
             pair_labels = {item[0]: item[1] for item in pair_options}
-            pair = st.selectbox("Blueprint de roteiro associado", pair_ids, format_func=lambda item: pair_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_card_pair_{path.stem}")
+            existing_pairs = thumbnail_blueprint_associations()
+            associated = [key for key, value in existing_pairs.items() if value == path.stem]
+            pair = st.multiselect("Blueprints de roteiro associados", pair_ids, default=[item for item in associated if item in pair_ids], format_func=lambda item: pair_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_card_pair_{path.stem}")
             if st.button("Guardar associação deste card", key=f"thumbnail_card_pair_save_{path.stem}"):
                 try:
-                    save_thumbnail_blueprint_pair(path.stem, pair)
-                    st.success("Associação guardada; canais com esse Blueprint usarão esta thumbnail blueprint automaticamente.")
+                    save_thumbnail_blueprint_pairs(path.stem, pair)
+                    st.success("Associações guardadas; todos os Blueprints selecionados usarão esta Thumbnail Blueprint automaticamente.")
                 except ValueError as exc:
                     st.error(str(exc))
             with st.expander("Abrir documento completo", expanded=False):
@@ -2155,12 +2157,11 @@ def render_thumbnail_blueprints():
                 script = st.selectbox("Blueprint de roteiro associado", blueprint_ids, index=blueprint_ids.index(current_script) if current_script in blueprint_ids else 0, format_func=lambda item: blueprint_labels.get(item, item or "Sem Blueprint padrão"), key=f"thumbnail_script_blueprint_channel_{channel_id}")
             with cols[2]:
                 if st.button("Guardar par", key=f"thumbnail_blueprint_save_{channel_id}", width="stretch"):
-                    if thumb in {"Youtube_Generic_Thumbnail_Blueprint", "Tiktok_Generic_Thumbnail_Blueprint"} and script:
-                        st.error("Not Allowed to Associate, System Use Only")
-                    else:
-                        update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
-                        st.success("Par Blueprint de roteiro + Thumbnail Blueprint guardado.")
-                        st.rerun()
+                    update_channel(channel_id, {"thumbnail_blueprint_id": thumb, "default_thumbnail_blueprint_id": thumb, "blueprint_id": script, "default_blueprint_id": script})
+                    if script:
+                        save_thumbnail_blueprint_pair(thumb, script)
+                    st.success("Par Blueprint de roteiro + Thumbnail Blueprint guardado.")
+                    st.rerun()
 def _tiktok_accounts_from_settings(settings: dict[str, Any]) -> list[dict[str, Any]]:
     raw_accounts = settings.get("tiktok_accounts")
     if not isinstance(raw_accounts, list) or not raw_accounts:

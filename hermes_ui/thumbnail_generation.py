@@ -23,18 +23,21 @@ DEFAULT_MIME_TYPE = "image/jpeg"
 DEFAULT_IMAGE_EXTENSION = ".jpg"
 THUMBNAIL_WIDTH = 1792
 THUMBNAIL_HEIGHT = 1024
+VERTICAL_THUMBNAIL_WIDTH = 1024
+VERTICAL_THUMBNAIL_HEIGHT = 1792
 
 
 class ThumbnailGenerationError(RuntimeError):
     """Raised when Nano Banana cannot produce a thumbnail image."""
 
 
-def normalize_thumbnail_bytes(image_bytes: bytes) -> bytes:
-    """Return a non-distorted, YouTube-ready 16:9 JPEG at 1792×1024."""
+def normalize_thumbnail_bytes(image_bytes: bytes, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> bytes:
+    """Return a non-distorted JPEG in the requested thumbnail orientation."""
     try:
         with Image.open(__import__("io").BytesIO(image_bytes)) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
-            image = ImageOps.fit(image, (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+            size = (VERTICAL_THUMBNAIL_WIDTH, VERTICAL_THUMBNAIL_HEIGHT) if str(aspect_ratio) == "9:16" else (THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+            image = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
             output = __import__("io").BytesIO()
             image.save(output, format="JPEG", quality=95, optimize=True)
             return output.getvalue()
@@ -171,6 +174,7 @@ def generate_thumbnail_image(
     reference_image: str | Path | None = None,
     lettering_text: str = "",
     lettering_prompt: str = "",
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
 ) -> Path:
     api_key = str(settings.get("gemini_image_api_key") or "").strip()
     if not api_key:
@@ -186,9 +190,6 @@ def generate_thumbnail_image(
     )
 
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
-    # YouTube thumbnails are never square: do not allow a legacy/provider setting
-    # to override the required horizontal canvas.
-    aspect_ratio = DEFAULT_ASPECT_RATIO
     image_size = DEFAULT_IMAGE_SIZE
     request_input: str | list[dict[str, str]] = effective_prompt
     if reference_image:
@@ -229,7 +230,7 @@ def generate_thumbnail_image(
         raise ThumbnailGenerationError("A API Nano Banana devolveu uma resposta que não é JSON.") from exc
     if str(payload.get("status") or "completed").lower() not in {"completed", "succeeded"}:
         raise ThumbnailGenerationError(f"A interação Nano Banana terminou com estado inesperado: {payload.get('status') or 'desconhecido'}.")
-    image_bytes = normalize_thumbnail_bytes(_extract_image_bytes(payload))
+    image_bytes = normalize_thumbnail_bytes(_extract_image_bytes(payload), aspect_ratio)
 
     ensure_storage()
     output_dir = STORAGE / "thumbnails"
