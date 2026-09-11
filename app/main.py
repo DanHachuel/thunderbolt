@@ -6424,7 +6424,6 @@ def _render_facebook_automation_cards() -> None:
 def render_facebook_automation() -> None:
     st.title("Automação Facebook")
     st.caption("Fluxo local de posts: Ideia/Tema → LLM → Artigo → Google Imagens ou IA → textos e legendas → Upload pela Meta Graph API.")
-    st.info("Esta página não usa planilhas nem Google Drive. Os artigos, imagens, legendas e estados ficam no armazenamento local do Thunderbolt.")
     pages = _facebook_pages_for_automation()
     settings = read_json("settings.json", {})
     if not pages:
