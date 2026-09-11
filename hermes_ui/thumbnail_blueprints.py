@@ -53,7 +53,7 @@ def resolve_thumbnail_blueprint(identifier: Any) -> dict[str, Any]:
 
 def _generic_thumbnail_blueprint_id(format_value: Any = "", platform: Any = "") -> str:
     raw = str(format_value or "").strip().casefold()
-    if raw in {"portrait", "vertical", "shorts", "9:16", "tiktok", "reels"}:
+    if raw in {"portrait", "portrait 9:16", "vertical", "shorts", "9:16", "tiktok", "reels"}:
         return VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID
     platform_raw = str(platform or "").strip().casefold()
     if platform_raw in {"tiktok", "instagram", "instagram reels", "shorts"} and not raw:
@@ -63,7 +63,11 @@ def _generic_thumbnail_blueprint_id(format_value: Any = "", platform: Any = "") 
 
 def thumbnail_blueprint_for_channel(channel: Mapping[str, Any], format_value: Any = "") -> dict[str, Any]:
     direct = channel.get("default_thumbnail_blueprint_id") or channel.get("thumbnail_blueprint_id")
-    if direct:
+    if direct and str(direct).strip() not in {
+        "Generic_Thumbnail_Blueprint",
+        HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+        VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+    }:
         return resolve_thumbnail_blueprint(direct)
     script_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
     pairs = _pair_state()
@@ -72,10 +76,25 @@ def thumbnail_blueprint_for_channel(channel: Mapping[str, Any], format_value: An
     )
 
 
-def thumbnail_blueprint_for_blueprint(blueprint_id: Any) -> dict[str, Any]:
+def thumbnail_blueprint_for_task(channel: Mapping[str, Any], task: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve a task thumbnail, replacing stale generic orientation defaults."""
+    format_value = task.get("format") or (task.get("generation_settings") or {}).get("video_aspect_ratio")
+    direct = str(task.get("thumbnail_blueprint_id") or "").strip()
+    if direct and direct not in {
+        "Generic_Thumbnail_Blueprint",
+        HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+        VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+    }:
+        return resolve_thumbnail_blueprint(direct)
+    return thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": ""}, format_value)
+
+
+def thumbnail_blueprint_for_blueprint(blueprint_id: Any, format_value: Any = "") -> dict[str, Any]:
     """Resolve the visual pair for a script Blueprint, falling back to Generic."""
     paired_id = _pair_state().get(str(blueprint_id or "").strip(), "")
-    return resolve_thumbnail_blueprint(paired_id or HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID)
+    if isinstance(paired_id, list):
+        paired_id = paired_id[0] if paired_id else ""
+    return resolve_thumbnail_blueprint(paired_id or _generic_thumbnail_blueprint_id(format_value))
 
 
 def _pair_state() -> dict[str, str]:
@@ -87,9 +106,11 @@ def _pair_state() -> dict[str, str]:
         return {}
 
 
+def thumbnail_blueprint_associations() -> dict[str, str]:
+    return _pair_state()
+
+
 def save_thumbnail_blueprint_pair(thumbnail_id: str, blueprint_id: str) -> None:
-    if str(thumbnail_id) in {HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID, VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID} and str(blueprint_id):
-        raise ValueError(GENERIC_ASSOCIATION_ERROR)
     pairs = _pair_state()
     if blueprint_id:
         pairs[str(blueprint_id)] = str(thumbnail_id)
@@ -97,6 +118,21 @@ def save_thumbnail_blueprint_pair(thumbnail_id: str, blueprint_id: str) -> None:
         for key, value in list(pairs.items()):
             if value == thumbnail_id:
                 pairs.pop(key, None)
+    atomic_write(BLUEPRINTS / "thumbnail_blueprint_pairs.json", pairs)
+
+
+def save_thumbnail_blueprint_pairs(thumbnail_id: str, blueprint_ids: list[str]) -> None:
+    """Associate one thumbnail blueprint with any number of script blueprints."""
+    selected = {str(item).strip() for item in blueprint_ids if str(item).strip()}
+    pairs = _pair_state()
+    for key, value in list(pairs.items()):
+        values = value if isinstance(value, list) else [value]
+        if str(key) in selected:
+            continue
+        if str(thumbnail_id) in {str(item) for item in values}:
+            pairs.pop(key, None)
+    for blueprint_id in selected:
+        pairs[blueprint_id] = str(thumbnail_id)
     atomic_write(BLUEPRINTS / "thumbnail_blueprint_pairs.json", pairs)
 
 

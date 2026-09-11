@@ -379,9 +379,9 @@ def seed_blueprints() -> None:
     thumbnail_destination = BLUEPRINTS / "thumbnails"
     thumbnail_destination.mkdir(parents=True, exist_ok=True)
     legacy_thumbnail = thumbnail_destination / "FINANCE_Thumbnail_Blueprint.md"
-    current_thumbnail = thumbnail_destination / "FINANCE USA_Thumbnail_Blueprint.md"
-    if legacy_thumbnail.is_file() and not current_thumbnail.exists():
-        legacy_thumbnail.replace(current_thumbnail)
+    renamed_thumbnail = thumbnail_destination / "FINANCE USA_Thumbnail_Blueprint.md"
+    if renamed_thumbnail.is_file() and not legacy_thumbnail.exists():
+        renamed_thumbnail.replace(legacy_thumbnail)
     for source in sorted(SEED_THUMBNAIL_BLUEPRINTS.glob("*.md")):
         target = thumbnail_destination / source.name
         if not target.exists():
@@ -393,7 +393,15 @@ def seed_blueprints() -> None:
             seeded_pairs = json.loads(pair_source.read_text(encoding="utf-8"))
             current_pairs = json.loads(pair_target.read_text(encoding="utf-8")) if pair_target.exists() else {}
             if isinstance(seeded_pairs, dict) and isinstance(current_pairs, dict):
+                finance_ids = {
+                    "blueprintcanalfinanças", "blueprintcanalfinancas", "BLUEPRINT CANAL FINANÇAS",
+                    "FINANÇAS", "FINANCAS", "FINANCE", "FINANCE USA", "FINANCE BRAZIL", "FINANCE CANADA",
+                    "FINANCE FRANCE", "FINANCE GERMANY", "FINANCE IRELAND", "FINANCE ISRAEL", "FINANCE ITALY",
+                    "FINANCE JAPAN", "FINANCE MEXICO", "FINANCE POLONY", "FINANCE SOUTH AFRICA",
+                    "FINANCE SOUTH COREA", "FINANCE SPAIN", "FINANCE UK", "FINANCE AUSTRALIA",
+                }
                 merged_pairs = {**seeded_pairs, **current_pairs}
+                merged_pairs.update({key: "FINANCE_Thumbnail_Blueprint" for key in finance_ids})
                 if merged_pairs != current_pairs:
                     atomic_write(pair_target, merged_pairs)
         except (OSError, UnicodeError, json.JSONDecodeError):
@@ -402,15 +410,15 @@ def seed_blueprints() -> None:
 
 
 def _rename_pending_finance_thumbnail_references(value: Any) -> tuple[Any, bool]:
-    """Rename the legacy finance thumbnail only in unfinished work items."""
-    legacy = "FINANCE_Thumbnail_Blueprint"
-    current = "FINANCE USA_Thumbnail_Blueprint"
+    """Restore the finance thumbnail name in unfinished persisted records."""
+    renamed = "FINANCE USA_Thumbnail_Blueprint"
+    current = "FINANCE_Thumbnail_Blueprint"
     changed = False
 
     def replace(item: Any) -> Any:
         nonlocal changed
         if isinstance(item, str):
-            if item == legacy:
+            if item == renamed:
                 changed = True
                 return current
             return item
@@ -424,7 +432,7 @@ def _rename_pending_finance_thumbnail_references(value: Any) -> tuple[Any, bool]
 
 
 def migrate_finance_thumbnail_blueprint() -> None:
-    """Move pending automation/video records to the renamed finance thumbnail."""
+    """Restore the finance thumbnail name in pending records and map finance variants."""
     def load_state(name: str, default: Any) -> Any:
         path = STATE / name
         try:
@@ -477,6 +485,50 @@ def migrate_finance_thumbnail_blueprint() -> None:
             save_state("queues.json", updated_queues)
 
 
+def migrate_tiktok_thumbnail_blueprint() -> None:
+    """Adopt the vertical generic thumbnail for legacy TikTok state."""
+    def load_state(name: str, default: Any) -> Any:
+        try:
+            return _load_json_unlocked(STATE / name)
+        except (OSError, json.JSONDecodeError):
+            return default
+
+    def save_state(name: str, value: Any) -> None:
+        _atomic_write_unlocked(STATE / name, value)
+
+    channels = load_state("channels.json", [])
+    channel_map = {str(item.get("id") or ""): item for item in channels if isinstance(item, dict)} if isinstance(channels, list) else {}
+    vertical_ids = {"Generic_Thumbnail_Blueprint", "Youtube_Generic_Thumbnail_Blueprint"}
+    channel_changes = False
+    if isinstance(channels, list):
+        for channel in channels:
+            platform = str(channel.get("platform") or "").strip().casefold()
+            current = str(channel.get("thumbnail_blueprint_id") or channel.get("default_thumbnail_blueprint_id") or "").strip()
+            if platform in {"tiktok", "instagram", "instagram reels"} and (not current or current in vertical_ids):
+                channel["thumbnail_blueprint_id"] = "Tiktok_Generic_Thumbnail_Blueprint"
+                channel["default_thumbnail_blueprint_id"] = "Tiktok_Generic_Thumbnail_Blueprint"
+                channel_changes = True
+        if channel_changes:
+            save_state("channels.json", channels)
+
+    tasks = load_state("tasks.json", [])
+    tasks_changed = False
+    if isinstance(tasks, list):
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            channel = channel_map.get(str(task.get("channel_id") or ""), {})
+            platform = str(task.get("platform") or channel.get("platform") or "").strip().casefold()
+            format_value = str(task.get("format") or (task.get("generation_settings") or {}).get("video_aspect_ratio") or "").strip().casefold()
+            vertical = platform in {"tiktok", "instagram", "instagram reels"} or format_value in {"portrait", "vertical", "shorts", "9:16"}
+            current = str(task.get("thumbnail_blueprint_id") or "").strip()
+            if vertical and (not current or current in vertical_ids):
+                task["thumbnail_blueprint_id"] = "Tiktok_Generic_Thumbnail_Blueprint"
+                tasks_changed = True
+        if tasks_changed:
+            save_state("tasks.json", tasks)
+
+
 def seed_prompt_masters() -> None:
     """Copy packaged TikTok Prompt Masters without overwriting user files."""
     if not SEED_TIKTOK_PROMPT_MASTERS.exists():
@@ -525,6 +577,7 @@ def ensure_storage() -> None:
         if not target.exists():
             atomic_write(target, default)
     migrate_finance_thumbnail_blueprint()
+    migrate_tiktok_thumbnail_blueprint()
 
 
 _LOCK_TIMEOUT_SECONDS = 30.0

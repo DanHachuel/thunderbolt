@@ -317,7 +317,12 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de imagem configurado.")
 
 
-def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "") -> Any:
+def _thumbnail_aspect_ratio(thumbnail_blueprint: Mapping[str, Any] | None) -> str:
+    content = str((thumbnail_blueprint or {}).get("content") or "")
+    return "9:16" if re.search(r"\b9\s*:\s*16\b|VERTICAL", content, flags=re.IGNORECASE) else "16:9"
+
+
+def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "", thumbnail_blueprint: Mapping[str, Any] | None = None) -> Any:
     provider = str(card.get("provider") or "").strip().lower()
     style = str(card.get("api_style") or media_provider_definition(provider).api_style)
     endpoint = _image_endpoint(card)
@@ -327,11 +332,12 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
     )
-    requested_size = "1792x1024" if provider == "pollinations" else "1280x720 minimum"
+    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint)
+    requested_size = ("1024x1792" if aspect_ratio == "9:16" else "1792x1024") if provider == "pollinations" else ("720x1280 minimum" if aspect_ratio == "9:16" else "1280x720 minimum")
     constrained_prompt = _append_generation_constraints(
         image_prompt,
         kind="image",
-        aspect_ratio="16:9",
+        aspect_ratio=aspect_ratio,
         size=requested_size,
     )
     constrained_prompt = _fit_provider_prompt(constrained_prompt, provider)
@@ -348,7 +354,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
     if style == "kie":
         body = {
             "model": _model(card),
-            "input": {"prompt": constrained_prompt, "aspect_ratio": "16:9", "resolution": "1K"},
+            "input": {"prompt": constrained_prompt, "aspect_ratio": aspect_ratio, "resolution": "1K"},
         }
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if provider == "agnes":
@@ -356,7 +362,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
             "model": _model(card) or AGNES_IMAGE_MODEL,
             "prompt": constrained_prompt,
             "size": "1K",
-            "ratio": "16:9",
+            "ratio": aspect_ratio,
             "return_base64": True,
             "extra_body": {"response_format": "b64_json"},
         }
@@ -365,12 +371,12 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         return requests.post(
             endpoint,
             headers=_headers(card),
-            json={"model": _model(card), "prompt": constrained_prompt, "n": 1, "aspect_ratio": "16:9"},
+            json={"model": _model(card), "prompt": constrained_prompt, "n": 1, "aspect_ratio": aspect_ratio},
             timeout=180,
         )
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     if provider == "pollinations":
-        body["size"] = "1792x1024"
+        body["size"] = "1024x1792" if aspect_ratio == "9:16" else "1792x1024"
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
 
 
@@ -427,6 +433,7 @@ def generate_image_for_card(
             )
         except Exception as exc:
             raise MediaGenerationError(str(exc)) from exc
+    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint)
     if provider == "nano_banana":
         merged = dict(settings)
         merged["gemini_image_api_key"] = _api_key(card)
@@ -439,8 +446,8 @@ def generate_image_for_card(
                 _append_generation_constraints(
                     prompt,
                     kind="image",
-                    aspect_ratio="16:9",
-                    size="1280x720 minimum",
+                    aspect_ratio=aspect_ratio,
+                    size="720x1280 minimum" if aspect_ratio == "9:16" else "1280x720 minimum",
                 ),
                 topic=topic,
                 variant_index=variant_index,
@@ -469,8 +476,8 @@ def generate_image_for_card(
             constrained_prompt = _append_generation_constraints(
                 image_prompt,
                 kind="image",
-                aspect_ratio="16:9",
-                size="1280x720 minimum",
+                aspect_ratio=aspect_ratio,
+                size="720x1280 minimum" if aspect_ratio == "9:16" else "1280x720 minimum",
             )
             from huggingface_hub import InferenceClient
             image = InferenceClient(token=token or None, provider="hf-inference").text_to_image(
@@ -484,7 +491,7 @@ def generate_image_for_card(
             raise MediaGenerationError(f"Hugging Face text-to-image falhou: {str(exc)[:240]}") from exc
 
     def request(current: dict[str, Any]) -> Any:
-        return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt)
+        return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt, thumbnail_blueprint=thumbnail_blueprint)
 
     try:
         routed = route_json_request(settings, pool=POOL_IMAGE, cards=[card], request=request)

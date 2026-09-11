@@ -12,7 +12,7 @@ from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
 from .storage import STORAGE, ensure_storage, now, read_json, update_json, write_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
-from .thumbnail_blueprints import thumbnail_blueprint_for_channel
+from .thumbnail_blueprints import thumbnail_blueprint_for_task
 
 
 def _generate_image_with_pool(
@@ -41,6 +41,7 @@ def _generate_image_with_pool(
             reference_image=reference_image,
             lettering_text=lettering_text,
             lettering_prompt=lettering_prompt,
+            aspect_ratio="9:16" if "9:16" in str((thumbnail_blueprint or {}).get("content") or "") else "16:9",
         )
     return generate_image_from_pool(
         settings,
@@ -270,15 +271,13 @@ def generate_thumbnail_for_task(
         and bool(item.get("enabled", True))
         for item in configured_cards
     ) if isinstance(configured_cards, list) else False
-    if not effective_blueprint and canva_selected:
+    if not effective_blueprint:
         channels = read_json("channels.json", [])
         channel = next(
             (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == record["channel_id"]),
             {},
         ) if isinstance(channels, list) else {}
-        effective_blueprint = thumbnail_blueprint_for_channel(
-            {**channel, "thumbnail_blueprint_id": record["thumbnail_blueprint_id"] or channel.get("thumbnail_blueprint_id", "")}
-        )
+        effective_blueprint = thumbnail_blueprint_for_task(channel, task)
     rules = str(effective_blueprint.get("content") or "").strip()
     if canva_selected and not rules:
         raise ThumbnailGenerationError("A tarefa não tem um Thumbnail Blueprint local válido.")
@@ -316,9 +315,7 @@ def regenerate_thumbnail_prompt(
     if not topic:
         raise ThumbnailGenerationError("A tarefa não tem tópico para refazer o prompt da thumbnail.")
     ensure_storage()
-    visual_blueprint = thumbnail_blueprint_for_channel(
-        {**(channel or {}), "thumbnail_blueprint_id": record.get("thumbnail_blueprint_id") or (channel or {}).get("thumbnail_blueprint_id", "")}
-    )
+    visual_blueprint = thumbnail_blueprint_for_task(channel or {}, task)
     effective_blueprint = {**(blueprint or {})}
     if visual_blueprint.get("content"):
         effective_blueprint["thumbnail_blueprint_rules"] = visual_blueprint["content"]
@@ -350,6 +347,12 @@ def regenerate_thumbnail_prompt_and_image(
     prompt = str((variant or {}).get("image_prompt") or "").strip()
     if not prompt:
         raise ThumbnailGenerationError("O provider não devolveu um prompt de imagem válido.")
+    channels = read_json("channels.json", [])
+    channel = next(
+        (item for item in channels if isinstance(item, dict) and str(item.get("id") or "") == str(task.get("channel_id") or "")),
+        {},
+    ) if isinstance(channels, list) else {}
+    effective_blueprint = thumbnail_blueprint_for_task(channel, task)
     _archive_image(str(task_id), record.get("image_path"))
     image_path = _generate_image_with_pool(
         settings,
@@ -358,6 +361,7 @@ def regenerate_thumbnail_prompt_and_image(
         variant_index=record["variant_index"],
         lettering_text=str((variant or {}).get("overlay_text") or ""),
         lettering_prompt=str((variant or {}).get("lettering_prompt") or ""),
+        thumbnail_blueprint=effective_blueprint,
     )
     updated = _update_thumbnail_task(
         task_id,
@@ -433,6 +437,7 @@ def regenerate_thumbnail_lettering(
         reference_image=previous_image,
         lettering_text=exact_headline,
         lettering_prompt=edit_prompt,
+        thumbnail_blueprint=thumbnail_blueprint_for_task(resolved_channel, task),
     )
     variant = _variant_for_record(record)
     variant["image_prompt"] = base_prompt
