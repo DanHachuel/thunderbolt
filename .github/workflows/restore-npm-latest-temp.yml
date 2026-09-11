@@ -1,0 +1,17 @@
+name: Restore npm latest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore latest tag
+        run: npm dist-tag add @danhachuel/thunderbolt@0.7.43 latest --registry=https://registry.npmjs.org/ --loglevel=http
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
