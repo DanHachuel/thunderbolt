@@ -68,3 +68,36 @@ def test_square_provider_response_is_normalized_to_youtube_thumbnail_size():
     with Image.open(BytesIO(normalized)) as image:
         assert image.size == (1792, 1024)
         assert image.format == "JPEG"
+
+
+def test_vertical_prompt_infers_portrait_ratio_and_normalizes_to_vertical_size():
+    assert thumbnail_generation.infer_thumbnail_aspect_ratio(
+        "Cinematic photorealistic vertical 9:16 frame, 1080x1920"
+    ) == "9:16"
+    source = BytesIO()
+    Image.new("RGB", (1024, 1024), (20, 40, 80)).save(source, format="PNG")
+    normalized = thumbnail_generation.normalize_thumbnail_bytes(source.getvalue(), "9:16")
+    with Image.open(BytesIO(normalized)) as image:
+        assert image.size == (1024, 1792)
+
+
+def test_vertical_prompt_is_sent_to_nano_as_portrait_ratio():
+    image_bytes = b"fake-jpeg-bytes"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "status": "completed",
+        "steps": [{"content": [{"type": "image", "data": encoded}]}],
+    }
+    with tempfile.TemporaryDirectory() as temp_dir:
+        original_storage = thumbnail_generation.STORAGE
+        thumbnail_generation.STORAGE = Path(temp_dir)
+        try:
+            with patch.object(thumbnail_generation.requests, "post", return_value=response) as post:
+                thumbnail_generation.generate_thumbnail_image(
+                    {"gemini_image_api_key": "secret-key"},
+                    "Cinematic photorealistic vertical 9:16 frame, 1080x1920",
+                )
+            assert post.call_args.kwargs["json"]["response_format"]["aspect_ratio"] == "9:16"
+        finally:
+            thumbnail_generation.STORAGE = original_storage

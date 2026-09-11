@@ -40,7 +40,7 @@ from .provider_routing import (
     route_json_request,
 )
 from .storage import STORAGE, ensure_storage, write_json
-from .thumbnail_generation import _compose_thumbnail_prompt, generate_thumbnail_image, normalize_thumbnail_bytes
+from .thumbnail_generation import _compose_thumbnail_prompt, generate_thumbnail_image, infer_thumbnail_aspect_ratio, normalize_thumbnail_bytes
 from .canva_client import CanvaClient
 from .canva_mcp_workflow import run_direct_canva_thumbnail
 
@@ -267,7 +267,14 @@ def _poll_image(card: Mapping[str, Any], request_id: str, *, attempts: int = 24,
     raise MediaGenerationError("O provider de imagem não concluiu dentro do limite de polling.")
 
 
-def _download_or_write(image_bytes: bytes | None, url: str, destination: Path, card: Mapping[str, Any]) -> Path:
+def _download_or_write(
+    image_bytes: bytes | None,
+    url: str,
+    destination: Path,
+    card: Mapping[str, Any],
+    *,
+    aspect_ratio: str = "16:9",
+) -> Path:
     if image_bytes is None and url:
         try:
             response = requests.get(url, headers={"Authorization": f"Bearer {_api_key(card)}"} if _api_key(card) else {}, timeout=180)
@@ -278,7 +285,7 @@ def _download_or_write(image_bytes: bytes | None, url: str, destination: Path, c
     if not image_bytes:
         raise MediaGenerationError("O provider concluiu a chamada mas não devolveu uma imagem utilizável.")
     try:
-        image_bytes = normalize_thumbnail_bytes(image_bytes)
+        image_bytes = normalize_thumbnail_bytes(image_bytes, aspect_ratio)
     except Exception as exc:
         raise MediaGenerationError(str(exc)) from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -317,9 +324,8 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de imagem configurado.")
 
 
-def _thumbnail_aspect_ratio(thumbnail_blueprint: Mapping[str, Any] | None) -> str:
-    content = str((thumbnail_blueprint or {}).get("content") or "")
-    return "9:16" if re.search(r"\b9\s*:\s*16\b|VERTICAL", content, flags=re.IGNORECASE) else "16:9"
+def _thumbnail_aspect_ratio(thumbnail_blueprint: Mapping[str, Any] | None, prompt: str = "") -> str:
+    return infer_thumbnail_aspect_ratio(prompt, dict(thumbnail_blueprint or {}))
 
 
 def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "", thumbnail_blueprint: Mapping[str, Any] | None = None) -> Any:
@@ -332,7 +338,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
     )
-    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint)
+    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt)
     requested_size = ("1024x1792" if aspect_ratio == "9:16" else "1792x1024") if provider == "pollinations" else ("720x1280 minimum" if aspect_ratio == "9:16" else "1280x720 minimum")
     constrained_prompt = _append_generation_constraints(
         image_prompt,
@@ -433,7 +439,7 @@ def generate_image_for_card(
             )
         except Exception as exc:
             raise MediaGenerationError(str(exc)) from exc
-    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint)
+    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt)
     if provider == "nano_banana":
         merged = dict(settings)
         merged["gemini_image_api_key"] = _api_key(card)
@@ -454,6 +460,7 @@ def generate_image_for_card(
                 lettering_text=lettering_text,
                 lettering_prompt=lettering_prompt,
                 reference_image=reference_image,
+                aspect_ratio=aspect_ratio,
             )
         except Exception as exc:
             raise MediaGenerationError(str(exc)) from exc
@@ -486,7 +493,7 @@ def generate_image_for_card(
             )
             buffer = io.BytesIO()
             image.save(buffer, format="PNG")
-            return _download_or_write(buffer.getvalue(), "", destination, card)
+            return _download_or_write(buffer.getvalue(), "", destination, card, aspect_ratio=aspect_ratio)
         except Exception as exc:
             raise MediaGenerationError(f"Hugging Face text-to-image falhou: {str(exc)[:240]}") from exc
 
@@ -514,7 +521,7 @@ def generate_image_for_card(
         elif request_id and style == "kie":
             urls = _poll_kie_task(routed.card, request_id, endpoint="/jobs/recordInfo", veo=False)
             url = urls[0] if urls else ""
-    return _download_or_write(image_bytes, url, destination, routed.card)
+    return _download_or_write(image_bytes, url, destination, routed.card, aspect_ratio=aspect_ratio)
 
 
 def _is_retryable_media_error(exc: BaseException) -> bool:

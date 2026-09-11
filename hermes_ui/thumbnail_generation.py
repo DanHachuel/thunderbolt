@@ -31,6 +31,22 @@ class ThumbnailGenerationError(RuntimeError):
     """Raised when Nano Banana cannot produce a thumbnail image."""
 
 
+def infer_thumbnail_aspect_ratio(
+    prompt: str = "",
+    blueprint: dict[str, Any] | None = None,
+    *,
+    fallback: str = DEFAULT_ASPECT_RATIO,
+) -> str:
+    """Resolve the requested thumbnail orientation without trusting provider defaults."""
+    blueprint_content = str((blueprint or {}).get("content") or "")
+    source = f"{blueprint_content}\n{str(prompt or '')}"
+    if re.search(r"\b9\s*:\s*16\b|\bvertical\b|\bportrait\b", source, flags=re.IGNORECASE):
+        return "9:16"
+    if re.search(r"\b16\s*:\s*9\b|\blandscape\b|\bwide\b", source, flags=re.IGNORECASE):
+        return "16:9"
+    return fallback if fallback in {"16:9", "9:16"} else DEFAULT_ASPECT_RATIO
+
+
 def normalize_thumbnail_bytes(image_bytes: bytes, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> bytes:
     """Return a non-distorted JPEG in the requested thumbnail orientation."""
     try:
@@ -188,6 +204,7 @@ def generate_thumbnail_image(
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
     )
+    effective_aspect_ratio = infer_thumbnail_aspect_ratio(clean_prompt, fallback=aspect_ratio)
 
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
     image_size = DEFAULT_IMAGE_SIZE
@@ -203,7 +220,7 @@ def generate_thumbnail_image(
         "response_format": {
             "type": "image",
             "mime_type": DEFAULT_MIME_TYPE,
-            "aspect_ratio": aspect_ratio,
+            "aspect_ratio": effective_aspect_ratio,
             "image_size": image_size,
         },
         "store": False,
@@ -230,7 +247,7 @@ def generate_thumbnail_image(
         raise ThumbnailGenerationError("A API Nano Banana devolveu uma resposta que não é JSON.") from exc
     if str(payload.get("status") or "completed").lower() not in {"completed", "succeeded"}:
         raise ThumbnailGenerationError(f"A interação Nano Banana terminou com estado inesperado: {payload.get('status') or 'desconhecido'}.")
-    image_bytes = normalize_thumbnail_bytes(_extract_image_bytes(payload), aspect_ratio)
+    image_bytes = normalize_thumbnail_bytes(_extract_image_bytes(payload), effective_aspect_ratio)
 
     ensure_storage()
     output_dir = STORAGE / "thumbnails"
@@ -258,6 +275,7 @@ __all__ = [
     "DEFAULT_ASPECT_RATIO",
     "DEFAULT_GEMINI_IMAGE_MODEL",
     "DEFAULT_IMAGE_SIZE",
+    "infer_thumbnail_aspect_ratio",
     "THUMBNAIL_HEIGHT",
     "THUMBNAIL_WIDTH",
     "GEMINI_INTERACTIONS_ENDPOINT",
