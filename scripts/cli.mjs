@@ -262,16 +262,19 @@ const proxy = http.createServer((request, response) => {
     headers: { ...request.headers, host: `127.0.0.1:${backendPort}`, "accept-encoding": "identity" },
   }, (upstreamResponse) => {
     const responseHeaders = { ...upstreamResponse.headers };
-    // Streamlit entrega HTML/JS de uma instância local que pode mudar após
-    // uma atualização via npx. Não permitir que o browser reaproveite uma
-    // página ou bundle da instância anterior.
-    delete responseHeaders.etag;
-    delete responseHeaders["last-modified"];
-    responseHeaders["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0";
-    responseHeaders.pragma = "no-cache";
-    responseHeaders.expires = "0";
     const contentType = String(responseHeaders["content-type"] || "").toLowerCase();
     const isHtml = contentType.includes("text/html") && !responseHeaders["content-encoding"];
+    // O documento HTML contém o estado da sessão e pode mudar após uma
+    // actualização via npx; os bundles estáticos do Streamlit, por outro lado,
+    // devem ser reutilizados pelo browser. Desactivar cache em todos os
+    // recursos tornava cada aba muito mais pesada e multiplicava downloads.
+    if (isHtml) {
+      delete responseHeaders.etag;
+      delete responseHeaders["last-modified"];
+      responseHeaders["cache-control"] = "no-store, no-cache, must-revalidate, max-age=0";
+      responseHeaders.pragma = "no-cache";
+      responseHeaders.expires = "0";
+    }
     if (!isHtml) {
       response.writeHead(upstreamResponse.statusCode || 502, responseHeaders);
       upstreamResponse.pipe(response);

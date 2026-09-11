@@ -67,6 +67,18 @@ def test_read_json_survives_windows_lock_permission_error(tmp_path, monkeypatch)
     assert storage.read_json("display_names.json")["prompt_masters"]["prompt.md"] == "Prompt"
 
 
+def test_read_json_cache_returns_copies_and_invalidates_after_write(tmp_path, monkeypatch):
+    storage = _isolated_storage(tmp_path, monkeypatch)
+    storage.write_json("tasks.json", [{"id": "one"}])
+
+    first = storage.read_json("tasks.json")
+    first[0]["id"] = "mutated-only-in-memory"
+    assert storage.read_json("tasks.json")[0]["id"] == "one"
+
+    storage.write_json("tasks.json", [{"id": "two"}])
+    assert storage.read_json("tasks.json")[0]["id"] == "two"
+
+
 def test_atomic_write_retries_transient_replace_permission_error(tmp_path, monkeypatch):
     storage = _isolated_storage(tmp_path, monkeypatch)
     path = storage.STATE / "tasks.json"

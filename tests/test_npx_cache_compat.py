@@ -84,6 +84,12 @@ class NpxCacheCompatibilityTests(unittest.TestCase):
         source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
         self.assertIn('"accept-encoding": "identity"', source)
 
+    def test_proxy_disables_cache_only_for_dynamic_html(self):
+        source = (ROOT / "scripts" / "cli.mjs").read_text(encoding="utf-8")
+        cache_block = source.split("const isHtml", 1)[1].split("if (!isHtml)", 1)[0]
+        self.assertIn("if (isHtml)", cache_block)
+        self.assertIn('responseHeaders["cache-control"] = "no-store', cache_block)
+
     def test_streamlit_bootstrap_owns_sigint_without_click_shutdown(self):
         bootstrap = (ROOT / "scripts" / "streamlit_bootstrap.py").read_text(encoding="utf-8")
         self.assertIn("def _custom_sigint_handler", bootstrap)

@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import time
+from threading import RLock
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -23,6 +24,9 @@ NICHES_DATA = STORAGE / "data" / "niches"
 SEED_BLUEPRINTS = ROOT / "seed" / "blueprints"
 SEED_THUMBNAIL_BLUEPRINTS = SEED_BLUEPRINTS / "thumbnails"
 SEED_TIKTOK_PROMPT_MASTERS = ROOT / "seed" / "prompt_masters"
+
+_READ_CACHE_LOCK = RLock()
+_READ_CACHE: dict[str, tuple[tuple[int, int], Any]] = {}
 
 DEFAULTS: dict[str, Any] = {
         "channels.json": [],
@@ -720,6 +724,19 @@ def _load_json_unlocked(path: Path) -> Any:
         return json.load(handle)
 
 
+def _read_fingerprint(path: Path) -> tuple[int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+def _invalidate_read_cache(path: Path) -> None:
+    with _READ_CACHE_LOCK:
+        _READ_CACHE.pop(str(path), None)
+
+
 def _recover_json_unlocked(name: str, path: Path, default: Any | None) -> Any:
     backup = _corrupt_backup(path)
     if name in _PROTECTED_STATE_FILES:
@@ -743,6 +760,13 @@ def _recover_json_unlocked(name: str, path: Path, default: Any | None) -> Any:
 def read_json(name: str, default: Any | None = None) -> Any:
     ensure_storage()
     path = STATE / name
+    fingerprint = _read_fingerprint(path)
+    cache_key = str(path)
+    if fingerprint is not None:
+        with _READ_CACHE_LOCK:
+            cached = _READ_CACHE.get(cache_key)
+        if cached is not None and cached[0] == fingerprint:
+            return deepcopy(cached[1])
     with _state_lock(path, read_only=True):
         try:
             data = _load_json_unlocked(path)
@@ -753,7 +777,12 @@ def read_json(name: str, default: Any | None = None) -> Any:
         migrated, changed = _migrate_settings(data)
         if changed:
             _atomic_write_unlocked(path, migrated)
-        return migrated
+        result = migrated
+        current_fingerprint = _read_fingerprint(path)
+        if current_fingerprint is not None:
+            with _READ_CACHE_LOCK:
+                _READ_CACHE[cache_key] = (current_fingerprint, deepcopy(result))
+        return deepcopy(result)
 
 
 def update_json(name: str, default: Any, mutator: Callable[[Any], Any]) -> Any:
@@ -767,6 +796,7 @@ def update_json(name: str, default: Any, mutator: Callable[[Any], Any]) -> Any:
             current = _recover_json_unlocked(name, path, default)
         result = mutator(current)
         _atomic_write_unlocked(path, current)
+        _invalidate_read_cache(path)
         return result
 
 
@@ -774,6 +804,7 @@ def write_json(name: str, data: Any) -> None:
     """Persist a state JSON file using :func:`atomic_write`."""
     ensure_storage()
     atomic_write(STATE / name, data)
+    _invalidate_read_cache(STATE / name)
 
 
 def append_json(name: str, item: dict[str, Any]) -> dict[str, Any]:
