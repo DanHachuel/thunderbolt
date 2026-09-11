@@ -60,6 +60,37 @@ def _country_key(value: Any) -> str:
     return "".join(char for char in normalized if not unicodedata.combining(char)).casefold()
 
 
+COUNTRY_CODE_NAMES = {
+    "BR": "Brasil",
+    "CH": "Suíça",
+    "ES": "Espanha",
+    "RS": "Sérvia",
+}
+
+
+COUNTRY_NAME_CODES = {name: code for code, name in COUNTRY_CODE_NAMES.items()}
+
+
+def _country_flag(value: Any) -> str:
+    """Render a two-letter country code as a Unicode regional-indicator flag."""
+    clean_value = _clean(value).upper()
+    if len(clean_value) != 2 or not clean_value.isascii() or not clean_value.isalpha():
+        return ""
+    return "".join(chr(0x1F1E6 + ord(char) - ord("A")) for char in clean_value)
+
+
+def _country_display(value: Any) -> str:
+    clean_value = _clean(value)
+    if not clean_value:
+        return "Não definido"
+    code = clean_value.upper()
+    flag = _country_flag(code)
+    if flag:
+        return f"{flag} {COUNTRY_CODE_NAMES.get(code, code)}"
+    mapped_code = COUNTRY_NAME_CODES.get(clean_value)
+    return f"{_country_flag(mapped_code)} {clean_value}" if mapped_code else clean_value
+
+
 COUNTRY_ALIASES = {
     "brazil": "Brasil",
     "brasil": "Brasil",
@@ -75,6 +106,12 @@ def _normalise_country(value: Any) -> str:
     clean_value = _clean(value)
     if not clean_value:
         return ""
+    code = clean_value.upper()
+    if code in COUNTRY_CODE_NAMES:
+        return COUNTRY_CODE_NAMES[code]
+    if len(code) == 2 and code.isascii() and code.isalpha():
+        # Keep unknown legacy ISO codes usable and renderable rather than dropping them.
+        return code
     if clean_value in COUNTRY_OPTIONS:
         return clean_value
     key = _country_key(clean_value)
@@ -108,7 +145,7 @@ def _country_index(value: Any) -> int:
 
 
 def _country_label(value: str) -> str:
-    return value or "Não definido"
+    return _country_display(value)
 
 
 def _instagram_posts_key(profile_id: str) -> str:

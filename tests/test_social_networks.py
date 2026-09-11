@@ -1,7 +1,7 @@
 from subprocess import CompletedProcess
 from unittest.mock import Mock, patch
 
-from app.social_networks_ui import _api_card_status, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _refresh_instagram_profile, _save_public_profile
+from app.social_networks_ui import _api_card_status, _country_display, _country_label, _instagram_profiles, _load_instagram_posts, _merge_instagram_refresh, _normalise_api_cards, _normalise_country, _refresh_instagram_profile, _save_public_profile
 from hermes_ui.domain import create_channel
 from integrations.instagram_public import _country_from_bloks, _fetch_web_profile_user, extract_public_instagram_country, fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_bio, normalize_instagram_metric
 from integrations.meta_social import test_facebook_pages_api_card as run_facebook_pages_api_test, test_instagram_api_card as run_instagram_api_test
@@ -265,6 +265,18 @@ def test_instagram_country_catalog_contains_attachment_values():
     assert "Estados Unidos" in COUNTRY_OPTIONS
     assert "Zimbábue" in COUNTRY_OPTIONS
     assert len(COUNTRY_OPTIONS) == 203
+
+
+def test_instagram_country_codes_render_as_flags_instead_of_siglas():
+    assert _normalise_country("CH") == "Suíça"
+    assert _normalise_country("RS") == "Sérvia"
+    assert _normalise_country("BR") == "Brasil"
+    assert _normalise_country("ES") == "Espanha"
+    assert _country_label("CH").startswith("🇨🇭")
+    assert _country_label("RS").startswith("🇷🇸")
+    assert _country_label("BR").startswith("🇧🇷")
+    assert _country_label("ES").startswith("🇪🇸")
+    assert _country_display("Suíça").startswith("🇨🇭")
 
 
 def test_instagram_card_renders_profile_bio_next_to_identity():
