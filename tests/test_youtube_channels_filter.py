@@ -39,6 +39,30 @@ def test_youtube_channels_ui_filters_both_table_and_card_loops():
     assert '\n    channels = read_json("channels.json", [])' not in block
 
 
+def test_youtube_channels_ui_exposes_country_filter_and_half_width_search_layout():
+    from pathlib import Path
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    start = source.index('def render_channels():')
+    end = source.index('def render_', start + 20)
+    block = source[start:end]
+    assert 'st.columns([1, 1], gap="small")' in block
+    assert '"Filtrar por País"' in block
+    assert 'youtube_registered_country_filter_applied' in block
+    assert 'COUNTRY_OPTIONS' in block
+
+
+def test_youtube_automation_cards_show_country_before_open_channel_and_share_country_filter():
+    from pathlib import Path
+    source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
+    start = source.index('def render_automation():')
+    end = source.index('def render_upload_direct():', start)
+    block = source[start:end]
+    assert '"Filtrar por País"' in block
+    assert 'filtered_automation_channels' in block
+    assert 'st.caption(f"País: {channel.get(\'country\') or \'Não definido\'}")' in block
+    assert block.index('st.caption(f"País:') < block.index('st.link_button("Abrir canal"')
+
+
 def test_channel_composio_account_id_uses_hyphenated_title_words():
     assert composio_connected_account_id_from_channel_name("The Financial Mechanics") == "The-Financial-Mechanics"
     assert composio_connected_account_id_from_channel_name("Canal de Finanças") == "Canal-De-Financas"

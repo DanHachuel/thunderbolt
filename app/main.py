@@ -3326,15 +3326,32 @@ def render_channels():
     channels = [channel for channel in read_json("channels.json", []) if is_youtube_channel_record(channel)]
     st.divider()
     st.subheader(f"Canais Youtube cadastrados ({len(channels)})")
-    youtube_channel_search = st.text_input(
-        "Pesquisar nomes dos canais YouTube",
-        key="youtube_registered_channels_search",
-        placeholder="Digite o nome do canal",
-    )
+    filter_cols = st.columns([1, 1], gap="small")
+    with filter_cols[0]:
+        youtube_channel_search = st.text_input(
+            "Pesquisar nomes dos canais YouTube",
+            key="youtube_registered_channels_search",
+            placeholder="Digite o nome do canal",
+        )
+    with filter_cols[1]:
+        youtube_country_options = [""] + list(COUNTRY_OPTIONS)
+        youtube_country_filter = st.selectbox(
+            "Filtrar por País",
+            youtube_country_options,
+            format_func=lambda value: value or "Todos os países",
+            key="youtube_registered_country_filter",
+        )
+        if st.button("Filtrar", type="primary", width="content", key="youtube_registered_country_filter_apply"):
+            st.session_state["youtube_registered_country_filter_applied"] = youtube_country_filter
+    applied_country = str(st.session_state.get("youtube_registered_country_filter_applied") or "").strip()
     visible_registered_channels = [
         channel for channel in channels
         if not youtube_channel_search.strip()
         or youtube_channel_search.strip().casefold() in str(channel.get("name") or "").casefold()
+    ]
+    visible_registered_channels = [
+        channel for channel in visible_registered_channels
+        if not applied_country or str(channel.get("country") or "").strip() == applied_country
     ]
     if not channels:
         st.info("Nenhum canal YouTube cadastrado.")
@@ -6480,7 +6497,24 @@ def render_automation():
     if not channels:
         st.info("Nenhum canal cadastrado para configurar.")
     with st.expander("Canais cadastrados", expanded=False):
-        for channel in channels:
+        automation_country_options = [""] + list(COUNTRY_OPTIONS)
+        automation_filter_cols = st.columns([1, 1], gap="small")
+        with automation_filter_cols[0]:
+            automation_country_filter = st.selectbox(
+                "Filtrar por País",
+                automation_country_options,
+                format_func=lambda value: value or "Todos os países",
+                key="youtube_automation_country_filter",
+            )
+        with automation_filter_cols[1]:
+            if st.button("Filtrar", type="primary", width="content", key="youtube_automation_country_filter_apply"):
+                st.session_state["youtube_automation_country_filter_applied"] = automation_country_filter
+        applied_automation_country = str(st.session_state.get("youtube_automation_country_filter_applied") or "").strip()
+        filtered_automation_channels = [
+            channel for channel in channels
+            if not applied_automation_country or str(channel.get("country") or "").strip() == applied_automation_country
+        ]
+        for channel in filtered_automation_channels:
             channel_id = channel["id"]
             with st.container(border=True):
                 blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
@@ -6497,6 +6531,7 @@ def render_automation():
                 with header_cols[1]:
                     st.write(f"**{channel.get('name', 'Sem nome')}**")
                     st.caption(channel.get("handle") or channel.get("url") or "sem URL")
+                    st.caption(f"País: {channel.get('country') or 'Não definido'}")
                     channel_url = str(channel.get("url") or "").strip()
                     if not channel_url:
                         channel_id_or_handle = str(channel.get("youtube_channel_id") or channel.get("youtube_id") or channel.get("handle") or "").strip()
