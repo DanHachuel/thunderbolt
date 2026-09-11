@@ -5924,6 +5924,8 @@ def render_thumbnails():
                         )
                         st.success("Thumbnail gerada com sucesso.")
                         st.rerun()
+                    except MediaGenerationError as exc:
+                        st.error(format_media_generation_error(exc, operation="gerar a imagem da thumbnail"))
                     except ThumbnailGenerationError as exc:
                         st.error(str(exc))
 
@@ -5955,6 +5957,8 @@ def render_thumbnails():
                         )
                         st.success("Prompt da thumbnail e imagem actualizados.")
                         st.rerun()
+                    except MediaGenerationError as exc:
+                        st.error(format_media_generation_error(exc, operation="refazer o prompt e gerar a imagem da thumbnail"))
                     except (CreativeGenerationError, ThumbnailGenerationError) as exc:
                         st.error(str(exc))
 
