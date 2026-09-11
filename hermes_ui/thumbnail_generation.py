@@ -190,7 +190,7 @@ def generate_thumbnail_image(
     reference_image: str | Path | None = None,
     lettering_text: str = "",
     lettering_prompt: str = "",
-    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+    aspect_ratio: str | None = None,
 ) -> Path:
     api_key = str(settings.get("gemini_image_api_key") or "").strip()
     if not api_key:
@@ -204,7 +204,7 @@ def generate_thumbnail_image(
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
     )
-    effective_aspect_ratio = infer_thumbnail_aspect_ratio(clean_prompt, fallback=aspect_ratio)
+    effective_aspect_ratio = aspect_ratio if aspect_ratio in {"16:9", "9:16"} else infer_thumbnail_aspect_ratio(clean_prompt)
 
     model = str(settings.get("gemini_image_model") or DEFAULT_GEMINI_IMAGE_MODEL).strip()
     image_size = DEFAULT_IMAGE_SIZE

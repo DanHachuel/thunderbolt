@@ -33,7 +33,7 @@ from hermes_ui.media_generation import MediaGenerationError, _append_generation_
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
 from hermes_ui.material_sources import material_api_keys, material_source_cards, selected_material_source
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image, infer_thumbnail_aspect_ratio
-from hermes_ui.thumbnail_blueprints import thumbnail_blueprint_for_channel
+from hermes_ui.thumbnail_blueprints import thumbnail_aspect_ratio_for_channel_task, thumbnail_blueprint_for_channel
 from hermes_ui.voice_preview import synthesize_preview
 
 PIPELINE_LOCK_FILENAME = "pipeline_worker.lock"
@@ -86,6 +86,7 @@ def _generate_pipeline_thumbnail(
     lettering_text: str = "",
     lettering_prompt: str = "",
     thumbnail_blueprint: dict[str, Any] | None = None,
+    aspect_ratio: str = "",
 ) -> Path:
     """Use the image pool while keeping the legacy single-Nano call seam."""
     cards = media_cards_for_pool(settings, "image")
@@ -97,7 +98,7 @@ def _generate_pipeline_thumbnail(
             variant_index=variant_index,
             lettering_text=lettering_text,
             lettering_prompt=lettering_prompt,
-            aspect_ratio=infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
+            aspect_ratio=aspect_ratio or infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
         )
     return generate_image_from_pool(
         settings,
@@ -107,6 +108,7 @@ def _generate_pipeline_thumbnail(
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
         thumbnail_blueprint=thumbnail_blueprint,
+        aspect_ratio=aspect_ratio,
     )
 
 
@@ -1356,6 +1358,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         blueprint = {"id": str(task.get("blueprint_id") or ""), "name": str(task.get("blueprint_name") or task.get("blueprint_id") or "")}
     visual_format = task.get("format") or ("portrait" if str(task.get("platform") or "").casefold() in {"tiktok", "instagram"} else "wide")
     visual_blueprint = thumbnail_blueprint_for_channel(channel, visual_format)
+    thumbnail_aspect_ratio = thumbnail_aspect_ratio_for_channel_task(channel, task, visual_blueprint)
     if visual_blueprint.get("content"):
         blueprint = {**blueprint, "thumbnail_blueprint_rules": visual_blueprint["content"]}
     route = _normalise_video_route(task, settings)
@@ -1549,8 +1552,8 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
         "keywords": keywords,
         "thumbnail": variant,
         "requirements": {
-            "aspect_ratio": "16:9",
-            "resolution": "1920x1080",
+            "aspect_ratio": thumbnail_aspect_ratio,
+            "resolution": "1024x1792" if thumbnail_aspect_ratio == "9:16" else "1792x1024",
             "max_elements": 3,
             "max_overlay_words": 4,
             "lettering_required": True,
@@ -1589,6 +1592,7 @@ def _run_task(task: dict[str, Any]) -> dict[str, Any]:
                 lettering_text=str(variant.get("overlay_text") or ""),
                 lettering_prompt=str(variant.get("lettering_prompt") or ""),
                 thumbnail_blueprint=blueprint,
+                aspect_ratio=thumbnail_aspect_ratio,
             )
         except (MediaGenerationError, ThumbnailGenerationError) as exc:
             raise PipelineError(f"A thumbnail não foi gerada; o vídeo já está disponível em {video_path}: {exc}") from exc

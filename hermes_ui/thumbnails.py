@@ -12,7 +12,7 @@ from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
 from .storage import STORAGE, ensure_storage, now, read_json, update_json, write_json
 from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image, infer_thumbnail_aspect_ratio
-from .thumbnail_blueprints import thumbnail_blueprint_for_task
+from .thumbnail_blueprints import thumbnail_aspect_ratio_for_channel_task, thumbnail_blueprint_for_task
 
 
 def _generate_image_with_pool(
@@ -25,6 +25,7 @@ def _generate_image_with_pool(
     lettering_prompt: str = "",
     reference_image: Path | None = None,
     thumbnail_blueprint: dict[str, Any] | None = None,
+    aspect_ratio: str = "",
 ) -> Path:
     """Use the legacy Nano adapter when it is the only active image card.
 
@@ -41,7 +42,7 @@ def _generate_image_with_pool(
             reference_image=reference_image,
             lettering_text=lettering_text,
             lettering_prompt=lettering_prompt,
-            aspect_ratio=infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
+            aspect_ratio=aspect_ratio or infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
         )
     return generate_image_from_pool(
         settings,
@@ -53,6 +54,7 @@ def _generate_image_with_pool(
         lettering_prompt=lettering_prompt,
         thumbnail_only=True,
         thumbnail_blueprint=thumbnail_blueprint,
+        aspect_ratio=aspect_ratio,
     )
 
 
@@ -271,6 +273,7 @@ def generate_thumbnail_for_task(
         and bool(item.get("enabled", True))
         for item in configured_cards
     ) if isinstance(configured_cards, list) else False
+    channel = {}
     if not effective_blueprint:
         channels = read_json("channels.json", [])
         channel = next(
@@ -278,6 +281,7 @@ def generate_thumbnail_for_task(
             {},
         ) if isinstance(channels, list) else {}
         effective_blueprint = thumbnail_blueprint_for_task(channel, task)
+    aspect_ratio = thumbnail_aspect_ratio_for_channel_task(channel, task, effective_blueprint)
     rules = str(effective_blueprint.get("content") or "").strip()
     if canva_selected and not rules:
         raise ThumbnailGenerationError("A tarefa não tem um Thumbnail Blueprint local válido.")
@@ -291,6 +295,7 @@ def generate_thumbnail_for_task(
         lettering_text=record.get("thumbnail_text") or "",
         lettering_prompt=record.get("lettering_prompt") or "",
         thumbnail_blueprint=effective_blueprint,
+        aspect_ratio=aspect_ratio,
     )
     updated = _update_thumbnail_task(
         task_id,
@@ -353,6 +358,7 @@ def regenerate_thumbnail_prompt_and_image(
         {},
     ) if isinstance(channels, list) else {}
     effective_blueprint = thumbnail_blueprint_for_task(channel, task)
+    aspect_ratio = thumbnail_aspect_ratio_for_channel_task(channel, task, effective_blueprint)
     _archive_image(str(task_id), record.get("image_path"))
     image_path = _generate_image_with_pool(
         settings,
@@ -362,6 +368,7 @@ def regenerate_thumbnail_prompt_and_image(
         lettering_text=str((variant or {}).get("overlay_text") or ""),
         lettering_prompt=str((variant or {}).get("lettering_prompt") or ""),
         thumbnail_blueprint=effective_blueprint,
+        aspect_ratio=aspect_ratio,
     )
     updated = _update_thumbnail_task(
         task_id,
@@ -429,6 +436,7 @@ def regenerate_thumbnail_lettering(
         "Não adicionar logótipos, marcas de água ou outros elementos."
     )
     _archive_image(str(task_id), previous_image)
+    lettering_blueprint = thumbnail_blueprint_for_task(resolved_channel, task)
     image_path = _generate_image_with_pool(
         settings,
         combined_prompt,
@@ -437,7 +445,8 @@ def regenerate_thumbnail_lettering(
         reference_image=previous_image,
         lettering_text=exact_headline,
         lettering_prompt=edit_prompt,
-        thumbnail_blueprint=thumbnail_blueprint_for_task(resolved_channel, task),
+        thumbnail_blueprint=lettering_blueprint,
+        aspect_ratio=thumbnail_aspect_ratio_for_channel_task(resolved_channel, task, lettering_blueprint),
     )
     variant = _variant_for_record(record)
     variant["image_prompt"] = base_prompt

@@ -67,6 +67,7 @@ from hermes_ui.script_documents import list_script_documents, read_script_docume
 from hermes_ui.script_generation import generate_script_document
 from hermes_ui.voice_preview import DEFAULT_SAMPLE, load_preview_file, synthesize_preview
 from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from hermes_ui.thumbnail_blueprints import thumbnail_aspect_ratio_for_channel_task
 from hermes_ui.creative_generation import CreativeGenerationError, generate_creative_package, generate_topic_for_channel, generate_video_keywords
 from integrations.platforms import IntegrationResult, TikTokAdapter, YouTubeAdapter, fetch_channel_videos_public
 from integrations.tiktok_public import fetch_public_tiktok_profile, normalize_tiktok_reference
@@ -1900,7 +1901,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                             thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
                             if st.button("Gerar imagem com Nano Banana", key=f"new_video_general_generate_thumbnail_{channel['id']}", width="stretch"):
                                 try:
-                                    thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                    thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index, aspect_ratio=thumbnail_aspect_ratio_for_channel_task(channel)))
                                     variant["image_path"] = thumbnail_path
                                     payload["thumbnail_path"] = thumbnail_path
                                     payload["thumbnail_status"] = "generated"
@@ -1964,7 +1965,7 @@ def render_new_video(page_title: str = "Criação de Vídeos"):
                         thumbnail_path = str(variant.get("image_path") or payload.get("thumbnail_path") or "").strip()
                         if st.button("Gerar imagem da thumbnail com Nano Banana", key="new_video_generate_thumbnail_image", width="stretch"):
                             try:
-                                thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index))
+                                thumbnail_path = str(generate_thumbnail_image(read_json("settings.json", {}), variant.get("image_prompt", ""), topic=str(payload.get("topic") or ""), variant_index=variant_index, aspect_ratio=thumbnail_aspect_ratio_for_channel_task(selected_one)))
                                 variant["image_path"] = thumbnail_path
                                 payload["thumbnail_path"] = thumbnail_path
                                 payload["thumbnail_status"] = "generated"

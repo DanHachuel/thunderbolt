@@ -89,6 +89,47 @@ def thumbnail_blueprint_for_task(channel: Mapping[str, Any], task: Mapping[str, 
     return thumbnail_blueprint_for_channel({**channel, "thumbnail_blueprint_id": ""}, format_value)
 
 
+def thumbnail_aspect_ratio_for_channel_task(
+    channel: Mapping[str, Any] | None,
+    task: Mapping[str, Any] | None = None,
+    blueprint: Mapping[str, Any] | None = None,
+) -> str:
+    """Resolve thumbnail orientation consistently for new and persisted tasks.
+
+    A channel-specific blueprint remains authoritative. When no specific blueprint
+    exists, platform defaults are used: TikTok/Instagram are portrait and YouTube
+    is landscape. This deliberately ignores stale generic blueprint ids persisted
+    on older YouTube tasks.
+    """
+    channel = channel or {}
+    task = task or {}
+    selected = dict(blueprint or {})
+    direct = str(
+        channel.get("default_thumbnail_blueprint_id")
+        or channel.get("thumbnail_blueprint_id")
+        or task.get("thumbnail_blueprint_id")
+        or ""
+    ).strip()
+    generic_ids = {
+        "Generic_Thumbnail_Blueprint",
+        HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+        VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID,
+    }
+    if not selected and direct and direct not in generic_ids:
+        selected = resolve_thumbnail_blueprint(direct)
+    if selected.get("content") and direct not in generic_ids:
+        return "9:16" if _contains_vertical_rules(selected.get("content")) else "16:9"
+
+    platform = str(channel.get("platform") or task.get("platform") or "").strip().casefold()
+    if platform in {"tiktok", "instagram", "instagram reels"}:
+        return "9:16"
+    return "16:9"
+
+
+def _contains_vertical_rules(value: Any) -> bool:
+    return bool(re.search(r"\b9\s*:\s*16\b|\bvertical\b|\bportrait\b", str(value or ""), flags=re.IGNORECASE))
+
+
 def thumbnail_blueprint_for_blueprint(blueprint_id: Any, format_value: Any = "") -> dict[str, Any]:
     """Resolve the visual pair for a script Blueprint, falling back to Generic."""
     paired_id = _pair_state().get(str(blueprint_id or "").strip(), "")

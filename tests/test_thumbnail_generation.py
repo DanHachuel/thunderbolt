@@ -101,3 +101,26 @@ def test_vertical_prompt_is_sent_to_nano_as_portrait_ratio():
             assert post.call_args.kwargs["json"]["response_format"]["aspect_ratio"] == "9:16"
         finally:
             thumbnail_generation.STORAGE = original_storage
+
+
+def test_explicit_landscape_ratio_overrides_legacy_vertical_prompt():
+    image_bytes = b"fake-jpeg-bytes"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "status": "completed",
+        "steps": [{"content": [{"type": "image", "data": encoded}]}],
+    }
+    with tempfile.TemporaryDirectory() as temp_dir:
+        original_storage = thumbnail_generation.STORAGE
+        thumbnail_generation.STORAGE = Path(temp_dir)
+        try:
+            with patch.object(thumbnail_generation.requests, "post", return_value=response) as post:
+                thumbnail_generation.generate_thumbnail_image(
+                    {"gemini_image_api_key": "secret-key"},
+                    "Legacy vertical 9:16 prompt",
+                    aspect_ratio="16:9",
+                )
+            assert post.call_args.kwargs["json"]["response_format"]["aspect_ratio"] == "16:9"
+        finally:
+            thumbnail_generation.STORAGE = original_storage

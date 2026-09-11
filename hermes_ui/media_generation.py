@@ -324,11 +324,17 @@ def _image_endpoint(card: Mapping[str, Any]) -> str:
     raise MediaGenerationError(f"O provider {card.get('provider')} não tem endpoint de imagem configurado.")
 
 
-def _thumbnail_aspect_ratio(thumbnail_blueprint: Mapping[str, Any] | None, prompt: str = "") -> str:
+def _thumbnail_aspect_ratio(
+    thumbnail_blueprint: Mapping[str, Any] | None,
+    prompt: str = "",
+    explicit_aspect_ratio: str = "",
+) -> str:
+    if explicit_aspect_ratio in {"16:9", "9:16"}:
+        return explicit_aspect_ratio
     return infer_thumbnail_aspect_ratio(prompt, dict(thumbnail_blueprint or {}))
 
 
-def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "", thumbnail_blueprint: Mapping[str, Any] | None = None) -> Any:
+def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", lettering_text: str = "", lettering_prompt: str = "", thumbnail_blueprint: Mapping[str, Any] | None = None, aspect_ratio: str = "") -> Any:
     provider = str(card.get("provider") or "").strip().lower()
     style = str(card.get("api_style") or media_provider_definition(provider).api_style)
     endpoint = _image_endpoint(card)
@@ -338,12 +344,12 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         lettering_text=lettering_text,
         lettering_prompt=lettering_prompt,
     )
-    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt)
-    requested_size = ("1024x1792" if aspect_ratio == "9:16" else "1792x1024") if provider == "pollinations" else ("720x1280 minimum" if aspect_ratio == "9:16" else "1280x720 minimum")
+    resolved_aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt, aspect_ratio)
+    requested_size = ("1024x1792" if resolved_aspect_ratio == "9:16" else "1792x1024") if provider == "pollinations" else ("720x1280 minimum" if resolved_aspect_ratio == "9:16" else "1280x720 minimum")
     constrained_prompt = _append_generation_constraints(
         image_prompt,
         kind="image",
-        aspect_ratio=aspect_ratio,
+        aspect_ratio=resolved_aspect_ratio,
         size=requested_size,
     )
     constrained_prompt = _fit_provider_prompt(constrained_prompt, provider)
@@ -360,7 +366,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
     if style == "kie":
         body = {
             "model": _model(card),
-            "input": {"prompt": constrained_prompt, "aspect_ratio": aspect_ratio, "resolution": "1K"},
+            "input": {"prompt": constrained_prompt, "aspect_ratio": resolved_aspect_ratio, "resolution": "1K"},
         }
         return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
     if provider == "agnes":
@@ -368,7 +374,7 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
             "model": _model(card) or AGNES_IMAGE_MODEL,
             "prompt": constrained_prompt,
             "size": "1K",
-            "ratio": aspect_ratio,
+            "ratio": resolved_aspect_ratio,
             "return_base64": True,
             "extra_body": {"response_format": "b64_json"},
         }
@@ -377,12 +383,12 @@ def _image_request(card: dict[str, Any], prompt: str, *, topic: str = "", letter
         return requests.post(
             endpoint,
             headers=_headers(card),
-            json={"model": _model(card), "prompt": constrained_prompt, "n": 1, "aspect_ratio": aspect_ratio},
+            json={"model": _model(card), "prompt": constrained_prompt, "n": 1, "aspect_ratio": resolved_aspect_ratio},
             timeout=180,
         )
     body = {"model": _model(card), "prompt": constrained_prompt, "n": 1, "response_format": "b64_json"}
     if provider == "pollinations":
-        body["size"] = "1024x1792" if aspect_ratio == "9:16" else "1792x1024"
+        body["size"] = "1024x1792" if resolved_aspect_ratio == "9:16" else "1792x1024"
     return requests.post(endpoint, headers=_headers(card), json=body, timeout=180)
 
 
@@ -397,6 +403,7 @@ def generate_image_for_card(
     lettering_prompt: str = "",
     reference_image: Path | None = None,
     thumbnail_blueprint: Mapping[str, Any] | None = None,
+    aspect_ratio: str = "",
 ) -> Path:
     """Generate one image with the selected media card."""
     card = _hydrate_media_card(settings, card)
@@ -439,7 +446,7 @@ def generate_image_for_card(
             )
         except Exception as exc:
             raise MediaGenerationError(str(exc)) from exc
-    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt)
+    aspect_ratio = _thumbnail_aspect_ratio(thumbnail_blueprint, prompt, aspect_ratio)
     if provider == "nano_banana":
         merged = dict(settings)
         merged["gemini_image_api_key"] = _api_key(card)
@@ -498,7 +505,7 @@ def generate_image_for_card(
             raise MediaGenerationError(f"Hugging Face text-to-image falhou: {str(exc)[:240]}") from exc
 
     def request(current: dict[str, Any]) -> Any:
-        return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt, thumbnail_blueprint=thumbnail_blueprint)
+        return _image_request(current, prompt, topic=topic, lettering_text=lettering_text, lettering_prompt=lettering_prompt, thumbnail_blueprint=thumbnail_blueprint, aspect_ratio=aspect_ratio)
 
     try:
         routed = route_json_request(settings, pool=POOL_IMAGE, cards=[card], request=request)
@@ -542,6 +549,7 @@ def generate_image_from_pool(
     reference_image: Path | None = None,
     thumbnail_only: bool = False,
     thumbnail_blueprint: Mapping[str, Any] | None = None,
+    aspect_ratio: str = "",
 ) -> Path:
     """Try eligible image cards in priority order, without cross-pool fallback."""
     cards = media_cards_for_pool(settings, "image", thumbnail_only=True) if thumbnail_only else media_cards_for_pool(settings, "image")
@@ -560,6 +568,7 @@ def generate_image_from_pool(
                 lettering_prompt=lettering_prompt,
                 reference_image=reference_image,
                 thumbnail_blueprint=thumbnail_blueprint,
+                aspect_ratio=aspect_ratio,
             )
         except MediaGenerationError as exc:
             errors.append(f"{card.get('provider')}: {str(exc)[:180]}")
