@@ -856,7 +856,7 @@ def load_blueprint_file(path: Path) -> dict[str, Any]:
 def list_prompt_master_files() -> list[Path]:
     """List only Markdown Prompt Master files stored in the TikTok area."""
     ensure_storage()
-    return sorted(TIKTOK_PROMPT_MASTERS.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return sorted(TIKTOK_PROMPT_MASTERS.glob("*.md"), key=lambda p: (p.name.casefold(), p.name))
 
 
 def load_prompt_master_file(path: Path) -> str:
