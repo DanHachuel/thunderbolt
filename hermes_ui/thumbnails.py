@@ -11,7 +11,7 @@ from .creative_generation import _language_instruction, generate_thumbnail_promp
 from .media_generation import generate_image_from_pool
 from .media_providers import media_cards_for_pool
 from .storage import STORAGE, ensure_storage, now, read_json, update_json, write_json
-from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from .thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image, infer_thumbnail_aspect_ratio
 from .thumbnail_blueprints import thumbnail_blueprint_for_task
 
 
@@ -41,7 +41,7 @@ def _generate_image_with_pool(
             reference_image=reference_image,
             lettering_text=lettering_text,
             lettering_prompt=lettering_prompt,
-            aspect_ratio="9:16" if "9:16" in str((thumbnail_blueprint or {}).get("content") or "") else "16:9",
+            aspect_ratio=infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
         )
     return generate_image_from_pool(
         settings,

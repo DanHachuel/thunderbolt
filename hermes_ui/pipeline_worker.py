@@ -32,7 +32,7 @@ from hermes_ui.llm_providers import active_llm_card, provider_definition
 from hermes_ui.media_generation import MediaGenerationError, _append_generation_constraints, generate_image_from_pool, generate_video_from_pool
 from hermes_ui.media_providers import FULL_IA_VIDEO_PROVIDER_CODES, media_cards_for_pool, media_provider_definition
 from hermes_ui.material_sources import material_api_keys, material_source_cards, selected_material_source
-from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image
+from hermes_ui.thumbnail_generation import ThumbnailGenerationError, generate_thumbnail_image, infer_thumbnail_aspect_ratio
 from hermes_ui.thumbnail_blueprints import thumbnail_blueprint_for_channel
 from hermes_ui.voice_preview import synthesize_preview
 
@@ -97,6 +97,7 @@ def _generate_pipeline_thumbnail(
             variant_index=variant_index,
             lettering_text=lettering_text,
             lettering_prompt=lettering_prompt,
+            aspect_ratio=infer_thumbnail_aspect_ratio(prompt, thumbnail_blueprint),
         )
     return generate_image_from_pool(
         settings,
