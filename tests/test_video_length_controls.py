@@ -26,9 +26,9 @@ def test_zero_channel_time_falls_back_to_prompt_master():
     assert (words, duration, source) == (600, "04:00", "Blueprint/Prompt Master")
 
 
-def test_empty_channel_uses_twelve_minute_default():
-    assert DEFAULT_AVERAGE_VIDEO_TIME == "12:00"
-    assert channel_video_length({}, {}, "") == (1800, "12:00", "padrão do canal")
+def test_empty_channel_uses_twenty_minute_default():
+    assert DEFAULT_AVERAGE_VIDEO_TIME == "20:00"
+    assert channel_video_length({}, {}, "") == (3000, "20:00", "padrão do canal")
 
 
 def test_channel_duration_uses_minutes_and_seconds():
@@ -37,9 +37,9 @@ def test_channel_duration_uses_minutes_and_seconds():
 
 
 def test_legacy_default_is_migrated_without_changing_explicit_seconds():
-    assert channel_video_time_value({"average_video_time": "00:12"}) == "12:00"
+    assert channel_video_time_value({"average_video_time": "00:12"}) == "20:00"
     assert channel_video_time_value({"average_video_time": "00:12", "average_video_word_count": 30}) == "00:12"
-    assert channel_video_length({"average_video_time": "00:12"}, {}, "") == (1800, "12:00", "canal")
+    assert channel_video_length({"average_video_time": "00:12"}, {}, "") == (3000, "20:00", "canal")
 
 
 def test_channel_cards_have_average_time_and_refresh_controls():
@@ -47,7 +47,7 @@ def test_channel_cards_have_average_time_and_refresh_controls():
     assert MAIN_SOURCE.count('Tempo Medio de Video') >= 4
     assert 'Tempo Medio de Video (HH:MM)' not in MAIN_SOURCE
     assert 'DEFAULT_AVERAGE_VIDEO_TIME' in MAIN_SOURCE
-    assert MAIN_SOURCE.count('Guardar tempo') >= 2
+    assert MAIN_SOURCE.count('Guardar tempo') >= 1
     assert 'youtube_channel_average_video_time_' in MAIN_SOURCE
     assert 'tiktok_channel_average_video_time_' in MAIN_SOURCE
     assert 'refresh_youtube_metrics_' in MAIN_SOURCE

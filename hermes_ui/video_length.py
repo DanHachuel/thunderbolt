@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 WORDS_PER_MINUTE = 150
-DEFAULT_AVERAGE_VIDEO_TIME = "12:00"
+DEFAULT_AVERAGE_VIDEO_TIME = "20:00"
 DEFAULT_TIKTOK_AVERAGE_VIDEO_TIME = "01:20"
 AVERAGE_VIDEO_TIME_KEY = "average_video_time"
 AVERAGE_VIDEO_WORD_COUNT_KEY = "average_video_word_count"

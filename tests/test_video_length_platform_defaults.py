@@ -7,11 +7,11 @@ from hermes_ui.video_length import (
 )
 
 
-def test_youtube_keeps_the_twelve_minute_default():
+def test_youtube_uses_the_twenty_minute_default():
     channel = {"platform": "youtube"}
-    assert default_average_video_time(channel) == DEFAULT_AVERAGE_VIDEO_TIME == "12:00"
-    assert channel_video_time_value(channel) == "12:00"
-    assert channel_video_length(channel)[1] == "12:00"
+    assert default_average_video_time(channel) == DEFAULT_AVERAGE_VIDEO_TIME == "20:00"
+    assert channel_video_time_value(channel) == "20:00"
+    assert channel_video_length(channel)[1] == "20:00"
 
 
 def test_tiktok_uses_one_minute_twenty_default_in_channel_and_automation_fallback():

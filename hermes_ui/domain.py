@@ -97,6 +97,12 @@ def create_channel(name: str, url: str = "", metadata: dict[str, Any] | None = N
     }
     if metadata:
         channel.update({k: v for k, v in metadata.items() if k in channel and k != "id"})
+    if str(channel.get("platform") or "").strip().casefold() == "youtube":
+        channel.setdefault("default_maximum_clip_duration", 5)
+        channel.setdefault("default_video_aspect_ratio", "Landscape 16:9")
+        channel.setdefault("default_enable_subtitles", True)
+        channel.setdefault("default_background_music_source", "Sem música")
+        channel.setdefault("average_video_time", "20:00")
     channels = read_json("channels.json", [])
     channels.append(channel)
     write_json("channels.json", channels)
@@ -208,10 +214,15 @@ def create_tasks_for_batch(batch: dict[str, Any]) -> list[dict[str, Any]]:
                     "default_subtitle_font_size": 60,
                     "default_subtitle_outline": "#000000",
                     "default_subtitle_outline_width": 1.5,
-                    "default_background_music_source": "Sem música",
-                    "default_background_music_volume": "20%",
+                "default_background_music_source": "Sem música",
+                "default_background_music_volume": "20%",
                 }.items()
             }
+            if str(channel.get("platform") or "").strip().casefold() == "youtube":
+                channel_generation_defaults.update({
+                    "maximum_clip_duration": channel.get("default_maximum_clip_duration", 5),
+                    "video_aspect_ratio": channel.get("default_video_aspect_ratio", "Landscape 16:9"),
+                })
             configured_generation_settings = options.get("generation_settings") if isinstance(options.get("generation_settings"), dict) else {}
             payload_generation_settings = payload.get("generation_settings") if isinstance(payload.get("generation_settings"), dict) else {}
             generation_settings = {**channel_generation_defaults, **configured_generation_settings, **payload_generation_settings}
@@ -519,6 +530,9 @@ def _refresh_task_channel_video_settings(task: dict[str, Any]) -> None:
     }
     for setting_name, (channel_key, default) in channel_defaults.items():
         generation_settings[setting_name] = channel.get(channel_key, default)
+    if str(channel.get("platform") or "").strip().casefold() == "youtube":
+        generation_settings["maximum_clip_duration"] = channel.get("default_maximum_clip_duration", 5)
+        generation_settings["video_aspect_ratio"] = channel.get("default_video_aspect_ratio", "Landscape 16:9")
     task["generation_settings"] = generation_settings
     task["voice"] = channel.get("default_voice") or channel.get("voice") or task.get("voice", "")
     task["thumbnail_blueprint_id"] = (

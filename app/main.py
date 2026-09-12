@@ -1578,7 +1578,7 @@ def render_channel_video_defaults(channel: dict) -> None:
     source = channel_video_source_value(channel.get("default_video_source") or channel.get("style_wide"))
     aspect_ratio = str(channel.get("default_video_aspect_ratio") or channel.get("video_aspect_ratio") or "Landscape 16:9")
     encoder = str(channel.get("default_video_encoder") or VIDEO_ENCODER_OPTIONS[0])
-    maximum_clip_duration = int(channel.get("default_maximum_clip_duration") or 10)
+    maximum_clip_duration = int(channel.get("default_maximum_clip_duration") or 5)
     videos_per_run = int(channel.get("default_videos_per_run") or 1)
     concatenation_mode = str(channel.get("default_video_concatenation_mode") or VIDEO_CONCATENATION_OPTIONS[0])
     transition_mode = str(channel.get("default_video_transition_mode") or VIDEO_TRANSITION_OPTIONS[0])
