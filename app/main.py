@@ -8811,7 +8811,7 @@ def render_settings():
             key=f"settings_{key}",
         )
 
-    api_keys_tab, upload_api_keys_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "API Keys Upload", "AI Influencers", "Teste de Voz"])
+    api_keys_tab, upload_api_keys_tab, subtitles_tab, ai_influencers_tab, voice_test_tab = render_localized_tabs(["API Keys", "API Keys Upload", "Legendas", "AI Influencers", "Teste de Voz"])
 
     with api_keys_tab:
         with st.container(border=True):
@@ -9191,6 +9191,68 @@ def render_settings():
                 write_json("settings.json", settings)
                 st.success("Postiz guardado.")
                 st.rerun()
+    with subtitles_tab:
+        st.subheader("Legendas")
+        st.caption("Escolha como o motor de vídeo gera as legendas. A configuração só é alterada quando clicar em guardar.")
+        st.markdown("### Os dois modos de geração")
+        st.markdown("O projecto oferece duas abordagens principais para criar as legendas:")
+        st.table([
+            {"Modo": "edge", "Velocidade": "Rápida", "Requisitos de Hardware": "Nenhum (roda em CPU)", "Qualidade": "Pode ser instável"},
+            {"Modo": "whisper", "Velocidade": "Lenta", "Requisitos de Hardware": "Alta (GPU recomendada)", "Qualidade": "Mais confiável"},
+        ])
+        subtitle_provider_options = ["edge", "whisper"]
+        current_subtitle_provider = str(settings.get("subtitle_provider") or "edge").strip().lower()
+        if current_subtitle_provider not in subtitle_provider_options:
+            current_subtitle_provider = "edge"
+        subtitle_provider = st.radio(
+            "Modo de geração",
+            subtitle_provider_options,
+            index=subtitle_provider_options.index(current_subtitle_provider),
+            format_func=lambda value: f"{value} — {'Rápida, CPU, pode ser instável' if value == 'edge' else 'Lenta, GPU recomendada, mais confiável'}",
+            horizontal=True,
+            key="subtitle_provider_ui",
+        )
+        st.caption("A escolha é feita alterando a propriedade `subtitle_provider` no `config.toml`.")
+        whisper_cols = st.columns(3)
+        with whisper_cols[0]:
+            whisper_model_size = st.selectbox(
+                "Modelo Whisper",
+                ["tiny", "base", "small", "medium", "large-v3"],
+                index=["tiny", "base", "small", "medium", "large-v3"].index(str(settings.get("whisper_model_size") or "large-v3")) if str(settings.get("whisper_model_size") or "large-v3") in ["tiny", "base", "small", "medium", "large-v3"] else 4,
+                key="subtitle_whisper_model_size",
+            )
+        with whisper_cols[1]:
+            whisper_device = st.selectbox(
+                "Dispositivo Whisper",
+                ["cpu", "cuda"],
+                index=["cpu", "cuda"].index(str(settings.get("whisper_device") or "cpu")) if str(settings.get("whisper_device") or "cpu") in ["cpu", "cuda"] else 0,
+                key="subtitle_whisper_device",
+            )
+        with whisper_cols[2]:
+            whisper_compute_type = st.selectbox(
+                "Tipo de cálculo Whisper",
+                ["int8", "float16", "float32"],
+                index=["int8", "float16", "float32"].index(str(settings.get("whisper_compute_type") or "int8")) if str(settings.get("whisper_compute_type") or "int8") in ["int8", "float16", "float32"] else 0,
+                key="subtitle_whisper_compute_type",
+            )
+        if st.button("Guardar configuração de legendas", type="primary", width="stretch", key="save_subtitle_settings"):
+            settings.update({
+                "subtitle_provider": subtitle_provider,
+                "whisper_model_size": whisper_model_size,
+                "whisper_device": whisper_device,
+                "whisper_compute_type": whisper_compute_type,
+            })
+            write_json("settings.json", settings)
+            subtitle_moneyprinter_path = str(settings.get("moneyprinter_path") or "").strip()
+            if subtitle_moneyprinter_path:
+                try:
+                    synced = sync_moneyprinter_config(settings, subtitle_moneyprinter_path)
+                    st.success(f"Configuração de legendas guardada{f' e sincronizada com {synced}' if synced else ''}.")
+                except Exception as exc:
+                    st.warning(f"Configuração de legendas guardada localmente, mas não foi possível sincronizar config.toml: {exc}")
+            else:
+                st.success("Configuração de legendas guardada localmente.")
+
     with ai_influencers_tab:
         st.subheader("AI Influencers")
         st.caption("Estado do backend usado por Personagens e Geração de Conteúdo IA. O selector e as credenciais são editados nesta aba, em Banco de Dados Influencers.")
