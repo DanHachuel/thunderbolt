@@ -160,6 +160,16 @@ def test_notifications_page_exposes_all_controls():
     assert "reconcile_persisted_notifications()" in source
 
 
+def test_notified_operations_are_inside_a_closed_expander():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "app" / "main.py").read_text(encoding="utf-8")
+    start = source.index('with st.expander("Operações notificadas", expanded=False):')
+    end = source.index('st.subheader("Histórico de notificações")', start)
+    block = source[start:end]
+    assert 'st.form("notification_preferences_form")' in block
+    assert 'st.form_submit_button("Guardar preferências"' in block
+
+
 def test_worker_and_music_storage_emit_completion_events(tmp_path):
     storage = _isolated_storage(tmp_path / "worker-music")
     from datetime import datetime

@@ -9524,26 +9524,27 @@ def render_notifications():
                 st.rerun()
 
         st.divider()
-        st.subheader("Operações notificadas")
-        st.caption("Ligue ou desligue cada tipo de notificação. As preferências ficam guardadas no storage local e aplicam-se às próximas conclusões.")
-        grouped: dict[str, list[dict[str, str]]] = {}
-        for event in catalog:
-            grouped.setdefault(event["category"], []).append(event)
-        with st.form("notification_preferences_form"):
-            pending_preferences: dict[str, bool] = {}
-            for category, events in grouped.items():
-                st.markdown(f"**{category}**")
-                for event in events:
-                    pending_preferences[event["code"]] = st.checkbox(
-                        event["label"],
-                        value=bool(preferences.get(event["code"], True)),
-                        help=event["description"],
-                        key=f"notification_preference_{event['code']}",
-                    )
-            if st.form_submit_button("Guardar preferências", type="primary", width="stretch"):
-                save_notification_preferences(pending_preferences)
-                st.success("Preferências de notificação guardadas.")
-                st.rerun()
+        with st.expander("Operações notificadas", expanded=False):
+            st.subheader("Operações notificadas")
+            st.caption("Ligue ou desligue cada tipo de notificação. As preferências ficam guardadas no storage local e aplicam-se às próximas conclusões.")
+            grouped: dict[str, list[dict[str, str]]] = {}
+            for event in catalog:
+                grouped.setdefault(event["category"], []).append(event)
+            with st.form("notification_preferences_form"):
+                pending_preferences: dict[str, bool] = {}
+                for category, events in grouped.items():
+                    st.markdown(f"**{category}**")
+                    for event in events:
+                        pending_preferences[event["code"]] = st.checkbox(
+                            event["label"],
+                            value=bool(preferences.get(event["code"], True)),
+                            help=event["description"],
+                            key=f"notification_preference_{event['code']}",
+                        )
+                if st.form_submit_button("Guardar preferências", type="primary", width="stretch"):
+                    save_notification_preferences(pending_preferences)
+                    st.success("Preferências de notificação guardadas.")
+                    st.rerun()
 
         st.divider()
         st.subheader("Histórico de notificações")
