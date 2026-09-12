@@ -5,6 +5,7 @@ import re
 import uuid
 import zipfile
 import unicodedata
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 import requests
@@ -12,7 +13,7 @@ import streamlit as st
 
 from hermes_ui.domain import create_channel, delete_channel, update_channel
 from hermes_ui.influencers import InfluencerBackendError, STANDALONE_CONTENT_INFLUENCER_ID, get_repository
-from hermes_ui.storage import read_json, write_json
+from hermes_ui.storage import STORAGE, TIKTOK_PROMPT_MASTERS, read_json, write_json
 from hermes_ui.countries import COUNTRY_OPTIONS
 from hermes_ui.languages import LANGUAGE_CODES, language_code, language_label
 from integrations.instagram_public import fetch_public_instagram_posts, fetch_public_instagram_profile, normalize_instagram_metric
@@ -30,6 +31,61 @@ def _metric(value: Any) -> str:
         return f"{int(value):,}".replace(",", ".")
     except (TypeError, ValueError):
         return _clean(value) or "—"
+
+
+INSTAGRAM_MODEL_OPTIONS = (
+    "Prompt-Masters Tiktok",
+    "Facebook Blueprint",
+    "Personagens Influencer/UGC",
+)
+
+
+def _instagram_model_options(settings: Mapping[str, Any], model_type: str) -> tuple[list[str], dict[str, str]]:
+    """Return the dependent model list for an Instagram account."""
+    if model_type == "Prompt-Masters Tiktok":
+        files = sorted(TIKTOK_PROMPT_MASTERS.glob("*.md")) if TIKTOK_PROMPT_MASTERS.is_dir() else []
+        values = [path.name for path in files]
+        return values, {path.name: path.stem for path in files}
+    if model_type == "Facebook Blueprint":
+        root = STORAGE / "facebook" / "blueprints"
+        files = sorted(root.glob("*.md")) if root.is_dir() else []
+        values = [path.name for path in files]
+        return values, {path.name: path.stem for path in files}
+    characters, _ = _characters(settings)
+    values = [_clean(item.get("id")) for item in characters if _clean(item.get("id"))]
+    return values, {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters if _clean(item.get("id"))}
+
+
+def resolve_instagram_model(profile: Mapping[str, Any], settings: Mapping[str, Any]) -> dict[str, str]:
+    """Resolve the model attached to an Instagram profile for automation."""
+    model_type = _clean(profile.get("instagram_model_type") or profile.get("model_type")) or INSTAGRAM_MODEL_OPTIONS[2]
+    if model_type not in INSTAGRAM_MODEL_OPTIONS:
+        model_type = INSTAGRAM_MODEL_OPTIONS[2]
+    model_id = _clean(profile.get("instagram_model_id") or profile.get("model_id"))
+    options, labels = _instagram_model_options(settings, model_type)
+    if model_id and model_id not in options:
+        model_id = ""
+    return {"type": model_type, "id": model_id, "label": labels.get(model_id, model_id or "Sem modelo seleccionado")}
+
+
+def _render_instagram_model_selector(profile: Mapping[str, Any], settings: Mapping[str, Any], *, key_prefix: str) -> tuple[str, str]:
+    current = resolve_instagram_model(profile, settings)
+    model_type = st.selectbox(
+        "Atrelar modelo",
+        list(INSTAGRAM_MODEL_OPTIONS),
+        index=list(INSTAGRAM_MODEL_OPTIONS).index(current["type"]),
+        key=f"{key_prefix}_model_type",
+        help="A conta pode usar Prompt-Masters Tiktok, Facebook Blueprint ou Personagens Influencer/UGC.",
+    )
+    options, labels = _instagram_model_options(settings, model_type)
+    model_id = st.selectbox(
+        "Modelo/Blueprint",
+        [""] + options,
+        index=options.index(current["id"]) + 1 if current["id"] in options else 0,
+        format_func=lambda value: "Sem modelo seleccionado" if not value else labels.get(value, value),
+        key=f"{key_prefix}_model_id",
+    )
+    return model_type, model_id
 
 
 def _profile_metric(profile: Mapping[str, Any], *keys: str) -> Any:
@@ -442,7 +498,7 @@ def _canonical_instagram_profile(data: Mapping[str, Any], existing: Mapping[str,
     return merged
 
 
-def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str, character_id: str = "") -> dict[str, Any]:
+def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str, character_id: str = "", instagram_model_type: str = "", instagram_model_id: str = "") -> dict[str, Any]:
     canonical = _canonical_instagram_profile(data)
     name = _clean(canonical.get("name")) or _clean(canonical.get("username")) or "Conta Instagram"
     url = _clean(canonical.get("url"))
@@ -463,6 +519,8 @@ def _save_public_profile(data: Mapping[str, Any], *, country: str, language: str
         "subscriber_count": metrics["subscriber_count"],
         "following_count": metrics["following_count"],
         "character_id": character_id.strip(),
+        "instagram_model_type": instagram_model_type.strip(),
+        "instagram_model_id": instagram_model_id.strip(),
         "active": True,
         "metrics_source": "instagram_public_page",
     }
@@ -601,6 +659,13 @@ def _render_instagram_card(profile: dict[str, Any], characters: list[dict[str, A
             update_channel(profile_id, {"character_id": selected_character})
             st.success("Personagem associado à conta Instagram.")
             st.rerun()
+        model_type, model_id = _render_instagram_model_selector(profile, settings, key_prefix=f"instagram_{profile_id}")
+        if st.button("Guardar modelo atrelado", type="primary", key=f"save_instagram_model_{profile_id}", width="stretch"):
+            update_channel(profile_id, {"instagram_model_type": model_type, "instagram_model_id": model_id})
+            st.success(f"{model_type} atrelado à conta Instagram.")
+            st.rerun()
+        resolved_model = resolve_instagram_model(profile, settings)
+        st.caption(f"Modelo da Automação Instagram: {resolved_model['type']} · {resolved_model['label']}")
         _render_instagram_posts(profile)
 
 
@@ -661,12 +726,13 @@ def render_social_networks(settings: dict[str, Any]) -> None:
                     character_options = [""] + [_clean(item.get("id")) for item in characters if _clean(item.get("id"))]
                     character_labels = {"": "Sem personagem associado"} | {_clean(item.get("id")): _clean(item.get("name")) or _clean(item.get("id")) for item in characters}
                     selected_character = st.selectbox("Personagem", character_options, format_func=lambda value: character_labels.get(value, value), key=f"social_instagram_result_character_{result_widget_id}")
+                    selected_model_type, selected_model_id = _render_instagram_model_selector(data, settings, key_prefix=f"social_instagram_result_{result_widget_id}")
                     save_profile = st.form_submit_button("Cadastrar conta Instagram", type="primary", width="stretch")
                 if save_profile:
                     profile_data = dict(data)
                     profile_data.update({"name": name, "bio": bio, "bio_raw": bio, "post_count": _metric_input(posts), "subscriber_count": _metric_input(followers), "following_count": _metric_input(following)})
                     profile_data["country"] = _normalise_country(country)
-                    _save_public_profile(profile_data, country=profile_data["country"], language=language, character_id=selected_character)
+                    _save_public_profile(profile_data, country=profile_data["country"], language=language, character_id=selected_character, instagram_model_type=selected_model_type, instagram_model_id=selected_model_id)
                     st.success("Conta Instagram cadastrada em Contas Instagram.")
                     for key in ("social_instagram_result", "social_instagram_ok", "social_instagram_message"):
                         st.session_state.pop(key, None)
@@ -678,3 +744,25 @@ def render_social_networks(settings: dict[str, Any]) -> None:
         characters, _ = _characters(settings)
         for profile in profiles:
             _render_instagram_card(profile, characters, settings)
+
+
+def render_instagram_automation(settings: dict[str, Any]) -> None:
+    """Show the Instagram automation model selected on each account."""
+    st.title("Automação Instagram")
+    st.caption("Cada geração de conteúdo Instagram usa o modelo atrelado à conta: Prompt-Masters Tiktok, Facebook Blueprint ou Personagens Influencer/UGC.")
+    profiles = _instagram_profiles()
+    if not profiles:
+        st.info("Ainda não existem contas Instagram cadastradas. Pode continuar a trabalhar e associar um modelo quando cadastrar uma conta.")
+        return
+    for profile in profiles:
+        profile_id = _clean(profile.get("id"))
+        resolved = resolve_instagram_model(profile, settings)
+        with st.container(border=True):
+            st.subheader(_clean(profile.get("name")) or "Conta Instagram")
+            st.caption(_clean(profile.get("handle")) or _clean(profile.get("url")) or "sem handle")
+            st.write(f"**Modelo usado na geração:** {resolved['type']}")
+            st.write(f"**Blueprint/modelo atrelado:** {resolved['label']}")
+            if not resolved["id"]:
+                st.warning("Nenhum modelo está atrelado. Escolha-o em Contas Instagram para activar a geração desta conta.")
+            else:
+                st.success("A automação utilizará este modelo para gerar o conteúdo da conta.")

@@ -95,7 +95,7 @@ from app.modules.token_optimizer.compressor import check_installation
 from app.modules.token_optimizer.config import DEFAULTS as TOKEN_OPTIMIZER_DEFAULTS
 from app.modules.token_optimizer.metrics import get_stats as get_token_optimizer_stats
 from app.influencers_ui import render_ai_influencer_characters, render_ai_influencer_content, render_ai_influencers_api_status, render_motion_control, render_ugc_products
-from app.social_networks_ui import render_meta_api_cards, render_social_networks
+from app.social_networks_ui import render_instagram_automation, render_meta_api_cards, render_social_networks
 from hermes_ui.blueprints import create_blueprint_from_link, list_branding_files, save_generated_blueprint
 from hermes_ui.thumbnail_blueprints import generate_thumbnail_blueprint, list_thumbnail_blueprint_documents, resolve_thumbnail_blueprint, save_thumbnail_blueprint, save_thumbnail_blueprint_pair, save_thumbnail_blueprint_pairs, thumbnail_blueprint_associations, thumbnail_blueprint_catalog, thumbnail_blueprint_for_blueprint, thumbnail_blueprint_for_channel
 from hermes_ui.metadata_cleaner import build_description, clean_video_metadata, list_edit_records, metadata_manifest, normalize_tags, save_edit_record, store_external_video
@@ -2159,6 +2159,31 @@ def render_youtube_brandings():
         except Exception as exc:
             with st.expander(f"Inválido — {path.stem}"):
                 st.error(str(exc))
+
+
+def render_facebook_blueprints():
+    root = STORAGE / "facebook" / "blueprints"
+    root.mkdir(parents=True, exist_ok=True)
+    st.title("Facebook Blueprint")
+    st.caption(f"Biblioteca de modelos para conteúdos Facebook e Instagram · armazenamento em `{root}`")
+    with st.form("facebook_blueprint_upload_form"):
+        uploaded = st.file_uploader("Adicionar Facebook Blueprint", type=["md"], key="facebook_blueprint_upload")
+        submitted = st.form_submit_button("Guardar Facebook Blueprint", type="primary")
+    if submitted:
+        if uploaded is None:
+            st.error("Seleccione um ficheiro Markdown antes de guardar.")
+        else:
+            target = root / Path(uploaded.name).name
+            target.write_bytes(uploaded.getvalue())
+            st.success(f"Facebook Blueprint guardado: {target.name}")
+            st.rerun()
+    files = sorted(root.glob("*.md"))
+    if not files:
+        st.info("Ainda não existem Facebook Blueprints. Adicione um ficheiro Markdown para o disponibilizar nas contas Instagram.")
+    for path in files:
+        with st.expander(path.stem, expanded=False):
+            st.caption(f"Ficheiro: `{path.name}`")
+            st.code(path.read_text(encoding="utf-8"), language="markdown")
 
 
 def render_thumbnail_blueprints():
@@ -10008,11 +10033,14 @@ def main():
         ("Canais Tiktok", ":material/music_video:", "Canais Tiktok"),
         ("Contas Instagram", ":material/share:", "Contas Instagram"),
         ("Facebook Pages", ":material/public:", "Facebook Pages"),
+        ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
+    ]
+    blueprint_items = [
         ("Blueprints Youtube", ":material/library_books:", "Blueprints Youtube"),
         ("Thumbnail Blueprints", ":material/image:", "Thumbnail Blueprints"),
         ("Brandings Youtube", ":material/brush:", "Brandings Youtube"),
-        ("Contas TikTok", ":material/account_circle:", "Contas TikTok"),
-        ("Prompt Masters", ":material/auto_awesome:", "Prompt Masters"),
+        ("Prompt-Masters Tiktok", ":material/auto_awesome:", "Prompt-Masters Tiktok"),
+        ("Facebook Blueprint", ":material/public:", "Facebook Blueprint"),
     ]
     music_items = [
         ("Criação de Músicas", ":material/music_note:", "Criação de Músicas"),
@@ -10055,6 +10083,7 @@ def main():
     automation_items = [
         ("Automação Youtube", ":material/schedule:", "Automação Youtube"),
         ("Automação Tiktok", ":material/schedule:", "Automação Tiktok"),
+        ("Automação Instagram", ":material/schedule:", "Automação Instagram"),
         ("Automação Facebook", ":material/schedule:", "Automação Facebook"),
         ("Automação Musicas", ":material/schedule:", "Automação Musicas"),
         ("Automação UGC", ":material/schedule:", "Automação UGC"),
@@ -10075,6 +10104,7 @@ def main():
         ("Pipeline Vídeos", ":material/account_tree:", "Pipeline Vídeos"),
         ("Pipeline Música", ":material/music_note:", "Pipeline Música"),
         ("AI Influencers", ":material/smart_toy:", "AI Influencers"),
+        ("Blueprints", ":material/library_books:", "Blueprints"),
         ("Edição", ":material/edit:", "Edição"),
         ("Growth", ":material/analytics:", "Growth"),
         ("Documentação", ":material/menu_book:", "Documentação"),
@@ -10085,6 +10115,7 @@ def main():
         "Niche Finder": niche_finder_items,
         "Pipeline Vídeos": pipeline_video_items,
         "AI Influencers": models_ai_items,
+        "Blueprints": blueprint_items,
         "Canais/Perfis (Vídeos)": channel_profile_items,
         "Pipeline Música": music_items,
         "Edição": edition_items,
@@ -10093,11 +10124,11 @@ def main():
         "Configurações": settings_items,
     }
     nav_paths = {
-        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok", "Automação Facebook": "/automacao/facebook", "Automação Musicas": "/automacao/musicas", "Automação UGC": "/automacao/ugc", "Automação Influencer Content": "/automacao/influencer-content", "Automação Bilibili": "/automacao/bilibili",
+        "Início": "/inicio", "Automação": "/automacao", "Automação Youtube": "/automacao/youtube", "Automação Tiktok": "/automacao/tiktok", "Automação Instagram": "/automacao/instagram", "Automação Facebook": "/automacao/facebook", "Automação Musicas": "/automacao/musicas", "Automação UGC": "/automacao/ugc", "Automação Influencer Content": "/automacao/influencer-content", "Automação Bilibili": "/automacao/bilibili",
         "Niche Finder": "/niche-finder", "Niche Finder Kaggle": "/niche-finder/kaggle", "Niche Finder Apify": "/niche-finder/apify",
         "Pipeline Vídeos": "/pipeline-videos", "Criação de Vídeos": "/pipeline-videos/criacao", "Criação de Shorts": "/pipeline-videos/shorts", "Backlog Vídeos": "/pipeline-videos/backlog", "Roteiros": "/pipeline-videos/roteiros", "Thumbnails": "/pipeline-videos/thumbnails", "Upload": "/pipeline-videos/upload", "Update Youtube Vídeos": "/pipeline-videos/update-youtube",
         "Pipeline Música": "/pipeline-musica", "Criação de Músicas": "/pipeline-musica/criacao", "Music Backlog": "/pipeline-musica/backlog", "Vozes Personalizadas": "/pipeline-musica/vozes-personalizadas", "Upload Música": "/pipeline-musica/upload",
-        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Contas Instagram": "/canais-perfis-videos/contas-instagram", "Facebook Pages": "/canais-perfis-videos/facebook-pages", "Blueprints Youtube": "/canais-perfis-videos/blueprints-youtube", "Thumbnail Blueprints": "/canais-perfis-videos/thumbnail-blueprints", "Brandings Youtube": "/canais-perfis-videos/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt Masters": "/canais-perfis-videos/prompt-masters",
+        "Canais/Perfis (Vídeos)": "/canais-perfis-videos", "Canais YouTube": "/canais-perfis-videos/canais-youtube", "Canais Tiktok": "/canais-perfis-videos/canais-tiktok", "Contas Instagram": "/canais-perfis-videos/contas-instagram", "Facebook Pages": "/canais-perfis-videos/facebook-pages", "Blueprints Youtube": "/blueprints/youtube", "Thumbnail Blueprints": "/blueprints/thumbnails", "Brandings Youtube": "/blueprints/brandings-youtube", "Contas TikTok": "/canais-perfis-videos/contas-tiktok", "Prompt-Masters Tiktok": "/blueprints/prompt-masters-tiktok", "Facebook Blueprint": "/blueprints/facebook",
         "AI Influencers": "/ai-influencers", "Personagens": "/ai-influencers/personagens", "Geração de Conteúdo IA": "/ai-influencers/geracao-conteudo", "Motion Control": "/ai-influencers/motion-control", "UGC Products": "/ai-influencers/ugc-products",
         "Edição": "/edicao", "Limpador de Metadados": "/edicao/limpador-metadados", "Cortes": "/edicao/cortes", "Editor Python": "/edicao/editor-python", "Download Mídia": "/edicao/download-midia",
         "Growth": "/growth", "Analista Growth Youtube": "/growth/youtube", "Analista Growth Tiktok": "/growth/tiktok", "Analista Growth Instagram": "/growth/instagram", "Analista Facebook Pages": "/growth/facebook-pages", "Analista Bilibili": "/growth/bilibili",
@@ -10114,10 +10145,10 @@ def main():
         "Música": "Pipeline Música",
         "Pipeline TikTok": "Canais/Perfis (Vídeos)",
         "Canais e Perfis de Vídeos": "Canais/Perfis (Vídeos)",
-        "Prompts Master": "Prompt Masters",
+        "Prompts Master": "Prompt-Masters Tiktok",
+        "Prompt Masters": "Prompt-Masters Tiktok",
         "Canais": "Canais YouTube",
         "Canais Youtube": "Canais YouTube",
-        "Blueprints": "Blueprints Youtube",
         "Configurações Técnicas": "Configuração API",
         "Models AI": "AI Influencers",
         "Contas Google/YouTube — canais em lote": "Configuração API",
@@ -10186,13 +10217,15 @@ def main():
         "Blueprints Youtube": render_blueprints,
         "Thumbnail Blueprints": render_thumbnail_blueprints,
         "Brandings Youtube": render_youtube_brandings,
-        "Prompt Masters": render_tiktok_prompt_masters,
+        "Prompt-Masters Tiktok": render_tiktok_prompt_masters,
+        "Facebook Blueprint": render_facebook_blueprints,
         "Canais YouTube": render_channels,
         "Canais Tiktok": render_tiktok_channels,
         "Contas TikTok": render_tiktok_accounts,
         "Facebook Pages": render_facebook_pages,
         "Automação Youtube": render_automation,
         "Automação Tiktok": render_tiktok_automation,
+        "Automação Instagram": lambda: render_instagram_automation(read_json("settings.json", {})),
         "Automação Facebook": render_facebook_automation,
         "Automação Musicas": lambda: None,
         "Automação UGC": lambda: None,
