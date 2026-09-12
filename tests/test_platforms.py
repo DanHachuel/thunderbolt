@@ -1,5 +1,7 @@
 import json
 
+import requests
+
 from integrations.platforms import TikTokAdapter, YouTubeAdapter, _extract_json_assignment, _parse_public_count
 
 
@@ -178,6 +180,35 @@ def test_fetch_channel_videos_public_caps_result_at_ten(monkeypatch):
 
     assert result.ok
     assert len(result.data["videos"]) == 10
+
+
+def test_fetch_channel_videos_public_falls_back_to_channel_page_when_rss_is_404(monkeypatch):
+    initial_data = {
+        "contents": {"videoRenderer": {
+            "videoId": "page-video-1",
+            "title": {"runs": [{"text": "Vídeo da página"}]},
+            "publishedTimeText": {"simpleText": "há 2 dias"},
+            "thumbnail": {"thumbnails": [{"url": "https://img.example/page-video-1.jpg"}]},
+        }}
+    }
+    page = f'<script>var ytInitialData = {json.dumps(initial_data, ensure_ascii=False)};</script>'
+
+    def get(url, **kwargs):
+        if "/feeds/videos.xml" in url:
+            return FakeResponse("", status_code=404)
+        return FakeResponse(page)
+
+    def raise_for_status(response):
+        if response.status_code >= 400:
+            raise requests.HTTPError(f"{response.status_code} error")
+
+    monkeypatch.setattr("integrations.platforms.requests.get", get)
+    monkeypatch.setattr(FakeResponse, "raise_for_status", raise_for_status)
+    result = YouTubeAdapter(settings={}).fetch_channel_videos_public({"youtube_channel_id": "UCVIDEOS404"}, limit=10)
+
+    assert result.ok
+    assert result.data["videos"][0]["youtube_video_id"] == "page-video-1"
+    assert result.data["videos"][0]["source"] == "youtube_public_page"
 
 
 def test_tiktok_adapter_reads_first_complete_api_card_before_legacy_credentials():

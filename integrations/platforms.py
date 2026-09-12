@@ -248,6 +248,45 @@ def _public_feed_data(channel_id: str, headers: dict[str, str]) -> dict[str, Any
         return {}
 
 
+def _public_page_videos(document: str, channel_id: str, limit: int) -> list[dict[str, Any]]:
+    """Extract public video cards from ytInitialData as an RSS fallback."""
+    initial_data = _extract_json_assignment(document, "ytInitialData") or {}
+    videos: list[dict[str, Any]] = []
+
+    def visit(value: Any) -> None:
+        if len(videos) >= limit:
+            return
+        if isinstance(value, dict):
+            renderer = value.get("videoRenderer")
+            if isinstance(renderer, dict):
+                video_id = str(renderer.get("videoId") or "").strip()
+                if video_id:
+                    title = _text_from_node(renderer.get("title")) or "Vídeo sem título"
+                    thumbnails = ((renderer.get("thumbnail") or {}).get("thumbnails") or [])
+                    thumbnail = str(thumbnails[-1].get("url", "")) if thumbnails and isinstance(thumbnails[-1], dict) else ""
+                    videos.append({
+                        "id": f"youtube_{video_id}",
+                        "youtube_video_id": video_id,
+                        "channel_id": channel_id,
+                        "title": title,
+                        "published_at": _text_from_node(renderer.get("publishedTimeText")),
+                        "updated_at": "",
+                        "url": f"https://www.youtube.com/watch?v={video_id}",
+                        "thumbnail_url": thumbnail,
+                        "source": "youtube_public_page",
+                        "status": "publicado",
+                    })
+                    return
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(initial_data)
+    return videos[:limit]
+
+
 def fetch_channel_videos_public(channel_ref: str | dict[str, Any], limit: int = 10) -> "IntegrationResult":
     """Fetch the latest public channel videos from YouTube's Atom feed without an API key."""
     if isinstance(channel_ref, dict):
@@ -281,6 +320,23 @@ def fetch_channel_videos_public(channel_ref: str | dict[str, Any], limit: int = 
         response.raise_for_status()
         root = ET.fromstring(response.text)
     except (requests.RequestException, ET.ParseError, ValueError) as exc:
+        for page_url in _public_page_candidates(f"https://www.youtube.com/channel/{channel_id}"):
+            try:
+                page_response = requests.get(
+                    page_url,
+                    headers={**headers, "Accept": "text/html,application/xhtml+xml"},
+                    timeout=12,
+                )
+                page_response.raise_for_status()
+            except requests.RequestException:
+                continue
+            fallback_videos = _public_page_videos(page_response.text or "", channel_id, max(1, min(10, int(limit or 10))))
+            if fallback_videos:
+                return IntegrationResult(
+                    True,
+                    f"{len(fallback_videos)} vídeo(s) público(s) carregado(s) pela página do canal sem API Key.",
+                    {"channel_id": channel_id, "videos": fallback_videos},
+                )
         return IntegrationResult(False, f"Não foi possível carregar os vídeos públicos do canal: {exc}", {"channel_id": channel_id, "videos": []})
     namespace = {
         "yt": "http://www.youtube.com/xml/schemas/2015",
