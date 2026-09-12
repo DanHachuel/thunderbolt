@@ -1572,6 +1572,84 @@ def render_channel_audio_subtitle_defaults(channel: dict) -> None:
             st.rerun()
 
 
+def render_channel_video_defaults(channel: dict) -> None:
+    """Render and persist the video defaults used by this channel."""
+    channel_id = str(channel.get("id") or "")
+    source = channel_video_source_value(channel.get("default_video_source") or channel.get("style_wide"))
+    aspect_ratio = str(channel.get("default_video_aspect_ratio") or channel.get("video_aspect_ratio") or "Landscape 16:9")
+    encoder = str(channel.get("default_video_encoder") or VIDEO_ENCODER_OPTIONS[0])
+    maximum_clip_duration = int(channel.get("default_maximum_clip_duration") or 10)
+    videos_per_run = int(channel.get("default_videos_per_run") or 1)
+    concatenation_mode = str(channel.get("default_video_concatenation_mode") or VIDEO_CONCATENATION_OPTIONS[0])
+    transition_mode = str(channel.get("default_video_transition_mode") or VIDEO_TRANSITION_OPTIONS[0])
+    with st.expander("Configurações de vídeo", expanded=False):
+        video_cols = st.columns(2)
+        with video_cols[0]:
+            selected_source = st.selectbox(
+                "Fonte do vídeo",
+                WIDE_STYLE_OPTIONS,
+                index=WIDE_STYLE_OPTIONS.index(source) if source in WIDE_STYLE_OPTIONS else 0,
+                key=f"channel_default_video_source_{channel_id}",
+            )
+            selected_aspect_ratio = st.selectbox(
+                "Proporção do vídeo",
+                CHANNEL_ASPECT_RATIO_OPTIONS,
+                index=CHANNEL_ASPECT_RATIO_OPTIONS.index(aspect_ratio) if aspect_ratio in CHANNEL_ASPECT_RATIO_OPTIONS else 0,
+                key=f"channel_default_video_aspect_ratio_{channel_id}",
+            )
+            selected_concatenation = st.selectbox(
+                "Video Concatenation Mode",
+                VIDEO_CONCATENATION_OPTIONS,
+                index=VIDEO_CONCATENATION_OPTIONS.index(concatenation_mode) if concatenation_mode in VIDEO_CONCATENATION_OPTIONS else 0,
+                key=f"channel_default_video_concatenation_{channel_id}",
+            )
+            selected_transition = st.selectbox(
+                "Video Transition Mode",
+                VIDEO_TRANSITION_OPTIONS,
+                index=VIDEO_TRANSITION_OPTIONS.index(transition_mode) if transition_mode in VIDEO_TRANSITION_OPTIONS else 0,
+                key=f"channel_default_video_transition_{channel_id}",
+            )
+        with video_cols[1]:
+            selected_maximum_clip_duration = st.selectbox(
+                "Maximum Clip Duration (seconds)",
+                [3, 5, 8, 10, 15],
+                index=[3, 5, 8, 10, 15].index(maximum_clip_duration) if maximum_clip_duration in [3, 5, 8, 10, 15] else 3,
+                key=f"channel_default_maximum_clip_duration_{channel_id}",
+            )
+            selected_videos_per_run = st.selectbox(
+                "Videos per Run",
+                list(range(1, 11)),
+                index=videos_per_run - 1 if 1 <= videos_per_run <= 10 else 0,
+                key=f"channel_default_videos_per_run_{channel_id}",
+            )
+            selected_encoder = st.selectbox(
+                "Video Encoder",
+                VIDEO_ENCODER_OPTIONS,
+                index=VIDEO_ENCODER_OPTIONS.index(encoder) if encoder in VIDEO_ENCODER_OPTIONS else 0,
+                key=f"channel_default_video_encoder_{channel_id}",
+            )
+            match_visuals = st.checkbox(
+                "Match Visuals to Script Order",
+                value=bool(channel.get("default_match_visuals_to_script_order", False)),
+                key=f"channel_default_match_visuals_{channel_id}",
+            )
+        if st.button("Guardar configurações de vídeo", type="primary", key=f"save_channel_video_defaults_{channel_id}", width="stretch"):
+            update_channel(channel_id, {
+                "default_video_source": channel_video_source_storage(selected_source),
+                "default_video_aspect_ratio": selected_aspect_ratio,
+                "default_video_concatenation_mode": selected_concatenation,
+                "default_video_transition_mode": selected_transition,
+                "default_maximum_clip_duration": int(selected_maximum_clip_duration),
+                "default_videos_per_run": int(selected_videos_per_run),
+                "default_video_encoder": selected_encoder,
+                "default_match_visuals_to_script_order": bool(match_visuals),
+                "style_wide": channel_video_source_storage(selected_source),
+                "video_aspect_ratio": selected_aspect_ratio,
+            })
+            st.success("Default de vídeo guardado para este canal.")
+            st.rerun()
+
+
 def render_channel_edit_form(channel: dict, youtube_account_ids: list[str], youtube_account_labels: dict[str, str], youtube_accounts_by_id: dict[str, dict[str, Any]]) -> None:
     channel_id = str(channel["id"])
     blueprint_ids, blueprint_labels, current_blueprint, voice_options, current_voice = channel_default_options(channel)
@@ -3409,17 +3487,34 @@ def render_channels():
                 delete_key = f"delete_pending_{channel_id}"
             with st.expander("Detalhes e configuração do canal", expanded=False):
                 calculated_time, calculated_source, calculated_words = _channel_average_video_time(channel)
-                average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
-                if st.button("Guardar tempo", key=f"save_youtube_channel_average_video_time_{channel_id}", width="stretch"):
-                    if not valid_hhmm(average_video_time):
-                        st.error("Use o formato MM:SS, por exemplo 12:00.")
-                    else:
-                        update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
-                        st.success("Tempo médio do canal YouTube guardado.")
-                        st.rerun()
+                with st.expander("Tempo Medio de Video", expanded=False):
+                    average_video_time = st.text_input("Tempo Medio de Video", value=channel_video_time_value(channel), key=f"youtube_channel_average_video_time_{channel_id}", help=f"Referência: {calculated_words or 0} palavras · {calculated_source}.")
+                    if st.button("Guardar Tempo Medio de Video", key=f"save_youtube_channel_average_video_time_{channel_id}", type="primary", width="stretch"):
+                        if not valid_hhmm(average_video_time):
+                            st.error("Use o formato MM:SS, por exemplo 12:00.")
+                        else:
+                            update_channel(channel_id, {"average_video_time": average_video_time.strip() or DEFAULT_AVERAGE_VIDEO_TIME, "average_video_word_count": words_from_channel_time(average_video_time)})
+                            st.success("Tempo médio do canal YouTube guardado.")
+                            st.rerun()
+                if st.session_state.get(edit_key):
+                    render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
+                else:
+                    summary = channel_blueprint_summary(channel)
+                    render_channel_thumbnail_blueprint_panel(channel, compact=True)
+                    channel_language = language_label(channel.get("language") or "pt")
+                    block_cols = st.columns(4, gap="small")
+                    with block_cols[0]:
+                        st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
+                    with block_cols[1]:
+                        st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
+                    with block_cols[2]:
+                        st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
+                    with block_cols[3]:
+                        st.markdown(f"**Idioma**\n\n{channel_language}")
+
                 action_cols = st.columns(2)
                 with action_cols[0]:
-                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", width="stretch"):
+                    if st.button("Editar", key=f"edit_channel_button_{channel_id}", type="primary", width="stretch"):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with action_cols[1]:
@@ -3442,31 +3537,6 @@ def render_channels():
                         if st.button("Cancelar", key=f"cancel_delete_{channel_id}"):
                             st.session_state.pop(delete_key, None)
                             st.rerun()
-                if st.session_state.get(edit_key):
-                    render_channel_edit_form(channel, youtube_account_ids, youtube_account_labels, youtube_accounts_by_id)
-                else:
-                    summary = channel_blueprint_summary(channel)
-                    render_channel_thumbnail_blueprint_panel(channel, compact=True)
-                    channel_language = language_label(channel.get("language") or "pt")
-                    block_cols = st.columns(4, gap="small")
-                    with block_cols[0]:
-                        st.markdown(f"**Blueprint Padrão**\n\n{summary['name']}")
-                        if st.button("Editar Blueprint", key=f"edit_prompts_{channel_id}", width="stretch"):
-                            st.session_state[edit_key] = True
-                            st.rerun()
-                    with block_cols[1]:
-                        st.markdown(f"**Nicho**\n\n{channel_niche_label(channel)}")
-                        if st.button("Editar Nicho", key=f"edit_niche_{channel_id}", width="stretch"):
-                            st.session_state[edit_key] = True
-                            st.rerun()
-                    with block_cols[2]:
-                        st.markdown(f"**Narrador/Voz Padrão**\n\n{summary['voice'] or 'Sem voz padrão'}")
-                        if st.button("Configurar Narrador/Voz", key=f"edit_voice_{channel_id}", width="stretch"):
-                            st.session_state[edit_key] = True
-                            st.rerun()
-                    with block_cols[3]:
-                        st.markdown(f"**Idioma**\n\n{channel_language}")
-
                 channel_account_ids = list(youtube_account_ids)
                 current_channel_account_id = str(channel.get("google_account_id", ""))
                 if current_channel_account_id and current_channel_account_id not in channel_account_ids:
@@ -3514,6 +3584,7 @@ def render_channels():
                         st.success("Conta Google e DELEGATED_SESSION_ID individual do canal guardados.")
                         st.rerun()
 
+                render_channel_video_defaults(channel)
                 render_channel_audio_subtitle_defaults(channel)
                 render_channel_videos(channel)
 
