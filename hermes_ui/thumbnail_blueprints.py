@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .provider_routing import route_llm_json
-from .storage import BLUEPRINTS, SEED_THUMBNAIL_BLUEPRINTS, atomic_write, list_blueprint_files, load_blueprint_file
+from .storage import BLUEPRINTS, SEED_BLUEPRINTS, SEED_THUMBNAIL_BLUEPRINTS, atomic_write, list_blueprint_files, load_blueprint_file
 
 HORIZONTAL_GENERIC_THUMBNAIL_BLUEPRINT_ID = "Youtube_Generic_Thumbnail_Blueprint"
 VERTICAL_GENERIC_THUMBNAIL_BLUEPRINT_ID = "Tiktok_Generic_Thumbnail_Blueprint"
@@ -72,7 +72,7 @@ def thumbnail_blueprint_for_channel(channel: Mapping[str, Any], format_value: An
     script_id = str(channel.get("default_blueprint_id") or channel.get("blueprint_id") or "").strip()
     pairs = _pair_state()
     return resolve_thumbnail_blueprint(
-        pairs.get(script_id, "") or _generic_thumbnail_blueprint_id(format_value, channel.get("platform"))
+        _paired_thumbnail_id(script_id, pairs) or _generic_thumbnail_blueprint_id(format_value, channel.get("platform"))
     )
 
 
@@ -118,6 +118,9 @@ def thumbnail_aspect_ratio_for_channel_task(
     if not selected and direct and direct not in generic_ids:
         selected = resolve_thumbnail_blueprint(direct)
     if selected.get("content") and direct not in generic_ids:
+        explicit_ratio = _explicit_blueprint_aspect_ratio(selected.get("content"))
+        if explicit_ratio:
+            return explicit_ratio
         return "9:16" if _contains_vertical_rules(selected.get("content")) else "16:9"
 
     platform = str(channel.get("platform") or task.get("platform") or "").strip().casefold()
@@ -130,21 +133,60 @@ def _contains_vertical_rules(value: Any) -> bool:
     return bool(re.search(r"\b9\s*:\s*16\b|\bvertical\b|\bportrait\b", str(value or ""), flags=re.IGNORECASE))
 
 
+def _explicit_blueprint_aspect_ratio(value: Any) -> str:
+    """Read the authoritative FORMAT/QUALITY ratio before contextual wording.
+
+    Finance and other landscape blueprints may mention a vertical third or
+    vertical positioning in their composition rules. Those words must not
+    override an explicit ``Aspect ratio: 16:9`` declaration.
+    """
+    content = str(value or "")
+    format_sections = re.findall(
+        r"(?is)(?:FORMAT\s*(?:&|AND)?\s*QUALITY|FORMATO\s*(?:E|&)\s*QUALIDADE)(.*?)(?=\n#{1,6}\s|\Z)",
+        content,
+    )
+    search_area = "\n".join(format_sections) if format_sections else content
+    ratio_match = re.search(r"\b(16\s*:\s*9|9\s*:\s*16)\b", search_area)
+    if not ratio_match:
+        return ""
+    return "16:9" if ratio_match.group(1).replace(" ", "") == "16:9" else "9:16"
+
+
+def _normalised_pair_key(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).strip()
+
+
+def _paired_thumbnail_id(blueprint_id: Any, pairs: Mapping[str, str]) -> str:
+    wanted = str(blueprint_id or "").strip()
+    if not wanted:
+        return ""
+    if wanted in pairs:
+        return str(pairs[wanted] or "")
+    wanted_key = _normalised_pair_key(wanted)
+    for key, value in pairs.items():
+        if _normalised_pair_key(key) == wanted_key:
+            return str(value or "")
+    return ""
+
+
 def thumbnail_blueprint_for_blueprint(blueprint_id: Any, format_value: Any = "") -> dict[str, Any]:
     """Resolve the visual pair for a script Blueprint, falling back to Generic."""
-    paired_id = _pair_state().get(str(blueprint_id or "").strip(), "")
+    paired_id = _paired_thumbnail_id(blueprint_id, _pair_state())
     if isinstance(paired_id, list):
         paired_id = paired_id[0] if paired_id else ""
     return resolve_thumbnail_blueprint(paired_id or _generic_thumbnail_blueprint_id(format_value))
 
 
 def _pair_state() -> dict[str, str]:
-    path = BLUEPRINTS / "thumbnail_blueprint_pairs.json"
-    try:
-        value = __import__("json").loads(path.read_text(encoding="utf-8"))
-        return {str(k): str(v) for k, v in value.items()} if isinstance(value, dict) else {}
-    except (OSError, ValueError, TypeError):
-        return {}
+    result: dict[str, str] = {}
+    for path in (SEED_BLUEPRINTS / "thumbnail_blueprint_pairs.json", BLUEPRINTS / "thumbnail_blueprint_pairs.json"):
+        try:
+            value = __import__("json").loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            continue
+        if isinstance(value, dict):
+            result.update({str(k): str(v) for k, v in value.items()})
+    return result
 
 
 def thumbnail_blueprint_associations() -> dict[str, str]:

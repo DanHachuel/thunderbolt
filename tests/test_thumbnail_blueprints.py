@@ -105,3 +105,30 @@ def test_channel_specific_thumbnail_blueprint_remains_authoritative(tmp_path: Pa
         ) == "9:16"
     finally:
         thumbnail_blueprints.BLUEPRINTS = original
+
+
+def test_finance_blueprints_use_finance_thumbnail_and_explicit_landscape_rules():
+    pairs = thumbnail_blueprints.thumbnail_blueprint_associations()
+    for identifier in (
+        "FINANCE USA", "FINANCE AUSTRALIA", "FINANCE BRAZIL", "FINANCE CANADA", "FINANCE FRANCE",
+        "FINANCE GERMANY", "FINANCE IRELAND", "FINANCE ISRAEL", "FINANCE ITALY", "FINANCE JAPAN",
+        "FINANCE MEXICO", "FINANCE POLONY", "FINANCE SOUTH AFRICA", "FINANCE SOUTH COREA",
+        "FINANCE SPAIN", "FINANCE UK",
+    ):
+        assert pairs[identifier] == "FINANCE_Thumbnail_Blueprint"
+    content = thumbnail_blueprints.resolve_thumbnail_blueprint("FINANCE_Thumbnail_Blueprint")["content"]
+    assert thumbnail_blueprints._explicit_blueprint_aspect_ratio(content) == "16:9"
+    assert thumbnail_blueprints.thumbnail_aspect_ratio_for_channel_task(
+        {"platform": "youtube"}, {"blueprint_id": "FINANCE USA"}, {"id": "FINANCE_Thumbnail_Blueprint", "content": content}
+    ) == "16:9"
+
+
+def test_finance_pair_lookup_accepts_separator_variants(tmp_path: Path):
+    original = thumbnail_blueprints.BLUEPRINTS
+    thumbnail_blueprints.BLUEPRINTS = tmp_path
+    try:
+        (tmp_path / "thumbnail_blueprint_pairs.json").write_text('{"FINANCE USA": "FINANCE_Thumbnail_Blueprint"}', encoding="utf-8")
+        result = thumbnail_blueprints.thumbnail_blueprint_for_channel({"blueprint_id": "finance_usa"})
+        assert result["id"] == "FINANCE_Thumbnail_Blueprint"
+    finally:
+        thumbnail_blueprints.BLUEPRINTS = original

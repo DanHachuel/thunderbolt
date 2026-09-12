@@ -39,12 +39,28 @@ def infer_thumbnail_aspect_ratio(
 ) -> str:
     """Resolve the requested thumbnail orientation without trusting provider defaults."""
     blueprint_content = str((blueprint or {}).get("content") or "")
+    explicit_ratio = _explicit_blueprint_aspect_ratio(blueprint_content)
+    if explicit_ratio:
+        return explicit_ratio
     source = f"{blueprint_content}\n{str(prompt or '')}"
     if re.search(r"\b9\s*:\s*16\b|\bvertical\b|\bportrait\b", source, flags=re.IGNORECASE):
         return "9:16"
     if re.search(r"\b16\s*:\s*9\b|\blandscape\b|\bwide\b", source, flags=re.IGNORECASE):
         return "16:9"
     return fallback if fallback in {"16:9", "9:16"} else DEFAULT_ASPECT_RATIO
+
+
+def _explicit_blueprint_aspect_ratio(value: Any) -> str:
+    content = str(value or "")
+    sections = re.findall(
+        r"(?is)(?:FORMAT\s*(?:&|AND)?\s*QUALITY|FORMATO\s*(?:E|&)\s*QUALIDADE)(.*?)(?=\n#{1,6}\s|\Z)",
+        content,
+    )
+    area = "\n".join(sections) if sections else content
+    match = re.search(r"\b(16\s*:\s*9|9\s*:\s*16)\b", area)
+    if not match:
+        return ""
+    return "16:9" if match.group(1).replace(" ", "") == "16:9" else "9:16"
 
 
 def normalize_thumbnail_bytes(image_bytes: bytes, aspect_ratio: str = DEFAULT_ASPECT_RATIO) -> bytes:
