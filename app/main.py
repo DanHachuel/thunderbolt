@@ -599,7 +599,6 @@ _CONTENT_TRANSLATED_STREAMLIT_METHODS = {
     "date_input", "number_input", "multiselect", "toggle", "select_slider", "expander", "tabs",
 }
 _OPTION_TRANSLATED_STREAMLIT_METHODS = {"selectbox", "radio", "multiselect", "select_slider", "tabs"}
-_STREAMLIT_I18N_INSTALLED = False
 
 
 def _translated_option_label(value: Any, selected_language: str, formatter: Any = None) -> str:
@@ -637,18 +636,21 @@ def _translate_streamlit_arguments(method_name: str, args: tuple[Any, ...], kwar
 
 def install_streamlit_content_translation() -> None:
     """Translate visible widget labels at render time while preserving stored option values."""
-    global _STREAMLIT_I18N_INSTALLED
-    if _STREAMLIT_I18N_INSTALLED:
+    if getattr(st, "_thunderbolt_i18n_installed", False):
         return
     for method_name in _CONTENT_TRANSLATED_STREAMLIT_METHODS:
-        original = getattr(st, method_name)
+        current = getattr(st, method_name)
+        if getattr(current, "_thunderbolt_translated", False):
+            continue
+        original = current
 
         def translated_method(*args: Any, __method_name: str = method_name, __original: Any = original, **kwargs: Any):
             translated_args, translated_kwargs = _translate_streamlit_arguments(__method_name, args, kwargs)
             return __original(*translated_args, **translated_kwargs)
 
+        translated_method._thunderbolt_translated = True
         setattr(st, method_name, translated_method)
-    _STREAMLIT_I18N_INSTALLED = True
+    setattr(st, "_thunderbolt_i18n_installed", True)
 
 
 install_streamlit_content_translation()
@@ -1408,12 +1410,14 @@ def render_video_generation_settings(
                     st.session_state[f"{prefix}_script_language"] = channel_language
                     st.session_state[channel_language_state_key] = channel_id
                 normalized_current_language = normalize_video_language(st.session_state.get(f"{prefix}_script_language") or normalized_current_language)
+            language_state_key = f"{prefix}_script_language"
+            if language_state_key not in st.session_state:
+                st.session_state[language_state_key] = normalized_current_language
             settings["script_language"] = st.selectbox(
                 "Script Language",
                 VIDEO_LANGUAGE_SELECTION_OPTIONS,
-                index=VIDEO_LANGUAGE_SELECTION_OPTIONS.index(normalized_current_language) if normalized_current_language in VIDEO_LANGUAGE_SELECTION_OPTIONS else 0,
                 format_func=video_language_label,
-                key=f"{prefix}_script_language",
+                key=language_state_key,
             )
         with subject_cols[1]:
             st.markdown("**Advanced Script Settings**")
@@ -1477,11 +1481,13 @@ def render_video_generation_settings(
                     configured_material_source = selected_material_source(read_json("settings.json", {}))
                     material_source_labels = {"pexels": "Pexels", "pixabay": "Pixabay"}
                     configured_material_label = material_source_labels.get(configured_material_source, "Pexels")
+                    material_state_key = f"{prefix}_material_source"
+                    if material_state_key not in st.session_state:
+                        st.session_state[material_state_key] = configured_material_label
                     settings["material_source"] = st.selectbox(
                         "Stock Material Source",
                         MATERIAL_SOURCE_OPTIONS,
-                        index=MATERIAL_SOURCE_OPTIONS.index(configured_material_label),
-                        key=f"{prefix}_material_source",
+                        key=material_state_key,
                     )
                 else:
                     settings["material_source"] = ""
@@ -1515,7 +1521,7 @@ def render_video_generation_settings(
                     aspect_options = ["Portrait 9:16", "Landscape 16:9", "Square 1:1"]
                     if f"{prefix}_video_aspect_ratio" not in st.session_state:
                         st.session_state[f"{prefix}_video_aspect_ratio"] = default_aspect_ratio
-                    settings["video_aspect_ratio"] = st.selectbox("Proporção do vídeo", aspect_options, index=aspect_options.index(st.session_state[f"{prefix}_video_aspect_ratio"]) if st.session_state[f"{prefix}_video_aspect_ratio"] in aspect_options else 0, key=f"{prefix}_video_aspect_ratio")
+                    settings["video_aspect_ratio"] = st.selectbox("Proporção do vídeo", aspect_options, key=f"{prefix}_video_aspect_ratio")
                     settings["maximum_clip_duration"] = st.selectbox("Maximum Clip Duration (seconds)", [3, 5, 8, 10, 15], key=f"{prefix}_maximum_clip_duration")
                     settings["videos_per_run"] = st.selectbox("Videos per Run", list(range(1, 11)), key=f"{prefix}_videos_per_run")
                     settings["video_encoder"] = st.selectbox("Video Encoder", VIDEO_ENCODER_OPTIONS, key=f"{prefix}_video_encoder")

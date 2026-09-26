@@ -72,4 +72,5 @@ def test_video_creation_and_scripts_use_language_options_constant():
     source = Path(__file__).parents[1].joinpath("app", "main.py").read_text(encoding="utf-8")
     assert '"Script Language"' in source
     assert "VIDEO_LANGUAGE_OPTIONS" in source
-    assert 'key=f"{prefix}_script_language"' in source
+    assert 'language_state_key = f"{prefix}_script_language"' in source
+    assert "key=language_state_key" in source
